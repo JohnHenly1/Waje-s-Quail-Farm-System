@@ -1,5 +1,9 @@
 <resources>
+    <!-- Header Nav -->
     <string name="app_name">Waje\'s Quail Farm</string>
+    <string name="analytic">Analytics</string>
+    <string name="schedule_dashboard">Schedule</string>
+    <string name="profile_dashboard">Profile</string>
 
     <!-- Dashboard strings -->
     <string name="menu">Menu</string>
@@ -23,7 +27,7 @@
     <string name="feed_remaining">Feed Remaining</string>
     <string name="feed_weight">450kg</string>
 
-    <!-- Bottom Navigation -->
+    <!-- Footer Nav -->
     <string name="home">Home</string>
     <string name="analytics">Analytics</string>
     <string name="schedule">Schedule</string>
