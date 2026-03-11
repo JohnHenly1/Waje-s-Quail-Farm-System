@@ -7,43 +7,48 @@
     android:layout_height="match_parent"
     android:background="@color/white">
 
-    <!-- Toolbar -->
+    <!-- Header -->
+
+    <!-- ScrollView for content -->
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/dark_green"
         android:minHeight="?attr/actionBarSize"
-        android:theme="?attr/actionBarTheme"
         android:paddingStart="16dp"
         android:paddingEnd="16dp"
+        android:theme="?attr/actionBarTheme"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.0"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintTop_toTopOf="parent">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
             android:gravity="center_vertical"
+            android:orientation="horizontal"
             android:paddingVertical="8dp">
 
             <ImageButton
                 android:id="@+id/imageButton"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:scaleType="centerInside"
                 android:contentDescription="@string/menu"
-                app:srcCompat="@drawable/lc_menu" />
+                android:scaleType="centerInside"
+                app:srcCompat="@drawable/ic_menu"
+                tools:ignore="TouchTargetSizeCheck" />
 
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:layout_marginStart="16dp"
+                android:layout_weight="1"
                 android:fontFamily="sans-serif"
                 android:text="@string/app_name"
+                android:gravity="center"
                 android:textColor="@color/white"
                 android:textSize="24sp"
                 android:textStyle="bold" />
@@ -53,13 +58,14 @@
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:scaleType="centerInside"
                 android:contentDescription="@string/notifications"
-                app:srcCompat="@drawable/ic_notifications" />
+                android:scaleType="centerInside"
+                app:srcCompat="@drawable/ic_notifications"
+                tools:ignore="TouchTargetSizeCheck" />
         </LinearLayout>
+        <!-- Header -->
     </androidx.appcompat.widget.Toolbar>
 
-    <!-- ScrollView for content -->
     <androidx.core.widget.NestedScrollView
         android:id="@+id/scrollView"
         android:layout_width="match_parent"
@@ -79,7 +85,7 @@
             android:paddingTop="16dp"
             android:paddingBottom="100dp">
 
-            <!-- Welcome Card -->
+            <!-- Welcome, Card -->
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -149,8 +155,9 @@
                                 android:layout_height="24dp"
                                 android:layout_gravity="center"
                                 android:scaleType="centerInside"
-                                android:tint="@color/yellow"
-                                app:srcCompat="@drawable/ic_lightbulb" />
+                                app:srcCompat="@drawable/ic_lightbulb"
+                                app:tint="@color/yellow"
+                                tools:ignore="ContentDescription" />
                         </FrameLayout>
 
                         <LinearLayout
@@ -214,8 +221,8 @@
                             android:layout_height="28dp"
                             android:layout_gravity="center"
                             android:scaleType="centerInside"
-                            android:tint="@color/white"
-                            app:srcCompat="@drawable/ic_shopping_bag" />
+                            app:srcCompat="@drawable/ic_shopping_bag"
+                            app:tint="@color/white" />
                     </FrameLayout>
 
                     <TextView
@@ -253,8 +260,8 @@
                             android:layout_height="28dp"
                             android:layout_gravity="center"
                             android:scaleType="centerInside"
-                            android:tint="@color/white"
-                            app:srcCompat="@drawable/ic_egg" />
+                            app:srcCompat="@drawable/ic_egg"
+                            app:tint="@color/white" />
                     </FrameLayout>
 
                     <TextView
@@ -292,8 +299,8 @@
                             android:layout_height="28dp"
                             android:layout_gravity="center"
                             android:scaleType="centerInside"
-                            android:tint="@color/white"
-                            app:srcCompat="@drawable/ic_file_text" />
+                            app:srcCompat="@drawable/ic_file_text"
+                            app:tint="@color/white" />
                     </FrameLayout>
 
                     <TextView
@@ -331,8 +338,8 @@
                             android:layout_height="28dp"
                             android:layout_gravity="center"
                             android:scaleType="centerInside"
-                            android:tint="@color/white"
-                            app:srcCompat="@drawable/ic_clipboard_list" />
+                            app:srcCompat="@drawable/ic_clipboard_list"
+                            app:tint="@color/white" />
                     </FrameLayout>
 
                     <TextView
@@ -447,7 +454,7 @@
         android:id="@+id/bottomNavContainer"
         android:layout_width="match_parent"
         android:layout_height="56dp"
-        android:background="@color/white"
+        android:background="@color/dark_green"
         android:orientation="horizontal"
         android:gravity="center"
         android:baselineAligned="false"
@@ -466,17 +473,17 @@
             android:contentDescription="@string/home">
 
             <ImageView
-                android:layout_width="24dp"
+                android:layout_width="22dp"
                 android:layout_height="24dp"
                 android:scaleType="centerInside"
-                android:tint="@color/dark_green"
-                app:srcCompat="@drawable/ic_home" />
+                app:srcCompat="@drawable/ic_home"
+                app:tint="@color/white" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/home"
-                android:textColor="@color/dark_green"
+                android:textColor="@color/white"
                 android:textSize="10sp"
                 android:layout_marginTop="2dp"
                 android:fontFamily="sans-serif" />
@@ -493,17 +500,43 @@
             android:contentDescription="@string/analytics">
 
             <ImageView
-                android:layout_width="24dp"
+                android:layout_width="22dp"
                 android:layout_height="24dp"
                 android:scaleType="centerInside"
-                android:tint="@color/dark_gray"
-                app:srcCompat="@drawable/ic_analytics" />
+                app:srcCompat="@drawable/ic_chart"
+                app:tint="@color/white" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/analytics"
-                android:textColor="@color/dark_gray"
+                android:textColor="@color/white"
+                android:textSize="10sp"
+                android:layout_marginTop="2dp"
+                android:fontFamily="sans-serif" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/CameraButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:contentDescription="@string/profile">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:scaleType="centerInside"
+                app:srcCompat="@drawable/ic_camera"
+                app:tint="@color/white" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="camera"
+                android:textColor="@color/white"
                 android:textSize="10sp"
                 android:layout_marginTop="2dp"
                 android:fontFamily="sans-serif" />
@@ -523,19 +556,20 @@
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:scaleType="centerInside"
-                android:tint="@color/dark_gray"
-                app:srcCompat="@drawable/ic_schedule" />
+                app:srcCompat="@drawable/ic_schedule"
+                app:tint="@color/white" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/schedule"
-                android:textColor="@color/dark_gray"
+                android:textColor="@color/white"
                 android:textSize="10sp"
                 android:layout_marginTop="2dp"
                 android:fontFamily="sans-serif" />
-        </LinearLayout>
 
+
+        </LinearLayout>
         <!-- Profile Button -->
         <LinearLayout
             android:id="@+id/profileButton"
@@ -550,18 +584,19 @@
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:scaleType="centerInside"
-                android:tint="@color/dark_gray"
-                app:srcCompat="@drawable/ic_profile" />
+                app:srcCompat="@drawable/ic_profile"
+                app:tint="@color/white" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/profile"
-                android:textColor="@color/dark_gray"
+                android:textColor="@color/white"
                 android:textSize="10sp"
                 android:layout_marginTop="2dp"
                 android:fontFamily="sans-serif" />
         </LinearLayout>
+
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

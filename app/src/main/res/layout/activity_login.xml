@@ -52,6 +52,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.494"
         app:layout_constraintStart_toStartOf="parent"
+        android:textColorHint="#996B8E23"
         app:layout_constraintTop_toBottomOf="@+id/editTextTextEmailAddress">
 
         <EditText
@@ -62,43 +63,58 @@
             android:ems="10"
             android:hint="Enter Password"
             android:inputType="textPassword"
-            android:padding="16dp"
-            android:textColorHint="#996B8E23" />
+            android:padding="16dp"/>
     </com.google.android.material.textfield.TextInputLayout>
 
-    <!-- Sign Up Button -->
+    <!-- Log In Button -->
+
+    <!-- Image View of The Logo-->
+
     <Button
         android:id="@+id/user_return_login"
         android:layout_width="wrap_content"
         android:layout_height="48dp"
         android:layout_marginTop="4dp"
         android:background="@android:color/transparent"
+        android:paddingHorizontal="16dp"
         android:text="Sign Up?"
         android:textColor="#466d1d"
         android:textSize="16sp"
         android:textStyle="bold"
-        android:paddingHorizontal="16dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.498"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/Login"
         app:layout_constraintVertical_bias="0.0" />
 
-    <!-- Log In Button -->
+    <Button
+        android:id="@+id/ForgotPassword"
+        android:layout_width="wrap_content"
+        android:layout_height="48dp"
+        android:background="@android:color/transparent"
+        android:paddingHorizontal="16dp"
+        android:text="Forgot Password?"
+        android:textColor="#466d1d"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.808"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/passwordInputLayout"
+        app:layout_constraintVertical_bias="0.01" />
+
     <Button
         android:id="@+id/Login"
         android:layout_width="320dp"
         android:layout_height="52dp"
-        android:layout_marginTop="8dp"
         android:backgroundTint="#466d1d"
         android:text="Log In"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.494"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/passwordInputLayout" />
+        app:layout_constraintTop_toBottomOf="@+id/ForgotPassword" />
 
-    <!-- Image View of The Logo-->
     <ImageView
         android:id="@+id/imageView"
         android:layout_width="130dp"
@@ -112,28 +128,30 @@
         app:layout_constraintVertical_bias="0.602" />
 
     <!-- Bush1 -->
+
+    <!-- Bush2 -->
+
     <ImageView
         android:id="@+id/desigbush"
         android:layout_width="287dp"
         android:layout_height="248dp"
-        android:layout_marginTop="124dp"
-        android:layout_marginEnd="184dp"
+        android:layout_marginTop="188dp"
+        android:layout_marginEnd="192dp"
         android:rotation="28"
         android:src="@drawable/design_bush"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/Login" />
+        app:layout_constraintTop_toBottomOf="@+id/passwordInputLayout" />
 
-    <!-- Bush2 -->
     <ImageView
         android:id="@+id/desigbush2"
         android:layout_width="285dp"
         android:layout_height="243dp"
-        android:layout_marginStart="208dp"
-        android:layout_marginTop="124dp"
+        android:layout_marginStart="196dp"
+        android:layout_marginTop="172dp"
         android:rotation="-15"
         android:src="@drawable/design_bush"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/Login" />
+        app:layout_constraintTop_toBottomOf="@+id/passwordInputLayout" />
 
 
 </androidx.constraintlayout.widget.ConstraintLayout>
