@@ -41,38 +41,43 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/textView" />
 
-    <!-- Enter Password-->
-    <EditText
-        android:id="@+id/user_passwordInput"
+    <!-- Enter Password with Visibility Toggle -->
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/passwordInputLayout"
         android:layout_width="320dp"
-        android:layout_height="52dp"
+        android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:background="@drawable/rounded_corner"
-        android:ems="10"
-        android:hint="Enter Password"
-        android:inputType="textPassword"
-        android:padding="16dp"
-        android:textColorHint="#996B8E23"
+        app:passwordToggleEnabled="true"
+        app:passwordToggleTint="#466d1d"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.494"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/editTextTextEmailAddress" />
+        app:layout_constraintTop_toBottomOf="@+id/editTextTextEmailAddress">
 
-    <!-- Sign up link -->
-    <EditText
+        <EditText
+            android:id="@+id/user_passwordInput"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:background="@drawable/rounded_corner"
+            android:ems="10"
+            android:hint="Enter Password"
+            android:inputType="textPassword"
+            android:padding="16dp"
+            android:textColorHint="#996B8E23" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <!-- Sign Up Button -->
+    <Button
         android:id="@+id/user_return_login"
-        android:layout_width="80dp"
+        android:layout_width="wrap_content"
         android:layout_height="48dp"
         android:layout_marginTop="4dp"
         android:background="@android:color/transparent"
-        android:backgroundTint="@android:color/transparent"
-        android:ems="10"
-        android:gravity="center"
-        android:inputType="text"
         android:text="Sign Up?"
         android:textColor="#466d1d"
         android:textSize="16sp"
         android:textStyle="bold"
+        android:paddingHorizontal="16dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.498"
@@ -91,7 +96,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.494"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/user_passwordInput" />
+        app:layout_constraintTop_toBottomOf="@+id/passwordInputLayout" />
 
     <!-- Image View of The Logo-->
     <ImageView
@@ -117,6 +122,7 @@
         android:src="@drawable/design_bush"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/Login" />
+
     <!-- Bush2 -->
     <ImageView
         android:id="@+id/desigbush2"

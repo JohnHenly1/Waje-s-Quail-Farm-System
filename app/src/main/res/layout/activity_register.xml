@@ -26,10 +26,26 @@
         app:layout_constraintTop_toTopOf="parent" />
 
     <EditText
+        android:id="@+id/editTextUsername"
+        android:layout_width="320dp"
+        android:layout_height="52dp"
+        android:layout_marginTop="200dp"
+        android:background="@drawable/rounded_corner"
+        android:ems="10"
+        android:hint="Enter Username"
+        android:inputType="text"
+        android:padding="16dp"
+        android:textColorHint="#996B8E23"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.494"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/textView" />
+
+    <EditText
         android:id="@+id/editTextTextEmailAddress"
         android:layout_width="320dp"
         android:layout_height="52dp"
-        android:layout_marginTop="264dp"
+        android:layout_marginTop="8dp"
         android:background="@drawable/rounded_corner"
         android:ems="10"
         android:hint="Enter Email"
@@ -39,25 +55,34 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.494"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toBottomOf="@+id/editTextUsername" />
 
-    <EditText
-        android:id="@+id/createpassword"
+    <!-- Create Password with Visibility Toggle -->
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/passwordInputLayout"
         android:layout_width="320dp"
-        android:layout_height="52dp"
+        android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:background="@drawable/rounded_corner"
-        android:ems="10"
-        android:hint="Create Password"
-        android:inputType="textEmailAddress"
-        android:padding="16dp"
-        android:textColorHint="#996B8E23"
+        app:passwordToggleEnabled="true"
+        app:passwordToggleTint="#466d1d"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.494"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/editTextTextEmailAddress"
-        app:layout_constraintVertical_bias="0.0" />
+        app:layout_constraintVertical_bias="0.0">
+
+        <EditText
+            android:id="@+id/createpassword"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:background="@drawable/rounded_corner"
+            android:ems="10"
+            android:hint="Create Password"
+            android:inputType="textPassword"
+            android:padding="16dp"
+            android:textColorHint="#996B8E23" />
+    </com.google.android.material.textfield.TextInputLayout>
 
     <ImageView
         android:id="@+id/farmlogo"
@@ -93,38 +118,44 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/Login" />
 
-    <EditText
-        android:id="@+id/confirmpassword"
+    <!-- Confirm Password with Visibility Toggle -->
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/confirmPasswordInputLayout"
         android:layout_width="320dp"
-        android:layout_height="52dp"
+        android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:background="@drawable/rounded_corner"
-        android:ems="10"
-        android:hint="Confirm Password"
-        android:inputType="textPassword"
-        android:padding="16dp"
-        android:textColorHint="#996B8E23"
+        app:passwordToggleEnabled="true"
+        app:passwordToggleTint="#466d1d"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.494"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/createpassword"
-        app:layout_constraintVertical_bias="0.0" />
+        app:layout_constraintTop_toBottomOf="@+id/passwordInputLayout"
+        app:layout_constraintVertical_bias="0.0">
 
-    <EditText
+        <EditText
+            android:id="@+id/confirmpassword"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:background="@drawable/rounded_corner"
+            android:ems="10"
+            android:hint="Confirm Password"
+            android:inputType="textPassword"
+            android:padding="16dp"
+            android:textColorHint="#996B8E23" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <Button
         android:id="@+id/user_return_login"
-        android:layout_width="150dp"
+        android:layout_width="wrap_content"
         android:layout_height="48dp"
         android:layout_marginTop="4dp"
         android:background="@android:color/transparent"
-        android:backgroundTint="@android:color/transparent"
-        android:ems="10"
-        android:gravity="center"
-        android:inputType="text"
         android:text="Return to login?"
         android:textColor="#466d1d"
         android:textSize="16sp"
         android:textStyle="bold"
+        android:paddingHorizontal="16dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.498"
@@ -143,7 +174,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.494"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/confirmpassword"
+        app:layout_constraintTop_toBottomOf="@+id/confirmPasswordInputLayout"
         app:layout_constraintVertical_bias="0.0" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

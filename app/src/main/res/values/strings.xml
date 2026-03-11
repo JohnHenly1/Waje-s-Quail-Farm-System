@@ -1,3 +1,41 @@
 <resources>
-    <string name="app_name">Exp1</string>
+    <string name="app_name">Waje\'s Quail Farm</string>
+
+    <!-- Dashboard strings -->
+    <string name="menu">Menu</string>
+    <string name="notifications">Notifications</string>
+    <string name="welcome_message">Hi, James!</string>
+    <string name="welcome_back">Welcome Back!</string>
+
+    <!-- AI Recommendation -->
+    <string name="ai_recommendation">AI Recommendation</string>
+    <string name="recommendation_text">Recommendation of things to do like watering quail or feeding quail</string>
+
+    <!-- Shortcuts -->
+    <string name="feed_inventory">Feed Inventory</string>
+    <string name="egg_count">Egg Count</string>
+    <string name="report">Report</string>
+    <string name="tasks">Tasks</string>
+
+    <!-- Quick Stats -->
+    <string name="total_eggs_today">Total Eggs Today</string>
+    <string name="eggs_count">1,248</string>
+    <string name="feed_remaining">Feed Remaining</string>
+    <string name="feed_weight">450kg</string>
+
+    <!-- Bottom Navigation -->
+    <string name="home">Home</string>
+    <string name="analytics">Analytics</string>
+    <string name="schedule">Schedule</string>
+    <string name="profile">Profile</string>
+
+    <!-- Alerts Screen -->
+    <string name="alerts_notifications">Alerts &amp; Notifications</string>
+    <string name="back">Back</string>
+    <string name="settings">Settings</string>
+    <string name="critical">Critical</string>
+    <string name="warnings">Warnings</string>
+    <string name="total">Total</string>
+    <string name="all_notifications">All Notifications</string>
+    <string name="mark_all_read">Mark All as Read</string>
 </resources>
