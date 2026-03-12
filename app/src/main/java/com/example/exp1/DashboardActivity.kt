@@ -29,10 +29,30 @@ class DashboardActivity : AppCompatActivity() {
         val username = intent.getStringExtra("username") ?: "User"
         updateWelcomeMessage(username)
 
+        // WITH THE FOOTER
         // Setup notification button
         setupNotificationButton()
+
+        // Setup schedule button
+        setupScheduleButton()
     }
 
+    // Footer elements setupScheduleButton, setupNotificationButton
+    // This connects to activity_schedule
+    private fun setupScheduleButton() {
+        try {
+            val scheduleButton = findViewById<ImageButton>(R.id.scheduleButton1)
+            scheduleButton?.setOnClickListener {
+                val intent = Intent(this, ScheduleActivity::class.java)
+                startActivity(intent)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+    }
+
+    // This connects to activity_alerts
     private fun setupNotificationButton() {
         try {
             val notificationButton = findViewById<ImageButton>(R.id.notificationButton)
@@ -45,6 +65,7 @@ class DashboardActivity : AppCompatActivity() {
         }
     }
 
+    //Card
     private fun updateWelcomeMessage(username: String) {
         try {
             // Try to find the welcome message TextView by scanning through the layout

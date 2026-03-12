@@ -4,6 +4,7 @@
     <string name="analytic">Analytics</string>
     <string name="schedule_dashboard">Schedule</string>
     <string name="profile_dashboard">Profile</string>
+    <string name="AddBtn">Add</string>
 
     <!-- Dashboard strings -->
     <string name="menu">Menu</string>

@@ -134,21 +134,21 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:background="@drawable/border_purple"
                     android:orientation="vertical"
-                    android:padding="24dp"
-                    android:background="@drawable/border_purple">
+                    android:padding="24dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical">
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
 
                         <FrameLayout
                             android:layout_width="48dp"
                             android:layout_height="48dp"
-                            android:background="@drawable/circle_dark_green"
-                            android:layout_marginEnd="12dp">
+                            android:layout_marginEnd="12dp"
+                            android:background="@drawable/circle_dark_green">
 
                             <ImageView
                                 android:layout_width="24dp"
@@ -169,21 +169,21 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
+                                android:fontFamily="sans-serif"
                                 android:text="@string/ai_recommendation"
                                 android:textColor="@color/black"
                                 android:textSize="16sp"
-                                android:textStyle="bold"
-                                android:fontFamily="sans-serif" />
+                                android:textStyle="bold" />
 
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="@string/recommendation_text"
-                                android:textColor="@color/dark_gray"
-                                android:textSize="13sp"
                                 android:layout_marginTop="8dp"
                                 android:fontFamily="sans-serif"
-                                android:lineSpacingExtra="4dp" />
+                                android:lineSpacingExtra="4dp"
+                                android:text="@string/recommendation_text"
+                                android:textColor="@color/dark_gray"
+                                android:textSize="13sp" />
                         </LinearLayout>
                     </LinearLayout>
                 </LinearLayout>
@@ -552,11 +552,14 @@
             android:gravity="center"
             android:contentDescription="@string/schedule">
 
-            <ImageView
+            <ImageButton
+                android:id="@+id/scheduleButton1"
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:scaleType="centerInside"
                 app:srcCompat="@drawable/ic_schedule"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                tools:ignore="TouchTargetSizeCheck"
                 app:tint="@color/white" />
 
             <TextView
