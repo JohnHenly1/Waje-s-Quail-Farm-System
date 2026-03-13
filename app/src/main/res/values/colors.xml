@@ -9,6 +9,8 @@
     <color name="gray">#888</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="dark_blue">#152238</color>
+
 
     <!-- Dashboard colors -->
     <color name="light_gray">#F5F5F5</color>

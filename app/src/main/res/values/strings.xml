@@ -43,4 +43,20 @@
     <string name="total">Total</string>
     <string name="all_notifications">All Notifications</string>
     <string name="mark_all_read">Mark All as Read</string>
+
+    <!-- Schedule Strings -->
+    <string name="Monday">Mon</string>
+    <string name="Tuesday">Tue</string>
+    <string name="Wednesday">Wed</string>
+    <string name="Thursday">Thu</string>
+    <string name="Friday">Fri</string>
+    <string name="Saturday">Sat</string>
+    <string name="Sunday">Sun</string>
+
+    <string name="textSchedule">Today\'s Schedule:</string>
+    <string name="task1">Morning\'s Feed</string>
+    <string name="textSchedule3">Schedule:</string>
+    <string name="distribute_quail_s_feed_at_this_time">Distribute Quail\'s Feed At this Time!</string>
+
+
 </resources>
