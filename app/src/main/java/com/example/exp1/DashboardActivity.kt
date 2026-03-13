@@ -69,7 +69,7 @@ class DashboardActivity : AppCompatActivity() {
     private fun updateWelcomeMessage(username: String) {
         try {
             // Try to find the welcome message TextView by scanning through the layout
-            val welcomeTextView = findTextViewWithText("Hi, James!")
+            val welcomeTextView = findTextViewWithText("Hi, User!")
             if (welcomeTextView != null) {
                 welcomeTextView.text = "Hi, $username!"
             }

@@ -24,9 +24,9 @@
 
     <!-- Quick Stats -->
     <string name="total_eggs_today">Total Eggs Today</string>
-    <string name="eggs_count">1,248</string>
+    <string name="eggs_count">0</string>
     <string name="feed_remaining">Feed Remaining</string>
-    <string name="feed_weight">450kg</string>
+    <string name="feed_weight">0</string>
 
     <!-- Footer Nav -->
     <string name="home">Home</string>
