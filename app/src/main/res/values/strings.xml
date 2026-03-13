@@ -9,7 +9,7 @@
     <!-- Dashboard strings -->
     <string name="menu">Menu</string>
     <string name="notifications">Notifications</string>
-    <string name="welcome_message">Hi, James!</string>
+    <string name="welcome_message">Hi, User!</string>
     <string name="welcome_back">Welcome Back!</string>
 
     <!-- AI Recommendation -->

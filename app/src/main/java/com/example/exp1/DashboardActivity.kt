@@ -2,7 +2,9 @@ package com.example.exp1
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
 import android.widget.ImageButton
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -35,6 +37,22 @@ class DashboardActivity : AppCompatActivity() {
 
         // Setup schedule button
         setupScheduleButton()
+
+        // Setup analytics button
+        setupAnalyticsButton()
+    }
+
+    // Setup analytics button navigation
+    private fun setupAnalyticsButton() {
+        try {
+            val analyticsButton = findViewById<LinearLayout>(R.id.analyticsButton)
+            analyticsButton?.setOnClickListener {
+                val intent = Intent(this, AnalyticsActivity::class.java)
+                startActivity(intent)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     // Footer elements setupScheduleButton, setupNotificationButton
@@ -100,6 +118,3 @@ class DashboardActivity : AppCompatActivity() {
         return null
     }
 }
-
-
-

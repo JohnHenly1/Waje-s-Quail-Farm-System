@@ -89,9 +89,9 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:background="null"
+                    android:background="@null"
                     android:onClick="previousMonthAction"
-                    android:text="<-"
+                    android:text="&lt;-"
                     android:textColor="@color/dark_green"
                     android:textSize="20sp"
                     android:textStyle="bold"/>
@@ -110,9 +110,9 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:background="null"
+                    android:background="@null"
                     android:onClick="nextMonthAction"
-                    android:text="->"
+                    android:text="-&gt;"
                     android:textColor="@color/dark_green"
                     android:textSize="20sp"
                     android:textStyle="bold" />
@@ -196,8 +196,8 @@
 
 
 
-      <!-- Footer -->
-      <LinearLayout
+    <!-- Bottom Navigation Bar -->
+    <LinearLayout
         android:id="@+id/bottomNavContainer"
         android:layout_width="match_parent"
         android:layout_height="56dp"
@@ -282,11 +282,11 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:fontFamily="sans-serif"
                 android:text="camera"
                 android:textColor="@color/white"
-                android:textSize="10sp" />
+                android:textSize="10sp"
+                android:layout_marginTop="2dp"
+                android:fontFamily="sans-serif" />
         </LinearLayout>
 
         <!-- Schedule Button -->
@@ -344,6 +344,6 @@
                 android:fontFamily="sans-serif" />
         </LinearLayout>
 
-     </LinearLayout>
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
