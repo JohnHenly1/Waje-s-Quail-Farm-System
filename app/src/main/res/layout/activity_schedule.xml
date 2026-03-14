@@ -135,21 +135,25 @@
                         android:background="@drawable/bg_day">
 
                         <TextView
+                            android:id="@+id/Monday"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/Monday"
                             android:textColor="@color/dark_green"
                             android:textSize="12sp"
                             android:paddingTop="8dp"/>
+
                         <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="6"
+                            android:id="@+id/day1"
+                            android:layout_width="match_parent"
+                            android:layout_height="30dp"
+                            android:gravity="center"
                             android:layout_marginTop="12dp"
-                            android:textSize="18sp"
-                            android:textStyle="bold"
+                            android:layout_marginBottom="10dp"
+                            android:text="6"
                             android:textColor="@color/dark_blue"
-                            android:layout_marginBottom="10dp"/>
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
                     </LinearLayout>
 
                     <LinearLayout
@@ -160,6 +164,7 @@
                         android:gravity="center"
                         android:background="@drawable/bg_day">
                         <TextView
+                            android:id="@+id/Tuesday"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/Tuesday"
@@ -167,8 +172,10 @@
                             android:textSize="12sp"
                             android:paddingTop="8dp"/>
                         <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
+                            android:id="@+id/day2"
+                            android:layout_width="match_parent"
+                            android:layout_height="30dp"
+                            android:gravity="center"
                             android:text="7"
                             android:layout_marginTop="12dp"
                             android:textSize="18sp"
@@ -185,6 +192,7 @@
                         android:gravity="center"
                         android:background="@drawable/bg_day">
                         <TextView
+                            android:id="@+id/Wednesday"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/Wednesday"
@@ -192,8 +200,10 @@
                             android:textSize="12sp"
                             android:paddingTop="8dp"/>
                         <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
+                            android:id="@+id/day3"
+                            android:layout_width="match_parent"
+                            android:layout_height="30dp"
+                            android:gravity="center"
                             android:text="8"
                             android:layout_marginTop="12dp"
                             android:textSize="18sp"
@@ -210,6 +220,7 @@
                         android:gravity="center"
                         android:background="@drawable/bg_day">
                         <TextView
+                            android:id="@+id/Thursday"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/Thursday"
@@ -217,8 +228,10 @@
                             android:textSize="12sp"
                             android:paddingTop="8dp"/>
                         <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
+                            android:id="@+id/day4"
+                            android:layout_width="match_parent"
+                            android:layout_height="30dp"
+                            android:gravity="center"
                             android:text="9"
                             android:layout_marginTop="12dp"
                             android:textSize="18sp"
@@ -235,6 +248,7 @@
                         android:gravity="center"
                         android:background="@drawable/bg_day">
                         <TextView
+                            android:id="@+id/Friday"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/Friday"
@@ -242,8 +256,10 @@
                             android:paddingTop="8dp"
                             android:textColor="@color/dark_green"/>
                         <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
+                            android:id="@+id/day5"
+                            android:layout_width="match_parent"
+                            android:layout_height="30dp"
+                            android:gravity="center"
                             android:text="10"
                             android:layout_marginTop="12dp"
                             android:textSize="18sp"
@@ -260,6 +276,7 @@
                         android:gravity="center"
                         android:background="@drawable/bg_day">
                         <TextView
+                            android:id="@+id/Saturday"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/Saturday"
@@ -267,8 +284,10 @@
                             android:paddingTop="8dp"
                             android:textColor="@color/dark_green"/>
                         <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
+                            android:id="@+id/day6"
+                            android:layout_width="match_parent"
+                            android:layout_height="30dp"
+                            android:gravity="center"
                             android:text="11"
                             android:layout_marginTop="12dp"
                             android:textSize="18sp"
@@ -285,6 +304,7 @@
                         android:gravity="center"
                         android:background="@drawable/bg_day">
                         <TextView
+                            android:id="@+id/Sunday"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/Sunday"
@@ -292,8 +312,10 @@
                             android:paddingTop="8dp"
                             android:textColor="@color/dark_green"/>
                         <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
+                            android:id="@+id/day7"
+                            android:layout_width="match_parent"
+                            android:layout_height="30dp"
+                            android:gravity="center"
                             android:text="13"
                             android:layout_marginTop="12dp"
                             android:textSize="18sp"
@@ -301,7 +323,6 @@
                             android:textColor="@color/dark_blue"
                             android:layout_marginBottom="10dp"/>
                     </LinearLayout>
-
                 </LinearLayout>
 
 
