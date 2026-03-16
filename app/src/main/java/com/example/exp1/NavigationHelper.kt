@@ -2,9 +2,15 @@ package com.example.exp1
 
 import android.app.Activity
 import android.content.Intent
-import android.graphics.Color
 import android.view.View
 import android.widget.LinearLayout
+import android.widget.TextView
+import androidx.core.view.GravityCompat
+import androidx.drawerlayout.widget.DrawerLayout
+import com.google.android.material.navigation.NavigationView
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 object NavigationHelper {
 
@@ -15,8 +21,9 @@ object NavigationHelper {
         val scheduleButton = activity.findViewById<LinearLayout>(R.id.scheduleButton)
         val profileButton = activity.findViewById<LinearLayout>(R.id.profileButton)
 
+        val username = activity.intent.getStringExtra("username")
+
         // Highlight current activity button
-        // Check both class name and local class name to be robust
         val activityName = activity.localClassName
         when {
             activityName.contains("DashboardActivity") || activity is DashboardActivity -> highlightButton(homeButton)
@@ -28,6 +35,7 @@ object NavigationHelper {
         homeButton?.setOnClickListener {
             if (activity !is DashboardActivity) {
                 val intent = Intent(activity, DashboardActivity::class.java)
+                intent.putExtra("username", username)
                 intent.flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
                 activity.startActivity(intent)
             }
@@ -36,6 +44,7 @@ object NavigationHelper {
         analyticsButton?.setOnClickListener {
             if (activity !is AnalyticsActivity) {
                 val intent = Intent(activity, AnalyticsActivity::class.java)
+                intent.putExtra("username", username)
                 intent.flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
                 activity.startActivity(intent)
             }
@@ -48,6 +57,7 @@ object NavigationHelper {
         scheduleButton?.setOnClickListener {
             if (activity !is ScheduleActivity) {
                 val intent = Intent(activity, ScheduleActivity::class.java)
+                intent.putExtra("username", username)
                 intent.flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
                 activity.startActivity(intent)
             }
@@ -56,9 +66,54 @@ object NavigationHelper {
         profileButton?.setOnClickListener {
             if (activity !is ProfileActivity) {
                 val intent = Intent(activity, ProfileActivity::class.java)
+                intent.putExtra("username", username)
                 intent.flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
                 activity.startActivity(intent)
             }
+        }
+    }
+
+    fun setupSideMenu(activity: Activity, drawerLayout: DrawerLayout) {
+        val navigationView = activity.findViewById<NavigationView>(R.id.sideMenu)
+        val username = activity.intent.getStringExtra("username") ?: "User"
+        
+        updateDrawerHeader(navigationView, username)
+        
+        navigationView?.setNavigationItemSelectedListener { menuItem ->
+            when (menuItem.itemId) {
+                R.id.nav_dashboard -> {
+                    if (activity !is DashboardActivity) {
+                        val intent = Intent(activity, DashboardActivity::class.java)
+                        intent.putExtra("username", username)
+                        activity.startActivity(intent)
+                    }
+                }
+                R.id.nav_settings -> {
+                    // Navigate to settings if it exists
+                }
+                R.id.nav_help -> {
+                    // Navigate to help
+                }
+                R.id.nav_logout -> {
+                    val intent = Intent(activity, MainActivity::class.java)
+                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    activity.startActivity(intent)
+                    activity.finish()
+                }
+            }
+            drawerLayout.closeDrawer(GravityCompat.START)
+            true
+        }
+    }
+
+    private fun updateDrawerHeader(navigationView: NavigationView?, username: String) {
+        val headerView = navigationView?.getHeaderView(0)
+        val userNameTextView = headerView?.findViewById<TextView>(R.id.userName)
+        val userInitialTextView = headerView?.findViewById<TextView>(R.id.userInitial)
+        
+        userNameTextView?.text = username
+        if (username.isNotEmpty()) {
+            userInitialTextView?.text = username[0].uppercaseChar().toString()
         }
     }
 
@@ -76,7 +131,6 @@ object NavigationHelper {
         button?.let {
             it.setBackgroundResource(R.drawable.nav_item_glow)
             it.alpha = 1.0f
-            // Slightly scale up for "glow" effect
             it.scaleX = 1.05f
             it.scaleY = 1.05f
         }

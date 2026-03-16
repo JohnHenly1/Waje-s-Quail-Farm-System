@@ -1,8 +1,8 @@
 package com.example.exp1;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.widget.ImageButton;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.activity.EdgeToEdge;
@@ -10,8 +10,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
-
-import org.w3c.dom.Text;
 
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
@@ -34,7 +32,13 @@ public class ScheduleActivity extends AppCompatActivity {
 
         ImageButton backBtn = findViewById(R.id.imageButton);
         if (backBtn != null) {
-            backBtn.setOnClickListener(v -> finish());
+            backBtn.setOnClickListener(v -> {
+                Intent intent = new Intent(ScheduleActivity.this, DashboardActivity.class);
+                intent.putExtra("username", getIntent().getStringExtra("username"));
+                intent.setFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+                startActivity(intent);
+                finish();
+            });
         }
 
         // Setup bottom navigation
