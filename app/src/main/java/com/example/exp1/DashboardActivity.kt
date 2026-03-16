@@ -2,21 +2,36 @@ package com.example.exp1
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.View
+import android.widget.Button
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.GravityCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.drawerlayout.widget.DrawerLayout
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 class DashboardActivity : AppCompatActivity() {
+
+    private lateinit var drawerLayout: DrawerLayout
+    private val handler = Handler(Looper.getMainLooper())
+    private lateinit var updateTimeRunnable: Runnable
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_dashboard)
         
+        drawerLayout = findViewById(R.id.drawerLayout)
+
         try {
             ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
                 val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -27,19 +42,57 @@ class DashboardActivity : AppCompatActivity() {
             e.printStackTrace()
         }
 
+        // Setup Menu Button to open Drawer
+        findViewById<ImageButton>(R.id.imageButton)?.setOnClickListener {
+            drawerLayout.openDrawer(GravityCompat.START)
+        }
+
+        // Setup Sign Out
+        findViewById<Button>(R.id.signOutButton)?.setOnClickListener {
+            val intent = Intent(this, MainActivity::class.java)
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            startActivity(intent)
+            finish()
+        }
+
+        // Setup Server Time Update
+        setupServerTime()
+
         // Get username from Intent and update welcome message
         val username = intent.getStringExtra("username") ?: "User"
         updateWelcomeMessage(username)
 
         // WITH THE FOOTER
+        // Setup bottom navigation
+        NavigationHelper.setupBottomNavigation(this)
+        
         // Setup notification button
-        setupNotificationButton()
+        NavigationHelper.setupNotificationButton(this)
 
         // Setup schedule button
         setupScheduleButton()
 
         // Setup analytics button
         setupAnalyticsButton()
+    }
+
+    private fun setupServerTime() {
+        val serverTimeText = findViewById<TextView>(R.id.serverTimeText)
+        val sdf = SimpleDateFormat("yyyy/MM/dd hh:mm:ss a", Locale.getDefault())
+        
+        updateTimeRunnable = object : Runnable {
+            override fun run() {
+                val currentTime = sdf.format(Calendar.getInstance().time)
+                serverTimeText?.text = currentTime
+                handler.postDelayed(this, 1000)
+            }
+        }
+        handler.post(updateTimeRunnable)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        handler.removeCallbacks(updateTimeRunnable)
     }
 
     // Setup analytics button navigation
@@ -70,26 +123,17 @@ class DashboardActivity : AppCompatActivity() {
 
     }
 
-    // This connects to activity_alerts
-    private fun setupNotificationButton() {
-        try {
-            val notificationButton = findViewById<ImageButton>(R.id.notificationButton)
-            notificationButton?.setOnClickListener {
-                val intent = Intent(this, AlertsActivity::class.java)
-                startActivity(intent)
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
     //Card
     private fun updateWelcomeMessage(username: String) {
         try {
             // Try to find the welcome message TextView by scanning through the layout
-            val welcomeTextView = findTextViewWithText("Hi, User!")
+            val welcomeTextView = findViewById<TextView>(R.id.welcome_text)
             if (welcomeTextView != null) {
                 welcomeTextView.text = "Hi, $username!"
+            } else {
+                // Fallback to recursive search if ID not found (though I added it in XML)
+                val foundView = findTextViewWithText("Hi, User!")
+                foundView?.text = "Hi, $username!"
             }
         } catch (e: Exception) {
             e.printStackTrace()

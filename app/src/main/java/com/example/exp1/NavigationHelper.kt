@@ -62,6 +62,16 @@ object NavigationHelper {
         }
     }
 
+    fun setupNotificationButton(activity: Activity) {
+        val notificationButton = activity.findViewById<View>(R.id.notificationButton)
+        notificationButton?.setOnClickListener {
+            if (activity !is AlertsActivity) {
+                val intent = Intent(activity, AlertsActivity::class.java)
+                activity.startActivity(intent)
+            }
+        }
+    }
+
     private fun highlightButton(button: LinearLayout?) {
         button?.let {
             it.setBackgroundResource(R.drawable.nav_item_glow)
