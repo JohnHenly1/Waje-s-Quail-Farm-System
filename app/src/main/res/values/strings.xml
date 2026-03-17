@@ -58,5 +58,28 @@
     <string name="textSchedule3">Schedule:</string>
     <string name="distribute_quail_s_feed_at_this_time">Distribute Quail\'s Feed At this Time!</string>
 
+    <!-- Profile Strings -->
+    <string name="manage_account">Manage your account</string>
+    <string name="user_initial">J</string>
+    <string name="user_name">James Anderson</string>
+    <string name="user_role">Farm Manager</string>
+    <string name="user_email">james@wajequailfarm.com</string>
+    <string name="total_birds">Total Birds</string>
+    <string name="total_birds_val">0</string>
+    <string name="active_cages">Active Cages</string>
+    <string name="active_cages_val">0</string>
+    <string name="days_running">Days Running</string>
+    <string name="days_running_val">0</string>
+    <string name="account_group">Account</string>
+    <string name="account_settings">Account Settings</string>
+    <string name="notification_preferences">Notification Preferences</string>
+    <string name="general_group">General</string>
+    <string name="language_region">Language &amp; Region</string>
+    <string name="privacy_security">Privacy &amp; Security</string>
+    <string name="help_support">Help &amp; Support</string>
+    <string name="log_out">Log Out</string>
+    <string name="version_info">Waje\'s Quail Farm Beta Ver.</string>
+    <string name="copyright">© 2026 All rights reserved</string>
+    <string name="camera">Camera</string>
 
 </resources>

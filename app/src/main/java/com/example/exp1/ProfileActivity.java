@@ -2,8 +2,7 @@ package com.example.exp1;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
+import android.view.View;
 import android.widget.ImageButton;
 import android.widget.TextView;
 import androidx.activity.EdgeToEdge;
@@ -11,14 +10,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.Locale;
 
 public class ProfileActivity extends AppCompatActivity {
-
-    private Handler handler = new Handler(Looper.getMainLooper());
-    private Runnable updateTimeRunnable;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,8 +25,24 @@ public class ProfileActivity extends AppCompatActivity {
             return insets;
         });
 
+        // Get user data
+        String username = getIntent().getStringExtra("username");
+        if (username != null && !username.isEmpty()) {
+            TextView userNameTv = findViewById(R.id.userName);
+            TextView profileInitialTv = findViewById(R.id.profileInitial);
+            userNameTv.setText(username);
+            profileInitialTv.setText(String.valueOf(username.charAt(0)).toUpperCase());
+
+            AccountManager accountManager = new AccountManager(this);
+            String email = accountManager.getEmail(username);
+            if (email != null) {
+                TextView userEmailTv = findViewById(R.id.userEmail);
+                userEmailTv.setText(email);
+            }
+        }
+
         // Setup Back Button to Dashboard
-        ImageButton backButton = findViewById(R.id.imageButton);
+        ImageButton backButton = findViewById(R.id.backButton);
         if (backButton != null) {
             backButton.setOnClickListener(v -> {
                 Intent intent = new Intent(ProfileActivity.this, DashboardActivity.class);
@@ -44,9 +53,18 @@ public class ProfileActivity extends AppCompatActivity {
             });
         }
 
+        // Setup Logout Button
+        View logoutButton = findViewById(R.id.logoutButton);
+        if (logoutButton != null) {
+            logoutButton.setOnClickListener(v -> {
+                Intent intent = new Intent(ProfileActivity.this, MainActivity.class);
+                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                startActivity(intent);
+                finish();
+            });
+        }
+
         // Setup bottom navigation
         NavigationHelper.INSTANCE.setupBottomNavigation(this);
-        // Setup notification button
-        NavigationHelper.INSTANCE.setupNotificationButton(this);
     }
 }

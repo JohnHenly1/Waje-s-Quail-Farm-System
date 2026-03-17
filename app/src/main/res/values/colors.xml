@@ -3,6 +3,8 @@
 
     <!-- Main colors -->
     <color name="dark_green">#2D5016</color>
+    <color name="header_dark_green">#1a3a0f</color>
+    <color name="card_green_light">#3d6b1f</color>
     <color name="purple">#800080</color>
 
     <!-- Miscellaneous colors -->
@@ -10,7 +12,6 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="dark_blue">#152238</color>
-
 
     <!-- Dashboard colors -->
     <color name="light_gray">#F5F5F5</color>
@@ -21,5 +22,25 @@
     <color name="orange_border">#FFE0B2</color>
     <color name="orange">#E87722</color>
     <color name="yellow">#FFD700</color>
+
+    <!-- Profile colors -->
+    <color name="text_blue_600">#2563eb</color>
+    <color name="bg_blue_100">#dbeafe</color>
+    <color name="text_purple_600">#9333ea</color>
+    <color name="bg_purple_100">#f3e8ff</color>
+    <color name="text_green_600">#16a34a</color>
+    <color name="bg_green_100">#dcfce7</color>
+    <color name="text_orange_600">#ea580c</color>
+    <color name="bg_orange_100">#ffedd5</color>
+    <color name="text_cyan_600">#0891b2</color>
+    <color name="bg_cyan_100">#cffafe</color>
+    <color name="logout_red">#dc2626</color>
+    <color name="logout_red_bg">#fef2f2</color>
+    <color name="stats_blue_start">#3b82f6</color>
+    <color name="stats_blue_end">#4f46e5</color>
+    <color name="stats_green_start">#22c55e</color>
+    <color name="stats_green_end">#059669</color>
+    <color name="stats_orange_start">#fbbf24</color>
+    <color name="stats_orange_end">#f97316</color>
 
 </resources>
