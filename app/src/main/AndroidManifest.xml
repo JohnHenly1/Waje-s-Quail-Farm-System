@@ -38,6 +38,12 @@
         <activity
             android:name=".ProfileActivity"
             android:exported="true"/>
+        <activity
+            android:name=".FeedInventoryActivity"
+            android:exported="true"/>
+        <activity
+            android:name=".EggCountActivity"
+            android:exported="true"/>
     </application>
 
 </manifest>

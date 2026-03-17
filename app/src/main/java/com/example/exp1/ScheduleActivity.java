@@ -2,6 +2,7 @@ package com.example.exp1;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.view.View;
 import android.widget.ImageButton;
 import android.widget.TextView;
 
@@ -29,7 +30,6 @@ public class ScheduleActivity extends AppCompatActivity {
             return insets;
         });
 
-
         ImageButton backBtn = findViewById(R.id.imageButton);
         if (backBtn != null) {
             backBtn.setOnClickListener(v -> {
@@ -44,18 +44,14 @@ public class ScheduleActivity extends AppCompatActivity {
         // Setup bottom navigation
         NavigationHelper.INSTANCE.setupBottomNavigation(this);
 
-        //calendar
+        // Calendar setup
         TextView monthText = findViewById(R.id.month);
-
-        //Upd month and add year beside the month so it will be like March 2026
-        Calendar calendar = Calendar.getInstance();
+        Calendar today = Calendar.getInstance();
         SimpleDateFormat monthFormat = new SimpleDateFormat("MMMM yyyy", Locale.getDefault());
+        monthText.setText(monthFormat.format(today.getTime()));
 
-        String currentMonth = monthFormat.format(calendar.getTime());
-        monthText.setText(currentMonth);
-
-       // array of days
-        TextView[] days = {
+        // Array of TextViews for day numbers (aligned with Monday-Sunday labels in layout)
+        TextView[] dayTextViews = {
                 findViewById(R.id.day1),
                 findViewById(R.id.day2),
                 findViewById(R.id.day3),
@@ -65,23 +61,38 @@ public class ScheduleActivity extends AppCompatActivity {
                 findViewById(R.id.day7)
         };
 
+        // Align calendar to the Monday of the current week
+        Calendar calendar = (Calendar) today.clone();
+        int dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK);
+        // Calculate days to subtract to reach Monday (Monday is 2, Sunday is 1 in Calendar)
+        int daysToSubtract = (dayOfWeek - Calendar.MONDAY + 7) % 7;
+        calendar.add(Calendar.DAY_OF_MONTH, -daysToSubtract);
 
-        // get today's date
-        int today = calendar.get(Calendar.DAY_OF_MONTH);
-
-        // fill the 7 days
-        for(int i = 0; i < 7; i++){
-
+        // Fill the 7 days of the week and highlight the current day
+        for (int i = 0; i < 7; i++) {
             int dayNumber = calendar.get(Calendar.DAY_OF_MONTH);
-            days[i].setText(String.valueOf(dayNumber));
+            dayTextViews[i].setText(String.valueOf(dayNumber));
 
-            // highlight today
-            if(dayNumber == today){
-                days[i].setBackgroundResource(R.drawable.bg_dayselected);
+            // Get the parent LinearLayout of the day TextView to apply the background
+            View dayContainer = (View) dayTextViews[i].getParent();
+
+            // Highlight the container if this calendar day is actually today
+            if (isSameDay(calendar, today)) {
+                dayContainer.setBackgroundResource(R.drawable.bg_dayselected);
+            } else {
+                dayContainer.setBackgroundResource(R.drawable.bg_day);
             }
 
+            // Move to the next day
             calendar.add(Calendar.DAY_OF_MONTH, 1);
         }
+    }
 
+    /**
+     * Checks if two Calendar instances represent the same day.
+     */
+    private boolean isSameDay(Calendar cal1, Calendar cal2) {
+        return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
+                cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR);
     }
 }

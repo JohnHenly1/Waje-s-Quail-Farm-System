@@ -61,6 +61,7 @@ class DashboardActivity : AppCompatActivity() {
         // Setup other buttons
         setupScheduleButton()
         setupAnalyticsButton()
+        setupShortcuts()
     }
 
     private fun setupServerTime() {
@@ -92,6 +93,32 @@ class DashboardActivity : AppCompatActivity() {
 
     private fun setupScheduleButton() {
         findViewById<android.widget.ImageButton>(R.id.scheduleButton1)?.setOnClickListener {
+            val intent = Intent(this, ScheduleActivity::class.java)
+            intent.putExtra("username", intent.getStringExtra("username"))
+            startActivity(intent)
+        }
+    }
+
+    private fun setupShortcuts() {
+        findViewById<android.view.View>(R.id.feedInventoryButton)?.setOnClickListener {
+            val intent = Intent(this, FeedInventoryActivity::class.java)
+            intent.putExtra("username", intent.getStringExtra("username"))
+            startActivity(intent)
+        }
+
+        findViewById<android.view.View>(R.id.eggCountButton)?.setOnClickListener {
+            val intent = Intent(this, EggCountActivity::class.java)
+            intent.putExtra("username", intent.getStringExtra("username"))
+            startActivity(intent)
+        }
+
+        findViewById<android.view.View>(R.id.reportButton)?.setOnClickListener {
+            val intent = Intent(this, AnalyticsActivity::class.java)
+            intent.putExtra("username", intent.getStringExtra("username"))
+            startActivity(intent)
+        }
+
+        findViewById<android.view.View>(R.id.tasksButton)?.setOnClickListener {
             val intent = Intent(this, ScheduleActivity::class.java)
             intent.putExtra("username", intent.getStringExtra("username"))
             startActivity(intent)

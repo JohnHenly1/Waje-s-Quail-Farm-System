@@ -10,10 +10,10 @@
         android:title="Settings" />
     <item
         android:id="@+id/nav_help"
-        android:icon="@drawable/ic_info"
+        android:icon="@drawable/ic_help_circle"
         android:title="Help" />
     <item
         android:id="@+id/nav_logout"
-        android:icon="@drawable/ic_alert_circle"
+        android:icon="@drawable/lc_logout"
         android:title="Logout" />
 </menu>

@@ -264,7 +264,7 @@
                                 android:layout_height="28dp"
                                 android:layout_gravity="center"
                                 android:scaleType="centerInside"
-                                app:srcCompat="@drawable/ic_egg"
+                                app:srcCompat="@drawable/lc_egg"
                                 app:tint="@color/white" />
                         </FrameLayout>
 
