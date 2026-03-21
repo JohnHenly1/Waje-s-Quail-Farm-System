@@ -21,6 +21,8 @@ object NavigationHelper {
         val scheduleButton = activity.findViewById<LinearLayout>(R.id.scheduleButton)
         val profileButton = activity.findViewById<LinearLayout>(R.id.profileButton)
 
+        // Try to get username from intent, or fallback to a global constant/pref if needed
+        // For now, ensure it's passed between all activities
         val username = activity.intent.getStringExtra("username")
 
         // Highlight current activity button
@@ -119,9 +121,11 @@ object NavigationHelper {
 
     fun setupNotificationButton(activity: Activity) {
         val notificationButton = activity.findViewById<View>(R.id.notificationButton)
+        val username = activity.intent.getStringExtra("username")
         notificationButton?.setOnClickListener {
             if (activity !is AlertsActivity) {
                 val intent = Intent(activity, AlertsActivity::class.java)
+                intent.putExtra("username", username)
                 activity.startActivity(intent)
             }
         }

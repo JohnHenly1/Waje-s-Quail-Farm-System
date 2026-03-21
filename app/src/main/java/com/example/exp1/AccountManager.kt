@@ -40,7 +40,11 @@ class AccountManager(context: Context) {
         }
         
         val storedPassword = sharedPreferences.getString("${username}_password", "")
-        return storedPassword == password
+        val isValid = storedPassword == password
+        if (isValid) {
+            saveCurrentSession(username)
+        }
+        return isValid
     }
 
     fun validateLoginByEmail(email: String, password: String): Boolean {
@@ -55,6 +59,17 @@ class AccountManager(context: Context) {
     fun getUsernameByEmail(email: String): String? {
         return sharedPreferences.getString("email_$email", null)
     }
+
+    // Session Management
+    fun saveCurrentSession(username: String) {
+        sharedPreferences.edit().putString("current_user_session", username).apply()
+    }
+
+    fun getCurrentUsername(): String? {
+        return sharedPreferences.getString("current_user_session", null)
+    }
+
+    fun clearSession() {
+        sharedPreferences.edit().remove("current_user_session").apply()
+    }
 }
-
-

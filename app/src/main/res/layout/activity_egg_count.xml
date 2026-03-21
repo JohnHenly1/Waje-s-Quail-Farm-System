@@ -52,9 +52,16 @@
                 android:textSize="24sp"
                 android:textStyle="bold" />
 
-            <View
-                android:layout_width="40dp"
-                android:layout_height="40dp" />
+            <ImageButton
+                android:id="@+id/refreshButton"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Refresh"
+                android:scaleType="centerInside"
+                app:srcCompat="@android:drawable/stat_notify_sync"
+                app:tint="@color/white"
+                tools:ignore="TouchTargetSizeCheck" />
         </LinearLayout>
     </androidx.appcompat.widget.Toolbar>
 
@@ -270,15 +277,50 @@
                 </androidx.cardview.widget.CardView>
             </GridLayout>
 
-            <!-- Daily Log -->
-            <TextView
-                android:layout_width="wrap_content"
+            <!-- Collection History Header with Toggle -->
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:gravity="center_vertical"
                 android:layout_marginBottom="12dp"
-                android:text="Collection History"
-                android:textColor="@color/black"
-                android:textSize="18sp"
-                android:textStyle="bold" />
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Collection History"
+                    android:textColor="@color/black"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <ImageButton
+                    android:id="@+id/prevWeekBtn"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    app:srcCompat="@drawable/ic_arrow_back"
+                    app:tint="@color/dark_green" />
+
+                <TextView
+                    android:id="@+id/weekRangeTxt"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="8dp"
+                    android:text="This Week"
+                    android:textColor="@color/dark_gray"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <ImageButton
+                    android:id="@+id/nextWeekBtn"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    app:srcCompat="@drawable/ic_arrow_forward"
+                    app:tint="@color/dark_green" />
+
+            </LinearLayout>
 
             <LinearLayout
                 android:id="@+id/collectionLogList"

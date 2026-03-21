@@ -1,7 +1,9 @@
 package com.example.exp1
 
 import android.os.Bundle
-import android.widget.ImageButton
+import android.view.LayoutInflater
+import android.view.View
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
@@ -10,43 +12,78 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 
 class AlertsActivity : AppCompatActivity() {
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_alerts)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-            insets
+
+        try {
+            ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
+                val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+                v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+                insets
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
 
-        setupUI()
-    }
-
-    private fun setupUI() {
-        // Back button
-        findViewById<ImageButton>(R.id.backButton)?.setOnClickListener {
+        findViewById<View>(R.id.backButton).setOnClickListener {
             finish()
         }
 
-        // Settings button
-        findViewById<ImageButton>(R.id.settingsButton)?.setOnClickListener {
-            Toast.makeText(this, "Settings clicked", Toast.LENGTH_SHORT).show()
+        findViewById<View>(R.id.clearAllButton).setOnClickListener {
+            GlobalData.clearAlerts()
+            updateAlertsList()
+            Toast.makeText(this, "All alerts cleared", Toast.LENGTH_SHORT).show()
         }
 
-        // Update counts (set to 0 since no data yet)
-        val criticalCount = 0
-        val warningCount = 0
-        val totalCount = 0
+        findViewById<View>(R.id.markAllReadBtn).setOnClickListener {
+            GlobalData.markAllAsRead()
+            updateAlertsList()
+            Toast.makeText(this, "All alerts marked as read", Toast.LENGTH_SHORT).show()
+        }
 
-        findViewById<TextView>(R.id.criticalCount)?.text = criticalCount.toString()
-        findViewById<TextView>(R.id.warningCount)?.text = warningCount.toString()
-        findViewById<TextView>(R.id.totalCount)?.text = totalCount.toString()
+        updateAlertsList()
+        NavigationHelper.setupBottomNavigation(this)
+    }
 
-        // Mark all as read button
-        findViewById<android.widget.Button>(R.id.markAllReadButton)?.setOnClickListener {
-            Toast.makeText(this, "All notifications marked as read", Toast.LENGTH_SHORT).show()
+    private fun updateAlertsList() {
+        val container = findViewById<LinearLayout>(R.id.alertsContainer)
+        container.removeAllViews()
+        val inflater = LayoutInflater.from(this)
+
+        val alerts = GlobalData.getAlerts()
+
+        // Update counters
+        findViewById<TextView>(R.id.totalCount).text = alerts.size.toString()
+        findViewById<TextView>(R.id.criticalCount).text = alerts.count { it.type == "Critical" }.toString()
+        findViewById<TextView>(R.id.warningCount).text = alerts.count { it.type == "Inventory" }.toString()
+
+        if (alerts.isEmpty()) {
+            val emptyTxt = TextView(this)
+            emptyTxt.text = "No alerts available"
+            emptyTxt.textAlignment = View.TEXT_ALIGNMENT_CENTER
+            emptyTxt.setPadding(32, 64, 32, 32)
+            container.addView(emptyTxt)
+        } else {
+            for (alert in alerts) {
+                val itemView = inflater.inflate(R.layout.item_inventory_history, container, false)
+                val actionTxt = itemView.findViewById<TextView>(R.id.historyAction)
+                val dateTxt = itemView.findViewById<TextView>(R.id.historyDate)
+                val icon = itemView.findViewById<View>(R.id.historyIcon)
+
+                actionTxt.text = alert.message
+                dateTxt.text = alert.timestamp
+
+                // Dim the alert if it's already read
+                if (alert.isRead) {
+                    itemView.alpha = 0.5f
+                } else {
+                    itemView.alpha = 1.0f
+                }
+
+                container.addView(itemView)
+            }
         }
     }
 }

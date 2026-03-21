@@ -39,12 +39,23 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginStart="16dp"
-            android:text="@string/alerts_notifications"
+            android:text="Alerts &amp; Notifications"
             android:textColor="@color/white"
             android:gravity="center"
             android:textSize="18sp"
             android:textStyle="bold"
             android:fontFamily="sans-serif" />
+
+        <!-- Mark All Read Button -->
+        <ImageButton
+            android:id="@+id/markAllReadBtn"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:scaleType="centerInside"
+            android:contentDescription="Mark All Read"
+            app:srcCompat="@drawable/ic_check_circle"
+            app:tint="@color/white" />
 
         <!-- Settings Button -->
         <ImageButton
@@ -53,7 +64,7 @@
             android:layout_height="40dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:scaleType="centerInside"
-            android:contentDescription="@string/settings"
+            android:contentDescription="Settings"
             app:srcCompat="@drawable/ic_settings"
             app:tint="@color/white" />
     </LinearLayout>
@@ -111,7 +122,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/critical"
+                        android:text="Critical"
                         android:textColor="@color/white"
                         android:textSize="11sp"
                         android:layout_marginTop="4dp"
@@ -145,7 +156,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/warnings"
+                        android:text="Inventory"
                         android:textColor="@color/white"
                         android:textSize="11sp"
                         android:layout_marginTop="4dp"
@@ -178,7 +189,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/total"
+                        android:text="Total"
                         android:textColor="@color/white"
                         android:textSize="11sp"
                         android:layout_marginTop="4dp"
@@ -186,12 +197,19 @@
                 </LinearLayout>
             </GridLayout>
 
-            <!-- Mark All as Read Button -->
+            <LinearLayout
+                android:id="@+id/alertsContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <!-- Clear All Button -->
             <Button
-                android:id="@+id/markAllReadButton"
+                android:id="@+id/clearAllButton"
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
-                android:text="@string/mark_all_read"
+                android:layout_marginTop="16dp"
+                android:text="Clear All Alerts"
                 android:textColor="@color/white"
                 android:textSize="16sp"
                 android:textStyle="bold"

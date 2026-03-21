@@ -25,15 +25,20 @@ public class ProfileActivity extends AppCompatActivity {
             return insets;
         });
 
-        // Get user data
+        // Get user data from intent or session
+        AccountManager accountManager = new AccountManager(this);
         String username = getIntent().getStringExtra("username");
+        
+        if (username == null || username.isEmpty()) {
+            username = accountManager.getCurrentUsername();
+        }
+
         if (username != null && !username.isEmpty()) {
             TextView userNameTv = findViewById(R.id.userName);
             TextView profileInitialTv = findViewById(R.id.profileInitial);
             userNameTv.setText(username);
             profileInitialTv.setText(String.valueOf(username.charAt(0)).toUpperCase());
 
-            AccountManager accountManager = new AccountManager(this);
             String email = accountManager.getEmail(username);
             if (email != null) {
                 TextView userEmailTv = findViewById(R.id.userEmail);
@@ -44,9 +49,10 @@ public class ProfileActivity extends AppCompatActivity {
         // Setup Back Button to Dashboard
         ImageButton backButton = findViewById(R.id.backButton);
         if (backButton != null) {
+            final String finalUsername = username;
             backButton.setOnClickListener(v -> {
                 Intent intent = new Intent(ProfileActivity.this, DashboardActivity.class);
-                intent.putExtra("username", getIntent().getStringExtra("username"));
+                intent.putExtra("username", finalUsername);
                 intent.setFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
                 startActivity(intent);
                 finish();
@@ -57,6 +63,7 @@ public class ProfileActivity extends AppCompatActivity {
         View logoutButton = findViewById(R.id.logoutButton);
         if (logoutButton != null) {
             logoutButton.setOnClickListener(v -> {
+                accountManager.clearSession();
                 Intent intent = new Intent(ProfileActivity.this, MainActivity.class);
                 intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                 startActivity(intent);
