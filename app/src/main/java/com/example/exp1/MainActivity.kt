@@ -15,6 +15,19 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        accountManager = AccountManager(this)
+        
+        // Persistent Login Check: If a session exists, skip login and go to Dashboard
+        val savedUsername = accountManager.getCurrentUsername()
+        if (savedUsername != null) {
+            val intent = Intent(this, DashboardActivity::class.java)
+            intent.putExtra("username", savedUsername)
+            startActivity(intent)
+            finish()
+            return
+        }
+
         enableEdgeToEdge()
         setContentView(R.layout.activity_login)
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
@@ -23,7 +36,6 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
-        accountManager = AccountManager(this)
         setupClickListeners()
     }
 
@@ -60,6 +72,7 @@ class MainActivity : AppCompatActivity() {
                         val intent = Intent(this, DashboardActivity::class.java)
                         intent.putExtra("username", username)
                         startActivity(intent)
+                        finish() // Prevent returning to login screen
                     }
                 }
             }

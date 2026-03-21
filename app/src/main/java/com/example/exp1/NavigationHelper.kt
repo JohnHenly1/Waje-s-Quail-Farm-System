@@ -22,7 +22,6 @@ object NavigationHelper {
         val profileButton = activity.findViewById<LinearLayout>(R.id.profileButton)
 
         // Try to get username from intent, or fallback to a global constant/pref if needed
-        // For now, ensure it's passed between all activities
         val username = activity.intent.getStringExtra("username")
 
         // Highlight current activity button
@@ -77,9 +76,14 @@ object NavigationHelper {
 
     fun setupSideMenu(activity: Activity, drawerLayout: DrawerLayout) {
         val navigationView = activity.findViewById<NavigationView>(R.id.sideMenu)
-        val username = activity.intent.getStringExtra("username") ?: "User"
         
-        updateDrawerHeader(navigationView, username)
+        val accountManager = AccountManager(activity)
+        var username = activity.intent.getStringExtra("username")
+        if (username == null || username.isEmpty()) {
+            username = accountManager.getCurrentUsername()
+        }
+        
+        updateDrawerHeader(navigationView, username ?: "User")
         
         navigationView?.setNavigationItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
@@ -97,6 +101,9 @@ object NavigationHelper {
                     // Navigate to help
                 }
                 R.id.nav_logout -> {
+                    // Clear the session before logging out
+                    accountManager.clearSession()
+
                     val intent = Intent(activity, MainActivity::class.java)
                     intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                     activity.startActivity(intent)

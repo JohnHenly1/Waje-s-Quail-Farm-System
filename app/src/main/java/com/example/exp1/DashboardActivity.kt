@@ -1,11 +1,14 @@
 package com.example.exp1
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
@@ -21,6 +24,7 @@ class DashboardActivity : AppCompatActivity() {
     private lateinit var drawerLayout: DrawerLayout
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var updateTimeRunnable: Runnable
+    private var doubleBackToExitPressedOnce = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,6 +42,21 @@ class DashboardActivity : AppCompatActivity() {
         } catch (e: Exception) {
             e.printStackTrace()
         }
+
+        // Setup double back to exit
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (doubleBackToExitPressedOnce) {
+                    finishAffinity()
+                    return
+                }
+
+                doubleBackToExitPressedOnce = true
+                Toast.makeText(this@DashboardActivity, "Please click BACK again to exit", Toast.LENGTH_SHORT).show()
+
+                handler.postDelayed({ doubleBackToExitPressedOnce = false }, 2000)
+            }
+        })
 
         // Setup side menu (header, navigation, and opening button)
         NavigationHelper.setupSideMenu(this, drawerLayout)
@@ -62,6 +81,15 @@ class DashboardActivity : AppCompatActivity() {
         setupScheduleButton()
         setupAnalyticsButton()
         setupShortcuts()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateFarmStats()
+    }
+
+    private fun updateFarmStats() {
+        // Here you could update dashboard stats if they existed in the XML
     }
 
     private fun setupServerTime() {
