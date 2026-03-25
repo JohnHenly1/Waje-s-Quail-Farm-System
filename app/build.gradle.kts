@@ -23,11 +23,11 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.exp1"
+        applicationId = "com.wajequailfarm.qa"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0"
+        versionName = "beta"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

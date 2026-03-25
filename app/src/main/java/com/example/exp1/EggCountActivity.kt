@@ -5,10 +5,14 @@ import android.view.LayoutInflater
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 class EggCountActivity : AppCompatActivity() {
 
@@ -20,13 +24,9 @@ class EggCountActivity : AppCompatActivity() {
         val total: Int
     )
 
-    private val dailyLog = listOf(
-        CollectionEntry("Mar 10, 2026", 420, 180, 50, 650),
-        CollectionEntry("Mar 9, 2026", 398, 195, 55, 648),
-        CollectionEntry("Mar 8, 2026", 410, 170, 48, 628),
-        CollectionEntry("Mar 7, 2026", 385, 188, 62, 635),
-        CollectionEntry("Mar 6, 2026", 405, 192, 53, 650)
-    )
+    // Current offset in weeks (0 = this week, -1 = last week, etc.)
+    private var weekOffset = 0
+    private val sdf = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,12 +47,34 @@ class EggCountActivity : AppCompatActivity() {
             finish()
         }
 
+        findViewById<View>(R.id.refreshButton).setOnClickListener {
+            refreshData()
+        }
+
+        findViewById<View>(R.id.prevWeekBtn).setOnClickListener {
+            weekOffset--
+            setupUI()
+        }
+
+        findViewById<View>(R.id.nextWeekBtn).setOnClickListener {
+            if (weekOffset < 0) {
+                weekOffset++
+                setupUI()
+            }
+        }
+
         setupUI()
         NavigationHelper.setupBottomNavigation(this)
     }
 
+    private fun refreshData() {
+        Toast.makeText(this, "Checking for hardware updates...", Toast.LENGTH_SHORT).show()
+        // Here you would eventually trigger the YOLO algorithm / Database sync
+        setupUI() 
+    }
+
     private fun setupUI() {
-        // Since you requested to remove values/set to 0 for now
+        // Reset Today's Values to 0
         findViewById<TextView>(R.id.todayTotalValue).text = "0"
         findViewById<TextView>(R.id.gradeAValue).text = "0"
         findViewById<TextView>(R.id.gradeBValue).text = "0"
@@ -61,13 +83,35 @@ class EggCountActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.gradeBPercent).text = "0%"
         findViewById<TextView>(R.id.gradeCPercent).text = "0%"
 
-        // We can still show the log structure but with empty or 0 data if preferred.
+        updateWeekRangeText()
+        setupCollectionLog()
+    }
+
+    private fun updateWeekRangeText() {
+        val weekRangeTxt = findViewById<TextView>(R.id.weekRangeTxt)
+        if (weekOffset == 0) {
+            weekRangeTxt.text = "This Week"
+        } else if (weekOffset == -1) {
+            weekRangeTxt.text = "Last Week"
+        } else {
+            weekRangeTxt.text = "${Math.abs(weekOffset)} Weeks Ago"
+        }
+    }
+
+    private fun setupCollectionLog() {
         val container = findViewById<LinearLayout>(R.id.collectionLogList)
+        container.removeAllViews()
         val inflater = LayoutInflater.from(this)
 
-        for ((index, entry) in dailyLog.withIndex()) {
-            val itemView = inflater.inflate(R.layout.item_collection_log, container, false)
+        // Generate 7 days for the current week offset
+        val calendar = Calendar.getInstance()
+        calendar.add(Calendar.WEEK_OF_YEAR, weekOffset)
+        
+        // Start from the most recent day of that week (e.g., Today if weekOffset is 0)
+        for (i in 0 until 7) {
+            val dateStr = sdf.format(calendar.time)
             
+            val itemView = inflater.inflate(R.layout.item_collection_log, container, false)
             val dateTxt = itemView.findViewById<TextView>(R.id.logDate)
             val totalTxt = itemView.findViewById<TextView>(R.id.logTotal)
             val gATxt = itemView.findViewById<TextView>(R.id.logGradeA)
@@ -75,15 +119,18 @@ class EggCountActivity : AppCompatActivity() {
             val gCTxt = itemView.findViewById<TextView>(R.id.logGradeC)
             val badge = itemView.findViewById<TextView>(R.id.todayBadge)
 
-            dateTxt.text = entry.date
+            dateTxt.text = dateStr
             totalTxt.text = "0"
             gATxt.text = "0"
             gBTxt.text = "0"
             gCTxt.text = "0"
             
-            if (index == 0) badge.visibility = View.VISIBLE
+            // Show "TODAY" badge only for the actual current date
+            val todayStr = sdf.format(Calendar.getInstance().time)
+            badge.visibility = if (dateStr == todayStr) View.VISIBLE else View.GONE
 
             container.addView(itemView)
+            calendar.add(Calendar.DAY_OF_YEAR, -1) // Move backwards
         }
     }
 }
