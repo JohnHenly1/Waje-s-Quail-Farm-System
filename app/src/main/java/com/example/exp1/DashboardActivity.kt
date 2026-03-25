@@ -29,27 +29,27 @@ class DashboardActivity : AppCompatActivity() {
         enableEdgeToEdge()
         setContentView(R.layout.activity_dashboard)
 
-        // Get username safely
+        //  Get username safely
         username = intent.getStringExtra("username") ?: "User"
 
-        // Initialize drawer
+        //  Initialize drawer
         drawerLayout = findViewById(R.id.drawerLayout)
 
-        // Safe insets
+        //  Safe insets
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
 
-        // Setup UI/UX
+        // Setup UI
         setupNavigation()
         setupServerTime()
         updateWelcomeMessage()
         setupButtons()
     }
 
-    //  Navigation Setup
+    // 🔥 Navigation Setup
     private fun setupNavigation() {
         try {
             NavigationHelper.setupSideMenu(this, drawerLayout)
@@ -66,7 +66,7 @@ class DashboardActivity : AppCompatActivity() {
         }
     }
 
-    //  Time updater
+    // 🔥 Time updater
     private fun setupServerTime() {
         val serverTimeText = findViewById<TextView?>(R.id.serverTimeText)
         val sdf = SimpleDateFormat("yyyy/MM/dd hh:mm:ss a", Locale.getDefault())
@@ -87,12 +87,12 @@ class DashboardActivity : AppCompatActivity() {
         handler.removeCallbacks(updateTimeRunnable)
     }
 
-    //  Welcome Text
+    // 🔥 Welcome Text
     private fun updateWelcomeMessage() {
         findViewById<TextView?>(R.id.welcome_text)?.text = "Hi, $username!"
     }
 
-    //  Buttons
+    // 🔥 Buttons
     private fun setupButtons() {
 
         // Analytics
