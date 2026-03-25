@@ -22,52 +22,55 @@ class DashboardActivity : AppCompatActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var updateTimeRunnable: Runnable
 
+    private var username: String = "User"
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_dashboard)
-        
+
+        // Get username safely
+        username = intent.getStringExtra("username") ?: "User"
+
+        // Initialize drawer
         drawerLayout = findViewById(R.id.drawerLayout)
 
+        // Safe insets
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+            insets
+        }
+
+        // Setup UI/UX
+        setupNavigation()
+        setupServerTime()
+        updateWelcomeMessage()
+        setupButtons()
+    }
+
+    //  Navigation Setup
+    private fun setupNavigation() {
         try {
-            ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
-                val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-                v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-                insets
+            NavigationHelper.setupSideMenu(this, drawerLayout)
+
+            findViewById<android.view.View>(R.id.imageButton)?.setOnClickListener {
+                drawerLayout.openDrawer(GravityCompat.START)
             }
+
+            NavigationHelper.setupBottomNavigation(this)
+            NavigationHelper.setupNotificationButton(this)
+
         } catch (e: Exception) {
             e.printStackTrace()
         }
-
-        // Setup side menu (header, navigation, and opening button)
-        NavigationHelper.setupSideMenu(this, drawerLayout)
-        findViewById<android.view.View>(R.id.imageButton)?.setOnClickListener {
-            drawerLayout.openDrawer(GravityCompat.START)
-        }
-
-        // Setup Server Time Update
-        setupServerTime()
-
-        // Update welcome message
-        val username = intent.getStringExtra("username") ?: "User"
-        updateWelcomeMessage(username)
-
-        // Setup bottom navigation
-        NavigationHelper.setupBottomNavigation(this)
-        
-        // Setup notification button
-        NavigationHelper.setupNotificationButton(this)
-
-        // Setup other buttons
-        setupScheduleButton()
-        setupAnalyticsButton()
-        setupShortcuts()
     }
 
+    //  Time updater
     private fun setupServerTime() {
-        val serverTimeText = findViewById<TextView>(R.id.serverTimeText)
+        val serverTimeText = findViewById<TextView?>(R.id.serverTimeText)
         val sdf = SimpleDateFormat("yyyy/MM/dd hh:mm:ss a", Locale.getDefault())
-        
+
         updateTimeRunnable = object : Runnable {
             override fun run() {
                 val currentTime = sdf.format(Calendar.getInstance().time)
@@ -75,6 +78,7 @@ class DashboardActivity : AppCompatActivity() {
                 handler.postDelayed(this, 1000)
             }
         }
+
         handler.post(updateTimeRunnable)
     }
 
@@ -83,49 +87,54 @@ class DashboardActivity : AppCompatActivity() {
         handler.removeCallbacks(updateTimeRunnable)
     }
 
-    private fun setupAnalyticsButton() {
-        findViewById<LinearLayout>(R.id.analyticsButton)?.setOnClickListener {
+    //  Welcome Text
+    private fun updateWelcomeMessage() {
+        findViewById<TextView?>(R.id.welcome_text)?.text = "Hi, $username!"
+    }
+
+    //  Buttons
+    private fun setupButtons() {
+
+        // Analytics
+        findViewById<LinearLayout?>(R.id.analyticsButton)?.setOnClickListener {
             val intent = Intent(this, AnalyticsActivity::class.java)
-            intent.putExtra("username", intent.getStringExtra("username"))
+            intent.putExtra("username", username)
             startActivity(intent)
         }
-    }
 
-    private fun setupScheduleButton() {
-        findViewById<android.widget.ImageButton>(R.id.scheduleButton1)?.setOnClickListener {
+        // Schedule
+        findViewById<android.widget.ImageButton?>(R.id.scheduleButton1)?.setOnClickListener {
             val intent = Intent(this, ScheduleActivity::class.java)
-            intent.putExtra("username", intent.getStringExtra("username"))
+            intent.putExtra("username", username)
             startActivity(intent)
         }
-    }
 
-    private fun setupShortcuts() {
-        findViewById<android.view.View>(R.id.feedInventoryButton)?.setOnClickListener {
+        // Feed Inventory
+        findViewById<android.view.View?>(R.id.feedInventoryButton)?.setOnClickListener {
             val intent = Intent(this, FeedInventoryActivity::class.java)
-            intent.putExtra("username", intent.getStringExtra("username"))
+            intent.putExtra("username", username)
             startActivity(intent)
         }
 
-        findViewById<android.view.View>(R.id.eggCountButton)?.setOnClickListener {
+        // Egg Count
+        findViewById<android.view.View?>(R.id.eggCountButton)?.setOnClickListener {
             val intent = Intent(this, EggCountActivity::class.java)
-            intent.putExtra("username", intent.getStringExtra("username"))
+            intent.putExtra("username", username)
             startActivity(intent)
         }
 
-        findViewById<android.view.View>(R.id.reportButton)?.setOnClickListener {
+        // Reports
+        findViewById<android.view.View?>(R.id.reportButton)?.setOnClickListener {
             val intent = Intent(this, AnalyticsActivity::class.java)
-            intent.putExtra("username", intent.getStringExtra("username"))
+            intent.putExtra("username", username)
             startActivity(intent)
         }
 
-        findViewById<android.view.View>(R.id.tasksButton)?.setOnClickListener {
+        // Tasks
+        findViewById<android.view.View?>(R.id.tasksButton)?.setOnClickListener {
             val intent = Intent(this, ScheduleActivity::class.java)
-            intent.putExtra("username", intent.getStringExtra("username"))
+            intent.putExtra("username", username)
             startActivity(intent)
         }
-    }
-
-    private fun updateWelcomeMessage(username: String) {
-        findViewById<TextView>(R.id.welcome_text)?.text = "Hi, $username!"
     }
 }

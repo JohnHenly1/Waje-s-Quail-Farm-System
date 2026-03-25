@@ -81,5 +81,6 @@
     <string name="version_info">Waje\'s Quail Farm Beta Ver.</string>
     <string name="copyright">© 2026 All rights reserved</string>
     <string name="camera">Camera</string>
+    <string name="default_web_client_id">1234567890-abc123xyz.apps.googleusercontent.com</string>
 
 </resources>
