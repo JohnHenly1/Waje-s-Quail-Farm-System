@@ -91,14 +91,26 @@ object NavigationHelper {
                     if (activity !is DashboardActivity) {
                         val intent = Intent(activity, DashboardActivity::class.java)
                         intent.putExtra("username", username)
+                        intent.flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
                         activity.startActivity(intent)
                     }
                 }
                 R.id.nav_settings -> {
-                    // Navigate to settings if it exists
+                    if (activity !is ProfileActivity) {
+                        val intent = Intent(activity, ProfileActivity::class.java)
+                        intent.putExtra("username", username)
+                        intent.flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                        activity.startActivity(intent)
+                    }
                 }
                 R.id.nav_help -> {
-                    // Navigate to help
+                    // Redirecting to Profile as it contains Help & Support section
+                    if (activity !is ProfileActivity) {
+                        val intent = Intent(activity, ProfileActivity::class.java)
+                        intent.putExtra("username", username)
+                        intent.flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                        activity.startActivity(intent)
+                    }
                 }
                 R.id.nav_logout -> {
                     // Clear the session before logging out

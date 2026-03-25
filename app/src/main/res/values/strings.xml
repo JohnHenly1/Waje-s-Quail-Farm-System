@@ -57,6 +57,10 @@
     <string name="task1">Morning\'s Feed</string>
     <string name="textSchedule3">Schedule:</string>
     <string name="distribute_quail_s_feed_at_this_time">Distribute Quail\'s Feed At this Time!</string>
+    <string name="add_schedule">Add Schedule</string>
+    <string name="bulk_delete">Bulk Delete</string>
+    <string name="delete_selected_tasks">Delete Selected Tasks</string>
+    <string name="no_tasks_selected">No tasks selected</string>
 
     <!-- Profile Strings -->
     <string name="manage_account">Manage your account</string>

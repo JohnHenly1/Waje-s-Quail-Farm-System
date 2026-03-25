@@ -67,8 +67,9 @@
                 android:backgroundTint="#40FFFFFF"
                 android:padding="10dp"
                 android:scaleType="centerInside"
-                app:srcCompat="@drawable/ic_add2"
-                app:tint="@color/white" />
+                app:srcCompat="@drawable/ic_add"
+                app:tint="@color/white"
+                android:contentDescription="Add Schedule" />
         </RelativeLayout>
     </androidx.appcompat.widget.Toolbar>
 
@@ -111,7 +112,8 @@
                             android:layout_width="20dp"
                             android:layout_height="20dp"
                             app:srcCompat="@drawable/ic_calendar_green"
-                            app:tint="@color/dark_green" />
+                            app:tint="@color/dark_green"
+                            android:contentDescription="Calendar Icon" />
 
                         <TextView
                             android:layout_width="0dp"
@@ -316,9 +318,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Sat"
                                 android:textColor="#4B5563"
-                                android:textSize="10sp" />
-
-                            <TextView
+                                android:textSize="10sp" />                            <TextView
                                 android:id="@+id/day6"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
@@ -391,9 +391,11 @@
                             android:backgroundTint="#F0FDF4"
                             android:padding="6dp"
                             app:srcCompat="@drawable/ic_check_circle"
-                            app:tint="#16A34A" />
+                            app:tint="#16A34A"
+                            android:contentDescription="Done Icon" />
 
                         <TextView
+                            android:id="@+id/doneCount"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:fontFamily="sans-serif-black"
@@ -436,9 +438,11 @@
                             android:backgroundTint="#EFF6FF"
                             android:padding="6dp"
                             app:srcCompat="@drawable/ic_notifications"
-                            app:tint="#2563EB" />
+                            app:tint="#2563EB"
+                            android:contentDescription="Ongoing Icon" />
 
                         <TextView
+                            android:id="@+id/ongoingCount"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:fontFamily="sans-serif-black"
@@ -481,9 +485,11 @@
                             android:backgroundTint="#FFF7ED"
                             android:padding="6dp"
                             app:srcCompat="@drawable/ic_notifications"
-                            app:tint="#EA580C" />
+                            app:tint="#EA580C"
+                            android:contentDescription="Pending Icon" />
 
                         <TextView
+                            android:id="@+id/pendingCount"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:fontFamily="sans-serif-black"
@@ -501,18 +507,58 @@
                 </androidx.cardview.widget.CardView>
             </LinearLayout>
 
-            <TextView
-                android:layout_width="wrap_content"
+            <RelativeLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
-                android:layout_marginBottom="12dp"
-                android:fontFamily="sans-serif-black"
-                android:text="Today's Tasks"
-                android:textColor="#111827"
-                android:textSize="18sp" />
+                android:layout_marginBottom="12dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-black"
+                    android:text="Today's Tasks"
+                    android:textColor="#111827"
+                    android:textSize="18sp" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:orientation="horizontal">
+
+                    <ImageButton
+                        android:id="@+id/taskDetailsBtn"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:layout_marginEnd="8dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        app:srcCompat="@drawable/ic_info"
+                        app:tint="@color/dark_green"
+                        android:contentDescription="All Task Details" />
+
+                    <ImageButton
+                        android:id="@+id/bulkDeleteBtn"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        app:srcCompat="@drawable/ic_trash"
+                        app:tint="#EF4444"
+                        android:contentDescription="Bulk Delete" />
+                </LinearLayout>
+            </RelativeLayout>
+
+            <!-- Tasks Container -->
+            <LinearLayout
+                android:id="@+id/tasksContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
 
             <!-- Placeholder for no tasks -->
             <LinearLayout
+                android:id="@+id/noTasksPlaceholder"
                 android:layout_width="match_parent"
                 android:layout_height="200dp"
                 android:gravity="center"
@@ -523,7 +569,8 @@
                     android:layout_height="64dp"
                     android:alpha="0.1"
                     app:srcCompat="@drawable/ic_clipboard_list"
-                    app:tint="@color/dark_green" />
+                    app:tint="@color/dark_green"
+                    android:contentDescription="No Tasks Icon" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -555,13 +602,16 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:gravity="center"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:clickable="true"
+            android:focusable="true">
 
             <ImageView
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 app:srcCompat="@drawable/ic_home"
-                app:tint="@color/white" />
+                app:tint="@color/white"
+                android:contentDescription="Home" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -577,13 +627,16 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:gravity="center"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:clickable="true"
+            android:focusable="true">
 
             <ImageView
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 app:srcCompat="@drawable/ic_chart"
-                app:tint="@color/white" />
+                app:tint="@color/white"
+                android:contentDescription="Analytics" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -599,13 +652,16 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:gravity="center"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:clickable="true"
+            android:focusable="true">
 
             <ImageView
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 app:srcCompat="@drawable/ic_camera"
-                app:tint="@color/white" />
+                app:tint="@color/white"
+                android:contentDescription="Camera" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -621,13 +677,16 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:gravity="center"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:clickable="true"
+            android:focusable="true">
 
             <ImageView
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 app:srcCompat="@drawable/ic_schedule"
-                app:tint="@color/white" />
+                app:tint="@color/white"
+                android:contentDescription="Schedule" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -643,13 +702,16 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:gravity="center"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:clickable="true"
+            android:focusable="true">
 
             <ImageView
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 app:srcCompat="@drawable/ic_profile"
-                app:tint="@color/white" />
+                app:tint="@color/white"
+                android:contentDescription="Profile" />
 
             <TextView
                 android:layout_width="wrap_content"

@@ -3,6 +3,7 @@ package com.example.exp1
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -47,6 +48,11 @@ class AlertsActivity : AppCompatActivity() {
         NavigationHelper.setupBottomNavigation(this)
     }
 
+    override fun onResume() {
+        super.onResume()
+        updateAlertsList()
+    }
+
     private fun updateAlertsList() {
         val container = findViewById<LinearLayout>(R.id.alertsContainer)
         container.removeAllViews()
@@ -57,7 +63,7 @@ class AlertsActivity : AppCompatActivity() {
         // Update counters
         findViewById<TextView>(R.id.totalCount).text = alerts.size.toString()
         findViewById<TextView>(R.id.criticalCount).text = alerts.count { it.type == "Critical" }.toString()
-        findViewById<TextView>(R.id.warningCount).text = alerts.count { it.type == "Inventory" }.toString()
+        findViewById<TextView>(R.id.warningCount).text = alerts.count { it.type == "System" }.toString()
 
         if (alerts.isEmpty()) {
             val emptyTxt = TextView(this)
@@ -70,10 +76,16 @@ class AlertsActivity : AppCompatActivity() {
                 val itemView = inflater.inflate(R.layout.item_inventory_history, container, false)
                 val actionTxt = itemView.findViewById<TextView>(R.id.historyAction)
                 val dateTxt = itemView.findViewById<TextView>(R.id.historyDate)
-                val icon = itemView.findViewById<View>(R.id.historyIcon)
+                val icon = itemView.findViewById<ImageView>(R.id.historyIcon)
 
                 actionTxt.text = alert.message
                 dateTxt.text = alert.timestamp
+
+                // Customizing based on type
+                if (alert.type == "System") {
+                    icon.setImageResource(R.drawable.ic_schedule)
+                    icon.setColorFilter(getColor(R.color.dark_green))
+                }
 
                 // Dim the alert if it's already read
                 if (alert.isRead) {
