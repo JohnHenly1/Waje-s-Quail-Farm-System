@@ -3,20 +3,27 @@ package com.example.exp1
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
+import android.view.animation.AnimationUtils
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.SwitchCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 
 class AlertsActivity : AppCompatActivity() {
+    private lateinit var accountManager: AccountManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_alerts)
+
+        accountManager = AccountManager(this)
 
         try {
             ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
@@ -44,8 +51,42 @@ class AlertsActivity : AppCompatActivity() {
             Toast.makeText(this, "All alerts marked as read", Toast.LENGTH_SHORT).show()
         }
 
+        findViewById<View>(R.id.settingsButton).setOnClickListener {
+            showNotificationPrefsDialog()
+        }
+
+        // Apply initial fade-in to the main container
+        findViewById<View>(R.id.alertsContainer).startAnimation(AnimationUtils.loadAnimation(this, R.anim.fade_in))
+
         updateAlertsList()
         NavigationHelper.setupBottomNavigation(this)
+    }
+
+    private fun showNotificationPrefsDialog() {
+        val builder = AlertDialog.Builder(this)
+        val dialogView = layoutInflater.inflate(R.layout.dialog_notification_preferences, null)
+        builder.setView(dialogView)
+
+        val switchAlerts = dialogView.findViewById<SwitchCompat>(R.id.switchAlerts)
+        val switchGlobalData = dialogView.findViewById<SwitchCompat>(R.id.switchGlobalData)
+        val switchSchedule = dialogView.findViewById<SwitchCompat>(R.id.switchSchedule)
+
+        // Load current preferences
+        switchAlerts.isChecked = accountManager.isAlertsEnabled()
+        switchGlobalData.isChecked = accountManager.isGlobalDataEnabled()
+        switchSchedule.isChecked = accountManager.isScheduleEnabled()
+
+        builder.setTitle("Notification Preferences")
+            .setPositiveButton("Save") { _, _ ->
+                accountManager.saveNotificationPreferences(
+                    switchAlerts.isChecked(),
+                    switchGlobalData.isChecked(),
+                    switchSchedule.isChecked()
+                )
+                Toast.makeText(this, "Preferences saved", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     override fun onResume() {
@@ -72,7 +113,8 @@ class AlertsActivity : AppCompatActivity() {
             emptyTxt.setPadding(32, 64, 32, 32)
             container.addView(emptyTxt)
         } else {
-            for (alert in alerts) {
+            val slideUp = AnimationUtils.loadAnimation(this, R.anim.slide_up)
+            for ((index, alert) in alerts.withIndex()) {
                 val itemView = inflater.inflate(R.layout.item_inventory_history, container, false)
                 val actionTxt = itemView.findViewById<TextView>(R.id.historyAction)
                 val dateTxt = itemView.findViewById<TextView>(R.id.historyDate)
@@ -93,6 +135,10 @@ class AlertsActivity : AppCompatActivity() {
                 } else {
                     itemView.alpha = 1.0f
                 }
+
+                // Cascading animation effect
+                slideUp.startOffset = (index * 50).toLong()
+                itemView.startAnimation(slideUp)
 
                 container.addView(itemView)
             }

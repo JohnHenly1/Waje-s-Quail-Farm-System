@@ -4,6 +4,8 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.View
+import android.view.animation.AnimationUtils
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.enableEdgeToEdge
@@ -47,6 +49,48 @@ class DashboardActivity : AppCompatActivity() {
         setupServerTime()
         updateWelcomeMessage()
         setupButtons()
+        
+        // Apply Animations
+        applyEntranceAnimations()
+    }
+
+    private fun applyEntranceAnimations() {
+        val fadeIn = AnimationUtils.loadAnimation(this, R.anim.fade_in)
+        val slideUp = AnimationUtils.loadAnimation(this, R.anim.slide_up)
+        
+        findViewById<View>(R.id.welcomeCard)?.startAnimation(fadeIn)
+        
+        val aiCard = findViewById<View>(R.id.aiCard)
+        slideUp.startOffset = 100
+        aiCard?.startAnimation(slideUp)
+        
+        val shortcutsGrid = findViewById<View>(R.id.shortcutsGrid)
+        slideUp.startOffset = 200
+        shortcutsGrid?.startAnimation(slideUp)
+        
+        val statsGrid = findViewById<View>(R.id.statsGrid)
+        slideUp.startOffset = 300
+        statsGrid?.startAnimation(slideUp)
+    }
+
+    private fun showLoading(action: () -> Unit) {
+        val loadingLayout = findViewById<View>(R.id.loadingLayout)
+        val loadingIcon = findViewById<View>(R.id.loadingIcon)
+        
+        if (loadingLayout != null && loadingIcon != null) {
+            loadingLayout.visibility = View.VISIBLE
+            val rotate = AnimationUtils.loadAnimation(this, R.anim.rotate)
+            loadingIcon.startAnimation(rotate)
+            
+            // Simulate network/loading delay
+            handler.postDelayed({
+                loadingLayout.visibility = View.GONE
+                loadingIcon.clearAnimation()
+                action()
+            }, 800)
+        } else {
+            action()
+        }
     }
 
     // 🔥 Navigation Setup
@@ -97,44 +141,56 @@ class DashboardActivity : AppCompatActivity() {
 
         // Analytics
         findViewById<LinearLayout?>(R.id.analyticsButton)?.setOnClickListener {
-            val intent = Intent(this, AnalyticsActivity::class.java)
-            intent.putExtra("username", username)
-            startActivity(intent)
+            showLoading {
+                val intent = Intent(this, AnalyticsActivity::class.java)
+                intent.putExtra("username", username)
+                startActivity(intent)
+            }
         }
 
         // Schedule
         findViewById<android.widget.ImageButton?>(R.id.scheduleButton1)?.setOnClickListener {
-            val intent = Intent(this, ScheduleActivity::class.java)
-            intent.putExtra("username", username)
-            startActivity(intent)
+            showLoading {
+                val intent = Intent(this, ScheduleActivity::class.java)
+                intent.putExtra("username", username)
+                startActivity(intent)
+            }
         }
 
         // Feed Inventory
         findViewById<android.view.View?>(R.id.feedInventoryButton)?.setOnClickListener {
-            val intent = Intent(this, FeedInventoryActivity::class.java)
-            intent.putExtra("username", username)
-            startActivity(intent)
+            showLoading {
+                val intent = Intent(this, FeedInventoryActivity::class.java)
+                intent.putExtra("username", username)
+                startActivity(intent)
+            }
         }
 
         // Egg Count
         findViewById<android.view.View?>(R.id.eggCountButton)?.setOnClickListener {
-            val intent = Intent(this, EggCountActivity::class.java)
-            intent.putExtra("username", username)
-            startActivity(intent)
+            showLoading {
+                val intent = Intent(this, EggCountActivity::class.java)
+                intent.putExtra("username", username)
+                startActivity(intent)
+            }
         }
 
         // Reports
         findViewById<android.view.View?>(R.id.reportButton)?.setOnClickListener {
-            val intent = Intent(this, AnalyticsActivity::class.java)
-            intent.putExtra("username", username)
-            startActivity(intent)
+            showLoading {
+                val intent = Intent(this, AnalyticsActivity::class.java)
+                intent.putExtra("username", username)
+                startActivity(intent)
+            }
         }
 
         // Tasks
         findViewById<android.view.View?>(R.id.tasksButton)?.setOnClickListener {
-            val intent = Intent(this, ScheduleActivity::class.java)
-            intent.putExtra("username", username)
-            startActivity(intent)
+            showLoading {
+                val intent = Intent(this, ScheduleActivity::class.java)
+                intent.putExtra("username", username)
+                startActivity(intent)
+            }
         }
     }
 }

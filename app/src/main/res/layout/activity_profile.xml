@@ -448,6 +448,7 @@
 
                     <!-- Language & Region -->
                     <LinearLayout
+                        android:id="@+id/languageRegionButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:background="?attr/selectableItemBackground"
@@ -487,6 +488,7 @@
 
                     <!-- Privacy & Security -->
                     <LinearLayout
+                        android:id="@+id/privacySecurityButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:background="?attr/selectableItemBackground"
@@ -526,6 +528,7 @@
 
                     <!-- Help & Support -->
                     <LinearLayout
+                        android:id="@+id/helpSupportButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:background="?attr/selectableItemBackground"

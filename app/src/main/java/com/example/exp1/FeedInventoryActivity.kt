@@ -35,11 +35,14 @@ class FeedInventoryActivity : AppCompatActivity() {
     private val inventory = mutableListOf<InventoryItem>()
     private val history = mutableListOf<HistoryItem>()
     private val statusOptions = arrayOf("Full", "Medium", "Low")
+    private lateinit var accountManager: AccountManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_feed_inventory)
+
+        accountManager = AccountManager(this)
 
         try {
             ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
@@ -168,8 +171,8 @@ class FeedInventoryActivity : AppCompatActivity() {
         val currentDate = sdf.format(Date())
         history.add(HistoryItem(action, currentDate))
 
-        // Add to global alerts if it's a critical change (low stock)
-        if (action.contains("Low")) {
+        // Add to global alerts if it's a critical change (low stock) and enabled
+        if (action.contains("Low") && accountManager.isGlobalDataEnabled()) {
             GlobalData.addAlert(action, currentDate)
         }
     }

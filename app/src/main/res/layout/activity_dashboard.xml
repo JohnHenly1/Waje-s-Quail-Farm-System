@@ -90,6 +90,7 @@
 
                 <!-- Welcome, Card -->
                 <androidx.cardview.widget.CardView
+                    android:id="@+id/welcomeCard"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="16dp"
@@ -127,6 +128,7 @@
 
                 <!-- AI Recommendation Card -->
                 <androidx.cardview.widget.CardView
+                    android:id="@+id/aiCard"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="16dp"
@@ -361,6 +363,7 @@
 
                 <!-- Quick Stats Grid -->
                 <GridLayout
+                    android:id="@+id/statsGrid"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:columnCount="2"
@@ -605,6 +608,9 @@
             </LinearLayout>
 
         </LinearLayout>
+
+        <!-- Include Loading Overlay -->
+        <include layout="@layout/layout_loading" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
