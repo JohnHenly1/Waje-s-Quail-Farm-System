@@ -143,7 +143,9 @@ public class ScheduleActivity extends AppCompatActivity {
             NotificationChannel channel = new NotificationChannel("task_reminder_channel", name, importance);
             channel.setDescription(description);
             NotificationManager notificationManager = getSystemService(NotificationManager.class);
-            notificationManager.createNotificationChannel(channel);
+            if (notificationManager != null) {
+                notificationManager.createNotificationChannel(channel);
+            }
         }
     }
 
@@ -589,29 +591,42 @@ public class ScheduleActivity extends AppCompatActivity {
     public static class TaskAlarmReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
+            AccountManager accountManager = new AccountManager(context);
+            
+            // Check if Schedule Notifications are enabled
+            if (!accountManager.isScheduleEnabled()) {
+                return;
+            }
+
             String title = intent.getStringExtra("taskTitle");
             String category = intent.getStringExtra("taskCategory");
             
             String timestamp = new SimpleDateFormat("yyyy/MM/dd hh:mm a", Locale.getDefault()).format(new Date());
 
-            GlobalData.INSTANCE.addAlert("Task Reminder: " + title + " (" + category + ")", timestamp, "System");
+            // Check if Global Data (History) is enabled
+            if (accountManager.isGlobalDataEnabled()) {
+                GlobalData.INSTANCE.addAlert("Task Reminder: " + title + " (" + category + ")", timestamp, "System");
+            }
 
-            NotificationCompat.Builder builder = new NotificationCompat.Builder(context, "task_reminder_channel")
-                    .setSmallIcon(R.drawable.ic_notifications)
-                    .setContentTitle("Task Reminder: " + title)
-                    .setContentText("It's time for " + category)
-                    .setPriority(NotificationCompat.PRIORITY_HIGH)
-                    .setAutoCancel(true);
+            // Check if System Alerts (Push Notifications) are enabled
+            if (accountManager.isAlertsEnabled()) {
+                NotificationCompat.Builder builder = new NotificationCompat.Builder(context, "task_reminder_channel")
+                        .setSmallIcon(R.drawable.ic_notifications)
+                        .setContentTitle("Task Reminder: " + title)
+                        .setContentText("It's time for " + category)
+                        .setPriority(NotificationCompat.PRIORITY_HIGH)
+                        .setAutoCancel(true);
 
-            Intent alertIntent = new Intent(context, AlertsActivity.class);
-            PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, alertIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-            builder.setContentIntent(pendingIntent);
+                Intent alertIntent = new Intent(context, AlertsActivity.class);
+                PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, alertIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                builder.setContentIntent(pendingIntent);
 
-            NotificationManagerCompat notificationManager = NotificationManagerCompat.from(context);
-            try {
-                notificationManager.notify((int) System.currentTimeMillis(), builder.build());
-            } catch (SecurityException e) {
-                e.printStackTrace();
+                NotificationManagerCompat notificationManager = NotificationManagerCompat.from(context);
+                try {
+                    notificationManager.notify((int) System.currentTimeMillis(), builder.build());
+                } catch (SecurityException e) {
+                    e.printStackTrace();
+                }
             }
         }
     }

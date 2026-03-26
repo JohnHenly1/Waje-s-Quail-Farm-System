@@ -1,0 +1,88 @@
+<resources>
+    <!-- Header Nav -->
+    <string name="app_name">Waje\'s Quail Farm</string>
+    <string name="analytic">Analytics</string>
+    <string name="schedule_dashboard">Iskedyul</string>
+    <string name="profile_dashboard">Profile</string>
+    <string name="AddBtn">Dugang</string>
+
+    <!-- Dashboard strings -->
+    <string name="menu">Menu</string>
+    <string name="notifications">Mga Notipikasyon</string>
+    <string name="welcome_message">Hi, User!</string>
+    <string name="welcome_back">Maayong Pagbalik!</string>
+
+    <!-- AI Recommendation -->
+    <string name="ai_recommendation">Rekomendasyon sa AI</string>
+    <string name="recommendation_text">Rekomendasyon sa mga butang nga buhaton sama sa pagpainom o pagpakaon sa pugo</string>
+
+    <!-- Shortcuts -->
+    <string name="feed_inventory">Imbentaryo sa Pagkaon</string>
+    <string name="egg_count">Ihap sa Itlog</string>
+    <string name="report">Report</string>
+    <string name="tasks">Mga Buluhaton</string>
+
+    <!-- Quick Stats -->
+    <string name="total_eggs_today">Tibuok Itlog Karong Adlawa</string>
+    <string name="eggs_count">0</string>
+    <string name="feed_remaining">Nabilin nga Pagkaon</string>
+    <string name="feed_weight">0</string>
+
+    <!-- Footer Nav -->
+    <string name="home">Home</string>
+    <string name="analytics">Analytics</string>
+    <string name="schedule">Iskedyul</string>
+    <string name="profile">Profile</string>
+
+    <!-- Alerts Screen -->
+    <string name="alerts_notifications">Mga Alerto ug Notipikasyon</string>
+    <string name="back">Balik</string>
+    <string name="settings">Mga Setting</string>
+    <string name="critical">Kritikal</string>
+    <string name="warnings">Mga Pasidaan</string>
+    <string name="total">Tibuok</string>
+    <string name="all_notifications">Tanan nga Notipikasyon</string>
+    <string name="mark_all_read">Markahi ang tanan nga nabasa na</string>
+
+    <!-- Schedule Strings -->
+    <string name="Monday">Lun</string>
+    <string name="Tuesday">Mar</string>
+    <string name="Wednesday">Miy</string>
+    <string name="Thursday">Huw</string>
+    <string name="Friday">Biy</string>
+    <string name="Saturday">Sab</string>
+    <string name="Sunday">Lin</string>
+
+    <string name="textSchedule">Iskedyul Karong Adlawa:</string>
+    <string name="task1">Pagkaon sa Buntag</string>
+    <string name="textSchedule3">Iskedyul:</string>
+    <string name="distribute_quail_s_feed_at_this_time">Iapod-apod ang pagkaon sa pugo niining orasa!</string>
+    <string name="add_schedule">Pagdugang og Iskedyul</string>
+    <string name="bulk_delete">I-delete ang daghan</string>
+    <string name="delete_selected_tasks">I-delete ang gipili nga mga buluhaton</string>
+    <string name="no_tasks_selected">Walay gipili nga buluhaton</string>
+
+    <!-- Profile Strings -->
+    <string name="manage_account">Dumala sa imong account</string>
+    <string name="user_initial">J</string>
+    <string name="user_name">James Anderson</string>
+    <string name="user_role">Manager sa Farm</string>
+    <string name="user_email">james@wajequailfarm.com</string>
+    <string name="total_birds">Tibuok Pugo</string>
+    <string name="total_birds_val">0</string>
+    <string name="active_cages">Aktibong mga Hawla</string>
+    <string name="active_cages_val">0</string>
+    <string name="days_running">Mga Adlaw nga Nagdagan</string>
+    <string name="days_running_val">0</string>
+    <string name="account_group">Account</string>
+    <string name="account_settings">Mga Setting sa Account</string>
+    <string name="notification_preferences">Mga Kagustuhan sa Notipikasyon</string>
+    <string name="general_group">Kinatibuk-an</string>
+    <string name="language_region">Pinulongan ug Rehiyon</string>
+    <string name="privacy_security">Privacy ug Seguridad</string>
+    <string name="help_support">Tabang ug Suporta</string>
+    <string name="log_out">Log Out</string>
+    <string name="version_info">Waje\'s Quail Farm Beta Ver.</string>
+    <string name="copyright">© 2026 Tanang katungod gitagana</string>
+    <string name="camera">Kamera</string>
+</resources>
