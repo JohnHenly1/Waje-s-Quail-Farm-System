@@ -85,4 +85,5 @@
     <string name="version_info">Waje\'s Quail Farm Beta Ver.</string>
     <string name="copyright">© 2026 All rights reserved</string>
     <string name="camera">Camera</string>
+    <string name="water_level">Water Level</string>
 </resources>
