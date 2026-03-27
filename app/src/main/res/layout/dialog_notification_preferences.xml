@@ -9,7 +9,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Notification Settings"
-        android:textColor="@color/black"
+        android:textColor="@color/white"
         android:textSize="20sp"
         android:textStyle="bold"
         android:layout_marginBottom="16dp" />
@@ -30,14 +30,14 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="System Alerts"
-                android:textColor="@color/black"
+                android:textColor="@color/lime"
                 android:textSize="16sp" />
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Show push notifications on your device"
                 android:textSize="12sp"
-                android:textColor="@color/gray" />
+                android:textColor="@color/white" />
         </LinearLayout>
 
         <androidx.appcompat.widget.SwitchCompat
@@ -67,14 +67,14 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Global Data Sync"
-                android:textColor="@color/black"
+                android:textColor="@color/lime"
                 android:textSize="16sp" />
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Store alerts in the application history"
                 android:textSize="12sp"
-                android:textColor="@color/gray" />
+                android:textColor="@color/white" />
         </LinearLayout>
 
         <androidx.appcompat.widget.SwitchCompat
@@ -104,14 +104,14 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Schedule Notifications"
-                android:textColor="@color/black"
+                android:textColor="@color/lime"
                 android:textSize="16sp" />
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Receive reminders for scheduled tasks"
                 android:textSize="12sp"
-                android:textColor="@color/gray" />
+                android:textColor="@color/white" />
         </LinearLayout>
 
         <androidx.appcompat.widget.SwitchCompat

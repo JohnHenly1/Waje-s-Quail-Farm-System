@@ -14,7 +14,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Task Title"
-            android:textColor="@color/black"
+            android:textColor="@color/lime"
             android:textSize="14sp"
             android:textStyle="bold" />
 
@@ -32,7 +32,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="Category"
-            android:textColor="@color/black"
+            android:textColor="@color/lime"
             android:textSize="14sp"
             android:textStyle="bold" />
 
@@ -48,7 +48,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="Time"
-            android:textColor="@color/black"
+            android:textColor="@color/lime"
             android:textSize="14sp"
             android:textStyle="bold" />
 
@@ -68,7 +68,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="Select Dates"
-            android:textColor="@color/black"
+            android:textColor="@color/lime"
             android:textSize="14sp"
             android:textStyle="bold" />
 
@@ -94,7 +94,7 @@
                 android:layout_weight="1"
                 android:gravity="center"
                 android:text="Month Year"
-                android:textColor="@color/black"
+                android:textColor="@color/lime"
                 android:textSize="16sp"
                 android:textStyle="bold" />
 

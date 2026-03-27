@@ -13,7 +13,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Privacy &amp; Security"
-            android:textColor="@color/black"
+            android:textColor="@color/white"
             android:textSize="20sp"
             android:textStyle="bold"
             android:layout_marginBottom="16dp" />
@@ -23,7 +23,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="1. Data Collection (The 'What')"
-            android:textColor="@color/dark_green"
+            android:textColor="@color/lime"
             android:textStyle="bold"
             android:textSize="16sp"
             android:layout_marginBottom="4dp" />
@@ -32,7 +32,7 @@
             android:layout_height="wrap_content"
             android:text="• Farm Profile: Name, contact info, and GPS location.\n• Flock Records: Quail counts, breeds, age, and mortality rates.\n• Production: Daily egg counts, meat weight, and feed consumption.\n• Health &amp; Biosecurity: Vaccination dates, illness logs, and visitor records.\n• Financials: Feed costs, medicine expenses, and sales revenue."
             android:textSize="14sp"
-            android:textColor="@color/gray"
+            android:textColor="@color/white"
             android:layout_marginBottom="16dp" />
 
         <!-- 2. Privacy Content -->
@@ -40,7 +40,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="2. Privacy Content (The 'How')"
-            android:textColor="@color/dark_green"
+            android:textColor="@color/lime"
             android:textStyle="bold"
             android:textSize="16sp"
             android:layout_marginBottom="4dp" />
@@ -49,7 +49,7 @@
             android:layout_height="wrap_content"
             android:text="• Ownership: The farmer owns all farm-generated data.\n• Usage: Data is used only for reports, trend analysis, or vet consultations.\n• Sharing: We disclose if data goes to 3rd parties (e.g., government disease tracking or researchers).\n• Anonymity: Any shared regional data is stripped of the farm's name and exact location."
             android:textSize="14sp"
-            android:textColor="@color/gray"
+            android:textColor="@color/white"
             android:layout_marginBottom="16dp" />
 
         <!-- 3. Security Measures -->
@@ -57,7 +57,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="3. Security Measures (The 'Armor')"
-            android:textColor="@color/dark_green"
+            android:textColor="@color/lime"
             android:textStyle="bold"
             android:textSize="16sp"
             android:layout_marginBottom="4dp" />
@@ -66,7 +66,7 @@
             android:layout_height="wrap_content"
             android:text="• Encryption: Data is scrambled (encrypted) during upload and while stored on servers.\n• Secure Login: Access is protected by passwords and/or biometric authentication.\n• Offline Safety: Data stored on the device (when offline) is also protected.\n• Access Control: Only authorized users can see specific farm records."
             android:textSize="14sp"
-            android:textColor="@color/gray"
+            android:textColor="@color/white"
             android:layout_marginBottom="16dp" />
 
     </LinearLayout>

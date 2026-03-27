@@ -93,7 +93,7 @@ class DashboardActivity : AppCompatActivity() {
         }
     }
 
-    // 🔥 Navigation Setup
+    // Navigation Setup
     private fun setupNavigation() {
         try {
             NavigationHelper.setupSideMenu(this, drawerLayout)
@@ -110,7 +110,7 @@ class DashboardActivity : AppCompatActivity() {
         }
     }
 
-    // 🔥 Time updater
+    // Time updater
     private fun setupServerTime() {
         val serverTimeText = findViewById<TextView?>(R.id.serverTimeText)
         val sdf = SimpleDateFormat("yyyy/MM/dd hh:mm:ss a", Locale.getDefault())
@@ -131,12 +131,12 @@ class DashboardActivity : AppCompatActivity() {
         handler.removeCallbacks(updateTimeRunnable)
     }
 
-    // 🔥 Welcome Text
+    // Welcome Text
     private fun updateWelcomeMessage() {
         findViewById<TextView?>(R.id.welcome_text)?.text = "Hi, $username!"
     }
 
-    // 🔥 Buttons
+    // Buttons
     private fun setupButtons() {
 
         // Analytics
