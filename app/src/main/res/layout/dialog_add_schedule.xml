@@ -10,6 +10,7 @@
         android:orientation="vertical"
         android:padding="24dp">
 
+        <!-- Task Title -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -27,6 +28,7 @@
             android:inputType="text"
             android:minHeight="48dp" />
 
+        <!-- Category -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -43,6 +45,25 @@
             android:layout_marginTop="8dp"
             android:minHeight="48dp" />
 
+        <!-- 🔥 Recurrence Section -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Repeat"
+            android:textColor="#374151"
+            android:textSize="13sp"
+            android:fontFamily="sans-serif-medium" />
+
+        <Spinner
+            android:id="@+id/spinnerRecurrence"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="4dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp" />
+
+        <!-- Time -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -63,6 +84,7 @@
             android:minHeight="48dp"
             android:paddingStart="4dp" />
 
+        <!-- Date Picker -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
