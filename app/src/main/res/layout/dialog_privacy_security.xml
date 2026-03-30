@@ -1,73 +1,186 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:padding="24dp">
+    android:background="@color/white">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:padding="24dp">
 
-        <TextView
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Privacy &amp; Security"
-            android:textColor="@color/white"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="16dp" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="24dp">
+
+            <ImageView
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:src="@drawable/ic_lock"
+                app:tint="@color/dark_green"
+                android:contentDescription="Privacy Icon" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:text="Privacy &amp; Security"
+                android:textColor="@color/dark_green"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+        </LinearLayout>
 
         <!-- 1. Data Collection -->
-        <TextView
-            android:layout_width="wrap_content"
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="1. Data Collection (The 'What')"
-            android:textColor="@color/lime"
-            android:textStyle="bold"
-            android:textSize="16sp"
-            android:layout_marginBottom="4dp" />
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="• Farm Profile: Name, contact info, and GPS location.\n• Flock Records: Quail counts, breeds, age, and mortality rates.\n• Production: Daily egg counts, meat weight, and feed consumption.\n• Health &amp; Biosecurity: Vaccination dates, illness logs, and visitor records.\n• Financials: Feed costs, medicine expenses, and sales revenue."
-            android:textSize="14sp"
-            android:textColor="@color/white"
-            android:layout_marginBottom="16dp" />
+            android:layout_marginBottom="16dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp"
+            app:cardBackgroundColor="@color/light_green">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="8dp">
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_clipboard_list"
+                        app:tint="@color/dark_green"
+                        android:contentDescription="Collection Icon" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:text="1. Data Collection (The 'What')"
+                        android:textColor="@color/dark_green"
+                        android:textStyle="bold"
+                        android:textSize="16sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="• Farm Profile: Name, contact info, and GPS location.\n• Flock Records: Quail counts, breeds, age, and mortality rates.\n• Production: Daily egg counts, meat weight, and feed consumption.\n• Health &amp; Biosecurity: Vaccination dates, illness logs, and visitor records.\n• Financials: Feed costs, medicine expenses, and sales revenue."
+                    android:textSize="13sp"
+                    android:textColor="@color/black"
+                    android:lineSpacingExtra="4dp" />
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
 
         <!-- 2. Privacy Content -->
-        <TextView
-            android:layout_width="wrap_content"
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="2. Privacy Content (The 'How')"
-            android:textColor="@color/lime"
-            android:textStyle="bold"
-            android:textSize="16sp"
-            android:layout_marginBottom="4dp" />
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="• Ownership: The farmer owns all farm-generated data.\n• Usage: Data is used only for reports, trend analysis, or vet consultations.\n• Sharing: We disclose if data goes to 3rd parties (e.g., government disease tracking or researchers).\n• Anonymity: Any shared regional data is stripped of the farm's name and exact location."
-            android:textSize="14sp"
-            android:textColor="@color/white"
-            android:layout_marginBottom="16dp" />
+            android:layout_marginBottom="16dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp"
+            app:cardBackgroundColor="@color/bg_blue_100">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="8dp">
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_visibility"
+                        app:tint="@color/text_blue_600"
+                        android:contentDescription="Privacy Policy Icon" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:text="2. Privacy Content (The 'How')"
+                        android:textColor="@color/text_blue_600"
+                        android:textStyle="bold"
+                        android:textSize="16sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="• Ownership: The farmer owns all farm-generated data.\n• Usage: Data is used only for reports, trend analysis, or vet consultations.\n• Sharing: We disclose if data goes to 3rd parties (e.g., government disease tracking or researchers).\n• Anonymity: Any shared regional data is stripped of the farm's name and exact location."
+                    android:textSize="13sp"
+                    android:textColor="@color/black"
+                    android:lineSpacingExtra="4dp" />
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
 
         <!-- 3. Security Measures -->
-        <TextView
-            android:layout_width="wrap_content"
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="3. Security Measures (The 'Armor')"
-            android:textColor="@color/lime"
-            android:textStyle="bold"
-            android:textSize="16sp"
-            android:layout_marginBottom="4dp" />
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="• Encryption: Data is scrambled (encrypted) during upload and while stored on servers.\n• Secure Login: Access is protected by passwords and/or biometric authentication.\n• Offline Safety: Data stored on the device (when offline) is also protected.\n• Access Control: Only authorized users can see specific farm records."
-            android:textSize="14sp"
-            android:textColor="@color/white"
-            android:layout_marginBottom="16dp" />
+            android:layout_marginBottom="8dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp"
+            app:cardBackgroundColor="@color/bg_orange_100">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="8dp">
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_lock"
+                        app:tint="@color/text_orange_600"
+                        android:contentDescription="Security Armor Icon" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:text="3. Security Measures (The 'Armor')"
+                        android:textColor="@color/text_orange_600"
+                        android:textStyle="bold"
+                        android:textSize="16sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="• Encryption: Data is scrambled (encrypted) during upload and while stored on servers.\n• Secure Login: Access is protected by passwords and/or biometric authentication.\n• Offline Safety: Data stored on the device (when offline) is also protected.\n• Access Control: Only authorized users can see specific farm records."
+                    android:textSize="13sp"
+                    android:textColor="@color/black"
+                    android:lineSpacingExtra="4dp" />
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
 
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

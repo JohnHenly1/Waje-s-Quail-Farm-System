@@ -1,19 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="24dp">
+    android:padding="24dp"
+    android:background="@color/white">
 
-    <TextView
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Notification Settings"
-        android:textColor="@color/white"
-        android:textSize="20sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="16dp" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="24dp">
 
+        <ImageView
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/lc_notification"
+            app:tint="@color/dark_green" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:text="Notifications"
+            android:textColor="@color/dark_green"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- System Alerts -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -30,27 +47,31 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="System Alerts"
-                android:textColor="@color/lime"
+                android:textColor="@color/dark_green"
+                android:textStyle="bold"
                 android:textSize="16sp" />
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Show push notifications on your device"
                 android:textSize="12sp"
-                android:textColor="@color/white" />
+                android:textColor="@color/dark_gray" />
         </LinearLayout>
 
         <androidx.appcompat.widget.SwitchCompat
             android:id="@+id/switchAlerts"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            app:thumbTint="@color/dark_green"
+            app:trackTint="@color/light_green" />
     </LinearLayout>
 
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="#F3F4F6" />
+        android:background="#EEEEEE" />
 
+    <!-- Global Data Sync -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -67,27 +88,31 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Global Data Sync"
-                android:textColor="@color/lime"
+                android:textColor="@color/dark_green"
+                android:textStyle="bold"
                 android:textSize="16sp" />
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Store alerts in the application history"
                 android:textSize="12sp"
-                android:textColor="@color/white" />
+                android:textColor="@color/dark_gray" />
         </LinearLayout>
 
         <androidx.appcompat.widget.SwitchCompat
             android:id="@+id/switchGlobalData"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            app:thumbTint="@color/dark_green"
+            app:trackTint="@color/light_green" />
     </LinearLayout>
 
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="#F3F4F6" />
+        android:background="#EEEEEE" />
 
+    <!-- Schedule Notifications -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -104,20 +129,23 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Schedule Notifications"
-                android:textColor="@color/lime"
+                android:textColor="@color/dark_green"
+                android:textStyle="bold"
                 android:textSize="16sp" />
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Receive reminders for scheduled tasks"
                 android:textSize="12sp"
-                android:textColor="@color/white" />
+                android:textColor="@color/dark_gray" />
         </LinearLayout>
 
         <androidx.appcompat.widget.SwitchCompat
             android:id="@+id/switchSchedule"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            app:thumbTint="@color/dark_green"
+            app:trackTint="@color/light_green" />
     </LinearLayout>
 
 </LinearLayout>

@@ -1,43 +1,72 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="24dp">
+    android:padding="24dp"
+    android:background="@color/white">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="24dp">
+
+        <ImageView
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/lc_farmrefresh"
+            app:tint="@color/dark_green" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:text="Farm Recalibration"
+            android:textColor="@color/dark_green"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+    </LinearLayout>
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Total Birds"
-        android:textColor="@color/lime"
+        android:textColor="@color/dark_green"
         android:textSize="14sp"
         android:textStyle="bold" />
 
     <EditText
         android:id="@+id/editTotalBirds"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="52dp"
         android:layout_marginTop="8dp"
+        android:background="@drawable/rounded_corner"
         android:hint="Enter total birds"
         android:inputType="number"
-        android:minHeight="48dp" />
+        android:padding="12dp"
+        android:textSize="16sp" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="20dp"
         android:text="Active Cages"
-        android:textColor="@color/lime"
+        android:textColor="@color/dark_green"
         android:textSize="14sp"
         android:textStyle="bold" />
 
     <EditText
         android:id="@+id/editActiveCages"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="52dp"
         android:layout_marginTop="8dp"
+        android:background="@drawable/rounded_corner"
         android:hint="Enter active cages"
         android:inputType="number"
-        android:minHeight="48dp" />
+        android:padding="12dp"
+        android:textSize="16sp" />
 
 </LinearLayout>
