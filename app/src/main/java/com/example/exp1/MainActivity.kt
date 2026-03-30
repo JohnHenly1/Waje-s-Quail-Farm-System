@@ -18,6 +18,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var auth: FirebaseAuth
     private lateinit var googleSignInClient: GoogleSignInClient
     private lateinit var btnLogin: Button
+    private lateinit var btnRegister: Button
 
     private val RC_SIGN_IN = 100
 
@@ -27,6 +28,7 @@ class MainActivity : AppCompatActivity() {
 
         auth = FirebaseAuth.getInstance()
         btnLogin = findViewById(R.id.Btn)
+        btnRegister = findViewById(R.id.btnRegister)
 
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(getString(R.string.default_web_client_id))
@@ -38,6 +40,11 @@ class MainActivity : AppCompatActivity() {
         btnLogin.setOnClickListener {
             val signInIntent = googleSignInClient.signInIntent
             startActivityForResult(signInIntent, RC_SIGN_IN)
+        }
+
+        btnRegister.setOnClickListener {
+            val intent = Intent(this, RegisterActivity::class.java)
+            startActivity(intent)
         }
     }
 

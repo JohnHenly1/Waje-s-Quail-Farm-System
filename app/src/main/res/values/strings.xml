@@ -86,4 +86,19 @@
     <string name="copyright">© 2026 All rights reserved</string>
     <string name="camera">Camera</string>
     <string name="water_level">Water Level</string>
+
+    <!-- Login & Registration -->
+    <string name="login_title">Log In</string>
+    <string name="continue_with_google">Continue With Google</string>
+    <string name="register_account">Register Account</string>
+    <string name="system_access">System Access</string>
+    <string name="enter_email_hint">Enter Email Address</string>
+    <string name="select_role">Select Desired Role:</string>
+    <string name="role_staff">Staff</string>
+    <string name="role_backup_owner">Backup Owner</string>
+    <string name="request_code">Request Access Code</string>
+    <string name="i_have_a_code">I have an Invite Code</string>
+    <string name="initial_farm_setup">Initial Farm Setup (Owner)</string>
+    <string name="role_available">Available: %1$d/%2$d</string>
+    <string name="role_full">Role Full</string>
 </resources>

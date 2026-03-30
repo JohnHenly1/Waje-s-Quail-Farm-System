@@ -6,70 +6,102 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".MainActivity"
-    android:background="#F4F4F4"
-    tools:layout_editor_absoluteX="0dp"
-    tools:layout_editor_absoluteY="12dp">
+    android:background="#F4F4F4">
 
-    <!-- Log In Text Indicator -->
+    <!-- Log In Text -->
     <TextView
         android:id="@+id/textView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="40dp"
-        android:text="Log In"
+        android:layout_marginTop="60dp"
+        android:text="@string/login_title"
         android:textColor="#466d1d"
-        android:textSize="24sp"
+        android:textSize="32sp"
         android:textStyle="bold"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <Button
-        android:id="@+id/Btn"
-        android:layout_width="320dp"
-        android:layout_height="52dp"
-        android:layout_marginTop="288dp"
-        android:backgroundTint="#466d1d"
-        android:textColor="@color/white"
-        android:text="Continue With Google"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.494"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/imageView" />
-
     <ImageView
         android:id="@+id/imageView"
-        android:layout_width="130dp"
-        android:layout_height="130dp"
+        android:layout_width="160dp"
+        android:layout_height="160dp"
+        android:layout_marginTop="32dp"
         android:src="@drawable/logo_quailfarm"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.498"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/textView" />
 
-    <!-- Bush1 -->
+    <LinearLayout
+        android:id="@+id/loginButtonsContainer"
+        android:layout_width="320dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="48dp"
+        android:orientation="vertical"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/imageView">
 
-    <!-- Bush2 -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/Btn"
+            style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:text="@string/continue_with_google"
+            android:textAllCaps="false"
+            android:textColor="@color/white"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            app:backgroundTint="#466d1d"
+            app:cornerRadius="16dp"
+            app:icon="@drawable/lc_google_icon"
+            app:iconGravity="textStart"
+            app:iconPadding="12dp"
+            app:iconSize="24dp"
+            app:iconTint="@null" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnRegister"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:layout_marginTop="16dp"
+            android:text="@string/register_account"
+            android:textColor="#466d1d"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textAllCaps="false"
+            app:cornerRadius="16dp"
+            app:icon="@drawable/ic_add"
+            app:iconGravity="textStart"
+            app:iconPadding="12dp"
+            app:iconSize="24dp"
+            app:iconTint="#466d1d"
+            app:strokeColor="#466d1d"
+            app:strokeWidth="2dp" />
+
+    </LinearLayout>
 
     <ImageView
         android:id="@+id/desigbush"
-        android:layout_width="287dp"
-        android:layout_height="248dp"
-        android:layout_marginTop="32dp"
-        android:layout_marginEnd="16dp"
+        android:layout_width="220dp"
+        android:layout_height="200dp"
+        android:layout_marginBottom="-50dp"
+        android:layout_marginStart="-50dp"
         android:rotation="28"
         android:src="@drawable/design_bush"
-        app:layout_constraintEnd_toStartOf="@+id/desigbush2"
-        app:layout_constraintTop_toBottomOf="@+id/Btn" />
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
 
     <ImageView
         android:id="@+id/desigbush2"
-        android:layout_width="285dp"
-        android:layout_height="243dp"
-        android:layout_marginStart="228dp"
-        android:layout_marginTop="32dp"
+        android:layout_width="220dp"
+        android:layout_height="200dp"
+        android:layout_marginBottom="-50dp"
+        android:layout_marginEnd="-50dp"
         android:rotation="-15"
         android:src="@drawable/design_bush"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/Btn" />
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>
