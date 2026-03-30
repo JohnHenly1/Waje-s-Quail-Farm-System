@@ -282,7 +282,7 @@
                             android:fontFamily="sans-serif" />
                     </LinearLayout>
 
-                    <!-- Report -->
+                    <!-- water level -->
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
@@ -294,7 +294,7 @@
                         android:padding="8dp">
 
                         <FrameLayout
-                            android:id="@+id/reportButton"
+                            android:id="@+id/water_level"
                             android:layout_width="56dp"
                             android:layout_height="56dp"
                             android:background="@drawable/rounded_dark_green"
@@ -305,7 +305,7 @@
                                 android:layout_height="28dp"
                                 android:layout_gravity="center"
                                 android:scaleType="centerInside"
-                                app:srcCompat="@drawable/ic_file_text"
+                                app:srcCompat="@drawable/ic_water_level"
                                 app:tint="@color/white" />
                         </FrameLayout>
 

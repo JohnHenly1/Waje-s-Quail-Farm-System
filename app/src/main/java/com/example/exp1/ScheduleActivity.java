@@ -54,7 +54,10 @@ import java.util.Map;
 
 public class ScheduleActivity extends AppCompatActivity {
 
-    // Recurrence constants
+    // CameraHelper --------------------------------------------------------------------------------
+    private CameraHelper cameraHelper;
+
+    // Recurrence constants-------------------------------------------------------------------------
     private static final String RECUR_ONCE     = "Once";
     private static final String RECUR_DAILY    = "Daily";
     private static final String RECUR_WEEKDAYS = "Weekdays (Mon-Fri)";
@@ -68,7 +71,7 @@ public class ScheduleActivity extends AppCompatActivity {
             RECUR_WEEKLY, RECUR_BIWEEKLY, RECUR_MONTHLY
     };
 
-    //  Calendar / UI fields
+    // Calendar and UI fields-----------------------------------------------------------------------
     private Calendar currentWeekCalendar;
     private TextView monthText;
     private TextView[] dayTextViews;
@@ -82,7 +85,7 @@ public class ScheduleActivity extends AppCompatActivity {
     private TextView doneCount, ongoingCount, pendingCount;
     private List<Task> taskList = new ArrayList<>();
 
-    // Firebase
+    // Firebase-------------------------------------------------------------------------------------
     private FirebaseFirestore db;
     private String currentUserEmail;
     private ListenerRegistration tasksListener;
@@ -92,14 +95,17 @@ public class ScheduleActivity extends AppCompatActivity {
             "July","August","September","October","November","December"
     };
 
-    //  Lifecycle
+    //  Lifecycle-----------------------------------------------------------------------------------
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
-        setContentView(R.layout.activity_schedule);
 
+        //1st step init CameraHelper----------------------------------------------------------------
+        cameraHelper = new CameraHelper(this);
+
+        setContentView(R.layout.activity_schedule);
         createNotificationChannel();
 
         db = FirebaseFirestore.getInstance();
@@ -156,7 +162,16 @@ public class ScheduleActivity extends AppCompatActivity {
         findViewById(R.id.bulkDeleteBtn).setOnClickListener(v -> showBulkDeleteDialog());
         findViewById(R.id.taskDetailsBtn).setOnClickListener(v -> showAllTaskDetails());
 
+        //2nd step call NavigationHelper------------------------------------------------------------
         NavigationHelper.INSTANCE.setupBottomNavigation(this);
+
+        //3rd step wire camera button after NavigationHelper----------------------------------------
+        LinearLayout cameraButton = findViewById(R.id.CameraButton);
+        if (cameraButton != null) {
+            cameraButton.setClickable(true);
+            cameraButton.setFocusable(true);
+            cameraButton.setOnClickListener(v -> cameraHelper.launch());
+        }
 
         updateCalendarUI();
         setupSwipeGestures();
@@ -169,7 +184,8 @@ public class ScheduleActivity extends AppCompatActivity {
         if (tasksListener != null) tasksListener.remove();
     }
 
-    //  Firestore — CRUD
+
+    //  Firestore CRUD------------------------------------------------------------------------------
 
     private void listenToTasks() {
         tasksListener = db.collection("users")
@@ -203,7 +219,6 @@ public class ScheduleActivity extends AppCompatActivity {
                 });
     }
 
-    /** Save a single task document. */
     private void addTaskToFirestore(Task task) {
         db.collection("users")
                 .document(currentUserEmail)
@@ -213,10 +228,6 @@ public class ScheduleActivity extends AppCompatActivity {
                         Toast.makeText(this, "Error saving task: " + e.getMessage(), Toast.LENGTH_SHORT).show());
     }
 
-    /**
-     * Generates all recurrence dates (up to 1 year) and saves each as a
-     * separate Firestore document sharing the same recurrenceGroupId.
-     */
     private void addRecurringTasks(String title, String category, String time,
                                    String recurrence, Calendar startCal,
                                    int selHour, int selMinute) {
@@ -274,7 +285,6 @@ public class ScheduleActivity extends AppCompatActivity {
                         Toast.makeText(this, "Error deleting: " + e.getMessage(), Toast.LENGTH_SHORT).show());
     }
 
-    /** Deletes every document that belongs to the same recurring series. */
     private void deleteRecurringSeriesFromFirestore(Task task) {
         if (task.recurrenceGroupId == null) { deleteTaskFromFirestore(task); return; }
         db.collection("users").document(currentUserEmail).collection("tasks")
@@ -306,8 +316,7 @@ public class ScheduleActivity extends AppCompatActivity {
                         Toast.makeText(this, "Error deleting tasks: " + e.getMessage(), Toast.LENGTH_SHORT).show());
     }
 
-
-    //  Recurrence date generator (max 1 year / 365 instances)
+    //  Recurrence date generator-------------------------------------------------------------------
 
     private List<Calendar> generateRecurrenceDates(String recurrence, Calendar start) {
         List<Calendar> dates = new ArrayList<>();
@@ -316,11 +325,9 @@ public class ScheduleActivity extends AppCompatActivity {
         final int MAX = 365;
 
         switch (recurrence) {
-
             case RECUR_ONCE:
                 dates.add((Calendar) start.clone());
                 break;
-
             case RECUR_DAILY: {
                 Calendar cur = (Calendar) start.clone();
                 while (!cur.after(limit) && dates.size() < MAX) {
@@ -329,7 +336,6 @@ public class ScheduleActivity extends AppCompatActivity {
                 }
                 break;
             }
-
             case RECUR_WEEKDAYS: {
                 Calendar cur = (Calendar) start.clone();
                 while (!cur.after(limit) && dates.size() < MAX) {
@@ -340,7 +346,6 @@ public class ScheduleActivity extends AppCompatActivity {
                 }
                 break;
             }
-
             case RECUR_WEEKENDS: {
                 Calendar cur = (Calendar) start.clone();
                 while (!cur.after(limit) && dates.size() < MAX) {
@@ -351,7 +356,6 @@ public class ScheduleActivity extends AppCompatActivity {
                 }
                 break;
             }
-
             case RECUR_WEEKLY: {
                 Calendar cur = (Calendar) start.clone();
                 while (!cur.after(limit) && dates.size() < MAX) {
@@ -360,7 +364,6 @@ public class ScheduleActivity extends AppCompatActivity {
                 }
                 break;
             }
-
             case RECUR_BIWEEKLY: {
                 Calendar cur = (Calendar) start.clone();
                 while (!cur.after(limit) && dates.size() < MAX) {
@@ -369,7 +372,6 @@ public class ScheduleActivity extends AppCompatActivity {
                 }
                 break;
             }
-
             case RECUR_MONTHLY: {
                 Calendar cur = (Calendar) start.clone();
                 while (!cur.after(limit) && dates.size() < MAX) {
@@ -378,7 +380,6 @@ public class ScheduleActivity extends AppCompatActivity {
                 }
                 break;
             }
-
             default:
                 dates.add((Calendar) start.clone());
                 break;
@@ -386,34 +387,33 @@ public class ScheduleActivity extends AppCompatActivity {
         return dates;
     }
 
-    //  Dialog — Add Schedule
+
+    //  Dialogs-------------------------------------------------------------------------------------
+
 
     private void showAddScheduleDialog() {
         View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_add_schedule, null);
 
         EditText    editTaskTitle     = dialogView.findViewById(R.id.editTaskTitle);
         Spinner     spinnerCategory   = dialogView.findViewById(R.id.spinnerCategory);
-        Spinner     spinnerRecurrence = dialogView.findViewById(R.id.spinnerRecurrence);  // NEW
+        Spinner     spinnerRecurrence = dialogView.findViewById(R.id.spinnerRecurrence);
         TextView    textTime          = dialogView.findViewById(R.id.textTime);
         TextView    txtCurrentMonth   = dialogView.findViewById(R.id.txtCurrentMonth);
         GridLayout  calendarGrid      = dialogView.findViewById(R.id.calendarGrid);
         ImageButton btnPrevMonth      = dialogView.findViewById(R.id.btnPrevMonth);
         ImageButton btnNextMonth      = dialogView.findViewById(R.id.btnNextMonth);
 
-        // Category spinner
         String[] categories = {"Feeding","Watering","Cleaning","Egg Collection","Lighting","Health Check"};
         ArrayAdapter<String> catAdapter = new ArrayAdapter<>(this,
                 android.R.layout.simple_spinner_item, categories);
         catAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerCategory.setAdapter(catAdapter);
 
-        // Recurrence spinner
         ArrayAdapter<String> recAdapter = new ArrayAdapter<>(this,
                 android.R.layout.simple_spinner_item, RECURRENCE_OPTIONS);
         recAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerRecurrence.setAdapter(recAdapter);
 
-        // Time picker
         final String[] selectedTime = {"08:00 AM"};
         final int[] selHour   = {8};
         final int[] selMinute = {0};
@@ -428,7 +428,6 @@ public class ScheduleActivity extends AppCompatActivity {
                 }, selHour[0], selMinute[0], false).show()
         );
 
-        // Mini calendar — single start-date selection
         final long[]     pickedStartDate = {0};
         final Calendar   viewCalendar    = Calendar.getInstance();
         viewCalendar.set(Calendar.DAY_OF_MONTH, 1);
@@ -445,8 +444,8 @@ public class ScheduleActivity extends AppCompatActivity {
                 for (String d : new String[]{"S","M","T","W","Th","F","S"})
                     calendarGrid.addView(makeHeaderCell(d));
 
-                Calendar cal     = (Calendar) viewCalendar.clone();
-                int firstDow     = cal.get(Calendar.DAY_OF_WEEK) - 1;
+                Calendar cal  = (Calendar) viewCalendar.clone();
+                int firstDow  = cal.get(Calendar.DAY_OF_WEEK) - 1;
                 for (int i = 0; i < firstDow; i++) calendarGrid.addView(makeSpacer());
 
                 int daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
@@ -528,8 +527,6 @@ public class ScheduleActivity extends AppCompatActivity {
                 .show();
     }
 
-    //  Delete dialog — single or entire series
-
     private void showDeleteOptions(Task task) {
         boolean isRecurring = task.recurrenceGroupId != null
                 && !RECUR_ONCE.equals(task.recurrence);
@@ -553,8 +550,6 @@ public class ScheduleActivity extends AppCompatActivity {
                     .show();
         }
     }
-
-    //  Other UI dialogs / task list
 
     private void showBulkDeleteDialog() {
         if (taskList.isEmpty()) {
@@ -612,6 +607,8 @@ public class ScheduleActivity extends AppCompatActivity {
                 .show();
     }
 
+    //  Task list UI--------------------------------------------------------------------------------
+
     private void updateTasksUI() {
         if (tasksContainer == null) return;
         tasksContainer.removeAllViews();
@@ -635,7 +632,6 @@ public class ScheduleActivity extends AppCompatActivity {
             titleTv.setText(task.title);
             categoryTv.setText(task.category);
 
-            // Show recurrence badge next to time when applicable
             String timeLabel = task.time;
             if (!RECUR_ONCE.equals(task.recurrence)) {
                 timeLabel += "  •  " + task.recurrence;
@@ -681,8 +677,7 @@ public class ScheduleActivity extends AppCompatActivity {
             placeholder.setVisibility(tasksContainer.getChildCount() == 0 ? View.VISIBLE : View.GONE);
     }
 
-    //  Calendar UI/UX, Design
-
+    //  Calendar UI---------------------------------------------------------------------------------
 
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -796,7 +791,7 @@ public class ScheduleActivity extends AppCompatActivity {
         if (am != null) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, calendar.getTimeInMillis(), pi);
     }
 
-    //  Mini-calendar cell factories
+    //  Mini-calendar cell factories----------------------------------------------------------------
 
     private TextView makeHeaderCell(String label) {
         TextView tv = new TextView(this);
@@ -836,14 +831,14 @@ public class ScheduleActivity extends AppCompatActivity {
         return v;
     }
 
-    //  Data model and Firestore
+    //  Data model----------------------------------------------------------------------------------
 
     private static class Task {
         String firestoreId;
         String title, category, time, status;
         int    year, month, day;
-        String recurrence;         // "Once", "Daily", "Weekdays (Mon-Fri)", and such
-        String recurrenceGroupId;  // UUID shared by all docs in a recurring series
+        String recurrence;
+        String recurrenceGroupId;
 
         Task(String firestoreId, String title, String category, String time,
              String status, int year, int month, int day,
@@ -861,8 +856,7 @@ public class ScheduleActivity extends AppCompatActivity {
         }
     }
 
-
-    //  Alarm Receiver
+    //  Alarm Receiver------------------------------------------------------------------------------
 
     public static class TaskAlarmReceiver extends BroadcastReceiver {
         @Override

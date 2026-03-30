@@ -85,20 +85,20 @@
     <string name="version_info">Waje\'s Quail Farm Beta Ver.</string>
     <string name="copyright">© 2026 All rights reserved</string>
     <string name="camera">Camera</string>
-    <string name="water_level" translatable="false">Water Level</string>
+    <string name="water_level">Water Level</string>
 
     <!-- Login & Registration -->
-    <string name="login_title" translatable="false">Log In</string>
-    <string name="continue_with_google" translatable="false">Continue With Google</string>
-    <string name="register_account" translatable="false">Register Account</string>
-    <string name="system_access" translatable="false">System Access</string>
-    <string name="enter_email_hint" translatable="false">Enter Email Address</string>
-    <string name="select_role" translatable="false">Select Desired Role:</string>
-    <string name="role_staff" translatable="false">Staff</string>
-    <string name="role_backup_owner" translatable="false">Backup Owner</string>
-    <string name="request_code" translatable="false">Request Access Code</string>
+    <string name="login_title">Log In</string>
+    <string name="continue_with_google">Continue With Google</string>
+    <string name="register_account">Register Account</string>
+    <string name="system_access">System Access</string>
+    <string name="enter_email_hint">Enter Email Address</string>
+    <string name="select_role">Select Desired Role:</string>
+    <string name="role_staff">Staff</string>
+    <string name="role_backup_owner">Backup Owner</string>
+    <string name="request_code">Request Access Code</string>
     <string name="i_have_a_code">I have an Invite Code</string>
-    <string name="initial_farm_setup" translatable="false">Initial Farm Setup (Owner)</string>
-    <string name="role_available" translatable="false">Available: %1$d/%2$d</string>
-    <string name="role_full" translatable="false">Role Full</string>
+    <string name="initial_farm_setup">Initial Farm Setup (Owner)</string>
+    <string name="role_available">Available: %1$d/%2$d</string>
+    <string name="role_full">Role Full</string>
 </resources>
