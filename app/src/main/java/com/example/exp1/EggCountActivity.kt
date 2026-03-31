@@ -25,6 +25,7 @@ class EggCountActivity : AppCompatActivity() {
     )
 
     // Current offset in weeks (0 = this week, -1 = last week, etc.)
+    // Current offset in weeks (0 = this week, -1 = last week, etc.)
     private var weekOffset = 0
     private val sdf = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
 
@@ -70,7 +71,7 @@ class EggCountActivity : AppCompatActivity() {
     private fun refreshData() {
         Toast.makeText(this, "Checking for hardware updates...", Toast.LENGTH_SHORT).show()
         // Here you would eventually trigger the YOLO algorithm / Database sync
-        setupUI() 
+        setupUI()
     }
 
     private fun setupUI() {
@@ -124,13 +125,13 @@ class EggCountActivity : AppCompatActivity() {
             gATxt.text = "0"
             gBTxt.text = "0"
             gCTxt.text = "0"
-            
+
             // Show "TODAY" badge only for the actual current date
             val todayStr = sdf.format(Calendar.getInstance().time)
             badge.visibility = if (dateStr == todayStr) View.VISIBLE else View.GONE
 
             container.addView(itemView)
-            calendar.add(Calendar.DAY_OF_YEAR, -1) // Move backwards
+            calendar.add(Calendar.DAY_OF_YEAR, -1) // Move backwards            calendar.add(Calendar.DAY_OF_YEAR, -1) // Move backwards
         }
     }
 }

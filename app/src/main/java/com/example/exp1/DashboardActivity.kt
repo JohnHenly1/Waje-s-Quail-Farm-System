@@ -206,9 +206,9 @@ class DashboardActivity : AppCompatActivity() {
             }
         }
 
-        findViewById<android.view.View?>(R.id.waterLevelButton)?.setOnClickListener {
+        findViewById<android.view.View?>(R.id.water_level)?.setOnClickListener {
             showLoading {
-                startActivity(Intent(this, WaterLevelActivity::class.java)
+                startActivity(Intent(this, WaterSensorActivity::class.java)
                     .putExtra("username", username))
             }
         }

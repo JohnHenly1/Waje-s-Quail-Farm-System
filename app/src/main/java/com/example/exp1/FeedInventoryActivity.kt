@@ -36,6 +36,7 @@ class FeedInventoryActivity : AppCompatActivity() {
     private val history = mutableListOf<HistoryItem>()
     private val statusOptions = arrayOf("Full", "Medium", "Low")
     private lateinit var accountManager: AccountManager
+    private var userRole: String = "staff"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,12 +44,17 @@ class FeedInventoryActivity : AppCompatActivity() {
         setContentView(R.layout.activity_feed_inventory)
 
         accountManager = AccountManager(this)
+        val currentUsername = accountManager.getCurrentUsername() ?: "User"
+        userRole = accountManager.getRole(currentUsername)
 
         try {
-            ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
-                val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-                v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-                insets
+            val mainView = findViewById<View>(R.id.main)
+            if (mainView != null) {
+                ViewCompat.setOnApplyWindowInsetsListener(mainView) { v, insets ->
+                    val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+                    v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+                    insets
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -56,14 +62,20 @@ class FeedInventoryActivity : AppCompatActivity() {
 
         findViewById<View>(R.id.backButton).setOnClickListener {
             val intent = Intent(this, DashboardActivity::class.java)
-            intent.putExtra("username", getIntent().getStringExtra("username"))
+            intent.putExtra("username", currentUsername)
             intent.setFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
             startActivity(intent)
             finish()
         }
 
-        findViewById<View>(R.id.addButton).setOnClickListener {
-            showAddEditDialog(null)
+        val addButton = findViewById<View>(R.id.addButton)
+        if (isAdmin()) {
+            addButton.visibility = View.VISIBLE
+            addButton.setOnClickListener {
+                showAddEditDialog(null)
+            }
+        } else {
+            addButton.visibility = View.GONE
         }
 
         findViewById<View>(R.id.historyButton).setOnClickListener {
@@ -72,6 +84,10 @@ class FeedInventoryActivity : AppCompatActivity() {
 
         updateUI()
         NavigationHelper.setupBottomNavigation(this)
+    }
+
+    private fun isAdmin(): Boolean {
+        return userRole == "owner" || userRole == "backup_owner"
     }
 
     private fun updateUI() {
@@ -83,12 +99,14 @@ class FeedInventoryActivity : AppCompatActivity() {
         val totalItemsValue = findViewById<TextView>(R.id.totalItemsValue)
         val lowStockValue = findViewById<TextView>(R.id.lowStockValue)
 
-        totalItemsValue.text = inventory.size.toString()
-        lowStockValue.text = inventory.count { it.status == "Low" }.toString()
+        if (totalItemsValue != null) totalItemsValue.text = inventory.size.toString()
+        if (lowStockValue != null) lowStockValue.text = inventory.count { it.status == "Low" }.toString()
     }
 
     private fun setupInventoryList() {
         val container = findViewById<LinearLayout>(R.id.inventoryList)
+        if (container == null) return
+        
         container.removeAllViews()
         val inflater = LayoutInflater.from(this)
 
@@ -121,12 +139,18 @@ class FeedInventoryActivity : AppCompatActivity() {
                 }
             }
 
+            // Staff can edit (to change status) but not delete
             editBtn.setOnClickListener {
                 showAddEditDialog(index)
             }
 
-            deleteBtn.setOnClickListener {
-                showDeleteConfirmation(index)
+            if (isAdmin()) {
+                deleteBtn.visibility = View.VISIBLE
+                deleteBtn.setOnClickListener {
+                    showDeleteConfirmation(index)
+                }
+            } else {
+                deleteBtn.visibility = View.GONE
             }
 
             container.addView(itemView)
@@ -159,10 +183,14 @@ class FeedInventoryActivity : AppCompatActivity() {
 
         builder.setView(view)
         builder.setPositiveButton("Close", null)
-        builder.setNeutralButton("Clear History") { _, _ ->
-            history.clear()
-            Toast.makeText(this, "History cleared", Toast.LENGTH_SHORT).show()
+        
+        if (isAdmin()) {
+            builder.setNeutralButton("Clear History") { _, _ ->
+                history.clear()
+                Toast.makeText(this, "History cleared", Toast.LENGTH_SHORT).show()
+            }
         }
+        
         builder.show()
     }
 
@@ -194,7 +222,7 @@ class FeedInventoryActivity : AppCompatActivity() {
     private fun showAddEditDialog(position: Int?) {
         val builder = AlertDialog.Builder(this)
         val isEdit = position != null
-        builder.setTitle(if (isEdit) "Edit Food" else "Add New Food")
+        builder.setTitle(if (isEdit) "Edit Food Status" else "Add New Food")
 
         val view = layoutInflater.inflate(R.layout.dialog_add_food, null)
         val nameInput = view.findViewById<EditText>(R.id.foodNameInput)
@@ -207,6 +235,10 @@ class FeedInventoryActivity : AppCompatActivity() {
         if (isEdit) {
             val item = inventory[position!!]
             nameInput.setText(item.name)
+            // Staff cannot change the name, only the status
+            if (!isAdmin()) {
+                nameInput.isEnabled = false
+            }
             statusSpinner.setSelection(statusOptions.indexOf(item.status))
         }
 
