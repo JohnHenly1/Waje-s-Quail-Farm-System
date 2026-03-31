@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F4F4F4"
+    tools:context=".EnterCodeActivity">
+
+    <TextView
+        android:id="@+id/enterCodeTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="60dp"
+        android:text="Enter Invite Code"
+        android:textColor="#466d1d"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <ImageView
+        android:id="@+id/codeLogo"
+        android:layout_width="120dp"
+        android:layout_height="120dp"
+        android:layout_marginTop="24dp"
+        android:src="@drawable/logo_quailfarm"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/enterCodeTitle" />
+
+    <androidx.cardview.widget.CardView
+        android:id="@+id/codeCard"
+        android:layout_width="320dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="32dp"
+        app:cardCornerRadius="20dp"
+        app:cardElevation="4dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/codeLogo">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="24dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Invitation Verification"
+                android:textColor="#466d1d"
+                android:textStyle="bold"
+                android:textSize="16sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Enter the 6-digit code sent to your email by the owner."
+                android:textColor="@color/gray"
+                android:textSize="12sp" />
+
+            <EditText
+                android:id="@+id/editInviteCode"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_marginTop="24dp"
+                android:background="@drawable/rounded_corner"
+                android:gravity="center"
+                android:hint="000000"
+                android:inputType="number"
+                android:maxLength="6"
+                android:padding="12dp"
+                android:textSize="32sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.2" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnVerifyCode"
+                style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="24dp"
+                android:text="Verify &amp; Register"
+                android:textAllCaps="false"
+                android:textStyle="bold"
+                app:backgroundTint="#466d1d"
+                app:cornerRadius="12dp" />
+
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <ImageView
+        android:id="@+id/desigbush"
+        android:layout_width="180dp"
+        android:layout_height="150dp"
+        android:layout_marginBottom="-30dp"
+        android:layout_marginStart="-30dp"
+        android:rotation="28"
+        android:src="@drawable/design_bush"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <ImageView
+        android:id="@+id/desigbush2"
+        android:layout_width="180dp"
+        android:layout_height="150dp"
+        android:layout_marginBottom="-30dp"
+        android:layout_marginEnd="-30dp"
+        android:rotation="-15"
+        android:src="@drawable/design_bush"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

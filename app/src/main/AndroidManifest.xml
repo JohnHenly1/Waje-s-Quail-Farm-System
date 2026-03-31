@@ -65,6 +65,9 @@
         <activity
             android:name=".WaterSensorActivity"
             android:exported="true"/>
+        <activity
+            android:name=".FarmSetupActivity"
+            android:exported="true"/>
     </application>
 
 </manifest>

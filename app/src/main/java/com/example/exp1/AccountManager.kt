@@ -7,7 +7,7 @@ class AccountManager(context: Context) {
     private val sharedPreferences: SharedPreferences = 
         context.getSharedPreferences("quail_farm_accounts", Context.MODE_PRIVATE)
 
-    fun registerAccount(username: String, email: String, password: String): Boolean {
+    fun registerAccount(username: String, email: String, password: String, role: String = "staff"): Boolean {
         // Check if account already exists
         if (accountExists(username)) {
             return false
@@ -17,6 +17,7 @@ class AccountManager(context: Context) {
         sharedPreferences.edit().apply {
             putString("${username}_email", email)
             putString("${username}_password", password)
+            putString("${username}_role", role)
             putString("${username}_registered", "true")
             
             // Also store email -> username mapping for login purposes
@@ -24,6 +25,10 @@ class AccountManager(context: Context) {
             apply()
         }
         return true
+    }
+
+    fun getRole(username: String): String {
+        return sharedPreferences.getString("${username}_role", "staff") ?: "staff"
     }
 
     fun accountExists(username: String): Boolean {
@@ -62,6 +67,7 @@ class AccountManager(context: Context) {
 
     fun updateProfile(oldUsername: String, newUsername: String, newEmail: String): Boolean {
         val password = sharedPreferences.getString("${oldUsername}_password", "") ?: ""
+        val role = getRole(oldUsername)
         
         sharedPreferences.edit().apply {
             // Remove old keys if username changed
@@ -71,6 +77,7 @@ class AccountManager(context: Context) {
                 
                 remove("${oldUsername}_email")
                 remove("${oldUsername}_password")
+                remove("${oldUsername}_role")
                 remove("${oldUsername}_registered")
                 
                 // Remove old email mapping
@@ -81,6 +88,7 @@ class AccountManager(context: Context) {
             // Save new data
             putString("${newUsername}_email", newEmail)
             putString("${newUsername}_password", password)
+            putString("${newUsername}_role", role)
             putString("${newUsername}_registered", "true")
             putString("email_${newEmail}", newUsername)
             
