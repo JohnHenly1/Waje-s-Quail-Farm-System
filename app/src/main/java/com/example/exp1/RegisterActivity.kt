@@ -3,18 +3,13 @@ package com.example.exp1
 import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
-import android.widget.Button
-import android.widget.EditText
-import android.widget.RadioButton
-import android.widget.RadioGroup
-import android.widget.Toast
+import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.firestore.FirebaseFirestore
 
 class RegisterActivity : AppCompatActivity() {
 
-    // These are the new buttons from your updated layout
     private lateinit var btnRequestCode: Button
     private lateinit var btnEnterCode: Button
     private lateinit var btnFarmSetup: Button
@@ -23,52 +18,77 @@ class RegisterActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_register)
 
-        // 1. Initialize the new buttons
         btnRequestCode = findViewById(R.id.btnRequestCode)
         btnEnterCode = findViewById(R.id.btnEnterCode)
         btnFarmSetup = findViewById(R.id.btnFarmSetup)
 
         val db = FirebaseFirestore.getInstance()
 
-        // 2. Logic for Requesting a Code (Shows a Dialog as we discussed)
         btnRequestCode.setOnClickListener {
-            showRequestCodeDialog()
+            showRequestCodeDialog(db)
         }
 
-        // 3. Logic for entering an existing code
         btnEnterCode.setOnClickListener {
-            Toast.makeText(this, "Enter Code feature coming soon!", Toast.LENGTH_SHORT).show()
-            // Here you will eventually navigate to a verification screen
+            val intent = Intent(this, EnterCodeActivity::class.java)
+            startActivity(intent)
         }
 
-        // 4. Check if Farm Setup should be visible (Owner check)
         checkOwnerExists(db)
 
         btnFarmSetup.setOnClickListener {
-            // Navigate to Farm Setup Activity
-            Toast.makeText(this, "Opening Farm Setup...", Toast.LENGTH_SHORT).show()
+            val intent = Intent(this, FarmSetupActivity::class.java)
+            startActivity(intent)
         }
     }
 
-    private fun showRequestCodeDialog() {
-        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_edit_profile, null) // We can reuse or make a new one
+    private fun showRequestCodeDialog(db: FirebaseFirestore) {
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_request_access, null)
+        val editEmail = dialogView.findViewById<EditText>(R.id.requestEmail)
+        val editName = dialogView.findViewById<EditText>(R.id.requestName)
+        val roleGroup = dialogView.findViewById<RadioGroup>(R.id.requestRoleGroup)
+        
         val builder = AlertDialog.Builder(this)
-            .setTitle("Request Access Code")
             .setView(dialogView)
+            .setPositiveButton("Submit Request", null)
+            .setNegativeButton("Cancel", null)
 
-        // Note: You'll want to create a specific layout for this dialog
-        // with an Email field and Role RadioButtons to match your plan.
+        val dialog = builder.create()
+        dialog.show()
 
-        builder.setPositiveButton("Submit Request") { dialog, _ ->
-            Toast.makeText(this, "Request Sent to Owner!", Toast.LENGTH_LONG).show()
-            dialog.dismiss()
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val email = editEmail.text.toString().trim().lowercase()
+            val name = editName.text.toString().trim()
+            
+            val selectedRoleId = roleGroup.checkedRadioButtonId
+            val role = if (selectedRoleId == R.id.radioRequestBackup) "backup_owner" else "staff"
+
+            if (email.isNotEmpty() && name.isNotEmpty()) {
+                val requestMap = hashMapOf(
+                    "name" to name,
+                    "email" to email,
+                    "status" to "pending",
+                    "role" to role,
+                    "requestedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
+                )
+
+                db.collection("user_access")
+                    .document(email)
+                    .set(requestMap)
+                    .addOnSuccessListener {
+                        Toast.makeText(this, "Request submitted for $role. Please wait for owner approval.", Toast.LENGTH_LONG).show()
+                        dialog.dismiss()
+                    }
+                    .addOnFailureListener { e ->
+                        Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+            } else {
+                Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show()
+            }
         }
-        builder.setNegativeButton("Cancel", null)
-        builder.show()
     }
 
     private fun checkOwnerExists(db: FirebaseFirestore) {
-        db.collection("users")
+        db.collection("user_access")
             .whereEqualTo("role", "owner")
             .get()
             .addOnSuccessListener { documents ->

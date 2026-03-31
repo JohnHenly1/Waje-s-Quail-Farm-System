@@ -21,6 +21,7 @@
     <string name="egg_count">Bilang ng Itlog</string>
     <string name="report">Ulat</string>
     <string name="tasks">Mga Gawain</string>
+    <string name="water_level">Antas ng Tubig</string>
 
     <!-- Quick Stats -->
     <string name="total_eggs_today">Kabuuang Itlog Ngayon</string>
@@ -85,5 +86,19 @@
     <string name="version_info">Waje\'s Quail Farm Beta Ver.</string>
     <string name="copyright">© 2026 Nakareserba ang lahat ng karapatan</string>
     <string name="camera">Kamera</string>
+
+    <!-- Login & Registration -->
+    <string name="login_title">Mag-login</string>
+    <string name="continue_with_google">Magpatuloy gamit ang Google</string>
+    <string name="register_account">Magrehistro ng Account</string>
+    <string name="system_access">Access sa System</string>
+    <string name="enter_email_hint">Ilagay ang Email Address</string>
+    <string name="select_role">Pumili ng Papel:</string>
+    <string name="role_staff">Staff</string>
+    <string name="role_backup_owner">Backup na May-ari</string>
+    <string name="request_code">Humingi ng Access Code</string>
     <string name="i_have_a_code">May Invite Code Ako</string>
+    <string name="initial_farm_setup">Initial na Setup ng Farm (May-ari)</string>
+    <string name="role_available">Available: %1$d/%2$d</string>
+    <string name="role_full">Puno na ang Papel</string>
 </resources>

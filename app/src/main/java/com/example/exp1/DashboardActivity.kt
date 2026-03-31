@@ -44,7 +44,6 @@ class DashboardActivity : AppCompatActivity() {
         registerForActivityResult(ActivityResultContracts.TakePicture()) { success ->
             if (success && photoUri != null) {
                 Toast.makeText(this, "Photo saved!", Toast.LENGTH_SHORT).show()
-                // TODO: do something with photoUri (e.g. open a preview screen)
             }
         }
 
@@ -56,16 +55,12 @@ class DashboardActivity : AppCompatActivity() {
         }
 
 
-    //  Lifecycle -----------------------------------------------------------------------------------
-
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_dashboard)
 
         username = intent.getStringExtra("username") ?: "User"
-
         drawerLayout = findViewById(R.id.drawerLayout)
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
@@ -87,10 +82,6 @@ class DashboardActivity : AppCompatActivity() {
     }
 
 
-    //  Camera helpers -------------------------------------------------------------------------------
-
-
-    /** Entry point — check permission then open camera. */
     private fun handleCameraClick() {
         when {
             ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
@@ -100,7 +91,6 @@ class DashboardActivity : AppCompatActivity() {
         }
     }
 
-    /** Creates a temp file, builds a FileProvider URI, and launches the camera. */
     private fun openCamera() {
         try {
             val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
@@ -108,14 +98,13 @@ class DashboardActivity : AppCompatActivity() {
 
             photoUri = FileProvider.getUriForFile(
                 this,
-                "${packageName}.fileprovider",   // must match your AndroidManifest provider authority
+                "${packageName}.fileprovider",
                 imageFile
             )
 
             takePictureLauncher.launch(photoUri)
 
         } catch (e: Exception) {
-            // Fallback: open camera app without saving to a specific URI
             val fallbackIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
             if (fallbackIntent.resolveActivity(packageManager) != null) {
                 startActivity(fallbackIntent)
@@ -125,38 +114,30 @@ class DashboardActivity : AppCompatActivity() {
         }
     }
 
-    //  UI setup-----------------------------------------------------------------------------------
-
     private fun applyEntranceAnimations() {
         val fadeIn  = AnimationUtils.loadAnimation(this, R.anim.fade_in)
         val slideUp = AnimationUtils.loadAnimation(this, R.anim.slide_up)
 
         findViewById<View>(R.id.welcomeCard)?.startAnimation(fadeIn)
-
-        slideUp.startOffset = 100
         findViewById<View>(R.id.aiCard)?.startAnimation(slideUp)
-
-        slideUp.startOffset = 200
         findViewById<View>(R.id.shortcutsGrid)?.startAnimation(slideUp)
-
-        slideUp.startOffset = 300
         findViewById<View>(R.id.statsGrid)?.startAnimation(slideUp)
     }
 
-    private fun showLoading(action: () -> Unit) {
+    fun showLoading(action: () -> Unit) {
         val loadingLayout = findViewById<View>(R.id.loadingLayout)
         val loadingIcon   = findViewById<View>(R.id.loadingIcon)
 
         if (loadingLayout != null && loadingIcon != null) {
             loadingLayout.visibility = View.VISIBLE
-            val rotate = AnimationUtils.loadAnimation(this, R.anim.rotate)
-            loadingIcon.startAnimation(rotate)
+            val jump = AnimationUtils.loadAnimation(this, R.anim.quail_jump)
+            loadingIcon.startAnimation(jump)
 
             handler.postDelayed({
                 loadingLayout.visibility = View.GONE
                 loadingIcon.clearAnimation()
                 action()
-            }, 800)
+            }, 1200)
         } else {
             action()
         }
@@ -165,14 +146,11 @@ class DashboardActivity : AppCompatActivity() {
     private fun setupNavigation() {
         try {
             NavigationHelper.setupSideMenu(this, drawerLayout)
-
             findViewById<android.view.View>(R.id.imageButton)?.setOnClickListener {
                 drawerLayout.openDrawer(GravityCompat.START)
             }
-
             NavigationHelper.setupBottomNavigation(this)
             NavigationHelper.setupNotificationButton(this)
-
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -196,13 +174,10 @@ class DashboardActivity : AppCompatActivity() {
     }
 
     private fun setupButtons() {
-
-        // -- Camera button -------------------------------------------------------------
         findViewById<LinearLayout?>(R.id.CameraButton)?.setOnClickListener {
             handleCameraClick()
         }
 
-        // -- Analytics -------------------------------------------------------------
         findViewById<LinearLayout?>(R.id.analyticsButton)?.setOnClickListener {
             showLoading {
                 startActivity(Intent(this, AnalyticsActivity::class.java)
@@ -210,9 +185,6 @@ class DashboardActivity : AppCompatActivity() {
             }
         }
 
-
-
-        // -- Schedule  -------------------------------------------------------------
         findViewById<android.widget.ImageButton?>(R.id.scheduleButton1)?.setOnClickListener {
             showLoading {
                 startActivity(Intent(this, ScheduleActivity::class.java)
@@ -220,7 +192,6 @@ class DashboardActivity : AppCompatActivity() {
             }
         }
 
-        // -- Feed Inventory  -------------------------------------------------------
         findViewById<android.view.View?>(R.id.feedInventoryButton)?.setOnClickListener {
             showLoading {
                 startActivity(Intent(this, FeedInventoryActivity::class.java)
@@ -228,7 +199,6 @@ class DashboardActivity : AppCompatActivity() {
             }
         }
 
-        // -- Egg Coun --------------------------------------------------------------
         findViewById<android.view.View?>(R.id.eggCountButton)?.setOnClickListener {
             showLoading {
                 startActivity(Intent(this, EggCountActivity::class.java)
@@ -236,15 +206,13 @@ class DashboardActivity : AppCompatActivity() {
             }
         }
 
-        //-- Water Level Activity ---------------------------------------------------
-        findViewById<android.view.View?>(R.id.water_level)?.setOnClickListener {
+        findViewById<android.view.View?>(R.id.waterLevelButton)?.setOnClickListener {
             showLoading {
-                startActivity(Intent(this, WaterSensorActivity::class.java)  // ← FIXED
+                startActivity(Intent(this, WaterLevelActivity::class.java)
                     .putExtra("username", username))
             }
         }
 
-        // -- Tasks ------------------------------------------------------------------
         findViewById<android.view.View?>(R.id.tasksButton)?.setOnClickListener {
             showLoading {
                 startActivity(Intent(this, ScheduleActivity::class.java)
