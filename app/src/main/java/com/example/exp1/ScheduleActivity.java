@@ -42,6 +42,8 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -109,9 +111,13 @@ public class ScheduleActivity extends AppCompatActivity {
         createNotificationChannel();
 
         db = FirebaseFirestore.getInstance();
-        currentUserEmail = getIntent().getStringExtra("username");
-        if (currentUserEmail == null || currentUserEmail.isEmpty()) {
-            currentUserEmail = "default_user";
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+
+        if (user != null) {
+            currentUserEmail = user.getUid();
+        } else {
+            Toast.makeText(this, "User not logged in!", Toast.LENGTH_LONG).show();
+            finish();
         }
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
