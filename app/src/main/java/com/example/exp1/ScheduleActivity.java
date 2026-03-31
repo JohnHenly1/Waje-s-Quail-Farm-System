@@ -619,64 +619,96 @@ public class ScheduleActivity extends AppCompatActivity {
         if (tasksContainer == null) return;
         tasksContainer.removeAllViews();
 
-        int done = 0, ongoing = 0, pending = 0;
+        final int[] done = {0};
+        final int[] ongoing = {0};
+        final int[] pending = {0};
         int selYear  = selectedDate.get(Calendar.YEAR);
         int selMonth = selectedDate.get(Calendar.MONTH);
         int selDay   = selectedDate.get(Calendar.DAY_OF_MONTH);
 
+        Map<String, List<Task>> groupedTasks = new HashMap<>();
+        // Group tasks by category
         for (Task task : taskList) {
             if (task.year != selYear || task.month != selMonth || task.day != selDay) continue;
 
-            View taskView = getLayoutInflater().inflate(R.layout.item_schedule_task, tasksContainer, false);
-
-            TextView    titleTv         = taskView.findViewById(R.id.taskTitle);
-            TextView    categoryTv      = taskView.findViewById(R.id.taskCategory);
-            TextView    timeTv          = taskView.findViewById(R.id.taskTime);
-            View        statusIndicator = taskView.findViewById(R.id.statusIndicator);
-            ImageButton deleteBtn       = taskView.findViewById(R.id.deleteTaskBtn);
-
-            titleTv.setText(task.title);
-            categoryTv.setText(task.category);
-
-            String timeLabel = task.time;
-            if (!RECUR_ONCE.equals(task.recurrence)) {
-                timeLabel += "  •  " + task.recurrence;
+            if (!groupedTasks.containsKey(task.category)) {
+                groupedTasks.put(task.category, new ArrayList<>());
             }
-            timeTv.setText(timeLabel);
-
-            taskView.setOnClickListener(v -> {
-                String[] statuses = {"Pending", "Ongoing", "Done"};
-                new AlertDialog.Builder(this)
-                        .setTitle("Update Status")
-                        .setItems(statuses, (dialog, which) -> {
-                            task.status = statuses[which];
-                            updateTaskStatus(task);
-                        })
-                        .show();
-            });
-
-            deleteBtn.setOnClickListener(v -> showDeleteOptions(task));
-
-            switch (task.status) {
-                case "Done":
-                    done++;
-                    statusIndicator.setBackgroundResource(R.drawable.bg_status_done);
-                    break;
-                case "Ongoing":
-                    ongoing++;
-                    statusIndicator.setBackgroundResource(R.drawable.bg_status_ongoing);
-                    break;
-                default:
-                    pending++;
-                    statusIndicator.setBackgroundResource(R.drawable.bg_status_pending);
-                    break;
-            }
-            tasksContainer.addView(taskView);
+            groupedTasks.get(task.category).add(task);
         }
 
-        if (doneCount    != null) doneCount.setText(String.valueOf(done));
-        if (ongoingCount != null) ongoingCount.setText(String.valueOf(ongoing));
-        if (pendingCount != null) pendingCount.setText(String.valueOf(pending));
+// Display grouped tasks
+        String[] orderedCategories = {
+                "Feeding", "Watering", "Cleaning",
+                "Egg Collection", "Lighting", "Health Check"
+        };
+
+        for (String category : orderedCategories) {
+            if (!groupedTasks.containsKey(category)) continue;
+
+            // 🔹 Add Category Header
+            TextView header = (TextView) getLayoutInflater()
+                    .inflate(R.layout.item_category_header, tasksContainer, false);
+
+            header.setText(category);
+            tasksContainer.addView(header);
+
+            // 🔹 Add Tasks under category
+            for (Task task : groupedTasks.get(category)) {
+
+                View taskView = getLayoutInflater()
+                        .inflate(R.layout.item_schedule_task, tasksContainer, false);
+
+                TextView titleTv = taskView.findViewById(R.id.taskTitle);
+                TextView categoryTv = taskView.findViewById(R.id.taskCategory);
+                TextView timeTv = taskView.findViewById(R.id.taskTime);
+                View statusIndicator = taskView.findViewById(R.id.statusIndicator);
+                ImageButton deleteBtn = taskView.findViewById(R.id.deleteTaskBtn);
+
+                titleTv.setText(task.title);
+                categoryTv.setText(task.category);
+
+                String timeLabel = task.time;
+                if (!RECUR_ONCE.equals(task.recurrence)) {
+                    timeLabel += "  •  " + task.recurrence;
+                }
+                timeTv.setText(timeLabel);
+
+                taskView.setOnClickListener(v -> {
+                    String[] statuses = {"Pending", "Ongoing", "Done"};
+                    new AlertDialog.Builder(this)
+                            .setTitle("Update Status")
+                            .setItems(statuses, (dialog, which) -> {
+                                task.status = statuses[which];
+                                updateTaskStatus(task);
+                            })
+                            .show();
+                });
+
+                deleteBtn.setOnClickListener(v -> showDeleteOptions(task));
+
+                switch (task.status) {
+                    case "Done":
+                        done[0]++;
+                        statusIndicator.setBackgroundResource(R.drawable.bg_status_done);
+                        break;
+                    case "Ongoing":
+                        ongoing[0]++;
+                        statusIndicator.setBackgroundResource(R.drawable.bg_status_ongoing);
+                        break;
+                    default:
+                        pending[0]++;
+                        statusIndicator.setBackgroundResource(R.drawable.bg_status_pending);
+                        break;
+                }
+
+                tasksContainer.addView(taskView);
+            }
+        }
+
+        if (doneCount    != null) doneCount.setText(String.valueOf(done[0]));
+        if (ongoingCount != null) ongoingCount.setText(String.valueOf(ongoing[0]));
+        if (pendingCount != null) pendingCount.setText(String.valueOf(pending[0]));
 
         View placeholder = findViewById(R.id.noTasksPlaceholder);
         if (placeholder != null)
