@@ -102,6 +102,7 @@ public class ScheduleActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        requestNotificationPermission();
         EdgeToEdge.enable(this);
 
         //1st step init CameraHelper----------------------------------------------------------------
@@ -223,6 +224,17 @@ public class ScheduleActivity extends AppCompatActivity {
                     }
                     updateTasksUI();
                 });
+    }
+
+    // Add this as a new method in ScheduleActivity
+    private void requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                    != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(
+                        new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 101);
+            }
+        }
     }
 
     private void addTaskToFirestore(Task task) {
@@ -808,25 +820,48 @@ public class ScheduleActivity extends AppCompatActivity {
     }
 
     private void scheduleNotification(Task task, int hour, int minute) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
-            if (am != null && !am.canScheduleExactAlarms()) {
-                startActivity(new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM));
-                return;
-            }
-        }
+        AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+        if (am == null) return;
+
         Calendar calendar = Calendar.getInstance();
         calendar.set(task.year, task.month, task.day, hour, minute, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
+
+        // Don't schedule if time already passed
         if (calendar.before(Calendar.getInstance())) return;
 
         Intent intent = new Intent(this, TaskAlarmReceiver.class);
         intent.putExtra("taskTitle", task.title);
         intent.putExtra("taskCategory", task.category);
+
         int rc = (task.title + task.year + task.month + task.day + hour + minute).hashCode();
         PendingIntent pi = PendingIntent.getBroadcast(this, rc, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
-        if (am != null) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, calendar.getTimeInMillis(), pi);
+
+        // Works across ALL Android versions
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // Android 12+
+            if (am.canScheduleExactAlarms()) {
+                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,
+                        calendar.getTimeInMillis(), pi);
+            } else {
+                // Fallback if exact alarm not permitted
+                am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,
+                        calendar.getTimeInMillis(), pi);
+                // Also open settings so user can grant it
+                Intent settingsIntent = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM);
+                settingsIntent.setData(android.net.Uri.parse("package:" + getPackageName()));
+                startActivity(settingsIntent);
+            }
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            // Android 6–11
+            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,
+                    calendar.getTimeInMillis(), pi);
+        } else {
+            // Android 5 and below
+            am.setExact(AlarmManager.RTC_WAKEUP,
+                    calendar.getTimeInMillis(), pi);
+        }
     }
 
     //  Mini-calendar cell factories----------------------------------------------------------------
@@ -899,39 +934,65 @@ public class ScheduleActivity extends AppCompatActivity {
     public static class TaskAlarmReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
-            AccountManager accountManager = new AccountManager(context);
-            if (!accountManager.isScheduleEnabled()) return;
-
             String title    = intent.getStringExtra("taskTitle");
             String category = intent.getStringExtra("taskCategory");
+
+            // Create channel (safe to call repeatedly)
+            createChannel(context);
+
             String timestamp = new SimpleDateFormat("yyyy/MM/dd hh:mm a",
                     Locale.getDefault()).format(new Date());
 
-            if (accountManager.isGlobalDataEnabled()) {
-                GlobalData.INSTANCE.addAlert(
-                        "Task Reminder: " + title + " (" + category + ")", timestamp, "System");
+            // In-app alert
+            try {
+                AccountManager accountManager = new AccountManager(context);
+                if (!accountManager.isScheduleEnabled()) return;
+                if (accountManager.isGlobalDataEnabled()) {
+                    GlobalData.INSTANCE.addAlert(
+                            "Task Reminder: " + title + " (" + category + ")",
+                            timestamp, "System");
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
             }
 
-            if (accountManager.isAlertsEnabled()) {
-                Intent alertIntent = new Intent(context, AlertsActivity.class);
-                PendingIntent pi = PendingIntent.getActivity(context, 0, alertIntent,
-                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            // Build and show notification
+            Intent alertIntent = new Intent(context, AlertsActivity.class);
+            alertIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            PendingIntent pi = PendingIntent.getActivity(context, 0, alertIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-                NotificationCompat.Builder builder =
-                        new NotificationCompat.Builder(context, "task_reminder_channel")
-                                .setSmallIcon(R.drawable.ic_notifications)
-                                .setContentTitle("Task Reminder: " + title)
-                                .setContentText("It's time for " + category)
-                                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                                .setContentIntent(pi)
-                                .setAutoCancel(true);
+            NotificationCompat.Builder builder =
+                    new NotificationCompat.Builder(context, "task_reminder_channel")
+                            .setSmallIcon(R.drawable.ic_notifications)
+                            .setContentTitle("Task Reminder: " + title)
+                            .setContentText("It's time for " + category)
+                            .setPriority(NotificationCompat.PRIORITY_MAX)
+                            .setDefaults(NotificationCompat.DEFAULT_ALL)
+                            .setContentIntent(pi)
+                            .setAutoCancel(true)
+                            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
 
-                try {
-                    NotificationManagerCompat.from(context)
-                            .notify((int) System.currentTimeMillis(), builder.build());
-                } catch (SecurityException e) {
-                    e.printStackTrace();
-                }
+            try {
+                NotificationManagerCompat nm = NotificationManagerCompat.from(context);
+                nm.notify((int) System.currentTimeMillis(), builder.build());
+            } catch (SecurityException e) {
+                e.printStackTrace();
+            }
+        }
+
+        private static void createChannel(Context context) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                NotificationChannel channel = new NotificationChannel(
+                        "task_reminder_channel",
+                        "Task Reminders",
+                        NotificationManager.IMPORTANCE_HIGH);
+                channel.setDescription("Notifications for farm tasks");
+                channel.enableLights(true);
+                channel.enableVibration(true);
+                channel.setLockscreenVisibility(NotificationCompat.VISIBILITY_PUBLIC);
+                NotificationManager nm = context.getSystemService(NotificationManager.class);
+                if (nm != null) nm.createNotificationChannel(channel);
             }
         }
     }
