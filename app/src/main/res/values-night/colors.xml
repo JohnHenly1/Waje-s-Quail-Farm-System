@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Schedule Task Theme Colors (Dark) -->
+    <color name="schedule_task_bg">#1A1A1A</color>
+    <color name="schedule_task_title">#FFFFFF</color>
+    <color name="schedule_task_subtitle">#9CA3AF</color>
+    <color name="schedule_task_header">#E5E7EB</color>
+</resources>

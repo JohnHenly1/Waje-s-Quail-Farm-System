@@ -44,4 +44,10 @@
     <color name="stats_orange_start">#fbbf24</color>
     <color name="stats_orange_end">#f97316</color>
 
+    <!-- Schedule Task Theme Colors -->
+    <color name="schedule_task_bg">#FFFFFF</color>
+    <color name="schedule_task_title">#000000</color>
+    <color name="schedule_task_subtitle">#666666</color>
+    <color name="schedule_task_header">#374151</color>
+
 </resources>

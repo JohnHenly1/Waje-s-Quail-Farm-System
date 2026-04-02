@@ -6,7 +6,7 @@
     android:layout_marginBottom="12dp"
     app:cardCornerRadius="20dp"
     app:cardElevation="0dp"
-    app:cardBackgroundColor="@color/black">
+    app:cardBackgroundColor="@color/schedule_task_bg">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -34,7 +34,7 @@
                 android:layout_height="wrap_content"
                 android:fontFamily="sans-serif-black"
                 android:text="Morning Feeding"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/schedule_task_title"
                 android:textSize="17sp" />
 
             <TextView
@@ -43,7 +43,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text="Feeding"
-                android:textColor="#9CA3AF"
+                android:textColor="@color/schedule_task_subtitle"
                 android:textSize="12sp" />
         </LinearLayout>
 
@@ -59,14 +59,14 @@
                 android:layout_height="wrap_content"
                 android:fontFamily="sans-serif-medium"
                 android:text="08:00 AM"
-                android:textColor="#9CA3AF"
+                android:textColor="@color/schedule_task_subtitle"
                 android:textSize="13sp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="  •  "
-                android:textColor="#9CA3AF"
+                android:textColor="@color/schedule_task_subtitle"
                 android:textSize="13sp" />
 
             <TextView
@@ -74,7 +74,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Daily"
-                android:textColor="#9CA3AF"
+                android:textColor="@color/schedule_task_subtitle"
                 android:textSize="13sp" />
         </LinearLayout>
 
