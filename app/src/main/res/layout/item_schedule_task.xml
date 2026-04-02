@@ -4,8 +4,9 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="12dp"
-    app:cardCornerRadius="16dp"
-    app:cardElevation="1dp">
+    app:cardCornerRadius="20dp"
+    app:cardElevation="0dp"
+    app:cardBackgroundColor="@color/black">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -16,8 +17,8 @@
 
         <View
             android:id="@+id/statusIndicator"
-            android:layout_width="4dp"
-            android:layout_height="40dp"
+            android:layout_width="6dp"
+            android:layout_height="44dp"
             android:background="@drawable/bg_status_pending" />
 
         <LinearLayout
@@ -33,8 +34,8 @@
                 android:layout_height="wrap_content"
                 android:fontFamily="sans-serif-black"
                 android:text="Morning Feeding"
-                android:textColor="#111827"
-                android:textSize="16sp" />
+                android:textColor="#FFFFFF"
+                android:textSize="17sp" />
 
             <TextView
                 android:id="@+id/taskCategory"
@@ -42,27 +43,58 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text="Feeding"
-                android:textColor="#6B7280"
+                android:textColor="#9CA3AF"
                 android:textSize="12sp" />
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/taskTime"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:fontFamily="sans-serif-medium"
-            android:text="08:00 AM"
-            android:textColor="#111827"
-            android:textSize="14sp" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
-        <ImageButton
-            android:id="@+id/deleteTaskBtn"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginStart="8dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            app:srcCompat="@drawable/ic_trash"
-            app:tint="#EF4444" />
+            <TextView
+                android:id="@+id/taskTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:text="08:00 AM"
+                android:textColor="#9CA3AF"
+                android:textSize="13sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="  •  "
+                android:textColor="#9CA3AF"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/taskRecurrence"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Daily"
+                android:textColor="#9CA3AF"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <androidx.cardview.widget.CardView
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginStart="12dp"
+            app:cardCornerRadius="8dp"
+            app:cardElevation="0dp"
+            app:cardBackgroundColor="#EF4444">
+            <ImageButton
+                android:id="@+id/deleteTaskBtn"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:scaleType="centerInside"
+                android:padding="6dp"
+                app:srcCompat="@drawable/ic_trash"
+                app:tint="@color/white" />
+        </androidx.cardview.widget.CardView>
 
     </LinearLayout>
 </androidx.cardview.widget.CardView>
