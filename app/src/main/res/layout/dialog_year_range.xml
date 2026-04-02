@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Select Year Range"
+        android:textColor="@color/dark_green"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Start Year"
+        android:textSize="14sp" />
+
+    <EditText
+        android:id="@+id/editStartYear"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="2024"
+        android:inputType="number" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="End Year"
+        android:textSize="14sp" />
+
+    <EditText
+        android:id="@+id/editEndYear"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="2025"
+        android:inputType="number" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Filter By"
+        android:textSize="14sp" />
+
+    <RadioGroup
+        android:id="@+id/rgYearFilter"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="vertical">
+
+        <RadioButton
+            android:id="@+id/rbAllDays"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="All Days"
+            android:checked="true" />
+
+        <RadioButton
+            android:id="@+id/rbYearlyWeekdays"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Weekdays Only (Mon-Fri)" />
+
+        <RadioButton
+            android:id="@+id/rbYearlyWeekends"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Weekends Only (Sat-Sun)" />
+    </RadioGroup>
+
+</LinearLayout>

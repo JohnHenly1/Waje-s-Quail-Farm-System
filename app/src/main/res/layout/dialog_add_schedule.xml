@@ -16,7 +16,7 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginBottom="24dp">
+            android:layout_marginBottom="20dp">
 
             <ImageView
                 android:layout_width="32dp"
@@ -58,7 +58,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="16dp"
             android:text="Category"
             android:textColor="@color/dark_green"
             android:textSize="14sp"
@@ -75,32 +75,11 @@
                 android:layout_height="match_parent" />
         </FrameLayout>
 
-        <!-- Recurrence Section -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:text="Repeat"
-            android:textColor="@color/dark_green"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/rounded_corner">
-            <Spinner
-                android:id="@+id/spinnerRecurrence"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent" />
-        </FrameLayout>
-
         <!-- Time -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="16dp"
             android:text="Time"
             android:textColor="@color/dark_green"
             android:textSize="14sp"
@@ -117,20 +96,102 @@
             android:paddingStart="12dp"
             android:textSize="16sp" />
 
-        <!-- Date Picker -->
+        <!-- Smart Selection Toolbox -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:text="Select Dates"
+            android:layout_marginTop="16dp"
+            android:text="Quick Selection Tools"
             android:textColor="@color/dark_green"
             android:textSize="14sp"
             android:textStyle="bold" />
 
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:scrollbars="none">
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnWeekdays"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Weekdays"
+                    android:textSize="12sp"
+                    android:layout_marginEnd="8dp"
+                    app:strokeColor="@color/dark_green"
+                    android:textColor="@color/dark_green"/>
+
+                <Button
+                    android:id="@+id/btnWeekends"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Weekends"
+                    android:textSize="12sp"
+                    android:layout_marginEnd="8dp"
+                    app:strokeColor="@color/dark_green"
+                    android:textColor="@color/dark_green"/>
+
+                <Button
+                    android:id="@+id/btnFullMonth"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="This Month"
+                    android:textSize="12sp"
+                    android:layout_marginEnd="8dp"
+                    app:strokeColor="@color/dark_green"
+                    android:textColor="@color/dark_green"/>
+
+                <Button
+                    android:id="@+id/btnFullYear"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="This Year"
+                    android:textSize="12sp"
+                    android:layout_marginEnd="8dp"
+                    app:strokeColor="@color/dark_green"
+                    android:textColor="@color/dark_green"/>
+
+                <Button
+                    android:id="@+id/btnClearSelection"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Clear"
+                    android:textSize="12sp"
+                    app:strokeColor="@color/logout_red"
+                    android:textColor="@color/logout_red"/>
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <!-- Smart Pattern Detection Badge -->
+        <TextView
+            android:id="@+id/txtPatternSuggestion"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_status_ongoing"
+            android:padding="6dp"
+            android:text="Repeat every 7 days?"
+            android:textColor="@color/white"
+            android:textSize="12sp"
+            android:visibility="gone"
+            android:clickable="true"
+            android:focusable="true"/>
+
+        <!-- Date Visualizer -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="16dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
@@ -166,8 +227,18 @@
             android:id="@+id/calendarGrid"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="8dp"
             android:columnCount="7" />
+
+        <TextView
+            android:id="@+id/txtScheduleSummary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Total: 0 dates selected"
+            android:textColor="@color/dark_gray"
+            android:textSize="14sp"
+            android:textStyle="italic" />
 
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>
