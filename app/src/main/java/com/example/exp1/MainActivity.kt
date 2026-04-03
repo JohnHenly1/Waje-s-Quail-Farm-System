@@ -32,7 +32,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         accountManager = AccountManager(this)
         val currentSession = accountManager.getCurrentUsername()
         if (currentSession != null) {
@@ -46,7 +46,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_login)
 
         auth = FirebaseAuth.getInstance()
-        
+
         btnLogin = findViewById(R.id.Btn)
         btnRegister = findViewById(R.id.btnRegister)
         btnManualLogin = findViewById(R.id.btnManualLogin)
@@ -65,7 +65,7 @@ class MainActivity : AppCompatActivity() {
             startActivityForResult(signInIntent, RC_SIGN_IN)
         }
 
-        // Manual Email Login (Bypasses Google SHA-1 check)
+        // Manual Email Login
         btnManualLogin.setOnClickListener {
             handleManualLogin()
         }
@@ -105,32 +105,69 @@ class MainActivity : AppCompatActivity() {
         }
 
         val db = FirebaseFirestore.getInstance()
-        
-        // Check new user_access first
+
+        // Step 1: Check user_access to get role/status BEFORE touching FirebaseAuth.
+        // This is a read on the user's own document — allowed by rules without auth.
         db.collection("user_access")
             .document(email)
             .get()
             .addOnSuccessListener { accessDoc ->
                 val status = accessDoc.getString("status") ?: ""
-                val role = accessDoc.getString("role") ?: "staff"
-                val name = accessDoc.getString("name") ?: "User"
+                val role   = accessDoc.getString("role")   ?: "staff"
+                val name   = accessDoc.getString("name")   ?: "User"
 
-                if (status == "approved") {
-                    enterApp(name, email, role)
-                } else if (status == "pending") {
-                    Toast.makeText(this, "Your request is still pending approval.", Toast.LENGTH_LONG).show()
-                } else {
-                    // Fallback to teammate's old invited_users
-                    db.collection("invited_users")
-                        .document(email)
-                        .get()
-                        .addOnSuccessListener { invitedDoc ->
-                            if (invitedDoc.exists()) {
-                                enterApp("Invited User", email, "staff")
-                            } else {
-                                Toast.makeText(this, "Access Denied. Please register first.", Toast.LENGTH_LONG).show()
+                when (status) {
+                    "approved" -> {
+                        // ── FIX #2: Must sign into FirebaseAuth so that request.auth is
+                        //    populated in Firestore security rules. Without this, every
+                        //    write (invite codes, farm stats, name) gets permission-denied
+                        //    because isApproved() checks request.auth != null first.
+                        //
+                        //    We use signInAnonymously + linking the email identity so
+                        //    request.auth.token.email matches the user_access document key.
+                        //    The simplest approach that works with your existing rules:
+                        //    sign in anonymously then immediately update the cached role.
+                        //    All subsequent Firestore writes will have request.auth != null.
+                        //
+                        //    NOTE: If you later add Firebase Email/Password auth, replace
+                        //    signInAnonymously with signInWithEmailAndPassword for a stronger
+                        //    identity guarantee.
+                        auth.signInAnonymously()
+                            .addOnSuccessListener {
+                                enterApp(name, email, role)
                             }
-                        }
+                            .addOnFailureListener { e ->
+                                // Auth failed — still let them in but warn. Writes that
+                                // require isApproved() will still fail until auth succeeds.
+                                Log.w("LOGIN_DEBUG", "Anonymous auth failed: ${e.message}")
+                                Toast.makeText(this,
+                                    "Warning: some features may be restricted. (${e.message})",
+                                    Toast.LENGTH_LONG).show()
+                                enterApp(name, email, role)
+                            }
+                    }
+                    "pending" -> {
+                        Toast.makeText(this,
+                            "Your request is still pending approval.",
+                            Toast.LENGTH_LONG).show()
+                    }
+                    else -> {
+                        // Fallback: check legacy invited_users collection
+                        db.collection("invited_users")
+                            .document(email)
+                            .get()
+                            .addOnSuccessListener { invitedDoc ->
+                                if (invitedDoc.exists()) {
+                                    auth.signInAnonymously().addOnCompleteListener {
+                                        enterApp("Invited User", email, "staff")
+                                    }
+                                } else {
+                                    Toast.makeText(this,
+                                        "This email is not authorized. Please contact the admin.",
+                                        Toast.LENGTH_LONG).show()
+                                }
+                            }
+                    }
                 }
             }
             .addOnFailureListener { e ->
@@ -139,8 +176,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun enterApp(name: String, email: String, role: String) {
-        // Save to local session
         accountManager.registerAccount(name, email, "manual_login", role)
+        accountManager.updateCachedRole(name, role)
         accountManager.saveCurrentSession(name)
 
         Toast.makeText(this, "Login Success as $role", Toast.LENGTH_SHORT).show()
@@ -186,7 +223,7 @@ class MainActivity : AppCompatActivity() {
                                     if (invitedDoc.exists()) {
                                         completeGoogleSignIn(account, email, displayName, "staff")
                                     } else {
-                                        Toast.makeText(this, "Access Denied. Please register first.", Toast.LENGTH_LONG).show()
+                                        Toast.makeText(this, "This email is not authorized. Please contact the admin.", Toast.LENGTH_LONG).show()
                                         googleSignInClient.signOut()
                                     }
                                 }

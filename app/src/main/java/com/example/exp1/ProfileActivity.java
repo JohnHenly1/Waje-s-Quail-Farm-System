@@ -22,15 +22,19 @@ import androidx.core.os.LocaleListCompat;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import com.google.firebase.firestore.FirebaseFirestore;
+
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public class ProfileActivity extends AppCompatActivity {
     private CameraHelper cameraHelper;
     private AccountManager accountManager;
     private FirestoreManager firestoreManager;
+    private RoleManager roleManager;
 
     private TextView totalBirdsValue;
     private TextView activeCagesValue;
@@ -49,6 +53,10 @@ public class ProfileActivity extends AppCompatActivity {
         setContentView(R.layout.activity_profile);
 
         accountManager = new AccountManager(this);
+
+        // ── FIX #3: Build RoleManager from the current user's cached role so we
+        //            can show/hide owner-only UI correctly.
+        roleManager = new RoleManager(accountManager.getCurrentRole());
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
@@ -118,6 +126,9 @@ public class ProfileActivity extends AppCompatActivity {
             helpSupportButton.setOnClickListener(v -> showHelpSupportDialog());
         }
 
+
+        setupOwnerOnlySection();
+
         // Back button ----------------------------------------------------------------------
         ImageButton backButton = findViewById(R.id.backButton);
         if (backButton != null) {
@@ -150,6 +161,157 @@ public class ProfileActivity extends AppCompatActivity {
             cameraButton.setFocusable(true);
             cameraButton.setOnClickListener(v -> cameraHelper.launch());
         }
+    }
+
+    // ── Owner-only section ────────────────────────────────────────────────────
+    private void setupOwnerOnlySection() {
+        View adminCard = findViewById(R.id.adminCard);
+        if (adminCard == null) return; // layout doesn't have the card yet → safe no-op
+
+        if (roleManager.canGenerateInviteCodes() || roleManager.canManageUsers()) {
+            adminCard.setVisibility(View.VISIBLE);
+        } else {
+            adminCard.setVisibility(View.GONE);
+            return;
+        }
+
+        // Generate Invite Code button
+        View generateInviteButton = findViewById(R.id.generateInviteButton);
+        if (generateInviteButton != null && roleManager.canGenerateInviteCodes()) {
+            generateInviteButton.setVisibility(View.VISIBLE);
+            generateInviteButton.setOnClickListener(v -> showGenerateInviteDialog());
+        } else if (generateInviteButton != null) {
+            generateInviteButton.setVisibility(View.GONE);
+        }
+
+        // Manage Users button (approve/reject pending requests)
+        View manageUsersButton = findViewById(R.id.manageUsersButton);
+        if (manageUsersButton != null && roleManager.canManageUsers()) {
+            manageUsersButton.setVisibility(View.VISIBLE);
+            manageUsersButton.setOnClickListener(v -> showManageUsersDialog());
+        } else if (manageUsersButton != null) {
+            manageUsersButton.setVisibility(View.GONE);
+        }
+    }
+
+    // Generate a 6-digit invite code and write it to invite_codes/{code} ------
+    private void showGenerateInviteDialog() {
+        String[] roles = {"staff", "backup_owner"};
+        String[] roleLabels = {"Staff", "Backup Owner"};
+        final int[] selectedIndex = {0};
+
+        new AlertDialog.Builder(this)
+                .setTitle("Generate Invite Code")
+                .setSingleChoiceItems(roleLabels, 0, (d, which) -> selectedIndex[0] = which)
+                .setPositiveButton("Generate", (dialog, which) -> {
+                    String role = roles[selectedIndex[0]];
+                    // Generate a random 6-character alphanumeric code
+                    String code = UUID.randomUUID().toString()
+                            .replace("-", "")
+                            .substring(0, 6)
+                            .toUpperCase();
+
+                    Map<String, Object> codeData = new HashMap<>();
+                    codeData.put("role", role);
+                    codeData.put("createdBy", currentEmail);
+                    codeData.put("createdAt", com.google.firebase.firestore.FieldValue.serverTimestamp());
+
+                    FirebaseFirestore.getInstance()
+                            .collection("invite_codes")
+                            .document(code)
+                            .set(codeData)
+                            .addOnSuccessListener(v -> {
+                                // Show the code in a copyable dialog
+                                new AlertDialog.Builder(ProfileActivity.this)
+                                        .setTitle("Invite Code Generated")
+                                        .setMessage(
+                                                "Share this code with the new " + roleLabels[selectedIndex[0]] + ":\n\n"
+                                                        + "Code: " + code + "\n\n"
+                                                        + "They enter it in the Register screen → \"Enter Invite Code\"."
+                                        )
+                                        .setPositiveButton("OK", null)
+                                        .show();
+                            })
+                            .addOnFailureListener(e ->
+                                    Toast.makeText(this,
+                                            "Failed to generate code: " + e.getMessage(),
+                                            Toast.LENGTH_LONG).show()
+                            );
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    // Show pending user_access requests and let the owner approve/reject -------
+    private void showManageUsersDialog() {
+        // Load all user_access docs with status == "pending"
+        FirebaseFirestore.getInstance()
+                .collection("user_access")
+                .whereEqualTo("status", "pending")
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    if (querySnapshot.isEmpty()) {
+                        new AlertDialog.Builder(this)
+                                .setTitle("Manage Users")
+                                .setMessage("No pending access requests.")
+                                .setPositiveButton("OK", null)
+                                .show();
+                        return;
+                    }
+
+                    // Build list of pending users
+                    List<com.google.firebase.firestore.DocumentSnapshot> docs = querySnapshot.getDocuments();
+                    String[] labels = new String[docs.size()];
+                    for (int i = 0; i < docs.size(); i++) {
+                        com.google.firebase.firestore.DocumentSnapshot doc = docs.get(i);
+                        String name  = doc.getString("name")  != null ? doc.getString("name")  : "Unknown";
+                        String email = doc.getString("email") != null ? doc.getString("email") : doc.getId();
+                        String role  = doc.getString("role")  != null ? doc.getString("role")  : "staff";
+                        labels[i] = name + " (" + email + ") — " + role;
+                    }
+
+                    final int[] selectedIndex = {0};
+                    new AlertDialog.Builder(this)
+                            .setTitle("Pending Requests")
+                            .setSingleChoiceItems(labels, 0, (d, which) -> selectedIndex[0] = which)
+                            .setPositiveButton("Approve", (dialog, which) -> {
+                                com.google.firebase.firestore.DocumentSnapshot chosen = docs.get(selectedIndex[0]);
+                                FirebaseFirestore.getInstance()
+                                        .collection("user_access")
+                                        .document(chosen.getId())
+                                        .update("status", "approved")
+                                        .addOnSuccessListener(v ->
+                                                Toast.makeText(this, "User approved!", Toast.LENGTH_SHORT).show()
+                                        )
+                                        .addOnFailureListener(e ->
+                                                Toast.makeText(this,
+                                                        "Approve failed: " + e.getMessage(),
+                                                        Toast.LENGTH_LONG).show()
+                                        );
+                            })
+                            .setNegativeButton("Reject", (dialog, which) -> {
+                                com.google.firebase.firestore.DocumentSnapshot chosen = docs.get(selectedIndex[0]);
+                                FirebaseFirestore.getInstance()
+                                        .collection("user_access")
+                                        .document(chosen.getId())
+                                        .update("status", "rejected")
+                                        .addOnSuccessListener(v ->
+                                                Toast.makeText(this, "User rejected.", Toast.LENGTH_SHORT).show()
+                                        )
+                                        .addOnFailureListener(e ->
+                                                Toast.makeText(this,
+                                                        "Reject failed: " + e.getMessage(),
+                                                        Toast.LENGTH_LONG).show()
+                                        );
+                            })
+                            .setNeutralButton("Cancel", null)
+                            .show();
+                })
+                .addOnFailureListener(e ->
+                        Toast.makeText(this,
+                                "Could not load requests: " + e.getMessage(),
+                                Toast.LENGTH_LONG).show()
+                );
     }
 
     //  Firestore load ---------------------------------------------------------------------------
@@ -234,7 +396,6 @@ public class ProfileActivity extends AppCompatActivity {
         EditText editTotalBirds  = dialogView.findViewById(R.id.editTotalBirds);
         EditText editActiveCages = dialogView.findViewById(R.id.editActiveCages);
 
-        // Pre-fill from Firestore (load fresh before showing dialog)
         firestoreManager.loadFarmData(new FirestoreManager.OnLoadListener() {
             @Override
             public void onLoaded(String name, int totalBirds, int activeCages, long daysRunning) {
@@ -244,20 +405,19 @@ public class ProfileActivity extends AppCompatActivity {
                 });
             }
             @Override
-            public void onError(Exception e) { /* fields stay empty, user can still type */ }
+            public void onError(Exception e) { /* fields stay empty */ }
         });
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setView(dialogView)
                 .setTitle("Farm Recalibration")
-                .setPositiveButton("Save", null)          // set null first to prevent auto-dismiss
-                .setNeutralButton("Restart Days", null)   // same
+                .setPositiveButton("Save", null)
+                .setNeutralButton("Restart Days", null)
                 .setNegativeButton("Cancel", null)
                 .create();
 
         dialog.setOnShowListener(d -> {
 
-            //  Save button --------------------------------------------------------------------
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
                 String birdsStr = editTotalBirds.getText().toString().trim();
                 String cagesStr = editActiveCages.getText().toString().trim();
@@ -265,16 +425,12 @@ public class ProfileActivity extends AppCompatActivity {
                 if (birdsStr.isEmpty() || cagesStr.isEmpty()) {
                     Toast.makeText(ProfileActivity.this,
                             "Please fill in both fields", Toast.LENGTH_SHORT).show();
-                    return; // keep dialog open
+                    return;
                 }
 
                 int newBirds = Integer.parseInt(birdsStr);
                 int newCages = Integer.parseInt(cagesStr);
 
-                // Save locally
-                accountManager.saveFarmStats(newBirds, newCages);
-
-                // Save to Firestore
                 firestoreManager.saveFarmStats(newBirds, newCages, new FirestoreManager.OnSaveListener() {
                     @Override
                     public void onSuccess() {
@@ -283,7 +439,7 @@ public class ProfileActivity extends AppCompatActivity {
                             activeCagesValue.setText(String.valueOf(newCages));
                             Toast.makeText(ProfileActivity.this,
                                     "Farm stats updated!", Toast.LENGTH_SHORT).show();
-                            loadFirestoreData(); // refresh daysRunning display too
+                            loadFirestoreData();
                             dialog.dismiss();
                         });
                     }
@@ -297,7 +453,6 @@ public class ProfileActivity extends AppCompatActivity {
                 });
             });
 
-            //  Restart Days button-----------------------------------------------------------------
             dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v -> {
                 dialog.dismiss();
                 new AlertDialog.Builder(ProfileActivity.this)

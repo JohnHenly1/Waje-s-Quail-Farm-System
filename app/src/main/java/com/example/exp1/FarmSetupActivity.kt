@@ -32,97 +32,91 @@ class FarmSetupActivity : AppCompatActivity() {
         enableEdgeToEdge()
         setContentView(R.layout.activity_farm_setup)
 
-        auth = FirebaseAuth.getInstance()
+        auth         = FirebaseAuth.getInstance()
         accountManager = AccountManager(this)
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.setupTitle)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+            val sb = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.setPadding(sb.left, sb.top, sb.right, sb.bottom)
             insets
         }
 
-        setupTotalBirds = findViewById(R.id.setupTotalBirds)
+        setupTotalBirds  = findViewById(R.id.setupTotalBirds)
         setupActiveCages = findViewById(R.id.setupActiveCages)
 
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(getString(R.string.default_web_client_id))
             .requestEmail()
             .build()
-
         googleSignInClient = GoogleSignIn.getClient(this, gso)
 
         findViewById<android.view.View>(R.id.btnCompleteSetup).setOnClickListener {
             val birds = setupTotalBirds.text.toString().trim()
             val cages = setupActiveCages.text.toString().trim()
-
             if (birds.isEmpty() || cages.isEmpty()) {
                 Toast.makeText(this, "Please enter farm statistics", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-
-            // Start Google Sign In to link the owner
-            val signInIntent = googleSignInClient.signInIntent
-            startActivityForResult(signInIntent, RC_SIGN_IN)
+            startActivityForResult(googleSignInClient.signInIntent, RC_SIGN_IN)
         }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != RC_SIGN_IN) return
 
-        if (requestCode == RC_SIGN_IN) {
-            val task = GoogleSignIn.getSignedInAccountFromIntent(data)
-            try {
-                val account = task.getResult(ApiException::class.java)
-                if (account == null) return
+        val task = GoogleSignIn.getSignedInAccountFromIntent(data)
+        try {
+            val account     = task.getResult(ApiException::class.java) ?: return
+            val email       = account.email?.trim()?.lowercase() ?: ""
+            val displayName = account.displayName ?: "Owner"
 
-                val email = account.email?.trim()?.lowercase() ?: ""
-                val displayName = account.displayName ?: "Owner"
+            val db          = FirebaseFirestore.getInstance()
+            val credential  = GoogleAuthProvider.getCredential(account.idToken, null)
 
-                val db = FirebaseFirestore.getInstance()
+            auth.signInWithCredential(credential).addOnCompleteListener { authTask ->
+                if (!authTask.isSuccessful) {
+                    Toast.makeText(this, "Sign-In Failed", Toast.LENGTH_SHORT).show()
+                    return@addOnCompleteListener
+                }
 
-                val credential = GoogleAuthProvider.getCredential(account.idToken, null)
-                auth.signInWithCredential(credential)
-                    .addOnCompleteListener { authTask ->
-                        if (authTask.isSuccessful) {
-                            // Register as owner and save farm config
-                            val birds = setupTotalBirds.text.toString().toInt()
-                            val cages = setupActiveCages.text.toString().toInt()
+                val birds = setupTotalBirds.text.toString().toInt()
+                val cages = setupActiveCages.text.toString().toInt()
 
-                            val farmConfig = hashMapOf(
-                                "ownerEmail" to email,
-                                "totalBirds" to birds,
-                                "activeCages" to cages,
-                                "setupDate" to com.google.firebase.firestore.FieldValue.serverTimestamp()
-                            )
+                val userAccess = hashMapOf(
+                    "name"   to displayName,
+                    "email"  to email,
+                    "status" to "approved",
+                    "role"   to "owner"
+                )
 
-                            val userAccess = hashMapOf(
-                                "name" to displayName,
-                                "email" to email,
-                                "status" to "approved",
-                                "role" to "owner"
-                            )
-
-                            // Batch write
-                            val batch = db.batch()
-                            batch.set(db.collection("farm_config").document("settings"), farmConfig)
-                            batch.set(db.collection("user_access").document(email), userAccess)
-
-                            batch.commit().addOnSuccessListener {
-                                accountManager.registerAccount(displayName, email, "google_auth", "owner")
-                                accountManager.saveFarmStats(birds, cages)
-                                accountManager.saveCurrentSession(displayName)
-
-                                Toast.makeText(this, "Farm Setup Complete!", Toast.LENGTH_SHORT).show()
-                                val intent = Intent(this, DashboardActivity::class.java)
-                                intent.putExtra("username", displayName)
-                                startActivity(intent)
-                                finish()
+                // Write user_access doc (per-user role record)
+                db.collection("user_access").document(email).set(userAccess)
+                    .addOnSuccessListener {
+                        // Write shared farm stats to farm_data/shared (not per-user)
+                        FarmRepository.saveFarmStats(birds, cages) { err ->
+                            if (err != null) {
+                                Toast.makeText(this, "Stats save failed: ${err.message}", Toast.LENGTH_SHORT).show()
+                                return@saveFarmStats
                             }
+                            FarmRepository.saveFarmStartDateIfAbsent()
+
+                            accountManager.registerAccount(displayName, email, "google_auth", "owner")
+                            accountManager.updateCachedRole(displayName, "owner")
+                            accountManager.saveCurrentSession(displayName)
+
+                            Toast.makeText(this, "Farm Setup Complete!", Toast.LENGTH_SHORT).show()
+                            startActivity(Intent(this, DashboardActivity::class.java)
+                                .putExtra("username", displayName))
+                            finish()
                         }
                     }
-            } catch (e: ApiException) {
-                Toast.makeText(this, "Sign-In Failed", Toast.LENGTH_SHORT).show()
+                    .addOnFailureListener { e ->
+                        Toast.makeText(this, "Setup failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
             }
+        } catch (e: ApiException) {
+            Toast.makeText(this, "Sign-In Failed", Toast.LENGTH_SHORT).show()
         }
     }
 }

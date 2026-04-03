@@ -81,6 +81,7 @@ public class ScheduleActivity extends AppCompatActivity {
     private FirebaseFirestore db;
     private String currentUserEmail;
     private ListenerRegistration tasksListener;
+    private RoleManager roleManager;
 
     private final String[] monthNames = {
             "January","February","March","April","May","June",
@@ -103,12 +104,17 @@ public class ScheduleActivity extends AppCompatActivity {
             currentUserEmail = "default_user";
         }
 
+        // gET USER ROLE----------------------------------------------------------------------------
+        AccountManager accountManager = new AccountManager(this);
+        roleManager = new RoleManager(accountManager.getCurrentRole());
+
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
 
+        // This is calendar-------------------------------------------------------------------------
         today = Calendar.getInstance();
         selectedDate = (Calendar) today.clone();
         currentWeekCalendar = (Calendar) today.clone();
@@ -146,7 +152,15 @@ public class ScheduleActivity extends AppCompatActivity {
             finish();
         });
 
-        findViewById(R.id.AddScheduleBtn).setOnClickListener(v -> showAddScheduleDialog());
+
+        ImageButton addBtn = findViewById(R.id.AddScheduleBtn);
+        if (roleManager.canAddTask()) {
+            addBtn.setVisibility(View.VISIBLE);
+            addBtn.setOnClickListener(v -> showAddScheduleDialog());
+        } else {
+            addBtn.setVisibility(View.GONE);
+        }
+
         findViewById(R.id.seeCalendarBtn).setOnClickListener(v -> showFullCalendar());
         findViewById(R.id.bulkDeleteBtn).setOnClickListener(v -> showBulkDeleteDialog());
         findViewById(R.id.taskDetailsBtn).setOnClickListener(v -> showAllTaskDetails());
@@ -172,8 +186,8 @@ public class ScheduleActivity extends AppCompatActivity {
     }
 
     private void listenToTasks() {
-        tasksListener = db.collection("users")
-                .document(currentUserEmail)
+        tasksListener = db.collection("farm_data")
+                .document("shared")
                 .collection("tasks")
                 .orderBy("createdAt", Query.Direction.DESCENDING)
                 .addSnapshotListener((snapshots, e) -> {
@@ -203,6 +217,7 @@ public class ScheduleActivity extends AppCompatActivity {
                 });
     }
 
+    // Rquest Notification from phone---------------------------------------------------------------
     private void requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
@@ -230,7 +245,7 @@ public class ScheduleActivity extends AppCompatActivity {
 
     private void updateTaskStatus(Task task) {
         if (task.firestoreId == null) return;
-        db.collection("users").document(currentUserEmail)
+        db.collection("farm_data").document("shared")
                 .collection("tasks").document(task.firestoreId)
                 .update("status", task.status)
                 .addOnFailureListener(e ->
@@ -239,7 +254,7 @@ public class ScheduleActivity extends AppCompatActivity {
 
     private void deleteTaskFromFirestore(Task task) {
         if (task.firestoreId == null) return;
-        db.collection("users").document(currentUserEmail)
+        db.collection("farm_data").document("shared")
                 .collection("tasks").document(task.firestoreId)
                 .delete()
                 .addOnFailureListener(e ->
@@ -248,7 +263,7 @@ public class ScheduleActivity extends AppCompatActivity {
 
     private void deleteRecurringSeriesFromFirestore(Task task) {
         if (task.recurrenceGroupId == null) { deleteTaskFromFirestore(task); return; }
-        db.collection("users").document(currentUserEmail).collection("tasks")
+        db.collection("farm_data").document("shared").collection("tasks")
                 .whereEqualTo("recurrenceGroupId", task.recurrenceGroupId)
                 .get()
                 .addOnSuccessListener(querySnapshot -> {
@@ -262,11 +277,12 @@ public class ScheduleActivity extends AppCompatActivity {
                 });
     }
 
+    // Bulk Delete/ Delete all Task-----------------------------------------------------------------
     private void bulkDeleteFromFirestore(List<Task> tasksToDelete) {
         com.google.firebase.firestore.WriteBatch batch = db.batch();
         for (Task task : tasksToDelete) {
             if (task.firestoreId != null) {
-                batch.delete(db.collection("users").document(currentUserEmail)
+                batch.delete(db.collection("farm_data").document("shared")
                         .collection("tasks").document(task.firestoreId));
             }
         }
@@ -545,7 +561,7 @@ public class ScheduleActivity extends AppCompatActivity {
                             Task t = new Task(null, title, category, selectedTime[0], "Pending",
                                     cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH),
                                     selectedRecurrence[0], groupId);
-                            DocumentReference ref = db.collection("users").document(currentUserEmail).collection("tasks").document();
+                            DocumentReference ref = db.collection("farm_data").document("shared").collection("tasks").document();
                             batch.set(ref, buildTaskMap(t));
                             scheduleNotification(t, selHour[0], selMinute[0]);
                         }
@@ -805,7 +821,11 @@ public class ScheduleActivity extends AppCompatActivity {
                         updateTaskStatus(task);
                     }).show();
                 });
-                deleteBtn.setOnClickListener(v -> showDeleteOptions(task));
+
+                deleteBtn.setVisibility(roleManager.canDeleteTask() ? View.VISIBLE : View.GONE);
+                if (roleManager.canDeleteTask()) {
+                    deleteBtn.setOnClickListener(v -> showDeleteOptions(task));
+                }
 
                 switch (task.status) {
                     case "Done": statusIndicator.setBackgroundResource(R.drawable.bg_status_done); break;

@@ -39,8 +39,8 @@ public class WaterSensorActivity extends AppCompatActivity {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private Runnable clockRunnable;
 
-    // ── Sample history data (replace with real sensor data / Firestore) ───────
-    // Each entry: { dayLabel, levelPercent }
+    // ── Sample history data need to be replaced by a sensor
+
     private final Object[][] historyData = {
             {"Mon", 80},
             {"Tue", 75},
