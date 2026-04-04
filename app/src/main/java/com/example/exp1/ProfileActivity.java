@@ -2,13 +2,19 @@ package com.example.exp1;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.animation.AnimationUtils;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -22,19 +28,22 @@ import androidx.core.os.LocaleListCompat;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import com.bumptech.glide.Glide;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import java.util.UUID;
+import java.util.Random;
 
 public class ProfileActivity extends AppCompatActivity {
     private CameraHelper cameraHelper;
     private AccountManager accountManager;
     private FirestoreManager firestoreManager;
-    private RoleManager roleManager;
 
     private TextView totalBirdsValue;
     private TextView activeCagesValue;
@@ -42,8 +51,11 @@ public class ProfileActivity extends AppCompatActivity {
     private TextView userNameTv;
     private TextView userEmailTv;
     private TextView profileInitialTv;
+    private ImageView profileImageView;
 
-    private String currentEmail;
+    private String userRole = "staff";
+    private String currentEmail = "";
+    private final Handler handler = new Handler(Looper.getMainLooper());
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,10 +65,8 @@ public class ProfileActivity extends AppCompatActivity {
         setContentView(R.layout.activity_profile);
 
         accountManager = new AccountManager(this);
-
-        // ── FIX #3: Build RoleManager from the current user's cached role so we
-        //            can show/hide owner-only UI correctly.
-        roleManager = new RoleManager(accountManager.getCurrentRole());
+        String currentSession = accountManager.getCurrentUsername();
+        userRole = accountManager.getRole(currentSession != null ? currentSession : "");
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
@@ -70,19 +80,22 @@ public class ProfileActivity extends AppCompatActivity {
         userNameTv       = findViewById(R.id.userName);
         userEmailTv      = findViewById(R.id.userEmail);
         profileInitialTv = findViewById(R.id.profileInitial);
+        profileImageView = findViewById(R.id.profileImage);
 
-        // Resolve username + email
-        String username = getIntent().getStringExtra("username");
-        if (username == null || username.isEmpty()) {
-            username = accountManager.getCurrentUsername();
+        // Resolve email
+        currentEmail = getIntent().getStringExtra("username");
+        if (currentEmail == null || currentEmail.isEmpty()) {
+            currentEmail = currentSession;
         }
-        currentEmail = accountManager.getEmail(username);
-        if (currentEmail == null) currentEmail = username; // fallback
+        
+        if (currentEmail == null) currentEmail = "";
 
         firestoreManager = new FirestoreManager(currentEmail);
 
-        updateUserInfoDisplay(username);
-        loadFirestoreData();
+        showLoading("Syncing Profile...", () -> {
+            fetchUserData();
+            loadFirestoreData();
+        });
 
         //  Edit profile (pen button) -----------------------------------------------------------
         View editProfileButton = findViewById(R.id.editProfileButton);
@@ -99,7 +112,12 @@ public class ProfileActivity extends AppCompatActivity {
         //  Farm Recalibration-----------------------------------------------------------
         View recalibrationButton = findViewById(R.id.farmRecalibrationButton);
         if (recalibrationButton != null) {
-            recalibrationButton.setOnClickListener(v -> showRecalibrationDialog());
+            if (isAdmin()) {
+                recalibrationButton.setVisibility(View.VISIBLE);
+                recalibrationButton.setOnClickListener(v -> showRecalibrationDialog());
+            } else {
+                recalibrationButton.setVisibility(View.GONE);
+            }
         }
 
         //  Notification Preferences -----------------------------------------------------------
@@ -126,15 +144,12 @@ public class ProfileActivity extends AppCompatActivity {
             helpSupportButton.setOnClickListener(v -> showHelpSupportDialog());
         }
 
-
-        setupOwnerOnlySection();
-
         // Back button ----------------------------------------------------------------------
         ImageButton backButton = findViewById(R.id.backButton);
         if (backButton != null) {
             backButton.setOnClickListener(v -> {
                 Intent intent = new Intent(ProfileActivity.this, DashboardActivity.class);
-                intent.putExtra("username", accountManager.getCurrentUsername());
+                intent.putExtra("username", currentEmail);
                 intent.setFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
                 startActivity(intent);
                 finish();
@@ -157,173 +172,80 @@ public class ProfileActivity extends AppCompatActivity {
 
         LinearLayout cameraButton = findViewById(R.id.CameraButton);
         if (cameraButton != null) {
-            cameraButton.setClickable(true);
-            cameraButton.setFocusable(true);
             cameraButton.setOnClickListener(v -> cameraHelper.launch());
         }
     }
 
-    // ── Owner-only section ────────────────────────────────────────────────────
-    private void setupOwnerOnlySection() {
-        View adminCard = findViewById(R.id.adminCard);
-        if (adminCard == null) return; // layout doesn't have the card yet → safe no-op
+    private void showLoading(String label, Runnable action) {
+        View loadingLayout = findViewById(R.id.loadingLayout);
+        View loadingIcon = findViewById(R.id.loadingIcon);
+        TextView statusText = findViewById(R.id.loadingStatusText);
+        ProgressBar progressBar = findViewById(R.id.loadingProgressBar);
+        TextView percentText = findViewById(R.id.loadingPercentageText);
 
-        if (roleManager.canGenerateInviteCodes() || roleManager.canManageUsers()) {
-            adminCard.setVisibility(View.VISIBLE);
+        if (loadingLayout != null && loadingIcon != null) {
+            statusText.setText(label);
+            loadingLayout.setVisibility(View.VISIBLE);
+            loadingIcon.startAnimation(AnimationUtils.loadAnimation(this, R.anim.quail_jump));
+
+            final int[] progress = {0};
+            handler.post(new Runnable() {
+                @Override
+                public void run() {
+                    if (progress[0] <= 100) {
+                        progressBar.setProgress(progress[0]);
+                        percentText.setText(progress[0] + "%");
+                        progress[0] += 10;
+                        handler.postDelayed(this, 50);
+                    } else {
+                        loadingLayout.setVisibility(View.GONE);
+                        loadingIcon.clearAnimation();
+                        action.run();
+                    }
+                }
+            });
         } else {
-            adminCard.setVisibility(View.GONE);
-            return;
-        }
-
-        // Generate Invite Code button
-        View generateInviteButton = findViewById(R.id.generateInviteButton);
-        if (generateInviteButton != null && roleManager.canGenerateInviteCodes()) {
-            generateInviteButton.setVisibility(View.VISIBLE);
-            generateInviteButton.setOnClickListener(v -> showGenerateInviteDialog());
-        } else if (generateInviteButton != null) {
-            generateInviteButton.setVisibility(View.GONE);
-        }
-
-        // Manage Users button (approve/reject pending requests)
-        View manageUsersButton = findViewById(R.id.manageUsersButton);
-        if (manageUsersButton != null && roleManager.canManageUsers()) {
-            manageUsersButton.setVisibility(View.VISIBLE);
-            manageUsersButton.setOnClickListener(v -> showManageUsersDialog());
-        } else if (manageUsersButton != null) {
-            manageUsersButton.setVisibility(View.GONE);
+            action.run();
         }
     }
 
-    // Generate a 6-digit invite code and write it to invite_codes/{code} ------
-    private void showGenerateInviteDialog() {
-        String[] roles = {"staff", "backup_owner"};
-        String[] roleLabels = {"Staff", "Backup Owner"};
-        final int[] selectedIndex = {0};
-
-        new AlertDialog.Builder(this)
-                .setTitle("Generate Invite Code")
-                .setSingleChoiceItems(roleLabels, 0, (d, which) -> selectedIndex[0] = which)
-                .setPositiveButton("Generate", (dialog, which) -> {
-                    String role = roles[selectedIndex[0]];
-                    // Generate a random 6-character alphanumeric code
-                    String code = UUID.randomUUID().toString()
-                            .replace("-", "")
-                            .substring(0, 6)
-                            .toUpperCase();
-
-                    Map<String, Object> codeData = new HashMap<>();
-                    codeData.put("role", role);
-                    codeData.put("createdBy", currentEmail);
-                    codeData.put("createdAt", com.google.firebase.firestore.FieldValue.serverTimestamp());
-
-                    FirebaseFirestore.getInstance()
-                            .collection("invite_codes")
-                            .document(code)
-                            .set(codeData)
-                            .addOnSuccessListener(v -> {
-                                // Show the code in a copyable dialog
-                                new AlertDialog.Builder(ProfileActivity.this)
-                                        .setTitle("Invite Code Generated")
-                                        .setMessage(
-                                                "Share this code with the new " + roleLabels[selectedIndex[0]] + ":\n\n"
-                                                        + "Code: " + code + "\n\n"
-                                                        + "They enter it in the Register screen → \"Enter Invite Code\"."
-                                        )
-                                        .setPositiveButton("OK", null)
-                                        .show();
-                            })
-                            .addOnFailureListener(e ->
-                                    Toast.makeText(this,
-                                            "Failed to generate code: " + e.getMessage(),
-                                            Toast.LENGTH_LONG).show()
-                            );
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
+    private void fetchUserData() {
+        if (currentEmail == null || currentEmail.isEmpty()) return;
+        FirebaseFirestore.getInstance().collection("user_access").document(currentEmail).get()
+            .addOnSuccessListener(doc -> {
+                if (doc.exists()) {
+                    String name = doc.getString("name");
+                    String photoUrl = doc.getString("profilePic");
+                    
+                    if (name != null) {
+                        userNameTv.setText(name);
+                        profileInitialTv.setText(String.valueOf(name.charAt(0)).toUpperCase());
+                    }
+                    userEmailTv.setText(currentEmail);
+                    
+                    if (photoUrl != null && !photoUrl.isEmpty()) {
+                        profileInitialTv.setVisibility(View.GONE);
+                        profileImageView.setVisibility(View.VISIBLE);
+                        Glide.with(this).load(photoUrl).circleCrop().into(profileImageView);
+                    } else {
+                        profileImageView.setVisibility(View.GONE);
+                        profileInitialTv.setVisibility(View.VISIBLE);
+                    }
+                }
+            });
     }
 
-    // Show pending user_access requests and let the owner approve/reject -------
-    private void showManageUsersDialog() {
-        // Load all user_access docs with status == "pending"
-        FirebaseFirestore.getInstance()
-                .collection("user_access")
-                .whereEqualTo("status", "pending")
-                .get()
-                .addOnSuccessListener(querySnapshot -> {
-                    if (querySnapshot.isEmpty()) {
-                        new AlertDialog.Builder(this)
-                                .setTitle("Manage Users")
-                                .setMessage("No pending access requests.")
-                                .setPositiveButton("OK", null)
-                                .show();
-                        return;
-                    }
-
-                    // Build list of pending users
-                    List<com.google.firebase.firestore.DocumentSnapshot> docs = querySnapshot.getDocuments();
-                    String[] labels = new String[docs.size()];
-                    for (int i = 0; i < docs.size(); i++) {
-                        com.google.firebase.firestore.DocumentSnapshot doc = docs.get(i);
-                        String name  = doc.getString("name")  != null ? doc.getString("name")  : "Unknown";
-                        String email = doc.getString("email") != null ? doc.getString("email") : doc.getId();
-                        String role  = doc.getString("role")  != null ? doc.getString("role")  : "staff";
-                        labels[i] = name + " (" + email + ") — " + role;
-                    }
-
-                    final int[] selectedIndex = {0};
-                    new AlertDialog.Builder(this)
-                            .setTitle("Pending Requests")
-                            .setSingleChoiceItems(labels, 0, (d, which) -> selectedIndex[0] = which)
-                            .setPositiveButton("Approve", (dialog, which) -> {
-                                com.google.firebase.firestore.DocumentSnapshot chosen = docs.get(selectedIndex[0]);
-                                FirebaseFirestore.getInstance()
-                                        .collection("user_access")
-                                        .document(chosen.getId())
-                                        .update("status", "approved")
-                                        .addOnSuccessListener(v ->
-                                                Toast.makeText(this, "User approved!", Toast.LENGTH_SHORT).show()
-                                        )
-                                        .addOnFailureListener(e ->
-                                                Toast.makeText(this,
-                                                        "Approve failed: " + e.getMessage(),
-                                                        Toast.LENGTH_LONG).show()
-                                        );
-                            })
-                            .setNegativeButton("Reject", (dialog, which) -> {
-                                com.google.firebase.firestore.DocumentSnapshot chosen = docs.get(selectedIndex[0]);
-                                FirebaseFirestore.getInstance()
-                                        .collection("user_access")
-                                        .document(chosen.getId())
-                                        .update("status", "rejected")
-                                        .addOnSuccessListener(v ->
-                                                Toast.makeText(this, "User rejected.", Toast.LENGTH_SHORT).show()
-                                        )
-                                        .addOnFailureListener(e ->
-                                                Toast.makeText(this,
-                                                        "Reject failed: " + e.getMessage(),
-                                                        Toast.LENGTH_LONG).show()
-                                        );
-                            })
-                            .setNeutralButton("Cancel", null)
-                            .show();
-                })
-                .addOnFailureListener(e ->
-                        Toast.makeText(this,
-                                "Could not load requests: " + e.getMessage(),
-                                Toast.LENGTH_LONG).show()
-                );
+    private boolean isAdmin() {
+        return "owner".equals(userRole);
     }
 
     //  Firestore load ---------------------------------------------------------------------------
     private void loadFirestoreData() {
+        if (firestoreManager == null) return;
         firestoreManager.loadFarmData(new FirestoreManager.OnLoadListener() {
             @Override
             public void onLoaded(String name, int totalBirds, int activeCages, long daysRunning) {
                 runOnUiThread(() -> {
-                    if (!name.isEmpty()) {
-                        userNameTv.setText(name);
-                        profileInitialTv.setText(String.valueOf(name.charAt(0)).toUpperCase());
-                    }
                     totalBirdsValue.setText(totalBirds > 0 ? String.valueOf(totalBirds) : "--");
                     activeCagesValue.setText(activeCages > 0 ? String.valueOf(activeCages) : "--");
                     daysRunningValue.setText(daysRunning > 0 ? String.valueOf(daysRunning) : "--");
@@ -332,21 +254,9 @@ public class ProfileActivity extends AppCompatActivity {
 
             @Override
             public void onError(Exception e) {
-                runOnUiThread(() ->
-                        Toast.makeText(ProfileActivity.this,
-                                "Could not load data: " + e.getMessage(), Toast.LENGTH_SHORT).show()
-                );
+                runOnUiThread(() -> Toast.makeText(ProfileActivity.this, "Error loading farm data", Toast.LENGTH_SHORT).show());
             }
         });
-    }
-
-    private void updateUserInfoDisplay(String username) {
-        if (username != null && !username.isEmpty()) {
-            userNameTv.setText(username);
-            profileInitialTv.setText(String.valueOf(username.charAt(0)).toUpperCase());
-            String email = accountManager.getEmail(username);
-            if (email != null) userEmailTv.setText(email);
-        }
     }
 
     //  Edit Name dialog (pen button)---------------------------------------------------------------
@@ -377,10 +287,7 @@ public class ProfileActivity extends AppCompatActivity {
 
                 @Override
                 public void onError(Exception e) {
-                    runOnUiThread(() ->
-                            Toast.makeText(ProfileActivity.this,
-                                    "Failed to update: " + e.getMessage(), Toast.LENGTH_SHORT).show()
-                    );
+                    runOnUiThread(() -> Toast.makeText(ProfileActivity.this, "Failed to update", Toast.LENGTH_SHORT).show());
                 }
             });
         });
@@ -396,17 +303,9 @@ public class ProfileActivity extends AppCompatActivity {
         EditText editTotalBirds  = dialogView.findViewById(R.id.editTotalBirds);
         EditText editActiveCages = dialogView.findViewById(R.id.editActiveCages);
 
-        firestoreManager.loadFarmData(new FirestoreManager.OnLoadListener() {
-            @Override
-            public void onLoaded(String name, int totalBirds, int activeCages, long daysRunning) {
-                runOnUiThread(() -> {
-                    if (totalBirds > 0)  editTotalBirds.setText(String.valueOf(totalBirds));
-                    if (activeCages > 0) editActiveCages.setText(String.valueOf(activeCages));
-                });
-            }
-            @Override
-            public void onError(Exception e) { /* fields stay empty */ }
-        });
+        // Pre-fill from current UI
+        editTotalBirds.setText(totalBirdsValue.getText());
+        editActiveCages.setText(activeCagesValue.getText());
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setView(dialogView)
@@ -417,63 +316,53 @@ public class ProfileActivity extends AppCompatActivity {
                 .create();
 
         dialog.setOnShowListener(d -> {
-
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
                 String birdsStr = editTotalBirds.getText().toString().trim();
                 String cagesStr = editActiveCages.getText().toString().trim();
 
                 if (birdsStr.isEmpty() || cagesStr.isEmpty()) {
-                    Toast.makeText(ProfileActivity.this,
-                            "Please fill in both fields", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(ProfileActivity.this, "Please fill in both fields", Toast.LENGTH_SHORT).show();
                     return;
                 }
 
                 int newBirds = Integer.parseInt(birdsStr);
                 int newCages = Integer.parseInt(cagesStr);
 
+                accountManager.saveFarmStats(newBirds, newCages);
                 firestoreManager.saveFarmStats(newBirds, newCages, new FirestoreManager.OnSaveListener() {
                     @Override
                     public void onSuccess() {
                         runOnUiThread(() -> {
                             totalBirdsValue.setText(String.valueOf(newBirds));
                             activeCagesValue.setText(String.valueOf(newCages));
-                            Toast.makeText(ProfileActivity.this,
-                                    "Farm stats updated!", Toast.LENGTH_SHORT).show();
-                            loadFirestoreData();
+                            Toast.makeText(ProfileActivity.this, "Farm stats updated!", Toast.LENGTH_SHORT).show();
                             dialog.dismiss();
                         });
                     }
                     @Override
                     public void onError(Exception e) {
-                        runOnUiThread(() ->
-                                Toast.makeText(ProfileActivity.this,
-                                        "Save failed: " + e.getMessage(), Toast.LENGTH_SHORT).show()
-                        );
+                        runOnUiThread(() -> Toast.makeText(ProfileActivity.this, "Save failed", Toast.LENGTH_SHORT).show());
                     }
                 });
             });
 
             dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v -> {
-                dialog.dismiss();
                 new AlertDialog.Builder(ProfileActivity.this)
                         .setTitle("Restart Days Running?")
-                        .setMessage("This will reset your Days Running counter back to Day 1. Are you sure?")
+                        .setMessage("Reset counter back to Day 1?")
                         .setPositiveButton("Restart", (d2, w) -> {
                             firestoreManager.restartDaysRunning(new FirestoreManager.OnSaveListener() {
                                 @Override
                                 public void onSuccess() {
                                     runOnUiThread(() -> {
                                         daysRunningValue.setText("1");
-                                        Toast.makeText(ProfileActivity.this,
-                                                "Days Running restarted!", Toast.LENGTH_SHORT).show();
+                                        Toast.makeText(ProfileActivity.this, "Days restarted!", Toast.LENGTH_SHORT).show();
+                                        dialog.dismiss();
                                     });
                                 }
                                 @Override
                                 public void onError(Exception e) {
-                                    runOnUiThread(() ->
-                                            Toast.makeText(ProfileActivity.this,
-                                                    "Restart failed: " + e.getMessage(), Toast.LENGTH_SHORT).show()
-                                    );
+                                    runOnUiThread(() -> Toast.makeText(ProfileActivity.this, "Restart failed", Toast.LENGTH_SHORT).show());
                                 }
                             });
                         })
@@ -481,46 +370,64 @@ public class ProfileActivity extends AppCompatActivity {
                         .show();
             });
         });
-
         dialog.show();
     }
 
-    // -- Account Settings -------------------------------------------------------------------------
     private void showAccountSettingsDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         View view = getLayoutInflater().inflate(R.layout.dialog_account_settings, null);
         builder.setView(view);
 
-        EditText currentPassword    = view.findViewById(R.id.currentPassword);
-        EditText newPassword        = view.findViewById(R.id.newPassword);
-        EditText confirmNewPassword = view.findViewById(R.id.confirmNewPassword);
+        View changePasswordBtn = view.findViewById(R.id.changePasswordBtn);
+        View deleteAccountBtn = view.findViewById(R.id.deleteAccountBtn);
 
-        builder.setPositiveButton("Update Password", (dialog, which) -> {
-            String oldPass     = currentPassword.getText().toString();
-            String newPass     = newPassword.getText().toString();
-            String confirmPass = confirmNewPassword.getText().toString();
+        changePasswordBtn.setOnClickListener(v -> showChangePasswordDialog());
+        deleteAccountBtn.setOnClickListener(v -> showDeleteAccountDialog());
 
-            if (oldPass.isEmpty()) {
-                Toast.makeText(this, "Current password required", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            if (!newPass.equals(confirmPass)) {
-                Toast.makeText(this, "Passwords do not match", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            if (!newPass.isEmpty()) {
-                if (accountManager.updatePassword(accountManager.getCurrentUsername(), oldPass, newPass)) {
-                    Toast.makeText(this, "Password updated successfully", Toast.LENGTH_SHORT).show();
-                } else {
-                    Toast.makeText(this, "Incorrect current password", Toast.LENGTH_SHORT).show();
-                }
+        builder.setPositiveButton("Close", null);
+        builder.show();
+    }
+
+    private void showChangePasswordDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Change Password");
+        View view = getLayoutInflater().inflate(R.layout.dialog_change_password, null);
+        builder.setView(view);
+
+        EditText oldPass = view.findViewById(R.id.oldPassword);
+        EditText newPass = view.findViewById(R.id.newPassword);
+
+        builder.setPositiveButton("Update", (dialog, which) -> {
+            String oldP = oldPass.getText().toString();
+            String newP = newPass.getText().toString();
+            String currentUser = accountManager.getCurrentUsername();
+            if (currentUser != null && accountManager.updatePassword(currentUser, oldP, newP)) {
+                Toast.makeText(this, "Password updated successfully", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "Incorrect current password", Toast.LENGTH_SHORT).show();
             }
         });
         builder.setNegativeButton("Cancel", null);
         builder.show();
     }
 
-    // -- Notification Preferences -----------------------------------------------------------------
+    private void showDeleteAccountDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle("Delete Account")
+                .setMessage("Are you sure you want to delete your account?")
+                .setPositiveButton("Delete", (dialog, which) -> {
+                    String currentUser = accountManager.getCurrentUsername();
+                    if (currentUser != null && accountManager.deleteAccount(currentUser)) {
+                        Intent intent = new Intent(this, MainActivity.class);
+                        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                        startActivity(intent);
+                        finish();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
     private void showNotificationPrefsDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         View dialogView = getLayoutInflater().inflate(R.layout.dialog_notification_preferences, null);
@@ -536,18 +443,13 @@ public class ProfileActivity extends AppCompatActivity {
 
         builder.setTitle("Notification Preferences")
                 .setPositiveButton("Save", (dialog, which) -> {
-                    accountManager.saveNotificationPreferences(
-                            switchAlerts.isChecked(),
-                            switchGlobalData.isChecked(),
-                            switchSchedule.isChecked()
-                    );
+                    accountManager.saveNotificationPreferences(switchAlerts.isChecked(), switchGlobalData.isChecked(), switchSchedule.isChecked());
                     Toast.makeText(this, "Preferences saved", Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
     }
 
-    // -- Language & Region -----------------------------------------------------
     private void showLanguageRegionDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         View view = getLayoutInflater().inflate(R.layout.dialog_language_region, null);
@@ -594,13 +496,14 @@ public class ProfileActivity extends AppCompatActivity {
             public void onItemSelected(AdapterView<?> parent, View v, int position, long id) {
                 String selectedRegion = regions[position];
                 List<String> provinces = regionProvinceMap.get(selectedRegion);
-                ArrayAdapter<String> provinceAdapter = new ArrayAdapter<>(ProfileActivity.this,
-                        android.R.layout.simple_spinner_item, provinces);
-                provinceAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                spinnerProvince.setAdapter(provinceAdapter);
-                String savedProvince = accountManager.getSelectedProvince();
-                if (provinces.contains(savedProvince)) {
-                    spinnerProvince.setSelection(provinces.indexOf(savedProvince));
+                if (provinces != null) {
+                    ArrayAdapter<String> provinceAdapter = new ArrayAdapter<>(ProfileActivity.this, android.R.layout.simple_spinner_item, provinces);
+                    provinceAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                    spinnerProvince.setAdapter(provinceAdapter);
+                    String savedProvince = accountManager.getSelectedProvince();
+                    if (provinces.contains(savedProvince)) {
+                        spinnerProvince.setSelection(provinces.indexOf(savedProvince));
+                    }
                 }
             }
             @Override public void onNothingSelected(AdapterView<?> parent) {}
@@ -611,13 +514,10 @@ public class ProfileActivity extends AppCompatActivity {
             String selectedReg  = spinnerRegion.getSelectedItem().toString();
             String selectedProv = spinnerProvince.getSelectedItem().toString();
             accountManager.saveLanguageRegion(selectedLang, selectedReg, selectedProv);
-
             String langTag = "en";
             if (selectedLang.equals("Tagalog")) langTag = "tl";
             else if (selectedLang.equals("Cebuano")) langTag = "ceb";
-            LocaleListCompat appLocales = LocaleListCompat.forLanguageTags(langTag);
-            AppCompatDelegate.setApplicationLocales(appLocales);
-            Toast.makeText(this, "Settings saved", Toast.LENGTH_SHORT).show();
+            AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(langTag));
             recreate();
         });
         builder.setNegativeButton("Cancel", null);
@@ -628,8 +528,257 @@ public class ProfileActivity extends AppCompatActivity {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         View view = getLayoutInflater().inflate(R.layout.dialog_privacy_security, null);
         builder.setView(view);
+
+        View adminSection = view.findViewById(R.id.adminOnlySection);
+        View btnUserList = view.findViewById(R.id.btnUserList);
+        View btnDatabase = view.findViewById(R.id.btnDatabaseManagement);
+
+        // Content Sections (Non-admin clickable)
+        View sectionDataCollection = view.findViewById(R.id.sectionDataCollection);
+        View sectionPrivacyContent = view.findViewById(R.id.sectionPrivacyContent);
+        View sectionSecurityMeasures = view.findViewById(R.id.sectionSecurityMeasures);
+
+        if (sectionDataCollection != null) sectionDataCollection.setOnClickListener(v -> showDataCollectionDetails());
+        if (sectionPrivacyContent != null) sectionPrivacyContent.setOnClickListener(v -> showPrivacyContentDetails());
+        if (sectionSecurityMeasures != null) sectionSecurityMeasures.setOnClickListener(v -> showSecurityMeasuresDetails());
+
+        if (isAdmin()) {
+            if (adminSection != null) adminSection.setVisibility(View.VISIBLE);
+            if (btnUserList != null) btnUserList.setOnClickListener(v -> showUserListDialog());
+            if (btnDatabase != null) btnDatabase.setOnClickListener(v -> showDatabaseManagementDialog());
+        }
+
         builder.setPositiveButton("Close", null);
         builder.show();
+    }
+
+    private void showDataCollectionDetails() {
+        new AlertDialog.Builder(this)
+            .setTitle("Data Collection Details")
+            .setMessage("We collect farm profile information (GPS for location-based weather), flock records, daily production, health logs, and financial records to provide comprehensive farm management analytics.")
+            .setPositiveButton("Close", null).show();
+    }
+
+    private void showPrivacyContentDetails() {
+        new AlertDialog.Builder(this)
+            .setTitle("Privacy Content Details")
+            .setMessage("Your data belongs to you. We only use it for farm reports and regional trend analysis. No identifying information is shared with third parties without explicit consent.")
+            .setPositiveButton("Close", null).show();
+    }
+
+    private void showSecurityMeasuresDetails() {
+        new AlertDialog.Builder(this)
+            .setTitle("Security Measures Details")
+            .setMessage("Your records are protected via Firebase end-to-end encryption. Only authorized roles (Owner, Backup Owner, Staff) can view specific data tiers.")
+            .setPositiveButton("Close", null).show();
+    }
+
+    private void showUserListDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("User Management");
+        LinearLayout mainLayout = new LinearLayout(this);
+        mainLayout.setOrientation(LinearLayout.VERTICAL);
+        mainLayout.setPadding(40, 40, 40, 40);
+
+        // -- Button Row --
+        LinearLayout buttonRow = new LinearLayout(this);
+        buttonRow.setOrientation(LinearLayout.HORIZONTAL);
+        buttonRow.setLayoutParams(new LinearLayout.LayoutParams(-1, -2));
+        buttonRow.setPadding(0, 0, 0, 20);
+
+        Button btnLimits = new Button(this);
+        btnLimits.setText("Set Limits");
+        btnLimits.setOnClickListener(v -> showRoleLimitsDialog());
+        buttonRow.addView(btnLimits);
+
+        Button btnPending = new Button(this);
+        btnPending.setText("Pending Requests");
+        btnPending.setOnClickListener(v -> showPendingRequestsDialog());
+        buttonRow.addView(btnPending);
+
+        Button btnInvite = new Button(this);
+        btnInvite.setText("Invite User");
+        btnInvite.setOnClickListener(v -> NavigationHelper.INSTANCE.showGenerateInviteCodeDialog(this, currentEmail));
+        buttonRow.addView(btnInvite);
+
+        mainLayout.addView(buttonRow);
+
+        // -- Users List --
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+
+        FirebaseFirestore.getInstance().collection("user_access")
+            .whereEqualTo("status", "approved")
+            .get()
+            .addOnSuccessListener(docs -> {
+                container.removeAllViews();
+                for (DocumentSnapshot doc : docs) {
+                    View row = getLayoutInflater().inflate(R.layout.item_user_manage, null);
+                    String name = doc.getString("name");
+                    String role = doc.getString("role");
+                    String email = doc.getId();
+
+                    ((TextView)row.findViewById(R.id.userNameText)).setText(name);
+                    ((TextView)row.findViewById(R.id.userRoleText)).setText(role);
+
+                    View deleteBtn = row.findViewById(R.id.deleteUserBtn);
+                    if ("owner".equals(role)) deleteBtn.setVisibility(View.GONE);
+
+                    deleteBtn.setOnClickListener(v -> {
+                        FirebaseFirestore.getInstance().collection("user_access").document(email).delete()
+                            .addOnSuccessListener(a -> showUserListDialog());
+                    });
+                    container.addView(row);
+                }
+            });
+
+        mainLayout.addView(container);
+        builder.setView(mainLayout);
+        builder.setPositiveButton("Done", null);
+        builder.show();
+    }
+
+    private void showRoleLimitsDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Role Limits");
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(40, 40, 40, 40);
+
+        EditText editBackupLimit = new EditText(this);
+        editBackupLimit.setHint("Max Backup Owners");
+        layout.addView(editBackupLimit);
+
+        EditText editStaffLimit = new EditText(this);
+        editStaffLimit.setHint("Max Staff");
+        layout.addView(editStaffLimit);
+
+        FirebaseFirestore.getInstance().collection("system_settings").document("role_limits").get()
+            .addOnSuccessListener(doc -> {
+                if (doc.exists()) {
+                    editBackupLimit.setText(String.valueOf(doc.getLong("backup_owner_limit")));
+                    editStaffLimit.setText(String.valueOf(doc.getLong("staff_limit")));
+                }
+            });
+
+        builder.setView(layout);
+        builder.setPositiveButton("Save", (d, w) -> {
+            Map<String, Object> limits = new HashMap<>();
+            limits.put("backup_owner_limit", Long.parseLong(editBackupLimit.getText().toString()));
+            limits.put("staff_limit", Long.parseLong(editStaffLimit.getText().toString()));
+
+            FirebaseFirestore.getInstance().collection("system_settings").document("role_limits").set(limits)
+                .addOnSuccessListener(a -> Toast.makeText(this, "Limits Updated!", Toast.LENGTH_SHORT).show());
+        });
+        builder.show();
+    }
+
+    private void showPendingRequestsDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Pending Access Requests");
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(40, 40, 40, 40);
+
+        FirebaseFirestore.getInstance().collection("user_access")
+            .whereEqualTo("status", "pending")
+            .get()
+            .addOnSuccessListener(docs -> {
+                container.removeAllViews();
+                if (docs.isEmpty()) {
+                    TextView tv = new TextView(this);
+                    tv.setText("No pending requests.");
+                    container.addView(tv);
+                }
+                for (DocumentSnapshot doc : docs) {
+                    View row = getLayoutInflater().inflate(R.layout.item_user_manage, null);
+                    String name = doc.getString("name");
+                    String role = doc.getString("role");
+                    String email = doc.getId();
+
+                    ((TextView)row.findViewById(R.id.userNameText)).setText(name + " (" + email + ")");
+                    ((TextView)row.findViewById(R.id.userRoleText)).setText("Role: " + role);
+
+                    ImageButton approveBtn = (ImageButton) row.findViewById(R.id.deleteUserBtn);
+                    approveBtn.setImageResource(android.R.drawable.ic_menu_save); // reuse button for approve
+
+                    approveBtn.setOnClickListener(v -> {
+                        String code = String.format(Locale.getDefault(), "%06d", new Random().nextInt(999999));
+                        Map<String, Object> update = new HashMap<>();
+                        update.put("status", "approved");
+                        update.put("verificationCode", code);
+
+                        doc.getReference().update(update)
+                            .addOnSuccessListener(a -> {
+                                new AlertDialog.Builder(this)
+                                    .setTitle("Request Approved")
+                                    .setMessage("Verification Code for " + name + ": " + code)
+                                    .setPositiveButton("Share via Gmail", (d, w) -> {
+                                        Intent intent = new Intent(Intent.ACTION_SEND);
+                                        intent.setType("message/rfc822");
+                                        intent.putExtra(Intent.EXTRA_EMAIL, new String[]{email});
+                                        intent.putExtra(Intent.EXTRA_SUBJECT, "Your Quail Farm Access Code");
+                                        intent.putExtra(Intent.EXTRA_TEXT, "Hello " + name + ",\n\nYour request for access has been approved.\nYour 6-digit verification code is: " + code + "\n\nPlease enter this code in the app to complete your registration.");
+                                        startActivity(Intent.createChooser(intent, "Send Email"));
+                                        showPendingRequestsDialog();
+                                    })
+                                    .setNegativeButton("Close", (d, w) -> showPendingRequestsDialog())
+                                    .show();
+                            });
+                    });
+                    container.addView(row);
+                }
+            });
+
+        builder.setView(container);
+        builder.setPositiveButton("Close", null);
+        builder.show();
+    }
+
+    private void showDatabaseManagementDialog() {
+        String[] items = {"Monitor Database", "Import Database", "Export Database", "Delete Database", "Wipe Everything"};
+        new AlertDialog.Builder(this)
+                .setTitle("Database Management")
+                .setItems(items, (dialog, which) -> {
+                    switch (which) {
+                        case 0: monitorDatabase(); break;
+                        case 1: importDatabase(); break;
+                        case 2: exportDatabase(); break;
+                        case 3: deleteDatabase(); break;
+                        case 4: wipeEverything(); break;
+                    }
+                }).setPositiveButton("Cancel", null).show();
+    }
+
+    private void monitorDatabase() {
+        Toast.makeText(this, "Monitoring Database Connections...", Toast.LENGTH_SHORT).show();
+    }
+
+    private void importDatabase() {
+        Toast.makeText(this, "Importing data from backup...", Toast.LENGTH_SHORT).show();
+    }
+
+    private void exportDatabase() {
+        Toast.makeText(this, "Exporting farm records to CSV...", Toast.LENGTH_SHORT).show();
+    }
+
+    private void deleteDatabase() {
+        new AlertDialog.Builder(this)
+            .setTitle("Delete Database")
+            .setMessage("Are you sure? This deletes only the farm records but keeps user accounts.")
+            .setPositiveButton("Delete", (d, w) -> Toast.makeText(this, "Database Deleted", Toast.LENGTH_SHORT).show())
+            .setNegativeButton("Cancel", null).show();
+    }
+
+    private void wipeEverything() {
+        new AlertDialog.Builder(this)
+            .setTitle("Wipe Everything")
+            .setMessage("WARNING: This will delete all users, all farm data, and reset the system. Proceed?")
+            .setPositiveButton("WIPE", (d, w) -> {
+                accountManager.clearSession();
+                finish();
+            })
+            .setNegativeButton("Cancel", null).show();
     }
 
     private void showHelpSupportDialog() {

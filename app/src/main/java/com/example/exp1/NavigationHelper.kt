@@ -4,17 +4,15 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
 import android.view.View
-import android.widget.ArrayAdapter
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
+import com.bumptech.glide.Glide
 import com.google.android.material.navigation.NavigationView
 import com.google.firebase.firestore.FirebaseFirestore
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Locale
 import java.util.UUID
 
 object NavigationHelper {
@@ -54,9 +52,7 @@ object NavigationHelper {
             }
         }
 
-        cameraButton?.setOnClickListener {
-            // Camera functionality handled per-activity
-        }
+        cameraButton?.setOnClickListener { }
 
         scheduleButton?.setOnClickListener {
             if (activity !is ScheduleActivity) {
@@ -79,47 +75,29 @@ object NavigationHelper {
 
     fun setupSideMenu(activity: Activity, drawerLayout: DrawerLayout) {
         val navigationView = activity.findViewById<NavigationView>(R.id.sideMenu)
-
+        
         val accountManager = AccountManager(activity)
-        var username = activity.intent.getStringExtra("username")
-        if (username == null || username.isEmpty()) {
-            username = accountManager.getCurrentUsername()
-        }
-
-        updateDrawerHeader(navigationView, username ?: "User")
-
-        // ── FIX: Re-fetch the role from Firestore to guarantee it's current,
-        //         then show/hide the Invite User menu item accordingly.
-        //         Using only the local cache here was unreliable after manual login.
-        val cachedRole = accountManager.getCurrentRole()
-        val rm = RoleManager(cachedRole)
-        navigationView?.menu?.findItem(R.id.nav_invite_user)?.isVisible = rm.canGenerateInviteCodes()
-
-        // Also refresh from Firestore in the background so future opens are accurate
-        val email = accountManager.getEmail(username ?: "")
-        if (email != null) {
-            FirebaseFirestore.getInstance()
-                .collection("user_access")
-                .document(email)
-                .get()
+        val currentEmail = accountManager.getCurrentUsername()
+        
+        if (currentEmail != null) {
+            FirebaseFirestore.getInstance().collection("user_access").document(currentEmail).get()
                 .addOnSuccessListener { doc ->
-                    val freshRole = doc.getString("role") ?: cachedRole
-                    accountManager.updateCachedRole(username ?: "", freshRole)
-                    val freshRm = RoleManager(freshRole)
-                    navigationView?.menu?.findItem(R.id.nav_invite_user)?.isVisible =
-                        freshRm.canGenerateInviteCodes()
+                    if (doc.exists()) {
+                        val name = doc.getString("name") ?: "User"
+                        val photoUrl = doc.getString("profilePic") ?: ""
+                        updateDrawerHeader(navigationView, name, photoUrl, activity)
+                    }
                 }
         }
-
+        
         navigationView?.setNavigationItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
                 R.id.nav_invite_user -> {
                     drawerLayout.closeDrawer(GravityCompat.START)
-                    // ── FIX: Use the refreshed role from local cache
-                    val currentRole = accountManager.getCurrentRole()
+                    val currentRole = accountManager.getRole(currentEmail ?: "")
                     val currentRm = RoleManager(currentRole)
                     if (currentRm.canGenerateInviteCodes()) {
-                        showGenerateInviteCodeDialog(activity, email ?: "")
+                        showGenerateInviteCodeDialog(activity, currentEmail ?: "")
                     } else {
                         Toast.makeText(activity, "Only owners can generate invite codes.", Toast.LENGTH_SHORT).show()
                     }
@@ -127,7 +105,7 @@ object NavigationHelper {
                 R.id.nav_dashboard -> {
                     if (activity !is DashboardActivity) {
                         val intent = Intent(activity, DashboardActivity::class.java)
-                        intent.putExtra("username", username)
+                        intent.putExtra("username", currentEmail)
                         intent.flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
                         activity.startActivity(intent)
                     }
@@ -135,7 +113,7 @@ object NavigationHelper {
                 R.id.nav_settings -> {
                     if (activity !is ProfileActivity) {
                         val intent = Intent(activity, ProfileActivity::class.java)
-                        intent.putExtra("username", username)
+                        intent.putExtra("username", currentEmail)
                         intent.flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
                         activity.startActivity(intent)
                     }
@@ -143,7 +121,7 @@ object NavigationHelper {
                 R.id.nav_help -> {
                     if (activity !is ProfileActivity) {
                         val intent = Intent(activity, ProfileActivity::class.java)
-                        intent.putExtra("username", username)
+                        intent.putExtra("username", currentEmail)
                         intent.flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
                         activity.startActivity(intent)
                     }
@@ -161,14 +139,26 @@ object NavigationHelper {
         }
     }
 
-    private fun updateDrawerHeader(navigationView: NavigationView?, username: String) {
+    private fun updateDrawerHeader(navigationView: NavigationView?, name: String, photoUrl: String, activity: Activity) {
         val headerView = navigationView?.getHeaderView(0)
         val userNameTextView = headerView?.findViewById<TextView>(R.id.userName)
         val userInitialTextView = headerView?.findViewById<TextView>(R.id.userInitial)
+        val userImageView = headerView?.findViewById<ImageView>(R.id.userPhoto)
 
-        userNameTextView?.text = username
-        if (username.isNotEmpty()) {
-            userInitialTextView?.text = username[0].uppercaseChar().toString()
+        userNameTextView?.text = name
+        
+        if (photoUrl.isNotEmpty()) {
+            userInitialTextView?.visibility = View.GONE
+            userImageView?.let {
+                it.visibility = View.VISIBLE
+                Glide.with(activity).load(photoUrl).circleCrop().into(it)
+            }
+        } else {
+            userImageView?.visibility = View.GONE
+            userInitialTextView?.let {
+                it.visibility = View.VISIBLE
+                if (name.isNotEmpty()) it.text = name[0].uppercaseChar().toString()
+            }
         }
     }
 
@@ -193,12 +183,7 @@ object NavigationHelper {
         }
     }
 
-    // -- Generate Invite Code dialog --------------------------------------------------------------
-    //      This now writes to "invite_codes/{code}" which IS covered by your rules:
-    //      allow write: if isOwner();
-    //      The new user enters the code in EnterCodeActivity — the correct flow.
-
-    private fun showGenerateInviteCodeDialog(activity: Activity, ownerEmail: String) {
+    fun showGenerateInviteCodeDialog(activity: Activity, ownerEmail: String) {
         val roles = arrayOf("staff", "backup_owner")
         val roleLabels = arrayOf("Staff", "Backup Owner")
         var selectedIndex = 0
@@ -226,7 +211,6 @@ object NavigationHelper {
                         "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
                     ))
                     .addOnSuccessListener {
-                        // Show the generated code so the owner can share it
                         showCodeResultDialog(activity, code, roleLabels[selectedIndex])
                     }
                     .addOnFailureListener { e ->

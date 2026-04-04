@@ -198,9 +198,9 @@
             <ImageView
                 android:layout_width="24dp"
                 android:layout_height="24dp"
-                android:scaleType="centerInside"
                 app:srcCompat="@drawable/ic_profile"
-                app:tint="@color/white" />
+                app:tint="@color/white"
+                android:contentDescription="Profile" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -524,4 +524,8 @@
         </LinearLayout>
 
     </androidx.core.widget.NestedScrollView>
+
+    <!-- Include Loading Overlay -->
+    <include layout="@layout/layout_loading" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

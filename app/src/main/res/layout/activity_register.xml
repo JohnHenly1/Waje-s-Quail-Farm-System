@@ -8,104 +8,159 @@
     tools:context=".RegisterActivity"
     android:background="#F4F4F4">
 
-    <TextView
-        android:id="@+id/textView"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="60dp"
-        android:text="@string/system_access"
-        android:textColor="#466d1d"
-        android:textSize="32sp"
-        android:textStyle="bold"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-
-    <ImageView
-        android:id="@+id/farmlogo"
-        android:layout_width="160dp"
-        android:layout_height="160dp"
-        android:layout_marginTop="32dp"
-        android:src="@drawable/logo_quailfarm"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/textView" />
-
+    <!-- Normal Registration UI -->
     <LinearLayout
-        android:id="@+id/buttonContainer"
-        android:layout_width="320dp"
-        android:layout_height="wrap_content"
+        android:id="@+id/registrationUI"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:orientation="vertical"
-        android:layout_marginTop="48dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/farmlogo">
+        android:gravity="center_horizontal"
+        tools:visibility="visible">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnRequestCode"
-            style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
-            android:layout_width="match_parent"
-            android:layout_height="64dp"
-            android:text="@string/request_code"
-            android:textColor="@color/white"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:textAllCaps="false"
-            app:backgroundTint="#466d1d"
-            app:cornerRadius="16dp"
-            app:icon="@drawable/ic_clipboard_list"
-            app:iconGravity="textStart"
-            app:iconPadding="12dp"
-            app:iconSize="24dp"
-            app:iconTint="@color/white" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnEnterCode"
-            style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
-            android:layout_width="match_parent"
-            android:layout_height="64dp"
+        <ImageButton
+            android:id="@+id/backButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="start"
+            android:layout_marginStart="16dp"
             android:layout_marginTop="16dp"
-            android:text="@string/i_have_a_code"
-            android:textColor="@color/white"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:textAllCaps="false"
-            app:backgroundTint="#6B8E23"
-            app:cornerRadius="16dp"
-            app:icon="@drawable/ic_file_text"
-            app:iconGravity="textStart"
-            app:iconPadding="12dp"
-            app:iconSize="24dp"
-            app:iconTint="@color/white" />
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_arrow_back"
+            app:tint="#466d1d" />
 
-        <View
-            android:id="@+id/divider"
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
+        <TextView
+            android:id="@+id/textView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="@string/system_access"
+            android:textColor="#466d1d"
+            android:textSize="32sp"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:id="@+id/farmlogo"
+            android:layout_width="160dp"
+            android:layout_height="160dp"
             android:layout_marginTop="32dp"
-            android:layout_marginBottom="16dp"
-            android:background="#CCCCCC" />
+            android:src="@drawable/logo_quailfarm" />
+
+        <LinearLayout
+            android:id="@+id/buttonContainer"
+            android:layout_width="320dp"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="48dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnRequestCode"
+                style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:text="@string/request_code"
+                android:textColor="@color/white"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textAllCaps="false"
+                app:backgroundTint="#466d1d"
+                app:cornerRadius="16dp"
+                app:icon="@drawable/ic_clipboard_list"
+                app:iconGravity="textStart" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnEnterCode"
+                style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_marginTop="16dp"
+                android:text="@string/i_have_a_code"
+                android:textColor="@color/white"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textAllCaps="false"
+                app:backgroundTint="#6B8E23"
+                app:cornerRadius="16dp"
+                app:icon="@drawable/ic_file_text"
+                app:iconGravity="textStart" />
+
+            <View
+                android:id="@+id/divider"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="32dp"
+                android:layout_marginBottom="16dp"
+                android:background="#CCCCCC" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnFarmSetup"
+                style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:text="@string/initial_farm_setup"
+                android:textColor="@color/white"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textAllCaps="false"
+                app:backgroundTint="#8B4513"
+                app:cornerRadius="16dp"
+                app:icon="@drawable/lc_farmrefresh"
+                app:iconGravity="textStart"
+                android:visibility="gone"
+                tools:visibility="visible" />
+
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- PENDING APPROVAL LAYOUT (Hidden by default) -->
+    <LinearLayout
+        android:id="@+id/pendingLayout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#F4F4F4"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone"
+        tools:visibility="gone">
+
+        <ImageView
+            android:id="@+id/pendingQuail"
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:src="@drawable/logo_quailfarm" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="Waiting for Owner Approval..."
+            android:textColor="#466d1d"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/pendingEmailTv"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="yourname@gmail.com"
+            android:textColor="@color/gray" />
+
+        <ProgressBar
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="200dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:indeterminate="true"
+            android:indeterminateTint="#466d1d" />
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnFarmSetup"
-            style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
-            android:layout_width="match_parent"
-            android:layout_height="64dp"
-            android:text="@string/initial_farm_setup"
-            android:textColor="@color/white"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:textAllCaps="false"
-            app:backgroundTint="#8B4513"
-            app:cornerRadius="16dp"
-            app:icon="@drawable/lc_farmrefresh"
-            app:iconGravity="textStart"
-            app:iconPadding="12dp"
-            app:iconSize="24dp"
-            app:iconTint="@color/white"
-            android:visibility="gone"
-            tools:visibility="visible" />
-
+            android:id="@+id/btnCancelPending"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="48dp"
+            android:text="Cancel Request"
+            android:textColor="@color/gray" />
     </LinearLayout>
 
     <ImageView

@@ -8,97 +8,99 @@
     tools:context=".MainActivity"
     android:background="#F4F4F4">
 
-    <!-- Log In Text -->
-    <TextView
-        android:id="@+id/textView"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="60dp"
-        android:text="@string/login_title"
-        android:textColor="#466d1d"
-        android:textSize="32sp"
-        android:textStyle="bold"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-
-    <ImageView
-        android:id="@+id/imageView"
-        android:layout_width="140dp"
-        android:layout_height="140dp"
-        android:layout_marginTop="20dp"
-        android:src="@drawable/logo_quailfarm"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/textView" />
-
-    <!-- Manual Email Login Area -->
+    <!-- Login UI Container -->
     <LinearLayout
-        android:id="@+id/manualLoginContainer"
-        android:layout_width="320dp"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
+        android:id="@+id/loginUIContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:orientation="vertical"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/imageView">
-
-        <EditText
-            android:id="@+id/editLoginEmail"
-            android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:background="@drawable/rounded_corner"
-            android:hint="Enter Approved Email"
-            android:inputType="textEmailAddress"
-            android:padding="16dp"
-            android:textColorHint="#996B8E23" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnManualLogin"
-            style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:layout_marginTop="12dp"
-            android:text="Login with Email"
-            android:textAllCaps="false"
-            android:textStyle="bold"
-            app:backgroundTint="#466d1d"
-            app:cornerRadius="16dp" />
+        android:gravity="center_horizontal">
 
         <TextView
+            android:id="@+id/textView"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:layout_marginTop="16dp"
-            android:text="— OR —"
-            android:textColor="@color/gray"
-            android:textSize="12sp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/Btn"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:layout_marginTop="16dp"
-            android:text="@string/continue_with_google"
-            android:textAllCaps="false"
-            app:cornerRadius="16dp"
-            app:icon="@drawable/lc_google_icon"
-            app:iconGravity="textStart"
-            app:iconTint="@null"
-            app:strokeColor="#466d1d" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnRegister"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/register_account"
+            android:layout_marginTop="60dp"
+            android:text="@string/login_title"
             android:textColor="#466d1d"
-            android:textAllCaps="false" />
+            android:textSize="32sp"
+            android:textStyle="bold" />
 
+        <ImageView
+            android:id="@+id/imageView"
+            android:layout_width="140dp"
+            android:layout_height="140dp"
+            android:layout_marginTop="20dp"
+            android:src="@drawable/logo_quailfarm" />
+
+        <!-- Manual Email Login Area -->
+        <LinearLayout
+            android:id="@+id/manualLoginContainer"
+            android:layout_width="320dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:orientation="vertical">
+
+            <EditText
+                android:id="@+id/editLoginEmail"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:background="@drawable/rounded_corner"
+                android:hint="Enter Approved Email"
+                android:inputType="textEmailAddress"
+                android:padding="16dp"
+                android:textColorHint="#996B8E23" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnManualLogin"
+                style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="12dp"
+                android:text="Login with Email"
+                android:textAllCaps="false"
+                android:textStyle="bold"
+                app:backgroundTint="#466d1d"
+                app:cornerRadius="16dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_marginTop="16dp"
+                android:text="— OR —"
+                android:textColor="@color/gray"
+                android:textSize="12sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/Btn"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="16dp"
+                android:text="@string/continue_with_google"
+                android:textAllCaps="false"
+                app:cornerRadius="16dp"
+                app:icon="@drawable/lc_google_icon"
+                app:iconGravity="textStart"
+                app:iconTint="@null"
+                app:strokeColor="#466d1d" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnRegister"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/register_account"
+                android:textColor="#466d1d"
+                android:textAllCaps="false" />
+
+        </LinearLayout>
     </LinearLayout>
+
+    <!-- Full Screen Pending / Loading Layout -->
+    <include layout="@layout/layout_loading" />
 
     <ImageView
         android:id="@+id/desigbush"

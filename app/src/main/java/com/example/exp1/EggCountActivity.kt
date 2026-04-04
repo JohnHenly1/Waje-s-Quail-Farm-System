@@ -1,8 +1,11 @@
 package com.example.exp1
 
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
+import android.view.animation.AnimationUtils
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -24,15 +27,20 @@ class EggCountActivity : AppCompatActivity() {
         val total: Int
     )
 
-    // Current offset in weeks (0 = this week, -1 = last week, etc.)
-    // Current offset in weeks (0 = this week, -1 = last week, etc.)
     private var weekOffset = 0
     private val sdf = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
+    private val handler = Handler(Looper.getMainLooper())
+    private lateinit var accountManager: AccountManager
+    private var userRole: String = "staff"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_egg_count)
+
+        accountManager = AccountManager(this)
+        val currentUsername = accountManager.getCurrentUsername()
+        userRole = accountManager.getRole(currentUsername ?: "")
 
         try {
             ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
@@ -48,8 +56,16 @@ class EggCountActivity : AppCompatActivity() {
             finish()
         }
 
-        findViewById<View>(R.id.refreshButton).setOnClickListener {
-            refreshData()
+        val refreshBtn = findViewById<View>(R.id.refreshButton)
+        if (isAdmin()) {
+            refreshBtn.visibility = View.VISIBLE
+            refreshBtn.setOnClickListener {
+                showLoading {
+                    refreshData()
+                }
+            }
+        } else {
+            refreshBtn.visibility = View.GONE
         }
 
         findViewById<View>(R.id.prevWeekBtn).setOnClickListener {
@@ -68,14 +84,35 @@ class EggCountActivity : AppCompatActivity() {
         NavigationHelper.setupBottomNavigation(this)
     }
 
+    private fun isAdmin(): Boolean {
+        return userRole == "owner" || userRole == "backup_owner"
+    }
+
+    fun showLoading(action: () -> Unit) {
+        val loadingLayout = findViewById<View>(R.id.loadingLayout)
+        val loadingIcon   = findViewById<View>(R.id.loadingIcon)
+
+        if (loadingLayout != null && loadingIcon != null) {
+            loadingLayout.visibility = View.VISIBLE
+            val jump = AnimationUtils.loadAnimation(this, R.anim.quail_jump)
+            loadingIcon.startAnimation(jump)
+
+            handler.postDelayed({
+                loadingLayout.visibility = View.GONE
+                loadingIcon.clearAnimation()
+                action()
+            }, 1200)
+        } else {
+            action()
+        }
+    }
+
     private fun refreshData() {
         Toast.makeText(this, "Checking for hardware updates...", Toast.LENGTH_SHORT).show()
-        // Here you would eventually trigger the YOLO algorithm / Database sync
-        setupUI()
+        setupUI() 
     }
 
     private fun setupUI() {
-        // Reset Today's Values to 0
         findViewById<TextView>(R.id.todayTotalValue).text = "0"
         findViewById<TextView>(R.id.gradeAValue).text = "0"
         findViewById<TextView>(R.id.gradeBValue).text = "0"
@@ -104,34 +141,23 @@ class EggCountActivity : AppCompatActivity() {
         container.removeAllViews()
         val inflater = LayoutInflater.from(this)
 
-        // Generate 7 days for the current week offset
         val calendar = Calendar.getInstance()
         calendar.add(Calendar.WEEK_OF_YEAR, weekOffset)
         
-        // Start from the most recent day of that week (e.g., Today if weekOffset is 0)
         for (i in 0 until 7) {
             val dateStr = sdf.format(calendar.time)
             
             val itemView = inflater.inflate(R.layout.item_collection_log, container, false)
             val dateTxt = itemView.findViewById<TextView>(R.id.logDate)
-            val totalTxt = itemView.findViewById<TextView>(R.id.logTotal)
-            val gATxt = itemView.findViewById<TextView>(R.id.logGradeA)
-            val gBTxt = itemView.findViewById<TextView>(R.id.logGradeB)
-            val gCTxt = itemView.findViewById<TextView>(R.id.logGradeC)
             val badge = itemView.findViewById<TextView>(R.id.todayBadge)
 
             dateTxt.text = dateStr
-            totalTxt.text = "0"
-            gATxt.text = "0"
-            gBTxt.text = "0"
-            gCTxt.text = "0"
-
-            // Show "TODAY" badge only for the actual current date
+            
             val todayStr = sdf.format(Calendar.getInstance().time)
             badge.visibility = if (dateStr == todayStr) View.VISIBLE else View.GONE
 
             container.addView(itemView)
-            calendar.add(Calendar.DAY_OF_YEAR, -1) // Move backwards            calendar.add(Calendar.DAY_OF_YEAR, -1) // Move backwards
+            calendar.add(Calendar.DAY_OF_YEAR, -1)
         }
     }
 }

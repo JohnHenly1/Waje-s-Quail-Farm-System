@@ -97,6 +97,12 @@
         <activity
             android:name=".FarmSetupActivity"
             android:exported="true"/>
+        <activity
+            android:name=".EnterCodeActivity"
+            android:exported="true"/>
+        <activity
+            android:name=".SetupAccountActivity"
+            android:exported="true"/>
     </application>
 
 </manifest>
