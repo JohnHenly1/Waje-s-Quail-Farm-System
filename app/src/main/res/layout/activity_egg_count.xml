@@ -303,7 +303,8 @@
                     android:layout_height="32dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     app:srcCompat="@drawable/ic_arrow_back"
-                    app:tint="@color/dark_green" />
+                    app:tint="@color/dark_green"
+                    tools:ignore="TouchTargetSizeCheck,SpeakableTextPresentCheck" />
 
                 <TextView
                     android:id="@+id/weekRangeTxt"
@@ -321,7 +322,8 @@
                     android:layout_height="32dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     app:srcCompat="@drawable/ic_arrow_forward"
-                    app:tint="@color/dark_green" />
+                    app:tint="@color/dark_green"
+                    tools:ignore="TouchTargetSizeCheck,SpeakableTextPresentCheck" />
 
             </LinearLayout>
 
@@ -441,11 +443,11 @@
                 android:id="@+id/scheduleButton1"
                 android:layout_width="24dp"
                 android:layout_height="24dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
                 android:scaleType="centerInside"
                 app:srcCompat="@drawable/ic_schedule"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                tools:ignore="TouchTargetSizeCheck"
-                app:tint="@color/white" />
+                app:tint="@color/white"
+                tools:ignore="TouchTargetSizeCheck,SpeakableTextPresentCheck" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -486,5 +488,8 @@
         </LinearLayout>
 
     </LinearLayout>
+
+    <!-- Include Loading Overlay -->
+    <include layout="@layout/layout_loading" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

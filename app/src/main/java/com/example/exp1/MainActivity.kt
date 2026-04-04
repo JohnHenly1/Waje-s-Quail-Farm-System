@@ -3,7 +3,9 @@ package com.example.exp1
 import android.content.Context
 import android.content.Intent
 import android.net.ConnectivityManager
+import android.net.Network
 import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -31,6 +33,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var googleSignInClient: GoogleSignInClient
     private lateinit var accountManager: AccountManager
     private var firestoreListener: ListenerRegistration? = null
+    private lateinit var cm: ConnectivityManager
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
     private val handler = Handler(Looper.getMainLooper())
     private val RC_SIGN_IN = 100
@@ -42,12 +46,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var loadingIcon: View
     private lateinit var noInternetSection: View
-    private lateinit var btnRetry: Button
+    private lateinit var btnOffline: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
         accountManager = AccountManager(this)
+        cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val currentEmail = accountManager.getCurrentUsername() 
 
         setContentView(R.layout.activity_login)
@@ -59,7 +64,7 @@ class MainActivity : AppCompatActivity() {
         statusText = findViewById(R.id.loadingStatusText)
         loadingIcon = findViewById(R.id.loadingIcon)
         noInternetSection = findViewById(R.id.noInternetSection)
-        btnRetry = findViewById(R.id.btnRetryConnection)
+        btnOffline = findViewById(R.id.btnOfflineMode)
 
         loginUIContainer.visibility = View.GONE
         loadingLayout.visibility = View.VISIBLE
@@ -68,11 +73,27 @@ class MainActivity : AppCompatActivity() {
         val jump = AnimationUtils.loadAnimation(this, R.anim.quail_jump)
         loadingIcon.startAnimation(jump)
 
-        btnRetry.setOnClickListener {
-            checkConnectionAndProceed(currentEmail)
+        findViewById<View>(R.id.btnRetryConnection).setOnClickListener {
+            if (isInternetActuallyWorking()) {
+                noInternetSection.visibility = View.GONE
+                progressBar.visibility = View.VISIBLE
+                percentageText.visibility = View.VISIBLE
+                startEntrySequence(currentEmail)
+            } else {
+                Toast.makeText(this, "Still no connection...", Toast.LENGTH_SHORT).show()
+            }
         }
 
-        checkConnectionAndProceed(currentEmail)
+        btnOffline.setOnClickListener {
+            if (currentEmail != null) {
+                // Enter app in offline mode using cached role
+                val role = accountManager.getRole(currentEmail)
+                enterApp("User", currentEmail, role, false)
+            }
+        }
+
+        // Start Live Sensor
+        registerNetworkSensor(currentEmail)
 
         auth = FirebaseAuth.getInstance()
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -82,8 +103,8 @@ class MainActivity : AppCompatActivity() {
         googleSignInClient = GoogleSignIn.getClient(this, gso)
 
         findViewById<View>(R.id.Btn).setOnClickListener {
-            if (!isNetworkAvailable()) {
-                showNoInternetUI()
+            if (!isInternetActuallyWorking()) {
+                showNoInternetUI(currentEmail != null)
                 return@setOnClickListener
             }
             googleSignInClient.signOut().addOnCompleteListener {
@@ -101,43 +122,55 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun isNetworkAvailable(): Boolean {
-        val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val network = connectivityManager.activeNetwork ?: return false
-        val activeNetwork = connectivityManager.getNetworkCapabilities(network) ?: return false
-        return when {
-            activeNetwork.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> true
-            activeNetwork.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> true
-            activeNetwork.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> true
-            else -> false
-        }
-    }
+    private fun registerNetworkSensor(email: String?) {
+        val request = NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+            .build()
 
-    private fun checkConnectionAndProceed(email: String?) {
-        if (isNetworkAvailable()) {
-            noInternetSection.visibility = View.GONE
-            progressBar.visibility = View.VISIBLE
-            percentageText.visibility = View.VISIBLE
-            
-            if (email != null) {
-                statusText.text = "Restoring Session..."
-                startEntrySequence(email)
-            } else {
-                statusText.text = "Preparing Farm..."
-                startEntrySequence(null)
+        networkCallback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                runOnUiThread {
+                    if (noInternetSection.visibility == View.VISIBLE) {
+                        noInternetSection.visibility = View.GONE
+                        progressBar.visibility = View.VISIBLE
+                        percentageText.visibility = View.VISIBLE
+                        startEntrySequence(email)
+                    }
+                }
             }
+
+            override fun onLost(network: Network) {
+                runOnUiThread {
+                    showNoInternetUI(email != null)
+                }
+            }
+        }
+        cm.registerNetworkCallback(request, networkCallback!!)
+
+        // Initial Check
+        if (!isInternetActuallyWorking()) {
+            showNoInternetUI(email != null)
         } else {
-            showNoInternetUI()
+            startEntrySequence(email)
         }
     }
 
-    private fun showNoInternetUI() {
+    private fun isInternetActuallyWorking(): Boolean {
+        val network = cm.activeNetwork ?: return false
+        val caps = cm.getNetworkCapabilities(network) ?: return false
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+               caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    }
+
+    private fun showNoInternetUI(canGoOffline: Boolean) {
+        handler.removeCallbacksAndMessages(null) 
+        loadingIcon.clearAnimation()
         statusText.text = "Connection Required"
         progressBar.visibility = View.GONE
         percentageText.visibility = View.GONE
         noInternetSection.visibility = View.VISIBLE
-        loginUIContainer.visibility = View.GONE
-        loadingLayout.visibility = View.VISIBLE
+        btnOffline.visibility = if (canGoOffline) View.VISIBLE else View.GONE
     }
 
     private fun startEntrySequence(email: String?) {
@@ -169,17 +202,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startLivePendingCheck(email: String) {
-        if (!isNetworkAvailable()) {
-            showNoInternetUI()
-            return
-        }
-
         firestoreListener?.remove()
         firestoreListener = FirebaseFirestore.getInstance().collection("user_access")
             .document(email)
             .addSnapshotListener { snapshot, e ->
                 if (e != null) {
-                    showLoginUI()
+                    // On error (like timeout), if we have a session, maybe allow entry
                     return@addSnapshotListener
                 }
                 
@@ -205,23 +233,16 @@ class MainActivity : AppCompatActivity() {
                         handleAccessDenied()
                     }
                 } else {
-                    showLoginUI()
+                    if (email.isNotEmpty()) handleAccessDenied()
                 }
             }
     }
 
-    private fun showLoginUI() {
-        loadingLayout.visibility = View.GONE
-        loadingIcon.clearAnimation()
-        loginUIContainer.visibility = View.VISIBLE
-    }
-
     private fun handleManualLogin() {
-        if (!isNetworkAvailable()) {
-            showNoInternetUI()
+        if (!isInternetActuallyWorking()) {
+            showNoInternetUI(false)
             return
         }
-
         val email = findViewById<EditText>(R.id.editLoginEmail).text.toString().trim().lowercase()
         if (email.isEmpty()) return
         
@@ -245,7 +266,7 @@ class MainActivity : AppCompatActivity() {
     private fun showPasswordDialog(email: String, correctPass: String, name: String, role: String) {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_password_entry, null)
         val tvEmail = dialogView.findViewById<TextView>(R.id.tvPasswordEmail)
-        val editPassword = dialogView.findViewById<TextInputEditText>(R.id.editLoginPassword)
+        val editPassword = dialogView.findViewById<EditText>(R.id.editLoginPassword)
         
         tvEmail.text = email
 
@@ -290,6 +311,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun enterApp(name: String, email: String, role: String, showToast: Boolean) {
+        if (networkCallback != null) {
+            try { cm.unregisterNetworkCallback(networkCallback!!) } catch (e: Exception) {}
+        }
         firestoreListener?.remove()
         accountManager.registerAccount(email, email, "verified", role)
         accountManager.saveCurrentSession(email)
@@ -327,6 +351,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        if (networkCallback != null) {
+            try { cm.unregisterNetworkCallback(networkCallback!!) } catch (e: Exception) {}
+        }
         firestoreListener?.remove()
         super.onDestroy()
     }
