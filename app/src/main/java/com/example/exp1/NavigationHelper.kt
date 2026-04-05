@@ -12,9 +12,11 @@ import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.animation.AnimationUtils
+import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.view.GravityCompat
@@ -45,7 +47,6 @@ object NavigationHelper {
             activityName.contains("ProfileActivity") || activity is ProfileActivity -> highlightButton(profileButton)
         }
 
-        // Apply haptic glow animation to all nav buttons
         applyTouchGlow(homeButton)
         applyTouchGlow(analyticsButton)
         applyTouchGlow(cameraButton)
@@ -90,7 +91,7 @@ object NavigationHelper {
                     v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
                 }
             }
-            false // allow click events to continue
+            false
         }
     }
 
@@ -182,6 +183,16 @@ object NavigationHelper {
         
         val accountManager = AccountManager(activity)
         val currentEmail = accountManager.getCurrentUsername()
+        val currentRole = accountManager.getRole(currentEmail ?: "")
+
+        // ── FIX: Hide Invite User if role is staff
+        val navMenu = navigationView.menu
+        val inviteItem = navMenu.findItem(R.id.nav_invite_user)
+        if (currentRole == "staff") {
+            inviteItem?.isVisible = false
+        } else {
+            inviteItem?.isVisible = true
+        }
         
         if (currentEmail != null) {
             FirebaseFirestore.getInstance().collection("user_access").document(currentEmail).get()
@@ -198,7 +209,6 @@ object NavigationHelper {
             when (menuItem.itemId) {
                 R.id.nav_invite_user -> {
                     drawerLayout.closeDrawer(GravityCompat.START)
-                    val currentRole = accountManager.getRole(currentEmail ?: "")
                     val currentRm = RoleManager(currentRole)
                     if (currentRm.canGenerateInviteCodes()) {
                         showGenerateInviteCodeDialog(activity, currentEmail ?: "")
@@ -281,13 +291,27 @@ object NavigationHelper {
         val roleLabels = arrayOf("Staff", "Backup Owner")
         var selectedIndex = 0
 
+        val container = LinearLayout(activity)
+        container.orientation = LinearLayout.VERTICAL
+        container.setPadding(60, 40, 60, 10)
+
+        val emailInput = EditText(activity)
+        emailInput.hint = "Enter Invited User's Email"
+        container.addView(emailInput)
+
         AlertDialog.Builder(activity)
             .setTitle("Generate Invite Code")
-            .setMessage("Select the role for the new user, then tap Generate.")
+            .setView(container)
             .setSingleChoiceItems(roleLabels, 0) { _, which ->
                 selectedIndex = which
             }
             .setPositiveButton("Generate") { _, _ ->
+                val invitedEmail = emailInput.text.toString().trim().lowercase()
+                if (invitedEmail.isEmpty()) {
+                    Toast.makeText(activity, "Please enter an email", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+
                 val role = roles[selectedIndex]
                 // ── EXPIRATION FIX: Set an expiration time (e.g., 24 hours from now)
                 val expirationTime = System.currentTimeMillis() + (24 * 60 * 60 * 1000)
@@ -298,12 +322,13 @@ object NavigationHelper {
                     .document(code)
                     .set(mapOf(
                         "role"      to role,
+                        "invitedEmail" to invitedEmail, // Now storing the email
                         "createdBy" to ownerEmail,
                         "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp(),
-                        "expiresAt" to expirationTime // Logic added for verification
+                        "expiresAt" to expirationTime 
                     ))
                     .addOnSuccessListener {
-                        showCodeResultDialog(activity, code, roleLabels[selectedIndex])
+                        showCodeResultDialog(activity, code, roleLabels[selectedIndex], invitedEmail)
                     }
                     .addOnFailureListener { e ->
                         Toast.makeText(
@@ -317,9 +342,9 @@ object NavigationHelper {
             .show()
     }
 
-    private fun showCodeResultDialog(activity: Activity, code: String, roleLabel: String) {
+    private fun showCodeResultDialog(activity: Activity, code: String, roleLabel: String, invitedEmail: String) {
         val message =
-            "Share this 6-digit code with the new $roleLabel:\n\n" +
+            "Share this 6-digit code with $invitedEmail ($roleLabel):\n\n" +
                     "  Code:  $code\n\n" +
                     "This code will expire in 24 hours.\n" +
                     "They enter it in the app:\n" +
@@ -329,7 +354,7 @@ object NavigationHelper {
             .setTitle("Invite Code Ready")
             .setMessage(message)
             .setPositiveButton("Share via Email") { _, _ ->
-                sendCodeByEmail(activity, code, roleLabel)
+                sendCodeByEmail(activity, code, roleLabel, invitedEmail)
             }
             .setNeutralButton("Copy & Close") { _, _ ->
                 val clipboard = activity.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
@@ -343,7 +368,7 @@ object NavigationHelper {
             .show()
     }
 
-    private fun sendCodeByEmail(activity: Activity, code: String, roleLabel: String) {
+    private fun sendCodeByEmail(activity: Activity, code: String, roleLabel: String, invitedEmail: String) {
         val subject = "You're invited to Waje's Quail Farm System"
         val body = """
 Hello,
@@ -363,7 +388,7 @@ To get started:
 
         try {
             val emailIntent = Intent(Intent.ACTION_SENDTO).apply {
-                data = android.net.Uri.parse("mailto:")
+                data = android.net.Uri.parse("mailto:$invitedEmail")
                 putExtra(Intent.EXTRA_SUBJECT, subject)
                 putExtra(Intent.EXTRA_TEXT, body)
             }

@@ -431,16 +431,6 @@
             </androidx.cardview.widget.CardView>
 
             <!-- Admin Group (owner / backup_owner) This view are hidden for staff members of the farm-->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:layout_marginStart="4dp"
-                android:layout_marginBottom="8dp"
-                android:text="Admin"
-                android:textColor="@color/black"
-                android:textSize="14sp"
-                android:textStyle="bold" />
 
             <androidx.cardview.widget.CardView
                 android:id="@+id/adminCard"
