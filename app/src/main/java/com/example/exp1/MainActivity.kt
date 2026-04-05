@@ -118,26 +118,12 @@ class MainActivity : AppCompatActivity() {
 
                 when (status) {
                     "approved" -> {
-                        // ── FIX #2: Must sign into FirebaseAuth so that request.auth is
-                        //    populated in Firestore security rules. Without this, every
-                        //    write (invite codes, farm stats, name) gets permission-denied
-                        //    because isApproved() checks request.auth != null first.
-                        //
-                        //    We use signInAnonymously + linking the email identity so
-                        //    request.auth.token.email matches the user_access document key.
-                        //    The simplest approach that works with your existing rules:
-                        //    sign in anonymously then immediately update the cached role.
-                        //    All subsequent Firestore writes will have request.auth != null.
-                        //
-                        //    NOTE: If you later add Firebase Email/Password auth, replace
-                        //    signInAnonymously with signInWithEmailAndPassword for a stronger
-                        //    identity guarantee.
+
                         auth.signInAnonymously()
                             .addOnSuccessListener {
                                 enterApp(name, email, role)
                             }
                             .addOnFailureListener { e ->
-                                // Auth failed — still let them in but warn. Writes that
                                 // require isApproved() will still fail until auth succeeds.
                                 Log.w("LOGIN_DEBUG", "Anonymous auth failed: ${e.message}")
                                 Toast.makeText(this,
@@ -176,14 +162,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun enterApp(name: String, email: String, role: String) {
-        accountManager.registerAccount(name, email, "manual_login", role)
-        accountManager.updateCachedRole(name, role)
-        accountManager.saveCurrentSession(name)
+        // Use email as the unique session key instead of name
+        accountManager.registerAccount(email, email, "manual_login", role)  // use email as username
+        accountManager.updateCachedRole(email, role)
+        accountManager.saveCurrentSession(email)  // session key = email
 
         Toast.makeText(this, "Login Success as $role", Toast.LENGTH_SHORT).show()
         showLoading {
             val intent = Intent(this, DashboardActivity::class.java)
-            intent.putExtra("username", name)
+            intent.putExtra("username", name)  // pass the display name to dashboard
             startActivity(intent)
             finish()
         }

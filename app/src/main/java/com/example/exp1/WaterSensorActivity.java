@@ -9,6 +9,8 @@ import android.view.ViewTreeObserver;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
+
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
@@ -55,7 +57,19 @@ public class WaterSensorActivity extends AppCompatActivity {
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_water_level_detection);
 
-        cameraHelper = new CameraHelper(this);
+        cameraHelper = new CameraHelper(this, (uri, results) -> {
+            // Count detections
+            int gradeA = 0, gradeB = 0, gradeC = 0;
+            for (DetectionResult r : results) {
+                switch (r.getLabel()) {
+                    case "egg_grade_a": gradeA++; break;
+                    case "egg_grade_b": gradeB++; break;
+                    case "egg_grade_c": gradeC++; break;
+                }
+            }
+            int total = gradeA + gradeB + gradeC;
+            Toast.makeText(this, "Detected " + total + " eggs!", Toast.LENGTH_SHORT).show();
+        });
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());

@@ -13,7 +13,7 @@ class AccountManager(context: Context) {
     private val sharedPreferences: SharedPreferences =
         context.getSharedPreferences("quail_farm_accounts", Context.MODE_PRIVATE)
 
-    // ── Account registration (local cache only) ────────────────────────────────
+    // -- Account registration (local cache only) --------------------------------------------------
 
     fun registerAccount(username: String, email: String, password: String, role: String = "staff"): Boolean {
         if (accountExists(username)) return false
@@ -28,7 +28,9 @@ class AccountManager(context: Context) {
         return true
     }
 
-    /** Called at login to refresh the cached role from Firestore's user_access doc. */
+
+
+    // Called at login to refresh the cached role from Firestore's user_access doc.
     fun updateCachedRole(username: String, role: String) {
         sharedPreferences.edit().putString("${username}_role", role).apply()
     }
@@ -36,7 +38,7 @@ class AccountManager(context: Context) {
     fun getRole(username: String): String =
         sharedPreferences.getString("${username}_role", "staff") ?: "staff"
 
-    /** Convenience: role for the currently logged-in user. */
+    /// Convenience: role for the currently logged-in user.
     fun getCurrentRole(): String {
         val username = getCurrentUsername() ?: return "staff"
         return getRole(username)
@@ -96,7 +98,7 @@ class AccountManager(context: Context) {
         return true
     }
 
-    // ── Session ────────────────────────────────────────────────────────────────
+    // -- Session ----------------------------------------------------------------------------------
 
     fun saveCurrentSession(username: String) {
         sharedPreferences.edit().putString("current_user_session", username).apply()
@@ -109,7 +111,9 @@ class AccountManager(context: Context) {
         sharedPreferences.edit().remove("current_user_session").apply()
     }
 
-    // ── Notification preferences ───────────────────────────────────────────────
+
+
+    // -- Notification preferences -----------------------------------------------------------------
 
     fun saveNotificationPreferences(alertsEnabled: Boolean, globalDataEnabled: Boolean, scheduleEnabled: Boolean) {
         val username = getCurrentUsername() ?: "default"
@@ -136,7 +140,7 @@ class AccountManager(context: Context) {
         return sharedPreferences.getBoolean("${username}_pref_schedule", true)
     }
 
-    // ── Language & Region ──────────────────────────────────────────────────────
+    // -- Language & Region ------------------------------------------------------------------------
 
     fun saveLanguageRegion(language: String, region: String, province: String) {
         val username = getCurrentUsername() ?: "default"

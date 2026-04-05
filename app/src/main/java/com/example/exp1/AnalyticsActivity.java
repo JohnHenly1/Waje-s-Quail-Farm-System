@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
+import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -20,7 +21,19 @@ public class AnalyticsActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
 
-        cameraHelper = new CameraHelper(this);
+        cameraHelper = new CameraHelper(this, (uri, results) -> {
+            // Count detections
+            int gradeA = 0, gradeB = 0, gradeC = 0;
+            for (DetectionResult r : results) {
+                switch (r.getLabel()) {
+                    case "egg_grade_a": gradeA++; break;
+                    case "egg_grade_b": gradeB++; break;
+                    case "egg_grade_c": gradeC++; break;
+                }
+            }
+            int total = gradeA + gradeB + gradeC;
+            Toast.makeText(this, "Detected " + total + " eggs!", Toast.LENGTH_SHORT).show();
+        });
 
         setContentView(R.layout.activity_analytics);
 

@@ -3,23 +3,13 @@ plugins {
     alias(libs.plugins.google.gms.google.services)
 }
 
-dependencies {
-
-    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
-
-    implementation("com.google.firebase:firebase-auth-ktx")
-    implementation("com.google.firebase:firebase-database-ktx")
-    implementation("com.google.firebase:firebase-firestore-ktx")
-
-    implementation("com.google.android.gms:play-services-auth:20.7.0")
-}
-
 android {
     namespace = "com.example.exp1"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
+    compileSdk = 36
+
+    packaging {
+        jniLibs { useLegacyPackaging = true }
+        resources { excludes += "META-INF/DEPENDENCIES" }
     }
 
     defaultConfig {
@@ -28,7 +18,6 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "beta"
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -41,13 +30,28 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
+    androidResources {
+        noCompress += "onnx"
+    }
 }
 
 dependencies {
+    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
+    implementation("com.google.firebase:firebase-auth-ktx")
+    implementation("com.google.firebase:firebase-database-ktx")
+    implementation("com.google.firebase:firebase-firestore-ktx")
+    implementation("com.google.android.gms:play-services-auth:20.7.0")
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.17.3")
+    implementation("androidx.camera:camera-core:1.4.1")
+    implementation("androidx.camera:camera-camera2:1.4.1")
+    implementation("androidx.camera:camera-lifecycle:1.4.1")
+    implementation("androidx.camera:camera-view:1.4.1")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)

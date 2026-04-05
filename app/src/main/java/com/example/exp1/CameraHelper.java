@@ -1,12 +1,10 @@
 package com.example.exp1;
 
 import android.Manifest;
-import android.app.Activity;
-import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
-import android.provider.MediaStore;
 import android.widget.Toast;
+import android.provider.MediaStore;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -27,31 +25,52 @@ public class CameraHelper {
     private final ActivityResultLauncher<Uri> takePictureLauncher;
     private final ActivityResultLauncher<String> requestPermissionLauncher;
 
-    public CameraHelper(AppCompatActivity activity) {
-        this.activity = activity;
+    //  interface
+    public interface OnPhotoDetected {
+        void onResults(Uri photoUri, java.util.List<DetectionResult> results);
+    }
 
-        // take picture
+    private OnPhotoDetected detectionCallback;
+    private YoloDetector yoloDetector;
+
+    //  Single constructor
+    public CameraHelper(AppCompatActivity activity, OnPhotoDetected callback) {
+        this.activity = activity;
+        this.detectionCallback = callback;
+        this.yoloDetector = new YoloDetector(activity);
+
         takePictureLauncher = activity.registerForActivityResult(
                 new ActivityResultContracts.TakePicture(),
                 success -> {
                     if (success && photoUri != null) {
-                        Toast.makeText(activity, "Photo saved!", Toast.LENGTH_SHORT).show();
-                        // Extend here: pass photoUri to an upload method, open preview, etc.
+                        try {
+                            android.graphics.Bitmap bitmap =
+                                    MediaStore.Images.Media.getBitmap(activity.getContentResolver(), photoUri);
+
+                            java.util.List<DetectionResult> results = yoloDetector.detect(bitmap);
+
+                            if (detectionCallback != null) {
+                                detectionCallback.onResults(photoUri, results);
+                            }
+
+                        } catch (Exception e) {
+                            Toast.makeText(activity,
+                                    "Detection failed: " + e.getMessage(),
+                                    Toast.LENGTH_SHORT).show();
+                        }
                     }
                 }
         );
 
-        // request CAMERA permission
         requestPermissionLauncher = activity.registerForActivityResult(
                 new ActivityResultContracts.RequestPermission(),
                 granted -> {
                     if (granted) openCamera();
-                    else Toast.makeText(activity, "Camera permission is required", Toast.LENGTH_SHORT).show();
+                    else Toast.makeText(activity, "Camera permission required", Toast.LENGTH_SHORT).show();
                 }
         );
     }
 
-    // Call this from any button click to open the camera
     public void launch() {
         if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA)
                 == PackageManager.PERMISSION_GRANTED) {
@@ -61,12 +80,9 @@ public class CameraHelper {
         }
     }
 
-    //Returns the URI of the last photo taken (may be null).
     public Uri getPhotoUri() {
         return photoUri;
     }
-
-    //----------------------------------------------------------------------------------------------
 
     private void openCamera() {
         try {
@@ -82,13 +98,7 @@ public class CameraHelper {
             takePictureLauncher.launch(photoUri);
 
         } catch (Exception e) {
-            // Fallback: launch any installed camera app without a specific save URI
-            Intent fallback = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-            if (fallback.resolveActivity(activity.getPackageManager()) != null) {
-                activity.startActivity(fallback);
-            } else {
-                Toast.makeText(activity, "No camera app found", Toast.LENGTH_SHORT).show();
-            }
+            Toast.makeText(activity, "Camera error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
     }
 }
