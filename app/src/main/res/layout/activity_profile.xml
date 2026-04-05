@@ -110,6 +110,14 @@
                         android:textColor="@color/white"
                         android:textSize="30sp"
                         android:textStyle="bold" />
+
+                    <ImageView
+                        android:id="@+id/profileImage"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:scaleType="centerCrop"
+                        android:visibility="gone"
+                        android:contentDescription="Profile Image" />
                 </FrameLayout>
 
                 <ImageButton

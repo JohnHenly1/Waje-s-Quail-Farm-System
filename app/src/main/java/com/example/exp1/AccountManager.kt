@@ -7,30 +7,46 @@ import android.content.SharedPreferences
  * AccountManager — local session management.
  *
  * Role is now stored per-email in SharedPreferences (mirrored from Firestore
- * user_access.role when the user logs in). Use RoleManager to check permissions.
+ * user_access.role when the user logins).
  */
 class AccountManager(context: Context) {
     private val sharedPreferences: SharedPreferences =
         context.getSharedPreferences("quail_farm_accounts", Context.MODE_PRIVATE)
 
-    // -- Account registration (local cache only) --------------------------------------------------
-
     fun registerAccount(username: String, email: String, password: String, role: String = "staff"): Boolean {
-        if (accountExists(username)) return false
         sharedPreferences.edit().apply {
             putString("${username}_email", email)
             putString("${username}_password", password)
             putString("${username}_role", role)
             putString("${username}_registered", "true")
+            
+            val usernames = getAllUsernames().toMutableSet()
+            usernames.add(username)
+            putStringSet("all_usernames_list", usernames)
+            
             putString("email_${email}", username)
             apply()
         }
         return true
     }
 
+    fun getAllUsernames(): Set<String> {
+        return sharedPreferences.getStringSet("all_usernames_list", emptySet()) ?: emptySet()
+    }
 
+    fun getAllUsers(): List<User> {
+        val usernames = getAllUsernames()
+        return usernames.map { username ->
+            User(
+                username = username,
+                email = getEmail(username) ?: "",
+                role = getRole(username)
+            )
+        }
+    }
 
-    // Called at login to refresh the cached role from Firestore's user_access doc.
+    data class User(val username: String, val email: String, val role: String)
+
     fun updateCachedRole(username: String, role: String) {
         sharedPreferences.edit().putString("${username}_role", role).apply()
     }
@@ -38,7 +54,6 @@ class AccountManager(context: Context) {
     fun getRole(username: String): String =
         sharedPreferences.getString("${username}_role", "staff") ?: "staff"
 
-    /// Convenience: role for the currently logged-in user.
     fun getCurrentRole(): String {
         val username = getCurrentUsername() ?: return "staff"
         return getRole(username)
@@ -47,49 +62,14 @@ class AccountManager(context: Context) {
     fun accountExists(username: String): Boolean =
         sharedPreferences.getString("${username}_registered", null) != null
 
-    fun accountExistsByEmail(email: String): Boolean =
-        sharedPreferences.getString("email_$email", null) != null
-
     fun validateLogin(username: String, password: String): Boolean {
         if (!accountExists(username)) return false
         val stored = sharedPreferences.getString("${username}_password", "")
         return if (stored == password) { saveCurrentSession(username); true } else false
     }
 
-    fun validateLoginByEmail(email: String, password: String): Boolean {
-        val username = sharedPreferences.getString("email_$email", null) ?: return false
-        return validateLogin(username, password)
-    }
-
     fun getEmail(username: String): String? =
         sharedPreferences.getString("${username}_email", null)
-
-    fun getUsernameByEmail(email: String): String? =
-        sharedPreferences.getString("email_$email", null)
-
-    fun updateProfile(oldUsername: String, newUsername: String, newEmail: String): Boolean {
-        val password = sharedPreferences.getString("${oldUsername}_password", "") ?: ""
-        val role     = getRole(oldUsername)
-        sharedPreferences.edit().apply {
-            if (oldUsername != newUsername) {
-                if (accountExists(newUsername)) return false
-                remove("${oldUsername}_email")
-                remove("${oldUsername}_password")
-                remove("${oldUsername}_role")
-                remove("${oldUsername}_registered")
-                val oldEmail = getEmail(oldUsername)
-                if (oldEmail != null) remove("email_$oldEmail")
-            }
-            putString("${newUsername}_email", newEmail)
-            putString("${newUsername}_password", password)
-            putString("${newUsername}_role", role)
-            putString("${newUsername}_registered", "true")
-            putString("email_${newEmail}", newUsername)
-            if (getCurrentUsername() == oldUsername) putString("current_user_session", newUsername)
-            apply()
-        }
-        return true
-    }
 
     fun updatePassword(username: String, oldPassword: String, newPassword: String): Boolean {
         val stored = sharedPreferences.getString("${username}_password", "")
@@ -98,7 +78,28 @@ class AccountManager(context: Context) {
         return true
     }
 
-    // -- Session ----------------------------------------------------------------------------------
+    fun deleteAccount(username: String): Boolean {
+        if (!accountExists(username)) return false
+        val email = getEmail(username)
+
+        sharedPreferences.edit().apply {
+            remove("${username}_email")
+            remove("${username}_password")
+            remove("${username}_role")
+            remove("${username}_registered")
+            if (email != null) remove("email_$email")
+
+            val usernames = getAllUsernames().toMutableSet()
+            usernames.remove(username)
+            putStringSet("all_usernames_list", usernames)
+
+            if (getCurrentUsername() == username) {
+                remove("current_user_session")
+            }
+            apply()
+        }
+        return true
+    }
 
     fun saveCurrentSession(username: String) {
         sharedPreferences.edit().putString("current_user_session", username).apply()
@@ -111,9 +112,13 @@ class AccountManager(context: Context) {
         sharedPreferences.edit().remove("current_user_session").apply()
     }
 
-
-
-    // -- Notification preferences -----------------------------------------------------------------
+    fun saveFarmStats(totalBirds: Int, activeCages: Int) {
+        sharedPreferences.edit().apply {
+            putInt("total_birds", totalBirds)
+            putInt("active_cages", activeCages)
+            apply()
+        }
+    }
 
     fun saveNotificationPreferences(alertsEnabled: Boolean, globalDataEnabled: Boolean, scheduleEnabled: Boolean) {
         val username = getCurrentUsername() ?: "default"
@@ -139,8 +144,6 @@ class AccountManager(context: Context) {
         val username = getCurrentUsername() ?: "default"
         return sharedPreferences.getBoolean("${username}_pref_schedule", true)
     }
-
-    // -- Language & Region ------------------------------------------------------------------------
 
     fun saveLanguageRegion(language: String, region: String, province: String) {
         val username = getCurrentUsername() ?: "default"

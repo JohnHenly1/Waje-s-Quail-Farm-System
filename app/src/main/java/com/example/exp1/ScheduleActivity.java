@@ -497,7 +497,7 @@ public class ScheduleActivity extends AppCompatActivity {
                                     for (int d_i = 1; d_i <= days; d_i++) {
                                         cal.set(Calendar.DAY_OF_MONTH, d_i);
                                         int dow = cal.get(Calendar.DAY_OF_WEEK);
-                                        
+
                                         boolean match = true;
                                         if (checkedId == R.id.rbYearlyWeekdays) {
                                             match = (dow != Calendar.SATURDAY && dow != Calendar.SUNDAY);
@@ -699,7 +699,7 @@ public class ScheduleActivity extends AppCompatActivity {
 
             idTv.setText(String.valueOf(idCounter++));
             idTv.setOnClickListener(v -> showTaskGroupDetailsDialog(groupTasks));
-            
+
             titleTv.setText(first.title);
             categoryTv.setText(first.category);
             timeTv.setText(first.time);
@@ -798,7 +798,7 @@ public class ScheduleActivity extends AppCompatActivity {
         Map<String, List<Task>> categoryGroups = new TreeMap<>();
         for (Task task : taskList) {
             if (task.year != selYear || task.month != selMonth || task.day != selDay) continue;
-            
+
             if (!categoryGroups.containsKey(task.category)) {
                 categoryGroups.put(task.category, new ArrayList<>());
             }

@@ -18,7 +18,8 @@
             android:layout_width="32dp"
             android:layout_height="32dp"
             android:src="@drawable/ic_settings"
-            app:tint="@color/dark_green" />
+            app:tint="@color/dark_green"
+            android:contentDescription="Settings Icon" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -30,68 +31,75 @@
             android:textStyle="bold" />
     </LinearLayout>
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Current Password"
-        android:textColor="@color/dark_green"
-        android:textSize="14sp"
-        android:textStyle="bold" />
-
-    <EditText
-        android:id="@+id/currentPassword"
+    <!-- Change Password Option -->
+    <LinearLayout
+        android:id="@+id/changePasswordBtn"
         android:layout_width="match_parent"
-        android:layout_height="52dp"
-        android:layout_marginTop="8dp"
-        android:background="@drawable/rounded_corner"
-        android:hint="Required to save changes"
-        android:inputType="textPassword"
-        android:padding="12dp"
-        android:textSize="16sp" />
+        android:layout_height="wrap_content"
+        android:background="?android:attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:paddingVertical="16dp">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_lock"
+            app:tint="@color/dark_green" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="16dp"
+            android:text="Change Password"
+            android:textColor="@color/black"
+            android:textSize="16sp" />
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:src="@drawable/ic_chevron_right"
+            app:tint="@color/gray" />
+    </LinearLayout>
 
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:layout_marginVertical="20dp"
         android:background="#EEEEEE" />
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="New Password"
-        android:textColor="@color/dark_green"
-        android:textSize="14sp"
-        android:textStyle="bold" />
-
-    <EditText
-        android:id="@+id/newPassword"
+    <!-- Delete Account Option -->
+    <LinearLayout
+        android:id="@+id/deleteAccountBtn"
         android:layout_width="match_parent"
-        android:layout_height="52dp"
-        android:layout_marginTop="8dp"
-        android:background="@drawable/rounded_corner"
-        android:hint="Leave blank to keep current"
-        android:inputType="textPassword"
-        android:padding="12dp"
-        android:textSize="16sp" />
-
-    <TextView
-        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
-        android:text="Confirm New Password"
-        android:textColor="@color/dark_green"
-        android:textSize="14sp"
-        android:textStyle="bold" />
+        android:background="?android:attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:paddingVertical="16dp">
 
-    <EditText
-        android:id="@+id/confirmNewPassword"
-        android:layout_width="match_parent"
-        android:layout_height="52dp"
-        android:layout_marginTop="8dp"
-        android:background="@drawable/rounded_corner"
-        android:hint="Re-type new password"
-        android:inputType="textPassword"
-        android:padding="12dp"
-        android:textSize="16sp" />
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_lock"
+            app:tint="@color/logout_red" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="16dp"
+            android:text="Delete Account"
+            android:textColor="@color/logout_red"
+            android:textSize="16sp" />
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:src="@drawable/ic_chevron_right"
+            app:tint="@color/gray" />
+    </LinearLayout>
 
 </LinearLayout>

@@ -227,7 +227,7 @@
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
-            android:contentDescription="@string/home">
+            android:background="?attr/selectableItemBackground">
 
             <ImageView
                 android:layout_width="22dp"
@@ -254,7 +254,7 @@
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
-            android:contentDescription="@string/analytics">
+            android:background="?attr/selectableItemBackground">
 
             <ImageView
                 android:layout_width="22dp"
@@ -280,7 +280,7 @@
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
-            android:contentDescription="@string/profile">
+            android:background="?attr/selectableItemBackground">
 
             <ImageView
                 android:layout_width="24dp"
@@ -307,7 +307,7 @@
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
-            android:contentDescription="@string/schedule">
+            android:background="?attr/selectableItemBackground">
 
             <ImageButton
                 android:id="@+id/scheduleButton1"
@@ -338,7 +338,7 @@
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
-            android:contentDescription="@string/profile">
+            android:background="?attr/selectableItemBackground">
 
             <ImageView
                 android:layout_width="24dp"
@@ -358,5 +358,8 @@
         </LinearLayout>
 
     </LinearLayout>
+
+    <!-- Include Loading Overlay -->
+    <include layout="@layout/layout_loading" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

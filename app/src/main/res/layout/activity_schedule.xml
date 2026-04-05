@@ -726,4 +726,7 @@
         </LinearLayout>
     </LinearLayout>
 
+    <!-- Include Loading Overlay -->
+    <include layout="@layout/layout_loading" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

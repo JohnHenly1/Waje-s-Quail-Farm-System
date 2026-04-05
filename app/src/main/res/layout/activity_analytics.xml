@@ -198,9 +198,9 @@
             <ImageView
                 android:layout_width="24dp"
                 android:layout_height="24dp"
-                android:scaleType="centerInside"
                 app:srcCompat="@drawable/ic_profile"
-                app:tint="@color/white" />
+                app:tint="@color/white"
+                android:contentDescription="Profile" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -259,12 +259,13 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="$"
+                            android:text="₱"
                             android:textColor="@color/white"
                             android:textSize="24sp"
                             android:layout_marginBottom="8dp" />
 
                         <TextView
+                            android:id="@+id/revenueValue"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="0"
@@ -305,12 +306,13 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="📊"
+                            android:text="₱"
                             android:textColor="@color/white"
                             android:textSize="24sp"
                             android:layout_marginBottom="8dp" />
 
                         <TextView
+                            android:id="@+id/feedCostValue"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="0"
@@ -351,12 +353,13 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="📈"
+                            android:text="₱"
                             android:textColor="@color/white"
                             android:textSize="24sp"
                             android:layout_marginBottom="8dp" />
 
                         <TextView
+                            android:id="@+id/profitValue"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="0"
@@ -377,6 +380,76 @@
                 </androidx.cardview.widget.CardView>
 
             </GridLayout>
+
+            <!-- AI Recommendation Card -->
+            <androidx.cardview.widget.CardView
+                android:id="@+id/aiCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardBackgroundColor="@color/light_gray"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0dp"
+                app:cardUseCompatPadding="false">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/border_purple"
+                    android:orientation="vertical"
+                    android:padding="24dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <FrameLayout
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:layout_marginEnd="12dp"
+                            android:background="@drawable/circle_dark_green">
+
+                            <ImageView
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:layout_gravity="center"
+                                android:scaleType="centerInside"
+                                app:srcCompat="@drawable/ic_lightbulb"
+                                app:tint="@color/yellow"
+                                tools:ignore="ContentDescription" />
+                        </FrameLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:fontFamily="sans-serif"
+                                android:text="@string/ai_recommendation"
+                                android:textColor="@color/black"
+                                android:textSize="16sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/recommendationText"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="8dp"
+                                android:fontFamily="sans-serif"
+                                android:lineSpacingExtra="4dp"
+                                android:text="@string/recommendation_text"
+                                android:textColor="@color/dark_blue"
+                                android:textSize="13sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
 
             <!-- Weekly Production Chart -->
             <androidx.cardview.widget.CardView
@@ -501,6 +574,7 @@
                         android:layout_marginBottom="16dp" />
 
                     <TextView
+                        android:id="@+id/performanceTitle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Excellent Performance!"
@@ -510,6 +584,7 @@
                         android:layout_marginBottom="8dp" />
 
                     <TextView
+                        android:id="@+id/performanceDesc"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="You're 0% above average production this month"
@@ -524,4 +599,8 @@
         </LinearLayout>
 
     </androidx.core.widget.NestedScrollView>
+
+    <!-- Include Loading Overlay -->
+    <include layout="@layout/layout_loading" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

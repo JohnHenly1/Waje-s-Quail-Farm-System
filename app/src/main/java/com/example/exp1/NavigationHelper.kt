@@ -2,20 +2,28 @@ package com.example.exp1
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.os.Handler
+import android.os.Looper
+import android.view.HapticFeedbackConstants
+import android.view.MotionEvent
 import android.view.View
-import android.widget.ArrayAdapter
+import android.view.animation.AnimationUtils
+import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
+import com.bumptech.glide.Glide
 import com.google.android.material.navigation.NavigationView
 import com.google.firebase.firestore.FirebaseFirestore
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Locale
 import java.util.UUID
+import kotlin.random.Random
 
 object NavigationHelper {
 
@@ -26,7 +34,8 @@ object NavigationHelper {
         val scheduleButton = activity.findViewById<LinearLayout>(R.id.scheduleButton)
         val profileButton = activity.findViewById<LinearLayout>(R.id.profileButton)
 
-        val username = activity.intent.getStringExtra("username")
+        val accountManager = AccountManager(activity)
+        val currentEmail = accountManager.getCurrentUsername()
 
         val activityName = activity.localClassName
         when {
@@ -36,116 +45,180 @@ object NavigationHelper {
             activityName.contains("ProfileActivity") || activity is ProfileActivity -> highlightButton(profileButton)
         }
 
+        // Apply haptic glow animation to all nav buttons
+        applyTouchGlow(homeButton)
+        applyTouchGlow(analyticsButton)
+        applyTouchGlow(cameraButton)
+        applyTouchGlow(scheduleButton)
+        applyTouchGlow(profileButton)
+
         homeButton?.setOnClickListener {
             if (activity !is DashboardActivity) {
-                val intent = Intent(activity, DashboardActivity::class.java)
-                intent.putExtra("username", username)
-                intent.flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-                activity.startActivity(intent)
+                navigateTo(activity, DashboardActivity::class.java, "Opening Dashboard...", currentEmail)
             }
         }
 
         analyticsButton?.setOnClickListener {
             if (activity !is AnalyticsActivity) {
-                val intent = Intent(activity, AnalyticsActivity::class.java)
-                intent.putExtra("username", username)
-                intent.flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-                activity.startActivity(intent)
+                navigateTo(activity, AnalyticsActivity::class.java, "Generating Reports...", currentEmail)
             }
         }
 
-        cameraButton?.setOnClickListener {
-            // Camera functionality handled per-activity
-        }
+        cameraButton?.setOnClickListener { }
 
         scheduleButton?.setOnClickListener {
             if (activity !is ScheduleActivity) {
-                val intent = Intent(activity, ScheduleActivity::class.java)
-                intent.putExtra("username", username)
-                intent.flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-                activity.startActivity(intent)
+                navigateTo(activity, ScheduleActivity::class.java, "Fetching Tasks...", currentEmail)
             }
         }
 
         profileButton?.setOnClickListener {
             if (activity !is ProfileActivity) {
-                val intent = Intent(activity, ProfileActivity::class.java)
-                intent.putExtra("username", username)
-                intent.flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-                activity.startActivity(intent)
+                navigateTo(activity, ProfileActivity::class.java, "Syncing Profile...", currentEmail)
             }
+        }
+    }
+
+    private fun applyTouchGlow(view: View?) {
+        view?.setOnTouchListener { v, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    v.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
+                    v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+                }
+            }
+            false // allow click events to continue
+        }
+    }
+
+    private fun <T : Activity> navigateTo(currentActivity: Activity, targetClass: Class<T>, label: String, email: String?) {
+        if (!isInternetActuallyWorking(currentActivity)) {
+            showNoInternetOverlay(currentActivity)
+            return
+        }
+        
+        showGlobalLoading(currentActivity, label) {
+            val intent = Intent(currentActivity, targetClass)
+            intent.putExtra("username", email)
+            intent.flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            currentActivity.startActivity(intent)
+        }
+    }
+
+    fun isInternetActuallyWorking(context: Context): Boolean {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = cm.activeNetwork ?: return false
+        val caps = cm.getNetworkCapabilities(network) ?: return false
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+               caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    }
+
+    fun showNoInternetOverlay(activity: Activity) {
+        val loadingLayout = activity.findViewById<View>(R.id.loadingLayout)
+        val progressBar = activity.findViewById<ProgressBar>(R.id.loadingProgressBar)
+        val percentageText = activity.findViewById<TextView>(R.id.loadingPercentageText)
+        val statusText = activity.findViewById<TextView>(R.id.loadingStatusText)
+        val noInternetSection = activity.findViewById<View>(R.id.noInternetSection)
+        val btnRetry = activity.findViewById<View>(R.id.btnRetryConnection)
+
+        if (loadingLayout != null && noInternetSection != null) {
+            statusText?.text = "No Connection. Check your Data and Wifi Connection"
+            progressBar?.visibility = View.GONE
+            percentageText?.visibility = View.GONE
+            noInternetSection.visibility = View.VISIBLE
+            loadingLayout.visibility = View.VISIBLE
+            
+            btnRetry?.setOnClickListener {
+                if (isInternetActuallyWorking(activity)) {
+                    loadingLayout.visibility = View.GONE
+                    activity.recreate()
+                } else {
+                    Toast.makeText(activity, "Still no connection...", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    fun showGlobalLoading(activity: Activity, label: String, action: () -> Unit) {
+        val loadingLayout = activity.findViewById<View>(R.id.loadingLayout)
+        val loadingIcon = activity.findViewById<View>(R.id.loadingIcon)
+        val statusText = activity.findViewById<TextView>(R.id.loadingStatusText)
+        val progressBar = activity.findViewById<ProgressBar>(R.id.loadingProgressBar)
+        val percentText = activity.findViewById<TextView>(R.id.loadingPercentageText)
+
+        if (loadingLayout != null && loadingIcon != null) {
+            statusText?.text = label
+            loadingLayout.visibility = View.VISIBLE
+            val jump = AnimationUtils.loadAnimation(activity, R.anim.quail_jump)
+            loadingIcon.startAnimation(jump)
+
+            var progress = 0
+            val handler = Handler(Looper.getMainLooper())
+            val runnable = object : Runnable {
+                override fun run() {
+                    if (progress <= 100) {
+                        progressBar?.progress = progress
+                        percentText?.text = "${progress}%"
+                        progress += 10
+                        handler.postDelayed(this, 40)
+                    } else {
+                        loadingLayout.visibility = View.GONE
+                        loadingIcon.clearAnimation()
+                        action()
+                    }
+                }
+            }
+            handler.post(runnable)
+        } else {
+            action()
         }
     }
 
     fun setupSideMenu(activity: Activity, drawerLayout: DrawerLayout) {
         val navigationView = activity.findViewById<NavigationView>(R.id.sideMenu)
-
+        
         val accountManager = AccountManager(activity)
-        var username = activity.intent.getStringExtra("username")
-        if (username == null || username.isEmpty()) {
-            username = accountManager.getCurrentUsername()
-        }
-
-        updateDrawerHeader(navigationView, username ?: "User")
-
-        // ── FIX: Re-fetch the role from Firestore to guarantee it's current,
-        //         then show/hide the Invite User menu item accordingly.
-        //         Using only the local cache here was unreliable after manual login.
-        val cachedRole = accountManager.getCurrentRole()
-        val rm = RoleManager(cachedRole)
-        navigationView?.menu?.findItem(R.id.nav_invite_user)?.isVisible = rm.canGenerateInviteCodes()
-
-        // Also refresh from Firestore in the background so future opens are accurate
-        val email = accountManager.getEmail(username ?: "")
-        if (email != null) {
-            FirebaseFirestore.getInstance()
-                .collection("user_access")
-                .document(email)
-                .get()
+        val currentEmail = accountManager.getCurrentUsername()
+        
+        if (currentEmail != null) {
+            FirebaseFirestore.getInstance().collection("user_access").document(currentEmail).get()
                 .addOnSuccessListener { doc ->
-                    val freshRole = doc.getString("role") ?: cachedRole
-                    accountManager.updateCachedRole(username ?: "", freshRole)
-                    val freshRm = RoleManager(freshRole)
-                    navigationView?.menu?.findItem(R.id.nav_invite_user)?.isVisible =
-                        freshRm.canGenerateInviteCodes()
+                    if (doc.exists()) {
+                        val name = doc.getString("name") ?: "User"
+                        val photoUrl = doc.getString("profilePic") ?: ""
+                        updateDrawerHeader(navigationView, name, photoUrl, activity)
+                    }
                 }
         }
-
+        
         navigationView?.setNavigationItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
                 R.id.nav_invite_user -> {
                     drawerLayout.closeDrawer(GravityCompat.START)
-                    // ── FIX: Use the refreshed role from local cache
-                    val currentRole = accountManager.getCurrentRole()
+                    val currentRole = accountManager.getRole(currentEmail ?: "")
                     val currentRm = RoleManager(currentRole)
                     if (currentRm.canGenerateInviteCodes()) {
-                        showGenerateInviteCodeDialog(activity, email ?: "")
+                        showGenerateInviteCodeDialog(activity, currentEmail ?: "")
                     } else {
                         Toast.makeText(activity, "Only owners can generate invite codes.", Toast.LENGTH_SHORT).show()
                     }
                 }
                 R.id.nav_dashboard -> {
                     if (activity !is DashboardActivity) {
-                        val intent = Intent(activity, DashboardActivity::class.java)
-                        intent.putExtra("username", username)
-                        intent.flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-                        activity.startActivity(intent)
+                        navigateTo(activity, DashboardActivity::class.java, "Opening Dashboard...", currentEmail)
                     }
                 }
                 R.id.nav_settings -> {
                     if (activity !is ProfileActivity) {
-                        val intent = Intent(activity, ProfileActivity::class.java)
-                        intent.putExtra("username", username)
-                        intent.flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-                        activity.startActivity(intent)
+                        navigateTo(activity, ProfileActivity::class.java, "Loading Settings...", currentEmail)
                     }
                 }
                 R.id.nav_help -> {
                     if (activity !is ProfileActivity) {
-                        val intent = Intent(activity, ProfileActivity::class.java)
-                        intent.putExtra("username", username)
-                        intent.flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-                        activity.startActivity(intent)
+                        navigateTo(activity, ProfileActivity::class.java, "Opening Help...", currentEmail)
                     }
                 }
                 R.id.nav_logout -> {
@@ -161,14 +234,26 @@ object NavigationHelper {
         }
     }
 
-    private fun updateDrawerHeader(navigationView: NavigationView?, username: String) {
+    private fun updateDrawerHeader(navigationView: NavigationView?, name: String, photoUrl: String, activity: Activity) {
         val headerView = navigationView?.getHeaderView(0)
         val userNameTextView = headerView?.findViewById<TextView>(R.id.userName)
         val userInitialTextView = headerView?.findViewById<TextView>(R.id.userInitial)
+        val userImageView = headerView?.findViewById<ImageView>(R.id.userPhoto)
 
-        userNameTextView?.text = username
-        if (username.isNotEmpty()) {
-            userInitialTextView?.text = username[0].uppercaseChar().toString()
+        userNameTextView?.text = name
+        
+        if (photoUrl.isNotEmpty()) {
+            userInitialTextView?.visibility = View.GONE
+            userImageView?.let {
+                it.visibility = View.VISIBLE
+                Glide.with(activity).load(photoUrl).circleCrop().into(it)
+            }
+        } else {
+            userImageView?.visibility = View.GONE
+            userInitialTextView?.let {
+                it.visibility = View.VISIBLE
+                if (name.isNotEmpty()) it.text = name[0].uppercaseChar().toString()
+            }
         }
     }
 
@@ -177,9 +262,7 @@ object NavigationHelper {
         val username = activity.intent.getStringExtra("username")
         notificationButton?.setOnClickListener {
             if (activity !is AlertsActivity) {
-                val intent = Intent(activity, AlertsActivity::class.java)
-                intent.putExtra("username", username)
-                activity.startActivity(intent)
+                navigateTo(activity, AlertsActivity::class.java, "Fetching Alerts...", username)
             }
         }
     }
@@ -193,12 +276,7 @@ object NavigationHelper {
         }
     }
 
-    // -- Generate Invite Code dialog --------------------------------------------------------------
-    //      This now writes to "invite_codes/{code}" which IS covered by your rules:
-    //      allow write: if isOwner();
-    //      The new user enters the code in EnterCodeActivity — the correct flow.
-
-    private fun showGenerateInviteCodeDialog(activity: Activity, ownerEmail: String) {
+    fun showGenerateInviteCodeDialog(activity: Activity, ownerEmail: String) {
         val roles = arrayOf("staff", "backup_owner")
         val roleLabels = arrayOf("Staff", "Backup Owner")
         var selectedIndex = 0
@@ -211,11 +289,9 @@ object NavigationHelper {
             }
             .setPositiveButton("Generate") { _, _ ->
                 val role = roles[selectedIndex]
-                val code = UUID.randomUUID()
-                    .toString()
-                    .replace("-", "")
-                    .substring(0, 6)
-                    .uppercase()
+                // ── EXPIRATION FIX: Set an expiration time (e.g., 24 hours from now)
+                val expirationTime = System.currentTimeMillis() + (24 * 60 * 60 * 1000)
+                val code = "%06d".format(Random.nextInt(1000000))
 
                 val db = FirebaseFirestore.getInstance()
                 db.collection("invite_codes")
@@ -223,10 +299,10 @@ object NavigationHelper {
                     .set(mapOf(
                         "role"      to role,
                         "createdBy" to ownerEmail,
-                        "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
+                        "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp(),
+                        "expiresAt" to expirationTime // Logic added for verification
                     ))
                     .addOnSuccessListener {
-                        // Show the generated code so the owner can share it
                         showCodeResultDialog(activity, code, roleLabels[selectedIndex])
                     }
                     .addOnFailureListener { e ->
@@ -243,8 +319,9 @@ object NavigationHelper {
 
     private fun showCodeResultDialog(activity: Activity, code: String, roleLabel: String) {
         val message =
-            "Share this 6-character code with the new $roleLabel:\n\n" +
+            "Share this 6-digit code with the new $roleLabel:\n\n" +
                     "  Code:  $code\n\n" +
+                    "This code will expire in 24 hours.\n" +
                     "They enter it in the app:\n" +
                     "Register screen → \"Enter Invite Code\" → type the code above → sign in with Google."
 
@@ -273,7 +350,7 @@ Hello,
 
 You have been invited to join Waje's Quail Farm System as a $roleLabel.
 
-Your invite code: $code
+Your invite code: $code (Valid for 24 hours)
 
 To get started:
 1. Download the app.
