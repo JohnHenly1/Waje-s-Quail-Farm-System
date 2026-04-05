@@ -50,12 +50,54 @@
         android:clickable="true"
         android:layout_marginBottom="16dp"/>
 
+    <!-- Address Section -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Your Address"
+        android:textColor="@color/dark_green"
+        android:textStyle="bold"
+        android:textSize="14sp"
+        android:layout_marginBottom="8dp" />
+
     <EditText
-        android:id="@+id/editSetupLocation"
+        android:id="@+id/editAddressStreet"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="Location / Address"
+        android:hint="Street Address"
         android:inputType="textPostalAddress"
+        android:layout_marginBottom="12dp"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="12dp">
+
+        <EditText
+            android:id="@+id/editAddressCity"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="City"
+            android:inputType="text"
+            android:layout_marginEnd="8dp"/>
+
+        <EditText
+            android:id="@+id/editAddressState"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="State/Province"
+            android:inputType="text"/>
+    </LinearLayout>
+
+    <EditText
+        android:id="@+id/editAddressPostal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Postal Code"
+        android:inputType="text"
         android:layout_marginBottom="16dp"/>
 
     <com.google.android.material.textfield.TextInputLayout

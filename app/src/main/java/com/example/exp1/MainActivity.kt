@@ -335,9 +335,19 @@ class MainActivity : AppCompatActivity() {
                 FirebaseFirestore.getInstance().collection("user_access").document(email).get()
                     .addOnSuccessListener { doc ->
                         if (doc.exists()) {
-                            val savedPassword = doc.getString("password") ?: ""
-                            loadingLayout.visibility = View.GONE
-                            showPasswordDialog(email, savedPassword, doc.getString("name") ?: "User", doc.getString("role") ?: "staff")
+                            val status = doc.getString("status") ?: "approved"
+                            if (status == "pending") {
+                                loadingLayout.visibility = View.GONE
+                                // Resume pending verification
+                                val intent = Intent(this, RegisterActivity::class.java)
+                                intent.putExtra("pendingEmail", email)
+                                startActivity(intent)
+                                googleSignInClient.signOut()
+                            } else {
+                                val savedPassword = doc.getString("password") ?: ""
+                                loadingLayout.visibility = View.GONE
+                                showPasswordDialog(email, savedPassword, doc.getString("name") ?: "User", doc.getString("role") ?: "staff")
+                            }
                         } else {
                             loadingLayout.visibility = View.GONE
                             showNotRegisteredDialog()

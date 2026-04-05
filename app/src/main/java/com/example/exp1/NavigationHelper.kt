@@ -9,6 +9,7 @@ import android.net.NetworkCapabilities
 import android.os.Handler
 import android.os.Looper
 import android.view.HapticFeedbackConstants
+import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.animation.AnimationUtils
@@ -185,7 +186,7 @@ object NavigationHelper {
         val currentEmail = accountManager.getCurrentUsername()
         val currentRole = accountManager.getRole(currentEmail ?: "")
 
-        // ── FIX: Hide Invite User if role is staff
+        // Hide Invite User if role is staff
         val navMenu = navigationView.menu
         val inviteItem = navMenu.findItem(R.id.nav_invite_user)
         if (currentRole == "staff") {
@@ -227,9 +228,8 @@ object NavigationHelper {
                     }
                 }
                 R.id.nav_help -> {
-                    if (activity !is ProfileActivity) {
-                        navigateTo(activity, ProfileActivity::class.java, "Opening Help...", currentEmail)
-                    }
+                    drawerLayout.closeDrawer(GravityCompat.START)
+                    showHelpSupportDialog(activity)
                 }
                 R.id.nav_logout -> {
                     accountManager.clearSession()
@@ -287,24 +287,27 @@ object NavigationHelper {
     }
 
     fun showGenerateInviteCodeDialog(activity: Activity, ownerEmail: String) {
-        val roles = arrayOf("staff", "backup_owner")
-        val roleLabels = arrayOf("Staff", "Backup Owner")
-        var selectedIndex = 0
-
+        // Create an input for the intended email to link the code securely
         val container = LinearLayout(activity)
         container.orientation = LinearLayout.VERTICAL
-        container.setPadding(60, 40, 60, 10)
+        container.setPadding(64, 40, 64, 10)
 
         val emailInput = EditText(activity)
-        emailInput.hint = "Enter Invited User's Email"
+        emailInput.hint = "Recipient Email"
         container.addView(emailInput)
+
+        // Add role selector spinner
+        val roleSpinner = Spinner(activity)
+        val roleOptions = listOf("Staff", "Backup Owner")
+        val roleAdapter = android.widget.ArrayAdapter(activity, android.R.layout.simple_spinner_item, roleOptions)
+        roleAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        roleSpinner.adapter = roleAdapter
+        roleSpinner.setSelection(0) // Default to "Staff"
+        container.addView(roleSpinner)
 
         AlertDialog.Builder(activity)
             .setTitle("Generate Invite Code")
             .setView(container)
-            .setSingleChoiceItems(roleLabels, 0) { _, which ->
-                selectedIndex = which
-            }
             .setPositiveButton("Generate") { _, _ ->
                 val invitedEmail = emailInput.text.toString().trim().lowercase()
                 if (invitedEmail.isEmpty()) {
@@ -312,89 +315,122 @@ object NavigationHelper {
                     return@setPositiveButton
                 }
 
-                val role = roles[selectedIndex]
-                // ── EXPIRATION FIX: Set an expiration time (e.g., 24 hours from now)
-                val expirationTime = System.currentTimeMillis() + (24 * 60 * 60 * 1000)
-                val code = "%06d".format(Random.nextInt(1000000))
+                val selectedRole = when (roleSpinner.selectedItemPosition) {
+                    0 -> "staff"
+                    1 -> "backup_owner"
+                    else -> "staff"
+                }
 
                 val db = FirebaseFirestore.getInstance()
-                db.collection("invite_codes")
-                    .document(code)
-                    .set(mapOf(
-                        "role"      to role,
-                        "invitedEmail" to invitedEmail, // Now storing the email
-                        "createdBy" to ownerEmail,
-                        "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp(),
-                        "expiresAt" to expirationTime 
-                    ))
-                    .addOnSuccessListener {
-                        showCodeResultDialog(activity, code, roleLabels[selectedIndex], invitedEmail)
+                // Check if email is already in use (availability check)
+                db.collection("user_access").document(invitedEmail).get()
+                    .addOnSuccessListener { doc ->
+                        if (doc.exists()) {
+                            Toast.makeText(activity, "This email is already registered.", Toast.LENGTH_SHORT).show()
+                        } else {
+                            // Proceed to generate code
+                            val expirationTime = System.currentTimeMillis() + (24 * 60 * 60 * 1000)
+                            val code = "%06d".format(Random.nextInt(1000000))
+
+                            db.collection("invite_codes")
+                                .document(code)
+                                .set(mapOf(
+                                    "role"      to selectedRole,
+                                    "invitedEmail" to invitedEmail,
+                                    "createdBy" to ownerEmail,
+                                    "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp(),
+                                    "expiresAt" to expirationTime 
+                                ))
+                                .addOnSuccessListener {
+                                    showCodeResultDialog(activity, code, invitedEmail, ownerEmail, selectedRole)
+                                }
+                                .addOnFailureListener { e ->
+                                    Toast.makeText(activity, "Failed to generate: ${e.message}", Toast.LENGTH_LONG).show()
+                                }
+                        }
                     }
                     .addOnFailureListener { e ->
-                        Toast.makeText(
-                            activity,
-                            "Failed to generate code: ${e.message}",
-                            Toast.LENGTH_LONG
-                        ).show()
+                        Toast.makeText(activity, "Error checking email: ${e.message}", Toast.LENGTH_SHORT).show()
                     }
             }
             .setNegativeButton("Cancel", null)
             .show()
     }
 
-    private fun showCodeResultDialog(activity: Activity, code: String, roleLabel: String, invitedEmail: String) {
-        val message =
-            "Share this 6-digit code with $invitedEmail ($roleLabel):\n\n" +
-                    "  Code:  $code\n\n" +
-                    "This code will expire in 24 hours.\n" +
-                    "They enter it in the app:\n" +
-                    "Register screen → \"Enter Invite Code\" → type the code above → sign in with Google."
-
+    private fun showCodeResultDialog(activity: Activity, code: String, email: String, ownerEmail: String, role: String) {
+        val roleDisplayName = when(role) {
+            "staff" -> "Staff"
+            "backup_owner" -> "Backup Owner"
+            else -> "Staff"
+        }
+        val message = "Share this code with $email:\n\nCode: $code\nRole: $roleDisplayName\n\nIt will expire in 24 hours."
         AlertDialog.Builder(activity)
             .setTitle("Invite Code Ready")
             .setMessage(message)
-            .setPositiveButton("Share via Email") { _, _ ->
-                sendCodeByEmail(activity, code, roleLabel, invitedEmail)
+            .setPositiveButton("Open Gmail") { _, _ -> sendCodeByEmail(activity, code, email, ownerEmail, role) }
+            .setNeutralButton("Copy Code") { _, _ ->
+                val clipboard = activity.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Invite Code", code))
+                Toast.makeText(activity, "Code copied", Toast.LENGTH_SHORT).show()
             }
-            .setNeutralButton("Copy & Close") { _, _ ->
-                val clipboard = activity.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
-                        as android.content.ClipboardManager
-                clipboard.setPrimaryClip(
-                    android.content.ClipData.newPlainText("Invite Code", code)
-                )
-                Toast.makeText(activity, "Code copied: $code", Toast.LENGTH_SHORT).show()
-            }
-            .setCancelable(false)
             .show()
     }
 
-    private fun sendCodeByEmail(activity: Activity, code: String, roleLabel: String, invitedEmail: String) {
-        val subject = "You're invited to Waje's Quail Farm System"
-        val body = """
+    private fun sendCodeByEmail(activity: Activity, code: String, email: String, ownerEmail: String, role: String) {
+        val roleDisplayName = when(role) {
+            "staff" -> "Staff"
+            "backup_owner" -> "Backup Owner"
+            else -> "Staff"
+        }
+        val emailBody = """
 Hello,
 
-You have been invited to join Waje's Quail Farm System as a $roleLabel.
+You have been invited to join the Quail Farm Management System by $ownerEmail.
 
-Your invite code: $code (Valid for 24 hours)
+Your 6-digit access code is: $code
+Your role: $roleDisplayName
 
-To get started:
-1. Download the app.
-2. On the login screen, tap "Register Account".
-3. Tap "Enter Invite Code".
-4. Type the code above and sign in with your Google account.
+This code is linked to your email ($email) and will expire in 24 hours.
 
-— Waje's Quail Farm System
+Steps to get started:
+1. Download the Quail Farm Management System app from the Play Store
+2. Select "Enter Code" during registration
+3. Enter your 6-digit code: $code
+4. Complete your profile setup
+
+The owner of the farm is: $ownerEmail
+If you have any questions, please contact them directly.
+
+Best regards,
+Waje's Quail Farm System
         """.trimIndent()
 
-        try {
-            val emailIntent = Intent(Intent.ACTION_SENDTO).apply {
-                data = android.net.Uri.parse("mailto:$invitedEmail")
-                putExtra(Intent.EXTRA_SUBJECT, subject)
-                putExtra(Intent.EXTRA_TEXT, body)
-            }
-            activity.startActivity(Intent.createChooser(emailIntent, "Send invite via…"))
-        } catch (e: Exception) {
-            Toast.makeText(activity, "Could not open email app: ${e.message}", Toast.LENGTH_SHORT).show()
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "message/rfc822"
+            putExtra(Intent.EXTRA_EMAIL, arrayOf(email))
+            putExtra(Intent.EXTRA_CC, arrayOf(ownerEmail))
+            putExtra(Intent.EXTRA_SUBJECT, "Quail Farm Invitation Code - $code")
+            putExtra(Intent.EXTRA_TEXT, emailBody)
+            setPackage("com.google.android.gm") // Force Gmail
         }
+        try {
+            activity.startActivity(intent)
+        } catch (e: Exception) {
+            // Fallback to chooser without package
+            intent.setPackage(null)
+            try {
+                activity.startActivity(Intent.createChooser(intent, "Send Email..."))
+            } catch (e2: Exception) {
+                Toast.makeText(activity, "No email app found", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun showHelpSupportDialog(activity: Activity) {
+        val builder = AlertDialog.Builder(activity)
+        val view = activity.layoutInflater.inflate(R.layout.dialog_help_support, null)
+        builder.setView(view)
+        builder.setPositiveButton("Close", null)
+        builder.show()
     }
 }

@@ -31,9 +31,15 @@ class FarmSetupActivity : AppCompatActivity() {
 
     private lateinit var setupTotalBirds: EditText
     private lateinit var setupActiveCages: EditText
-    private lateinit var setupFarmLocation: EditText
+    private lateinit var setupFarmLocationStreet: EditText
+    private lateinit var setupFarmLocationCity: EditText
+    private lateinit var setupFarmLocationState: EditText
+    private lateinit var setupFarmLocationPostal: EditText
     private lateinit var setupBirthday: EditText
-    private lateinit var setupAddress: EditText
+    private lateinit var setupAddressStreet: EditText
+    private lateinit var setupAddressCity: EditText
+    private lateinit var setupAddressState: EditText
+    private lateinit var setupAddressPostal: EditText
     private lateinit var setupPassword: EditText
     private lateinit var ownerProfilePic: ImageView
     
@@ -56,9 +62,15 @@ class FarmSetupActivity : AppCompatActivity() {
         // Initialize Views
         setupTotalBirds = findViewById(R.id.setupTotalBirds)
         setupActiveCages = findViewById(R.id.setupActiveCages)
-        setupFarmLocation = findViewById(R.id.setupFarmLocation)
+        setupFarmLocationStreet = findViewById(R.id.setupFarmLocationStreet)
+        setupFarmLocationCity = findViewById(R.id.setupFarmLocationCity)
+        setupFarmLocationState = findViewById(R.id.setupFarmLocationState)
+        setupFarmLocationPostal = findViewById(R.id.setupFarmLocationPostal)
         setupBirthday = findViewById(R.id.setupBirthday)
-        setupAddress = findViewById(R.id.setupAddress)
+        setupAddressStreet = findViewById(R.id.setupAddressStreet)
+        setupAddressCity = findViewById(R.id.setupAddressCity)
+        setupAddressState = findViewById(R.id.setupAddressState)
+        setupAddressPostal = findViewById(R.id.setupAddressPostal)
         setupPassword = findViewById(R.id.setupPassword)
         ownerProfilePic = findViewById(R.id.ownerProfilePic)
 
@@ -76,14 +88,35 @@ class FarmSetupActivity : AppCompatActivity() {
         findViewById<android.view.View>(R.id.btnCompleteSetup).setOnClickListener {
             val birds = setupTotalBirds.text.toString().trim()
             val cages = setupActiveCages.text.toString().trim()
-            val farmLoc = setupFarmLocation.text.toString().trim()
+            val farmLocStreet = setupFarmLocationStreet.text.toString().trim()
+            val farmLocCity = setupFarmLocationCity.text.toString().trim()
+            val farmLocState = setupFarmLocationState.text.toString().trim()
+            val farmLocPostal = setupFarmLocationPostal.text.toString().trim()
             val bday = setupBirthday.text.toString().trim()
-            val address = setupAddress.text.toString().trim()
+            val street = setupAddressStreet.text.toString().trim()
+            val city = setupAddressCity.text.toString().trim()
+            val state = setupAddressState.text.toString().trim()
+            val postal = setupAddressPostal.text.toString().trim()
             val pass = setupPassword.text.toString().trim()
 
-            if (birds.isEmpty() || cages.isEmpty() || farmLoc.isEmpty() || 
-                bday.isEmpty() || address.isEmpty() || pass.isEmpty()) {
+            if (birds.isEmpty() || cages.isEmpty() || farmLocStreet.isEmpty() || farmLocCity.isEmpty() || 
+                farmLocState.isEmpty() || farmLocPostal.isEmpty() || bday.isEmpty() || street.isEmpty() || 
+                city.isEmpty() || state.isEmpty() || postal.isEmpty() || pass.isEmpty()) {
                 Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            // Validate farm location
+            val farmLocError = validateAddress(farmLocStreet, farmLocCity, farmLocState, farmLocPostal)
+            if (farmLocError != null) {
+                Toast.makeText(this, farmLocError, Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            // Validate address components
+            val addressError = validateAddress(street, city, state, postal)
+            if (addressError != null) {
+                Toast.makeText(this, addressError, Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
@@ -94,7 +127,10 @@ class FarmSetupActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            startActivityForResult(googleSignInClient.signInIntent, RC_SIGN_IN)
+            // Sign out to force account picker
+            googleSignInClient.signOut().addOnCompleteListener {
+                startActivityForResult(googleSignInClient.signInIntent, RC_SIGN_IN)
+            }
         }
     }
 
@@ -115,6 +151,22 @@ class FarmSetupActivity : AppCompatActivity() {
             calendar.get(Calendar.MONTH),
             calendar.get(Calendar.DAY_OF_MONTH)
         ).show()
+    }
+
+    private fun validateAddress(street: String, city: String, state: String, postal: String): String? {
+        if (street.length < 5) return "Street address must be at least 5 characters"
+        if (city.length < 2) return "City must be at least 2 characters"
+        if (state.length < 2) return "State/Province must be at least 2 characters"
+        if (postal.length < 3) return "Postal code must be at least 3 characters"
+        
+        // Check for suspicious characters
+        val invalidChars = "!@#$%^&*()=[]{}|;':\",<>?"
+        if (street.any { it in invalidChars } || city.any { it in invalidChars } || 
+            state.any { it in invalidChars } || postal.any { it in invalidChars }) {
+            return "Address contains invalid characters"
+        }
+        
+        return null
     }
 
     private fun getPasswordStrengthError(password: String): String? {
@@ -140,9 +192,15 @@ class FarmSetupActivity : AppCompatActivity() {
             
             val birdsCount = setupTotalBirds.text.toString().toInt()
             val cagesCount = setupActiveCages.text.toString().toInt()
-            val farmLoc = setupFarmLocation.text.toString().trim()
+            val farmLocStreet = setupFarmLocationStreet.text.toString().trim()
+            val farmLocCity = setupFarmLocationCity.text.toString().trim()
+            val farmLocState = setupFarmLocationState.text.toString().trim()
+            val farmLocPostal = setupFarmLocationPostal.text.toString().trim()
             val bday = setupBirthday.text.toString().trim()
-            val ownerAddress = setupAddress.text.toString().trim()
+            val street = setupAddressStreet.text.toString().trim()
+            val city = setupAddressCity.text.toString().trim()
+            val state = setupAddressState.text.toString().trim()
+            val postal = setupAddressPostal.text.toString().trim()
             val pass = setupPassword.text.toString().trim()
 
             val db = FirebaseFirestore.getInstance()
@@ -154,7 +212,8 @@ class FarmSetupActivity : AppCompatActivity() {
 
             auth.signInWithCredential(credential).addOnCompleteListener { authTask ->
                 if (!authTask.isSuccessful) {
-                    Toast.makeText(this, "Sign-In Failed", Toast.LENGTH_SHORT).show()
+                    val errorMsg = authTask.exception?.message ?: "Sign-In Failed"
+                    Toast.makeText(this, "Sign-In Failed: $errorMsg", Toast.LENGTH_LONG).show()
                     return@addOnCompleteListener
                 }
 
@@ -163,7 +222,12 @@ class FarmSetupActivity : AppCompatActivity() {
                     "email" to email,
                     "password" to pass,
                     "birthday" to bday,
-                    "address" to ownerAddress,
+                    "address" to mapOf(
+                        "street" to street,
+                        "city" to city,
+                        "state" to state,
+                        "postalCode" to postal
+                    ),
                     "profilePic" to photoUrl,
                     "status" to "approved",
                     "role" to "owner",
@@ -178,7 +242,12 @@ class FarmSetupActivity : AppCompatActivity() {
                         val farmStats = hashMapOf(
                             "totalBirds" to birdsCount,
                             "activeCages" to cagesCount,
-                            "farmLocation" to farmLoc,
+                            "farmLocation" to mapOf(
+                                "street" to farmLocStreet,
+                                "city" to farmLocCity,
+                                "state" to farmLocState,
+                                "postalCode" to farmLocPostal
+                            ),
                             "farmStartDate" to com.google.firebase.Timestamp.now()
                         )
                         

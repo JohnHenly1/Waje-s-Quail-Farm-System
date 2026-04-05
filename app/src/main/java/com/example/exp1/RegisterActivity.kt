@@ -40,6 +40,12 @@ class RegisterActivity : AppCompatActivity() {
 
         val db = FirebaseFirestore.getInstance()
 
+        // Check if resuming pending
+        val pendingEmail = intent.getStringExtra("pendingEmail")
+        if (pendingEmail != null) {
+            startPendingVerification(pendingEmail)
+        }
+
         btnRequestCode.setOnClickListener {
             showRequestCodeDialog(db)
         }
@@ -156,6 +162,17 @@ class RegisterActivity : AppCompatActivity() {
         pendingQuail.clearAnimation()
         pendingLayout.visibility = View.GONE
         registrationUI.visibility = View.VISIBLE
+        // Delete the pending request
+        val email = pendingEmailTv.text.toString()
+        if (!email.isEmpty()) {
+            FirebaseFirestore.getInstance().collection("user_access").document(email).delete()
+                .addOnSuccessListener {
+                    Toast.makeText(this, "Request cancelled", Toast.LENGTH_SHORT).show()
+                }
+                .addOnFailureListener { e ->
+                    Toast.makeText(this, "Error cancelling request", Toast.LENGTH_SHORT).show()
+                }
+        }
     }
 
     private fun updateAvailabilityInButtons(db: FirebaseFirestore, rbStaff: RadioButton, rbBackup: RadioButton) {

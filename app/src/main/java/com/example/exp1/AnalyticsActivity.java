@@ -9,12 +9,9 @@ import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.Looper;
 import android.view.View;
-import android.view.animation.AnimationUtils;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
-import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -32,11 +29,16 @@ import com.github.mikephil.charting.data.BarEntry;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
+import com.github.mikephil.charting.formatter.IndexAxisValueFormatter;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -47,13 +49,18 @@ import kotlin.Unit;
 public class AnalyticsActivity extends AppCompatActivity {
 
     private CameraHelper cameraHelper;
-    private final Handler handler = new Handler(Looper.getMainLooper());
     private FirebaseFirestore db;
 
     private TextView revenueValue, feedCostValue, profitValue, recommendationText, performanceTitle, performanceDesc;
+    private TextView weeklyMonthLabel, monthlyYearLabel, serverTimeLabel;
     private LineChart weeklyChart;
     private BarChart monthlyChart;
     private ConnectivityManager.NetworkCallback networkCallback;
+    private int selectedWeeklyYear;
+    private int selectedWeeklyMonth;
+    private int selectedMonthlyYear;
+    private Map<String, Integer> allData;
+    private int totalEggs;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -91,6 +98,9 @@ public class AnalyticsActivity extends AppCompatActivity {
         revenueValue = findViewById(R.id.revenueValue);
         feedCostValue = findViewById(R.id.feedCostValue);
         profitValue = findViewById(R.id.profitValue);
+        weeklyMonthLabel = findViewById(R.id.weeklyMonthLabel);
+        monthlyYearLabel = findViewById(R.id.monthlyYearLabel);
+        serverTimeLabel = findViewById(R.id.serverTimeLabel);
 
         // ── LIVE INTERNET SENSOR ──
         // Check once at start, then register listener for real-time changes
@@ -120,6 +130,57 @@ public class AnalyticsActivity extends AppCompatActivity {
         NavigationHelper.INSTANCE.setupBottomNavigation(this);
         NavigationHelper.INSTANCE.setupNotificationButton(this);
 
+        // Initialize selected periods
+        Calendar cal = Calendar.getInstance();
+        selectedWeeklyYear = cal.get(Calendar.YEAR);
+        selectedWeeklyMonth = cal.get(Calendar.MONTH);
+        selectedMonthlyYear = cal.get(Calendar.YEAR);
+
+        // Start real-time time update
+        startTimeUpdate();
+
+        // Set up button listeners for navigation
+        ImageButton previousWeekButton = findViewById(R.id.previousWeekButton);
+        ImageButton nextWeekButton = findViewById(R.id.nextWeekButton);
+        ImageButton previousMonthButton = findViewById(R.id.previousMonthButton);
+        ImageButton nextMonthButton = findViewById(R.id.nextMonthButton);
+
+        if (previousWeekButton != null) {
+            previousWeekButton.setOnClickListener(v -> {
+                selectedWeeklyMonth--;
+                if (selectedWeeklyMonth < 0) {
+                    selectedWeeklyMonth = 11;
+                    selectedWeeklyYear--;
+                }
+                updateDashboard();
+            });
+        }
+
+        if (nextWeekButton != null) {
+            nextWeekButton.setOnClickListener(v -> {
+                selectedWeeklyMonth++;
+                if (selectedWeeklyMonth > 11) {
+                    selectedWeeklyMonth = 0;
+                    selectedWeeklyYear++;
+                }
+                updateDashboard();
+            });
+        }
+
+        if (previousMonthButton != null) {
+            previousMonthButton.setOnClickListener(v -> {
+                selectedMonthlyYear--;
+                updateDashboard();
+            });
+        }
+
+        if (nextMonthButton != null) {
+            nextMonthButton.setOnClickListener(v -> {
+                selectedMonthlyYear++;
+                updateDashboard();
+            });
+        }
+
         // Camera button
         LinearLayout cameraButton = findViewById(R.id.CameraButton);
         if (cameraButton != null) {
@@ -146,7 +207,7 @@ public class AnalyticsActivity extends AppCompatActivity {
                         if (noNet != null && noNet.getVisibility() == View.VISIBLE) {
                             // Internet came back, hide error and refresh the activity
                             loadingLayout.setVisibility(View.GONE);
-                            recreate(); 
+                            recreate();
                         }
                     }
                 });
@@ -169,77 +230,151 @@ public class AnalyticsActivity extends AppCompatActivity {
         }
     }
 
+    private void startTimeUpdate() {
+        SimpleDateFormat timeFormat = new SimpleDateFormat("MM/dd/yyyy hh:mm a", Locale.getDefault());
+        Handler handler = new Handler();
+        Runnable updateTime = new Runnable() {
+            @Override
+            public void run() {
+                Calendar cal = Calendar.getInstance();
+                String time = timeFormat.format(cal.getTime());
+                if (serverTimeLabel != null) serverTimeLabel.setText(time);
+                handler.postDelayed(this, 60000);
+            }
+        };
+        handler.post(updateTime);
+    }
+
     private void fetchAnalyticsData() {
-        // Query real egg collection data
+        // Query real egg collection data without date filter
         db.collection("farm_data").document("shared").collection("egg_collections")
                 .orderBy("timestamp", Query.Direction.DESCENDING)
-                .limit(30)
                 .get()
                 .addOnSuccessListener(queryDocumentSnapshots -> {
                     if (queryDocumentSnapshots.isEmpty()) {
-                        generateSimulation();
+                        allData = new TreeMap<>();
+                        totalEggs = 0;
+                        updateDashboard();
                     } else {
                         processRealData(queryDocumentSnapshots);
                     }
                 })
-                .addOnFailureListener(e -> generateSimulation());
+                .addOnFailureListener(e -> {
+                    allData = new TreeMap<>();
+                    totalEggs = 0;
+                    updateDashboard();
+                });
     }
 
     private void processRealData(com.google.firebase.firestore.QuerySnapshot snapshots) {
-        Map<String, Integer> dailyTotals = new TreeMap<>();
-        int totalEggs = 0;
+        allData = new TreeMap<>();
+        totalEggs = 0;
 
         for (QueryDocumentSnapshot doc : snapshots) {
             String date = doc.getString("date");
             int count = doc.getLong("total") != null ? doc.getLong("total").intValue() : 0;
-            if (date != null) dailyTotals.put(date, count);
+            if (date != null) allData.put(date, count);
             totalEggs += count;
         }
 
-        updateDashboard(dailyTotals, totalEggs);
+        updateDashboard();
     }
 
-    private void generateSimulation() {
-        Map<String, Integer> simData = new TreeMap<>();
-        simData.put("Mon", 150); simData.put("Tue", 165);
-        simData.put("Wed", 140); simData.put("Thu", 180);
-        simData.put("Fri", 175); simData.put("Sat", 190);
-        simData.put("Sun", 205);
-        updateDashboard(simData, 1205);
-    }
-
-    private void updateDashboard(Map<String, Integer> data, int total) {
-        // 1. Update Financials (Simulated P5 revenue, P1.8 cost)
-        double revenue = total * 5.0;
-        double cost = total * 1.8;
+    private void updateDashboard() {
+        // Update Financials
+        double revenue = totalEggs * 5.0;
+        double cost = totalEggs * 1.8;
         double profit = revenue - cost;
 
         if (revenueValue != null) revenueValue.setText(String.format(Locale.getDefault(), "₱%.0f", revenue));
         if (feedCostValue != null) feedCostValue.setText(String.format(Locale.getDefault(), "₱%.0f", cost));
         if (profitValue != null) profitValue.setText(String.format(Locale.getDefault(), "₱%.0f", profit));
 
-        // 2. Line Chart Logic
-        List<Entry> lineEntries = new ArrayList<>();
-        int i = 0;
-        double sum = 0;
-        for (Integer val : data.values()) {
-            lineEntries.add(new Entry(i++, val));
-            sum += val;
+        // Aggregate for weekly
+        Map<Integer, Integer> weekTotals = new HashMap<>();
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        for (Map.Entry<String, Integer> entry : allData.entrySet()) {
+            try {
+                Date date = sdf.parse(entry.getKey());
+                Calendar entryCal = Calendar.getInstance();
+                entryCal.setTime(date);
+                int year = entryCal.get(Calendar.YEAR);
+                int month = entryCal.get(Calendar.MONTH);
+                int week = entryCal.get(Calendar.WEEK_OF_MONTH);
+                if (year == selectedWeeklyYear && month == selectedWeeklyMonth) {
+                    weekTotals.put(week, weekTotals.getOrDefault(week, 0) + entry.getValue());
+                }
+            } catch (Exception e) {
+                // ignore
+            }
         }
-        double average = sum / (data.size() > 0 ? data.size() : 1);
 
+        // Weekly chart
+        List<Entry> lineEntries = new ArrayList<>();
+        List<String> weeklyLabels = new ArrayList<>();
+        for (int w = 1; w <= 4; w++) {
+            lineEntries.add(new Entry(w - 1, weekTotals.getOrDefault(w, 0)));
+            weeklyLabels.add("Week " + w);
+        }
         LineDataSet lineSet = new LineDataSet(lineEntries, "Egg Count");
         lineSet.setColor(Color.parseColor("#466d1d"));
         lineSet.setCircleColor(Color.parseColor("#466d1d"));
         lineSet.setLineWidth(3f);
+        lineSet.setDrawValues(true);
         weeklyChart.setData(new LineData(lineSet));
+        weeklyChart.getXAxis().setValueFormatter(new IndexAxisValueFormatter(weeklyLabels));
+        weeklyChart.getXAxis().setLabelRotationAngle(-45f);
+        weeklyChart.getXAxis().setGranularity(1f);
+        weeklyChart.getXAxis().setLabelCount(weeklyLabels.size());
         weeklyChart.animateX(800);
         weeklyChart.invalidate();
 
-        // 3. Performance & Smart Tips
-        if (!data.isEmpty()) {
-            List<Integer> values = new ArrayList<>(data.values());
+        // Aggregate for monthly
+        Map<Integer, Integer> monthTotals = new HashMap<>();
+        for (Map.Entry<String, Integer> entry : allData.entrySet()) {
+            try {
+                Date date = sdf.parse(entry.getKey());
+                Calendar entryCal = Calendar.getInstance();
+                entryCal.setTime(date);
+                int year = entryCal.get(Calendar.YEAR);
+                int month = entryCal.get(Calendar.MONTH);
+                if (year == selectedMonthlyYear) {
+                    monthTotals.put(month, monthTotals.getOrDefault(month, 0) + entry.getValue());
+                }
+            } catch (Exception e) {
+                // ignore
+            }
+        }
+
+        // Monthly chart
+        List<BarEntry> barEntries = new ArrayList<>();
+        List<String> monthlyLabels = new ArrayList<>();
+        String[] months = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+        for (int m = 0; m < 12; m++) {
+            barEntries.add(new BarEntry(m, monthTotals.getOrDefault(m, 0)));
+            monthlyLabels.add(months[m]);
+        }
+        BarDataSet barSet = new BarDataSet(barEntries, "Egg Count");
+        barSet.setColor(Color.parseColor("#466d1d"));
+        barSet.setDrawValues(true);
+        monthlyChart.setData(new BarData(barSet));
+        monthlyChart.getXAxis().setValueFormatter(new IndexAxisValueFormatter(monthlyLabels));
+        monthlyChart.getXAxis().setLabelRotationAngle(-45f);
+        monthlyChart.getXAxis().setGranularity(1f);
+        monthlyChart.getXAxis().setLabelCount(monthlyLabels.size());
+        monthlyChart.animateY(800);
+        monthlyChart.invalidate();
+
+        // Set labels
+        String monthYear = String.format(Locale.getDefault(), "%02d/%d", selectedWeeklyMonth + 1, selectedWeeklyYear);
+        if (weeklyMonthLabel != null) weeklyMonthLabel.setText(monthYear);
+        if (monthlyYearLabel != null) monthlyYearLabel.setText(String.valueOf(selectedMonthlyYear));
+
+        // Performance & Smart Tips
+        if (!allData.isEmpty()) {
+            List<Integer> values = new ArrayList<>(allData.values());
             int latest = values.get(values.size() - 1);
+            double average = totalEggs / (double) allData.size();
             calculatePerformance(latest, average);
             generateSmartTip(latest, values.size() > 1 ? values.get(values.size() - 2) : latest);
         }
@@ -257,8 +392,8 @@ public class AnalyticsActivity extends AppCompatActivity {
 
         if (performanceDesc != null) {
             String direction = diffPercent >= 0 ? "above" : "below";
-            performanceDesc.setText(String.format(Locale.getDefault(), 
-                "You're %.1f%% %s average production this month", Math.abs(diffPercent), direction));
+            performanceDesc.setText(String.format(Locale.getDefault(),
+                    "You're %.1f%% %s average production this month", Math.abs(diffPercent), direction));
         }
     }
 

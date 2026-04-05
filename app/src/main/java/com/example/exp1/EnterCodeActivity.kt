@@ -84,7 +84,7 @@ class EnterCodeActivity : AppCompatActivity() {
                                 if (expiresAt != 0L && System.currentTimeMillis() > expiresAt) {
                                     Toast.makeText(this, "This code has expired.", Toast.LENGTH_LONG).show()
                                 } else {
-                                    detectedEmail = "" // Signal generic code
+                                    detectedEmail = doc.getString("invitedEmail") ?: ""
                                     detectedRole = doc.getString("role") ?: "staff"
                                     triggerManualSignIn()
                                 }

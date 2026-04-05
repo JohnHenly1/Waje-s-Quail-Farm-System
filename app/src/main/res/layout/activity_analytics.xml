@@ -52,6 +52,15 @@
                 android:textSize="24sp"
                 android:textStyle="bold" />
 
+            <TextView
+                android:id="@+id/serverTimeLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="12:00 PM"
+                android:textColor="@color/white"
+                android:textSize="12sp"
+                android:layout_marginStart="8dp" />
+
             <ImageButton
                 android:id="@+id/notificationButton"
                 android:layout_width="40dp"
@@ -451,6 +460,7 @@
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
+
             <!-- Weekly Production Chart -->
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
@@ -494,7 +504,47 @@
                     <com.github.mikephil.charting.charts.LineChart
                         android:id="@+id/weeklyChart"
                         android:layout_width="match_parent"
-                        android:layout_height="200dp" />
+                        android:layout_height="350dp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center"
+                        android:layout_marginTop="8dp">
+
+                        <ImageButton
+                            android:id="@+id/previousWeekButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="@string/previous"
+                            android:scaleType="centerInside"
+                            app:srcCompat="@drawable/ic_arrow_back"
+                            app:tint="@color/black"
+                            tools:ignore="TouchTargetSizeCheck" />
+
+                        <TextView
+                            android:id="@+id/weeklyMonthLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="04/2026"
+                            android:textColor="@color/black"
+                            android:textSize="14sp"
+                            android:layout_marginStart="8dp"
+                            android:layout_marginEnd="8dp" />
+
+                        <ImageButton
+                            android:id="@+id/nextWeekButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="@string/next"
+                            android:scaleType="centerInside"
+                            app:srcCompat="@drawable/ic_arrow_forward"
+                            tools:ignore="TouchTargetSizeCheck" />
+
+                    </LinearLayout>
 
                 </LinearLayout>
 
@@ -543,7 +593,49 @@
                     <com.github.mikephil.charting.charts.BarChart
                         android:id="@+id/monthlyChart"
                         android:layout_width="match_parent"
-                        android:layout_height="220dp" />
+                        android:layout_height="370dp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center"
+                        android:layout_marginTop="8dp">
+
+                        <ImageButton
+                            android:id="@+id/previousMonthButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="@string/previous"
+                            android:scaleType="centerInside"
+                            app:srcCompat="@drawable/ic_arrow_back"
+                            app:tint="@color/black"
+                            tools:ignore="TouchTargetSizeCheck" />
+
+                        <TextView
+                            android:id="@+id/monthlyYearLabel"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="2026"
+                            android:textColor="@color/black"
+                            android:textSize="14sp"
+                            android:layout_marginStart="8dp"
+                            android:layout_marginEnd="8dp"
+                            android:gravity="center" />
+
+                        <ImageButton
+                            android:id="@+id/nextMonthButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="@string/next"
+                            android:scaleType="centerInside"
+                            app:srcCompat="@drawable/ic_arrow_forward"
+                            tools:ignore="TouchTargetSizeCheck" />
+
+                    </LinearLayout>
 
                 </LinearLayout>
 

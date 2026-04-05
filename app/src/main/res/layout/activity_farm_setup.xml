@@ -89,14 +89,62 @@
                     android:inputType="number"
                     android:padding="12dp" />
 
+                <!-- Farm Location Section -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="Farm Location"
+                    android:textColor="#466d1d"
+                    android:textStyle="bold"
+                    android:textSize="14sp" />
+
                 <EditText
-                    android:id="@+id/setupFarmLocation"
+                    android:id="@+id/setupFarmLocationStreet"
                     android:layout_width="match_parent"
                     android:layout_height="52dp"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="8dp"
                     android:background="@drawable/rounded_corner"
-                    android:hint="Farm Location / Address"
+                    android:hint="Street Address"
                     android:inputType="textPostalAddress"
+                    android:padding="12dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp">
+
+                    <EditText
+                        android:id="@+id/setupFarmLocationCity"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/rounded_corner"
+                        android:hint="City"
+                        android:inputType="text"
+                        android:padding="12dp"
+                        android:layout_marginEnd="8dp" />
+
+                    <EditText
+                        android:id="@+id/setupFarmLocationState"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/rounded_corner"
+                        android:hint="State/Province"
+                        android:inputType="text"
+                        android:padding="12dp" />
+                </LinearLayout>
+
+                <EditText
+                    android:id="@+id/setupFarmLocationPostal"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/rounded_corner"
+                    android:hint="Postal Code"
+                    android:inputType="text"
                     android:padding="12dp" />
 
                 <!-- Section: Owner Information -->
@@ -120,14 +168,62 @@
                     android:clickable="true"
                     android:padding="12dp" />
 
+                <!-- Owner Address Section -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="Owner Address"
+                    android:textColor="#466d1d"
+                    android:textStyle="bold"
+                    android:textSize="14sp" />
+
                 <EditText
-                    android:id="@+id/setupAddress"
+                    android:id="@+id/setupAddressStreet"
                     android:layout_width="match_parent"
                     android:layout_height="52dp"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="8dp"
                     android:background="@drawable/rounded_corner"
-                    android:hint="Owner Address"
+                    android:hint="Street Address"
                     android:inputType="textPostalAddress"
+                    android:padding="12dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp">
+
+                    <EditText
+                        android:id="@+id/setupAddressCity"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/rounded_corner"
+                        android:hint="City"
+                        android:inputType="text"
+                        android:padding="12dp"
+                        android:layout_marginEnd="8dp" />
+
+                    <EditText
+                        android:id="@+id/setupAddressState"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/rounded_corner"
+                        android:hint="State/Province"
+                        android:inputType="text"
+                        android:padding="12dp" />
+                </LinearLayout>
+
+                <EditText
+                    android:id="@+id/setupAddressPostal"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/rounded_corner"
+                    android:hint="Postal Code"
+                    android:inputType="text"
                     android:padding="12dp" />
 
                 <com.google.android.material.textfield.TextInputLayout

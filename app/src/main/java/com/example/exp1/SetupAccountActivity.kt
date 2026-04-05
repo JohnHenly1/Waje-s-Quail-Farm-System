@@ -14,7 +14,10 @@ class SetupAccountActivity : AppCompatActivity() {
 
     private lateinit var editName: EditText
     private lateinit var editBirthday: EditText
-    private lateinit var editLocation: EditText
+    private lateinit var editAddressStreet: EditText
+    private lateinit var editAddressCity: EditText
+    private lateinit var editAddressState: EditText
+    private lateinit var editAddressPostal: EditText
     private lateinit var editPassword: EditText
     private lateinit var imgProfile: ImageView
     private lateinit var btnComplete: Button
@@ -35,7 +38,10 @@ class SetupAccountActivity : AppCompatActivity() {
 
         editName = findViewById(R.id.editSetupName)
         editBirthday = findViewById(R.id.editSetupBirthday)
-        editLocation = findViewById(R.id.editSetupLocation)
+        editAddressStreet = findViewById(R.id.editAddressStreet)
+        editAddressCity = findViewById(R.id.editAddressCity)
+        editAddressState = findViewById(R.id.editAddressState)
+        editAddressPostal = findViewById(R.id.editAddressPostal)
         editPassword = findViewById(R.id.editSetupPassword)
         imgProfile = findViewById(R.id.imgSetupProfile)
         btnComplete = findViewById(R.id.btnCompleteSetup)
@@ -54,12 +60,28 @@ class SetupAccountActivity : AppCompatActivity() {
         btnComplete.setOnClickListener {
             val name = editName.text.toString().trim()
             val bday = editBirthday.text.toString().trim()
-            val loc = editLocation.text.toString().trim()
+            val street = editAddressStreet.text.toString().trim()
+            val city = editAddressCity.text.toString().trim()
+            val state = editAddressState.text.toString().trim()
+            val postal = editAddressPostal.text.toString().trim()
             val pass = editPassword.text.toString().trim()
 
             if (name.isEmpty() || pass.isEmpty()) {
                 Toast.makeText(this, "Name and Password are required", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
+            }
+
+            // Validate address if any component is provided
+            if (street.isNotEmpty() || city.isNotEmpty() || state.isNotEmpty() || postal.isNotEmpty()) {
+                if (street.isEmpty() || city.isEmpty() || state.isEmpty() || postal.isEmpty()) {
+                    Toast.makeText(this, "Please fill all address fields or leave them all empty", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                val addressError = validateAddress(street, city, state, postal)
+                if (addressError != null) {
+                    Toast.makeText(this, addressError, Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
             }
 
             // Strong Password Restriction
@@ -70,35 +92,73 @@ class SetupAccountActivity : AppCompatActivity() {
             }
 
             val db = FirebaseFirestore.getInstance()
-            val userData = hashMapOf(
-                "name" to name,
-                "email" to email,
-                "birthday" to bday,
-                "location" to loc,
-                "password" to pass,
-                "role" to role,
-                "profilePic" to photoUrl,
-                "status" to "approved",
-                "setupCompleted" to true,
-                "verifiedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
-            )
+            // Check if email is already registered
+            db.collection("user_access").document(email).get()
+                .addOnSuccessListener { doc ->
+                    if (doc.exists()) {
+                        Toast.makeText(this, "This email is already registered.", Toast.LENGTH_SHORT).show()
+                    } else {
+                        val addressMap = if (street.isNotEmpty()) {
+                            mapOf(
+                                "street" to street,
+                                "city" to city,
+                                "state" to state,
+                                "postalCode" to postal
+                            )
+                        } else {
+                            mapOf<String, String>()
+                        }
 
-            db.collection("user_access").document(email).set(userData)
-                .addOnSuccessListener {
-                    val accountManager = AccountManager(this)
-                    accountManager.registerAccount(name, email, pass, role)
-                    accountManager.saveCurrentSession(email)
+                        val userData = hashMapOf(
+                            "name" to name,
+                            "email" to email,
+                            "birthday" to bday,
+                            "address" to addressMap,
+                            "password" to pass,
+                            "role" to role,
+                            "profilePic" to photoUrl,
+                            "status" to "approved",
+                            "setupCompleted" to true,
+                            "verifiedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
+                        )
 
-                    Toast.makeText(this, "Profile Setup Complete!", Toast.LENGTH_SHORT).show()
-                    val intent = Intent(this, DashboardActivity::class.java)
-                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                    startActivity(intent)
-                    finish()
+                        db.collection("user_access").document(email).set(userData)
+                            .addOnSuccessListener {
+                                val accountManager = AccountManager(this)
+                                accountManager.registerAccount(name, email, pass, role)
+                                accountManager.saveCurrentSession(email)
+
+                                Toast.makeText(this, "Profile Setup Complete!", Toast.LENGTH_SHORT).show()
+                                val intent = Intent(this, DashboardActivity::class.java)
+                                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                startActivity(intent)
+                                finish()
+                            }
+                            .addOnFailureListener {
+                                Toast.makeText(this, "Error saving data", Toast.LENGTH_SHORT).show()
+                            }
+                    }
                 }
                 .addOnFailureListener {
-                    Toast.makeText(this, "Error saving data", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Error checking email", Toast.LENGTH_SHORT).show()
                 }
         }
+    }
+
+    private fun validateAddress(street: String, city: String, state: String, postal: String): String? {
+        if (street.length < 5) return "Street address must be at least 5 characters"
+        if (city.length < 2) return "City must be at least 2 characters"
+        if (state.length < 2) return "State/Province must be at least 2 characters"
+        if (postal.length < 3) return "Postal code must be at least 3 characters"
+        
+        // Check for suspicious characters
+        val invalidChars = "!@#$%^&*()=[]{}|;':\",<>?"
+        if (street.any { it in invalidChars } || city.any { it in invalidChars } || 
+            state.any { it in invalidChars } || postal.any { it in invalidChars }) {
+            return "Address contains invalid characters"
+        }
+        
+        return null
     }
 
     private fun getPasswordStrengthError(password: String): String? {

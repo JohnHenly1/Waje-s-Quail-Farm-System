@@ -182,9 +182,9 @@
                         android:layout_width="40dp"
                         android:layout_height="40dp"
                         android:background="@drawable/bg_stat_blue"
-                        android:src="@drawable/ic_users"
-                        android:padding="8dp"
                         android:contentDescription="@null"
+                        android:padding="8dp"
+                        android:src="@drawable/quailbird_icon"
                         app:tint="@color/white" />
 
                     <TextView
@@ -222,9 +222,9 @@
                         android:layout_width="40dp"
                         android:layout_height="40dp"
                         android:background="@drawable/bg_stat_green"
-                        android:src="@drawable/ic_home"
-                        android:padding="8dp"
                         android:contentDescription="@null"
+                        android:padding="8dp"
+                        android:src="@drawable/cageicon"
                         app:tint="@color/white" />
 
                     <TextView
@@ -262,9 +262,9 @@
                         android:layout_width="40dp"
                         android:layout_height="40dp"
                         android:background="@drawable/bg_stat_orange"
-                        android:src="@drawable/ic_award"
-                        android:padding="8dp"
                         android:contentDescription="@null"
+                        android:padding="8dp"
+                        android:src="@drawable/day_icon"
                         app:tint="@color/white" />
 
                     <TextView

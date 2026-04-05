@@ -86,6 +86,8 @@
     <string name="copyright">© 2026 All rights reserved</string>
     <string name="camera">Camera</string>
     <string name="water_level">Water Level</string>
+    <string name="previous">Previous</string>
+    <string name="next">Next</string>
 
     <!-- Login & Registration -->
     <string name="login_title">Log In</string>

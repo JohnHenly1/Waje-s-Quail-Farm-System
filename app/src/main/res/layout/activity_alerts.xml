@@ -157,11 +157,11 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Inventory"
-                        android:textColor="@color/white"
-                        android:textSize="11sp"
                         android:layout_marginTop="4dp"
-                        android:fontFamily="sans-serif" />
+                        android:fontFamily="sans-serif"
+                        android:text="Warning"
+                        android:textColor="@color/white"
+                        android:textSize="11sp" />
                 </LinearLayout>
 
                 <!-- Total Card -->
