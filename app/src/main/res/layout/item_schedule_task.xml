@@ -85,6 +85,7 @@
             app:cardCornerRadius="8dp"
             app:cardElevation="0dp"
             app:cardBackgroundColor="#EF4444">
+
             <ImageButton
                 android:id="@+id/deleteTaskBtn"
                 android:layout_width="match_parent"

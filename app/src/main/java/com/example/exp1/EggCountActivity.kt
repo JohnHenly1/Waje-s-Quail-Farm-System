@@ -23,6 +23,11 @@ import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -35,6 +40,7 @@ class EggCountActivity : AppCompatActivity() {
     // ── Week navigation ───────────────────────────────────────────────────────
     private var weekOffset = 0
     private val sdf = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
+    private val dbDateFmt = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
     // ── YOLO detector (null = failed to load, camera still works) ─────────────
     private var detector: YoloDetector? = null
@@ -54,6 +60,13 @@ class EggCountActivity : AppCompatActivity() {
     /** Bounding boxes already counted in live mode (dedup) */
     private val countedBoxes = mutableListOf<android.graphics.RectF>()
 
+    // ── Firebase Realtime Database ────────────────────────────────────────────
+    private val database by lazy { FirebaseDatabase.getInstance() }
+    private val auth by lazy { FirebaseAuth.getInstance() }
+    /** Realtime listener for the collection history — kept so we can remove it */
+    private var historyListener: ValueEventListener? = null
+    private var historyRef: com.google.firebase.database.DatabaseReference? = null
+
     // ── Cached views ──────────────────────────────────────────────────────────
     private lateinit var previewView: PreviewView
     private lateinit var overlayView: DetectionOverlayView
@@ -63,6 +76,7 @@ class EggCountActivity : AppCompatActivity() {
     private lateinit var retakeBtn: Button
     private lateinit var modeSwitchBtn: Button
     private lateinit var frozenOverlay: View
+    private lateinit var saveBtn: Button
 
     // ── Permission / gallery launchers ────────────────────────────────────────
     private val requestCameraPermission = registerForActivityResult(
@@ -123,6 +137,7 @@ class EggCountActivity : AppCompatActivity() {
         retakeBtn     = findViewById(R.id.retakeBtn)
         modeSwitchBtn = findViewById(R.id.modeSwitchBtn)
         frozenOverlay = findViewById(R.id.frozenOverlay)
+        saveBtn       = findViewById(R.id.saveCollectionBtn)
     }
 
     private fun wireListeners() {
@@ -135,6 +150,9 @@ class EggCountActivity : AppCompatActivity() {
             if (isLiveMode) pickImageLauncher.launch("image/*")
             else resumeLive()
         }
+
+        // Save today's egg count to Firebase Realtime Database
+        saveBtn.setOnClickListener { saveCollectionToDatabase() }
 
         findViewById<View>(R.id.prevWeekBtn).setOnClickListener { weekOffset--; setupUI() }
         findViewById<View>(R.id.nextWeekBtn).setOnClickListener {
@@ -149,7 +167,6 @@ class EggCountActivity : AppCompatActivity() {
     private fun tryLoadDetector() {
         try {
             detector = YoloDetector(this)
-            // Success — show a brief green banner then hide it
             showBanner("✓ YOLO model ready — point camera at eggs", isError = false, autoHide = true)
         } catch (e: Exception) {
             Log.e(TAG, "YoloDetector init failed", e)
@@ -240,7 +257,6 @@ class EggCountActivity : AppCompatActivity() {
     private fun captureFrame() {
         val cap = imageCapture
         if (cap == null) {
-            // Fallback: grab preview bitmap
             val bmp = previewView.bitmap
             if (bmp != null) freezeAndAnalyze(bmp)
             else toast("Camera not ready yet")
@@ -274,12 +290,11 @@ class EggCountActivity : AppCompatActivity() {
         cameraExecutor.execute {
             val results = runDetection(bmp)
             runOnUiThread {
-                // Replace counts with exact count from this frame
                 gradeA = 0; gradeB = 0; gradeC = 0; countedBoxes.clear()
                 for (det in results) when (det.label) {
-                    "egg_grade_a" -> gradeA++
-                    "egg_grade_b" -> gradeB++
-                    "egg_grade_c" -> gradeC++
+                    "Quail_Egg_Grade_A" -> gradeA++
+                    "Quail_Egg_Grade_B" -> gradeB++
+                    "Quail_Egg_Grade_C" -> gradeC++
                 }
                 overlayView.setResults(results)
                 updateCountUI()
@@ -287,8 +302,12 @@ class EggCountActivity : AppCompatActivity() {
                 val total = gradeA + gradeB + gradeC
                 liveScanLabel.text = "● CAPTURED"
                 captureBtn.isEnabled = true
+
+                // Show save button after capture so user can confirm & save
+                saveBtn.visibility = View.VISIBLE
+
                 showBanner(
-                    if (detector != null) "Found $total egg(s). Tap ↩ to scan again."
+                    if (detector != null) "Found $total egg(s). Tap 'Save Collection' to record."
                     else "Detection disabled — model error. See banner above.",
                     isError = detector == null,
                     autoHide = detector != null
@@ -306,7 +325,137 @@ class EggCountActivity : AppCompatActivity() {
         captureBtn.visibility = View.VISIBLE
         retakeBtn.visibility  = View.GONE
         modeSwitchBtn.text    = "Pick Photo"
+        saveBtn.visibility    = View.GONE
         resetCounts()
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Firebase: Save today's collection to Realtime Database
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Data is stored under:
+     *   egg_collections / {dateKey} / total
+     *                              / gradeA
+     *                              / gradeB
+     *                              / gradeC
+     *                              / timestamp
+     *                              / savedBy  (uid of the user who saved)
+     *
+     * Using the date (yyyy-MM-dd) as the node key means one authoritative
+     * record per day.  Subsequent saves on the same day overwrite the node
+     * so the latest scan is always reflected.
+     */
+    private fun saveCollectionToDatabase() {
+        val total = gradeA + gradeB + gradeC
+        if (total == 0) {
+            toast("No eggs detected yet — nothing to save.")
+            return
+        }
+
+        saveBtn.isEnabled = false
+        val today = dbDateFmt.format(Calendar.getInstance().time)
+
+        val record = mapOf(
+            "date"      to today,
+            "total"     to total,
+            "gradeA"    to gradeA,
+            "gradeB"    to gradeB,
+            "gradeC"    to gradeC,
+            "timestamp" to System.currentTimeMillis(),
+            "savedBy"   to (auth.currentUser?.uid ?: "unknown")
+        )
+
+        database.getReference("egg_collections")
+            .child(today)
+            .setValue(record)
+            .addOnSuccessListener {
+                showBanner("✓ Saved $total eggs for $today", isError = false, autoHide = true)
+                saveBtn.isEnabled = true
+                saveBtn.visibility = View.GONE
+                // The persistent ValueEventListener on egg_collections will fire
+                // automatically when this write lands, updating the log in real time.
+                toast("Collection saved!")
+            }
+            .addOnFailureListener { e ->
+                Log.e(TAG, "Save failed", e)
+                showBanner("✗ Save failed: ${e.message?.take(80)}", isError = true, autoHide = false)
+                saveBtn.isEnabled = true
+                toast("Save failed — check internet connection.")
+            }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Firebase: Load collection history for the displayed week
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Attaches a realtime ValueEventListener to the egg_collections node.
+     * Any time a new save happens (from this device or another), the log
+     * updates automatically.
+     */
+    private fun loadCollectionHistory() {
+        // Remove any previous listener before re-attaching
+        historyListener?.let { historyRef?.removeEventListener(it) }
+
+        val ref = database.getReference("egg_collections")
+        historyRef = ref
+
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                // Build date → record map
+                val records = mutableMapOf<String, Map<String, Any>>()
+                for (child in snapshot.children) {
+                    val key  = child.key ?: continue
+                    @Suppress("UNCHECKED_CAST")
+                    val data = child.value as? Map<String, Any> ?: continue
+                    records[key] = data
+                }
+                runOnUiThread { populateCollectionLog(records) }
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Log.w(TAG, "History load cancelled: ${error.message}")
+            }
+        }
+
+        ref.addValueEventListener(listener)
+        historyListener = listener
+    }
+
+    /**
+     * Fills the 7-day collection log with data fetched from the database.
+     * Days with no data show zeros (same behaviour as before).
+     */
+    private fun populateCollectionLog(records: Map<String, Map<String, Any>>) {
+        val container = findViewById<LinearLayout>(R.id.collectionLogList)
+        container.removeAllViews()
+        val inflater = LayoutInflater.from(this)
+        val todayStr = sdf.format(Calendar.getInstance().time)
+        val cal      = Calendar.getInstance().apply { add(Calendar.WEEK_OF_YEAR, weekOffset) }
+
+        repeat(7) {
+            val displayDate = sdf.format(cal.time)
+            val dbDate      = dbDateFmt.format(cal.time)          // yyyy-MM-dd key
+            val record      = records[dbDate]
+
+            val total  = (record?.get("total")  as? Long)?.toInt() ?: 0
+            val gA     = (record?.get("gradeA") as? Long)?.toInt() ?: 0
+            val gB     = (record?.get("gradeB") as? Long)?.toInt() ?: 0
+            val gC     = (record?.get("gradeC") as? Long)?.toInt() ?: 0
+
+            val item = inflater.inflate(R.layout.item_collection_log, container, false)
+            item.findViewById<TextView>(R.id.logDate).text   = displayDate
+            item.findViewById<TextView>(R.id.logTotal).text  = total.toString()
+            item.findViewById<TextView>(R.id.logGradeA).text = gA.toString()
+            item.findViewById<TextView>(R.id.logGradeB).text = gB.toString()
+            item.findViewById<TextView>(R.id.logGradeC).text = gC.toString()
+            item.findViewById<TextView>(R.id.todayBadge).visibility =
+                if (displayDate == todayStr) View.VISIBLE else View.GONE
+
+            container.addView(item)
+            cal.add(Calendar.DAY_OF_YEAR, -1)
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -382,7 +531,9 @@ class EggCountActivity : AppCompatActivity() {
     private fun setupUI() {
         updateCountUI()
         updateWeekLabel()
-        buildCollectionLog()
+        // History is loaded (and kept live) via onResume → loadCollectionHistory()
+        // Hide Save button initially; it appears after a capture
+        saveBtn.visibility = View.GONE
     }
 
     private fun updateWeekLabel() {
@@ -393,32 +544,7 @@ class EggCountActivity : AppCompatActivity() {
         }
     }
 
-    private fun buildCollectionLog() {
-        val container = findViewById<LinearLayout>(R.id.collectionLogList)
-        container.removeAllViews()
-        val inflater = LayoutInflater.from(this)
-        val today    = sdf.format(Calendar.getInstance().time)
-        val cal      = Calendar.getInstance().apply { add(Calendar.WEEK_OF_YEAR, weekOffset) }
-
-        repeat(7) {
-            val dateStr = sdf.format(cal.time)
-            val item    = inflater.inflate(R.layout.item_collection_log, container, false)
-            item.findViewById<TextView>(R.id.logDate).text   = dateStr
-            item.findViewById<TextView>(R.id.logTotal).text  = "0"
-            item.findViewById<TextView>(R.id.logGradeA).text = "0"
-            item.findViewById<TextView>(R.id.logGradeB).text = "0"
-            item.findViewById<TextView>(R.id.logGradeC).text = "0"
-            item.findViewById<TextView>(R.id.todayBadge).visibility =
-                if (dateStr == today) View.VISIBLE else View.GONE
-            container.addView(item)
-            cal.add(Calendar.DAY_OF_YEAR, -1)
-        }
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Utility
-    // ─────────────────────────────────────────────────────────────────────────
-
+    //  Utility-------------------------------------------------------------------------------------
     private fun uriToBitmap(uri: Uri): Bitmap? = try {
         contentResolver.openInputStream(uri)?.use {
             android.graphics.BitmapFactory.decodeStream(it)
@@ -443,11 +569,32 @@ class EggCountActivity : AppCompatActivity() {
     private fun toast(msg: String) =
         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
 
-    // ─────────────────────────────────────────────────────────────────────────
+
+    //  Lifecycle: manage realtime database listener------------------------------------------------
+    override fun onResume() {
+        super.onResume()
+        /*
+        this is a listener that re-attaches everytime the screen are visible
+        And any collections saved from another device are reflected immediately without needing a manual refresh.
+        */
+        loadCollectionHistory()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        /*
+        Detach while off-screen to avoid unnecessary network traffic and
+        the risk of updating a detached view hierarchy.
+        */
+        historyListener?.let { historyRef?.removeEventListener(it) }
+        historyListener = null
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         cameraExecutor.shutdown()
         detector?.close()
+        historyListener?.let { historyRef?.removeEventListener(it) }
     }
 
     companion object {

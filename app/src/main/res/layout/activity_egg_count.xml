@@ -192,7 +192,22 @@
 
             </LinearLayout>
 
-            <!-- ─────────────  TODAY'S COUNT CARD  ───────────── -->
+            <!-- Save Collection button this is hidden until a capture is completed -->
+            <Button
+                android:id="@+id/saveCollectionBtn"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="12dp"
+                android:backgroundTint="#2E7D32"
+                android:text="💾  Save Collection"
+                android:textColor="@color/white"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <!-- ─────────────  Today's Count Card  ───────────── -->
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

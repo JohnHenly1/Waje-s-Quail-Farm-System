@@ -547,7 +547,7 @@
                         android:layout_width="32dp"
                         android:layout_height="32dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
-                        app:srcCompat="@drawable/ic_trash"
+                        app:srcCompat="@android:drawable/ic_menu_delete"
                         app:tint="#EF4444"
                         android:contentDescription="Bulk Delete" />
                 </LinearLayout>

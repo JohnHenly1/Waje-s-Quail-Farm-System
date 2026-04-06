@@ -30,9 +30,13 @@ import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
 import com.github.mikephil.charting.formatter.IndexAxisValueFormatter;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.Query;
-import com.google.firebase.firestore.QueryDocumentSnapshot;
+
+// Realtime Database — replaces Firestore for egg_collections
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -49,8 +53,13 @@ import kotlin.Unit;
 public class AnalyticsActivity extends AppCompatActivity {
 
     private CameraHelper cameraHelper;
-    private FirebaseFirestore db;
 
+    // ── Realtime Database ─────────────────────────────────────────────────────
+    private DatabaseReference eggCollectionsRef;
+    private ValueEventListener eggCollectionsListener;
+    // Initialised eagerly so updateDashboard() is safe to call at any time,
+    // even before the first Firebase callback fires.
+    private Map<String, Integer> allData = new TreeMap<>();
     private TextView revenueValue, feedCostValue, profitValue, recommendationText, performanceTitle, performanceDesc;
     private TextView weeklyMonthLabel, monthlyYearLabel, serverTimeLabel;
     private LineChart weeklyChart;
@@ -59,16 +68,18 @@ public class AnalyticsActivity extends AppCompatActivity {
     private int selectedWeeklyYear;
     private int selectedWeeklyMonth;
     private int selectedMonthlyYear;
-    private Map<String, Integer> allData;
     private int totalEggs;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
-        db = FirebaseFirestore.getInstance();
+
+        // ── Init Realtime Database reference ──────────────────────────────────
+        eggCollectionsRef = FirebaseDatabase.getInstance()
+                .getReference("egg_collections");
+
         cameraHelper = new CameraHelper(this, (uri, results) -> {
-            // Count detections
             int gradeA = 0, gradeB = 0, gradeC = 0;
             for (DetectionResult r : results) {
                 switch (r.getLabel()) {
@@ -90,26 +101,24 @@ public class AnalyticsActivity extends AppCompatActivity {
         });
 
         // Initialize Views
-        weeklyChart = findViewById(R.id.weeklyChart);
-        monthlyChart = findViewById(R.id.monthlyChart);
+        weeklyChart       = findViewById(R.id.weeklyChart);
+        monthlyChart      = findViewById(R.id.monthlyChart);
         recommendationText = findViewById(R.id.recommendationText);
-        performanceTitle = findViewById(R.id.performanceTitle);
-        performanceDesc = findViewById(R.id.performanceDesc);
-        revenueValue = findViewById(R.id.revenueValue);
-        feedCostValue = findViewById(R.id.feedCostValue);
-        profitValue = findViewById(R.id.profitValue);
-        weeklyMonthLabel = findViewById(R.id.weeklyMonthLabel);
-        monthlyYearLabel = findViewById(R.id.monthlyYearLabel);
-        serverTimeLabel = findViewById(R.id.serverTimeLabel);
+        performanceTitle  = findViewById(R.id.performanceTitle);
+        performanceDesc   = findViewById(R.id.performanceDesc);
+        revenueValue      = findViewById(R.id.revenueValue);
+        feedCostValue     = findViewById(R.id.feedCostValue);
+        profitValue       = findViewById(R.id.profitValue);
+        weeklyMonthLabel  = findViewById(R.id.weeklyMonthLabel);
+        monthlyYearLabel  = findViewById(R.id.monthlyYearLabel);
+        serverTimeLabel   = findViewById(R.id.serverTimeLabel);
 
-        // ── LIVE INTERNET SENSOR ──
-        // Check once at start, then register listener for real-time changes
+        // ── LIVE INTERNET SENSOR ──────────────────────────────────────────────
         if (!NavigationHelper.INSTANCE.isInternetActuallyWorking(this)) {
             NavigationHelper.INSTANCE.showNoInternetOverlay(this);
         } else {
-            // Loading Sequence from NavigationHelper
             NavigationHelper.INSTANCE.showGlobalLoading(this, "Analyzing Farm Yield...", () -> {
-                fetchAnalyticsData();
+                attachRealtimeListener();   // replaces fetchAnalyticsData()
                 return Unit.INSTANCE;
             });
         }
@@ -132,53 +141,37 @@ public class AnalyticsActivity extends AppCompatActivity {
 
         // Initialize selected periods
         Calendar cal = Calendar.getInstance();
-        selectedWeeklyYear = cal.get(Calendar.YEAR);
+        selectedWeeklyYear  = cal.get(Calendar.YEAR);
         selectedWeeklyMonth = cal.get(Calendar.MONTH);
         selectedMonthlyYear = cal.get(Calendar.YEAR);
 
-        // Start real-time time update
         startTimeUpdate();
 
-        // Set up button listeners for navigation
-        ImageButton previousWeekButton = findViewById(R.id.previousWeekButton);
-        ImageButton nextWeekButton = findViewById(R.id.nextWeekButton);
+        // Period navigation buttons
+        ImageButton previousWeekButton  = findViewById(R.id.previousWeekButton);
+        ImageButton nextWeekButton      = findViewById(R.id.nextWeekButton);
         ImageButton previousMonthButton = findViewById(R.id.previousMonthButton);
-        ImageButton nextMonthButton = findViewById(R.id.nextMonthButton);
+        ImageButton nextMonthButton     = findViewById(R.id.nextMonthButton);
 
         if (previousWeekButton != null) {
             previousWeekButton.setOnClickListener(v -> {
                 selectedWeeklyMonth--;
-                if (selectedWeeklyMonth < 0) {
-                    selectedWeeklyMonth = 11;
-                    selectedWeeklyYear--;
-                }
+                if (selectedWeeklyMonth < 0) { selectedWeeklyMonth = 11; selectedWeeklyYear--; }
                 updateDashboard();
             });
         }
-
         if (nextWeekButton != null) {
             nextWeekButton.setOnClickListener(v -> {
                 selectedWeeklyMonth++;
-                if (selectedWeeklyMonth > 11) {
-                    selectedWeeklyMonth = 0;
-                    selectedWeeklyYear++;
-                }
+                if (selectedWeeklyMonth > 11) { selectedWeeklyMonth = 0; selectedWeeklyYear++; }
                 updateDashboard();
             });
         }
-
         if (previousMonthButton != null) {
-            previousMonthButton.setOnClickListener(v -> {
-                selectedMonthlyYear--;
-                updateDashboard();
-            });
+            previousMonthButton.setOnClickListener(v -> { selectedMonthlyYear--; updateDashboard(); });
         }
-
         if (nextMonthButton != null) {
-            nextMonthButton.setOnClickListener(v -> {
-                selectedMonthlyYear++;
-                updateDashboard();
-            });
+            nextMonthButton.setOnClickListener(v -> { selectedMonthlyYear++; updateDashboard(); });
         }
 
         // Camera button
@@ -189,6 +182,61 @@ public class AnalyticsActivity extends AppCompatActivity {
             cameraButton.setOnClickListener(v -> cameraHelper.launch());
         }
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Realtime Database — attach persistent listener
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Attaches a ValueEventListener to the egg_collections node.
+     * Firebase calls onDataChange() immediately with current data and again
+     * any time a child node changes — so the charts update in real time
+     * whenever EggCountActivity saves a new collection.
+     *
+     * Data structure expected (written by EggCountActivity):
+     *   egg_collections / {yyyy-MM-dd} / total     (long)
+     *                                  / gradeA    (long)
+     *                                  / gradeB    (long)
+     *                                  / gradeC    (long)
+     *                                  / timestamp (long)
+     *                                  / savedBy   (String)
+     */
+    private void attachRealtimeListener() {
+        eggCollectionsListener = new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot snapshot) {
+                allData   = new TreeMap<>();
+                totalEggs = 0;
+
+                for (DataSnapshot child : snapshot.getChildren()) {
+                    // The key is "yyyy-MM-dd"
+                    String dateKey = child.getKey();
+                    Long   total   = child.child("total").getValue(Long.class);
+
+                    if (dateKey != null && total != null) {
+                        allData.put(dateKey, total.intValue());
+                        totalEggs += total.intValue();
+                    }
+                }
+
+                runOnUiThread(() -> updateDashboard());
+            }
+
+            @Override
+            public void onCancelled(DatabaseError error) {
+                // Graceful degradation: show empty charts
+                allData   = new TreeMap<>();
+                totalEggs = 0;
+                runOnUiThread(() -> updateDashboard());
+            }
+        };
+
+        eggCollectionsRef.addValueEventListener(eggCollectionsListener);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Internet sensor
+    // ─────────────────────────────────────────────────────────────────────────
 
     private void startLiveInternetSensor() {
         ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
@@ -205,7 +253,6 @@ public class AnalyticsActivity extends AppCompatActivity {
                     if (loadingLayout != null && loadingLayout.getVisibility() == View.VISIBLE) {
                         View noNet = findViewById(R.id.noInternetSection);
                         if (noNet != null && noNet.getVisibility() == View.VISIBLE) {
-                            // Internet came back, hide error and refresh the activity
                             loadingLayout.setVisibility(View.GONE);
                             recreate();
                         }
@@ -224,11 +271,34 @@ public class AnalyticsActivity extends AppCompatActivity {
     @Override
     protected void onStop() {
         super.onStop();
+        // Unregister network callback
         if (networkCallback != null) {
             ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
             cm.unregisterNetworkCallback(networkCallback);
         }
+        // Detach Realtime Database listener to stop receiving updates while off-screen
+        if (eggCollectionsListener != null) {
+            eggCollectionsRef.removeEventListener(eggCollectionsListener);
+        }
     }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        // Re-attach the listener when the activity returns to the foreground so
+        // the charts refresh if new egg data arrived while the screen was away.
+        // We always remove first (no-op if not registered) to guarantee exactly
+        // one registration — preventing the double-callback bug that would occur
+        // if onStart fires without a matching onStop having removed the listener.
+        if (eggCollectionsListener != null && NavigationHelper.INSTANCE.isInternetActuallyWorking(this)) {
+            eggCollectionsRef.removeEventListener(eggCollectionsListener);
+            eggCollectionsRef.addValueEventListener(eggCollectionsListener);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Clock
+    // ─────────────────────────────────────────────────────────────────────────
 
     private void startTimeUpdate() {
         SimpleDateFormat timeFormat = new SimpleDateFormat("MM/dd/yyyy hh:mm a", Locale.getDefault());
@@ -245,72 +315,42 @@ public class AnalyticsActivity extends AppCompatActivity {
         handler.post(updateTime);
     }
 
-    private void fetchAnalyticsData() {
-        // Query real egg collection data without date filter
-        db.collection("farm_data").document("shared").collection("egg_collections")
-                .orderBy("timestamp", Query.Direction.DESCENDING)
-                .get()
-                .addOnSuccessListener(queryDocumentSnapshots -> {
-                    if (queryDocumentSnapshots.isEmpty()) {
-                        allData = new TreeMap<>();
-                        totalEggs = 0;
-                        updateDashboard();
-                    } else {
-                        processRealData(queryDocumentSnapshots);
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    allData = new TreeMap<>();
-                    totalEggs = 0;
-                    updateDashboard();
-                });
-    }
-
-    private void processRealData(com.google.firebase.firestore.QuerySnapshot snapshots) {
-        allData = new TreeMap<>();
-        totalEggs = 0;
-
-        for (QueryDocumentSnapshot doc : snapshots) {
-            String date = doc.getString("date");
-            int count = doc.getLong("total") != null ? doc.getLong("total").intValue() : 0;
-            if (date != null) allData.put(date, count);
-            totalEggs += count;
-        }
-
-        updateDashboard();
-    }
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Dashboard rendering
+    // ─────────────────────────────────────────────────────────────────────────
 
     private void updateDashboard() {
-        // Update Financials
+        // allData is always non-null (eagerly initialized as empty TreeMap);
+        // charts will simply render zeros until Firebase delivers real data.
+
+        // Financials
         double revenue = totalEggs * 5.0;
-        double cost = totalEggs * 1.8;
-        double profit = revenue - cost;
+        double cost    = totalEggs * 1.8;
+        double profit  = revenue - cost;
 
-        if (revenueValue != null) revenueValue.setText(String.format(Locale.getDefault(), "₱%.0f", revenue));
+        if (revenueValue  != null) revenueValue .setText(String.format(Locale.getDefault(), "₱%.0f", revenue));
         if (feedCostValue != null) feedCostValue.setText(String.format(Locale.getDefault(), "₱%.0f", cost));
-        if (profitValue != null) profitValue.setText(String.format(Locale.getDefault(), "₱%.0f", profit));
+        if (profitValue   != null) profitValue  .setText(String.format(Locale.getDefault(), "₱%.0f", profit));
 
-        // Aggregate for weekly
-        Map<Integer, Integer> weekTotals = new HashMap<>();
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+
+        // ── Weekly chart (by week-of-month for the selected month) ────────────
+        Map<Integer, Integer> weekTotals = new HashMap<>();
         for (Map.Entry<String, Integer> entry : allData.entrySet()) {
             try {
                 Date date = sdf.parse(entry.getKey());
                 Calendar entryCal = Calendar.getInstance();
                 entryCal.setTime(date);
-                int year = entryCal.get(Calendar.YEAR);
+                int year  = entryCal.get(Calendar.YEAR);
                 int month = entryCal.get(Calendar.MONTH);
-                int week = entryCal.get(Calendar.WEEK_OF_MONTH);
+                int week  = entryCal.get(Calendar.WEEK_OF_MONTH);
                 if (year == selectedWeeklyYear && month == selectedWeeklyMonth) {
                     weekTotals.put(week, weekTotals.getOrDefault(week, 0) + entry.getValue());
                 }
-            } catch (Exception e) {
-                // ignore
-            }
+            } catch (Exception ignored) {}
         }
 
-        // Weekly chart
-        List<Entry> lineEntries = new ArrayList<>();
+        List<Entry> lineEntries  = new ArrayList<>();
         List<String> weeklyLabels = new ArrayList<>();
         for (int w = 1; w <= 4; w++) {
             lineEntries.add(new Entry(w - 1, weekTotals.getOrDefault(w, 0)));
@@ -329,27 +369,24 @@ public class AnalyticsActivity extends AppCompatActivity {
         weeklyChart.animateX(800);
         weeklyChart.invalidate();
 
-        // Aggregate for monthly
+        // ── Monthly chart (total per month for the selected year) ─────────────
         Map<Integer, Integer> monthTotals = new HashMap<>();
         for (Map.Entry<String, Integer> entry : allData.entrySet()) {
             try {
                 Date date = sdf.parse(entry.getKey());
                 Calendar entryCal = Calendar.getInstance();
                 entryCal.setTime(date);
-                int year = entryCal.get(Calendar.YEAR);
+                int year  = entryCal.get(Calendar.YEAR);
                 int month = entryCal.get(Calendar.MONTH);
                 if (year == selectedMonthlyYear) {
                     monthTotals.put(month, monthTotals.getOrDefault(month, 0) + entry.getValue());
                 }
-            } catch (Exception e) {
-                // ignore
-            }
+            } catch (Exception ignored) {}
         }
 
-        // Monthly chart
-        List<BarEntry> barEntries = new ArrayList<>();
-        List<String> monthlyLabels = new ArrayList<>();
-        String[] months = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+        List<BarEntry> barEntries   = new ArrayList<>();
+        List<String>   monthlyLabels = new ArrayList<>();
+        String[] months = {"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
         for (int m = 0; m < 12; m++) {
             barEntries.add(new BarEntry(m, monthTotals.getOrDefault(m, 0)));
             monthlyLabels.add(months[m]);
@@ -365,47 +402,49 @@ public class AnalyticsActivity extends AppCompatActivity {
         monthlyChart.animateY(800);
         monthlyChart.invalidate();
 
-        // Set labels
-        String monthYear = String.format(Locale.getDefault(), "%02d/%d", selectedWeeklyMonth + 1, selectedWeeklyYear);
+        // Period labels
+        String monthYear = String.format(Locale.getDefault(), "%02d/%d",
+                selectedWeeklyMonth + 1, selectedWeeklyYear);
         if (weeklyMonthLabel != null) weeklyMonthLabel.setText(monthYear);
-        if (monthlyYearLabel != null) monthlyYearLabel.setText(String.valueOf(selectedMonthlyYear));
+        if (monthlyYearLabel  != null) monthlyYearLabel .setText(String.valueOf(selectedMonthlyYear));
 
-        // Performance & Smart Tips
+        // Performance & smart tips
         if (!allData.isEmpty()) {
             List<Integer> values = new ArrayList<>(allData.values());
-            int latest = values.get(values.size() - 1);
+            int   latest  = values.get(values.size() - 1);
             double average = totalEggs / (double) allData.size();
             calculatePerformance(latest, average);
             generateSmartTip(latest, values.size() > 1 ? values.get(values.size() - 2) : latest);
         }
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Performance & smart tip logic (unchanged)
+    // ─────────────────────────────────────────────────────────────────────────
+
     private void calculatePerformance(int latest, double average) {
         if (average == 0) return;
         double diffPercent = ((latest - average) / average) * 100;
 
         if (performanceTitle != null) {
-            if (diffPercent >= 10) performanceTitle.setText("Excellent Performance!");
+            if      (diffPercent >= 10) performanceTitle.setText("Excellent Performance!");
             else if (diffPercent >= -5) performanceTitle.setText("Stable Production");
-            else performanceTitle.setText("Production Alert");
+            else                        performanceTitle.setText("Production Alert");
         }
 
         if (performanceDesc != null) {
             String direction = diffPercent >= 0 ? "above" : "below";
             performanceDesc.setText(String.format(Locale.getDefault(),
-                    "You're %.1f%% %s average production this month", Math.abs(diffPercent), direction));
+                    "You're %.1f%% %s average production this month",
+                    Math.abs(diffPercent), direction));
         }
     }
 
     private void generateSmartTip(int latest, int prev) {
         String tip;
-        if (latest < prev * 0.9) {
-            tip = "Critical Tip: Production dropped by 10%. Check for sudden temperature changes or stressors in the cages.";
-        } else if (latest > prev * 1.1) {
-            tip = "Great Job! Yield is up. Ensure consistent feed supply to maintain this peak production rate.";
-        } else {
-            tip = "Maintenance Tip: Production is stable. Remember to maintain 14-16 hours of daily light exposure for quails.";
-        }
+        if      (latest < prev * 0.9) tip = "Critical Tip: Production dropped by 10%. Check for sudden temperature changes or stressors in the cages.";
+        else if (latest > prev * 1.1) tip = "Great Job! Yield is up. Ensure consistent feed supply to maintain this peak production rate.";
+        else                          tip = "Maintenance Tip: Production is stable. Remember to maintain 14-16 hours of daily light exposure for quails.";
         if (recommendationText != null) recommendationText.setText(tip);
     }
 }
