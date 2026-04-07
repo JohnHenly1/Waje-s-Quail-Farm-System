@@ -402,6 +402,7 @@
                                 android:fontFamily="sans-serif" />
 
                             <TextView
+                                android:id="@+id/total_eggs_value"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/eggs_count"
@@ -443,6 +444,7 @@
                                 android:fontFamily="sans-serif" />
 
                             <TextView
+                                android:id="@+id/feed_remaining_value"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/feed_weight"

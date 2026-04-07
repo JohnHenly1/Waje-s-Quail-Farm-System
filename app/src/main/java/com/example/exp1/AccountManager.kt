@@ -120,12 +120,15 @@ class AccountManager(context: Context) {
         }
     }
 
-    fun saveNotificationPreferences(alertsEnabled: Boolean, globalDataEnabled: Boolean, scheduleEnabled: Boolean) {
+    fun saveNotificationPreferences(alertsEnabled: Boolean, globalDataEnabled: Boolean, scheduleEnabled: Boolean, eggCountEnabled: Boolean, eggCountHour: Int, eggCountMinute: Int) {
         val username = getCurrentUsername() ?: "default"
         sharedPreferences.edit().apply {
             putBoolean("${username}_pref_alerts",      alertsEnabled)
             putBoolean("${username}_pref_global_data", globalDataEnabled)
             putBoolean("${username}_pref_schedule",    scheduleEnabled)
+            putBoolean("${username}_pref_egg_count",   eggCountEnabled)
+            putInt("${username}_egg_count_hour",       eggCountHour)
+            putInt("${username}_egg_count_minute",     eggCountMinute)
             apply()
         }
     }
@@ -143,6 +146,21 @@ class AccountManager(context: Context) {
     fun isScheduleEnabled(): Boolean {
         val username = getCurrentUsername() ?: "default"
         return sharedPreferences.getBoolean("${username}_pref_schedule", true)
+    }
+
+    fun isEggCountEnabled(): Boolean {
+        val username = getCurrentUsername() ?: "default"
+        return sharedPreferences.getBoolean("${username}_pref_egg_count", false)
+    }
+
+    fun getEggCountHour(): Int {
+        val username = getCurrentUsername() ?: "default"
+        return sharedPreferences.getInt("${username}_egg_count_hour", 18) // 6 PM default
+    }
+
+    fun getEggCountMinute(): Int {
+        val username = getCurrentUsername() ?: "default"
+        return sharedPreferences.getInt("${username}_egg_count_minute", 0)
     }
 
     fun saveLanguageRegion(language: String, region: String, province: String) {

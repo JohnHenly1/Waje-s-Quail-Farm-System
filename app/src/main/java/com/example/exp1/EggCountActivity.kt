@@ -1,6 +1,7 @@
 package com.example.exp1
 
 import android.Manifest
+import android.app.DatePickerDialog
 import android.content.ContentValues
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -66,6 +67,8 @@ class EggCountActivity : AppCompatActivity() {
     /** Realtime listener for the collection history — kept so we can remove it */
     private var historyListener: ValueEventListener? = null
     private var historyRef: com.google.firebase.database.DatabaseReference? = null
+    /** Cached collection records for populating log without re-fetching */
+    private var collectionRecords = mutableMapOf<String, Map<String, Any>>()
 
     // ── Cached views ──────────────────────────────────────────────────────────
     private lateinit var previewView: PreviewView
@@ -77,6 +80,18 @@ class EggCountActivity : AppCompatActivity() {
     private lateinit var modeSwitchBtn: Button
     private lateinit var frozenOverlay: View
     private lateinit var saveBtn: Button
+    private lateinit var liveTimeText: TextView
+
+    // ── Live time update ──────────────────────────────────────────────────────
+    private val handler = Handler(Looper.getMainLooper())
+    private val timeUpdateRunnable = object : Runnable {
+        override fun run() {
+            val now = Calendar.getInstance()
+            val timeFormat = SimpleDateFormat("hh:mm a\nMMM d, yyyy", Locale.getDefault())
+            liveTimeText.text = timeFormat.format(now.time)
+            handler.postDelayed(this, 1000)
+        }
+    }
 
     // ── Permission / gallery launchers ────────────────────────────────────────
     private val requestCameraPermission = registerForActivityResult(
@@ -138,6 +153,7 @@ class EggCountActivity : AppCompatActivity() {
         modeSwitchBtn = findViewById(R.id.modeSwitchBtn)
         frozenOverlay = findViewById(R.id.frozenOverlay)
         saveBtn       = findViewById(R.id.saveCollectionBtn)
+        liveTimeText  = findViewById(R.id.liveTimeText)
     }
 
     private fun wireListeners() {
@@ -154,6 +170,7 @@ class EggCountActivity : AppCompatActivity() {
         // Save today's egg count to Firebase Realtime Database
         saveBtn.setOnClickListener { saveCollectionToDatabase() }
 
+        findViewById<View>(R.id.calendarBtn).setOnClickListener { openCalendarPicker() }
         findViewById<View>(R.id.prevWeekBtn).setOnClickListener { weekOffset--; setupUI() }
         findViewById<View>(R.id.nextWeekBtn).setOnClickListener {
             if (weekOffset < 0) { weekOffset++; setupUI() }
@@ -411,6 +428,7 @@ class EggCountActivity : AppCompatActivity() {
                     val data = child.value as? Map<String, Any> ?: continue
                     records[key] = data
                 }
+                collectionRecords = records // Cache the records
                 runOnUiThread { populateCollectionLog(records) }
             }
 
@@ -423,6 +441,26 @@ class EggCountActivity : AppCompatActivity() {
         historyListener = listener
     }
 
+    private fun openCalendarPicker() {
+        val cal = Calendar.getInstance()
+        val datePicker = DatePickerDialog(this, { _, year, month, day ->
+            val selectedCal = Calendar.getInstance().apply { set(year, month, day) }
+            // Calculate weekOffset
+            // First, get the Monday of the current week
+            val currentWeekMonday = Calendar.getInstance().apply {
+                set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+            }
+            // Monday of selected week
+            val selectedWeekMonday = selectedCal.clone() as Calendar
+            selectedWeekMonday.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+            // Difference in weeks
+            val diff = ((selectedWeekMonday.timeInMillis - currentWeekMonday.timeInMillis) / (7 * 24 * 60 * 60 * 1000)).toInt()
+            weekOffset = diff
+            setupUI()
+        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH))
+        datePicker.show()
+    }
+
     /**
      * Fills the 7-day collection log with data fetched from the database.
      * Days with no data show zeros (same behaviour as before).
@@ -432,29 +470,33 @@ class EggCountActivity : AppCompatActivity() {
         container.removeAllViews()
         val inflater = LayoutInflater.from(this)
         val todayStr = sdf.format(Calendar.getInstance().time)
-        val cal      = Calendar.getInstance().apply { add(Calendar.WEEK_OF_YEAR, weekOffset) }
-
+        val cal = Calendar.getInstance().apply {
+            // Set to Monday of the week
+            set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+            // Add weekOffset weeks
+            add(Calendar.WEEK_OF_YEAR, weekOffset)
+        }
+        val dayNames = arrayOf("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
         repeat(7) {
             val displayDate = sdf.format(cal.time)
-            val dbDate      = dbDateFmt.format(cal.time)          // yyyy-MM-dd key
-            val record      = records[dbDate]
-
-            val total  = (record?.get("total")  as? Long)?.toInt() ?: 0
-            val gA     = (record?.get("gradeA") as? Long)?.toInt() ?: 0
-            val gB     = (record?.get("gradeB") as? Long)?.toInt() ?: 0
-            val gC     = (record?.get("gradeC") as? Long)?.toInt() ?: 0
-
+            val dayOfWeek = dayNames[cal.get(Calendar.DAY_OF_WEEK) - 1]
+            val fullDateText = "$dayOfWeek, $displayDate"
+            val dbDate = dbDateFmt.format(cal.time)
+            val record = records[dbDate]
+            val total = (record?.get("total") as? Long)?.toInt() ?: 0
+            val gA = (record?.get("gradeA") as? Long)?.toInt() ?: 0
+            val gB = (record?.get("gradeB") as? Long)?.toInt() ?: 0
+            val gC = (record?.get("gradeC") as? Long)?.toInt() ?: 0
             val item = inflater.inflate(R.layout.item_collection_log, container, false)
-            item.findViewById<TextView>(R.id.logDate).text   = displayDate
-            item.findViewById<TextView>(R.id.logTotal).text  = total.toString()
+            item.findViewById<TextView>(R.id.logDate).text = fullDateText
+            item.findViewById<TextView>(R.id.logTotal).text = total.toString()
             item.findViewById<TextView>(R.id.logGradeA).text = gA.toString()
             item.findViewById<TextView>(R.id.logGradeB).text = gB.toString()
             item.findViewById<TextView>(R.id.logGradeC).text = gC.toString()
             item.findViewById<TextView>(R.id.todayBadge).visibility =
                 if (displayDate == todayStr) View.VISIBLE else View.GONE
-
             container.addView(item)
-            cal.add(Calendar.DAY_OF_YEAR, -1)
+            cal.add(Calendar.DAY_OF_YEAR, 1)
         }
     }
 
@@ -531,7 +573,7 @@ class EggCountActivity : AppCompatActivity() {
     private fun setupUI() {
         updateCountUI()
         updateWeekLabel()
-        // History is loaded (and kept live) via onResume → loadCollectionHistory()
+        populateCollectionLog(collectionRecords)
         // Hide Save button initially; it appears after a capture
         saveBtn.visibility = View.GONE
     }
@@ -578,6 +620,7 @@ class EggCountActivity : AppCompatActivity() {
         And any collections saved from another device are reflected immediately without needing a manual refresh.
         */
         loadCollectionHistory()
+        handler.post(timeUpdateRunnable)
     }
 
     override fun onPause() {
@@ -588,6 +631,7 @@ class EggCountActivity : AppCompatActivity() {
         */
         historyListener?.let { historyRef?.removeEventListener(it) }
         historyListener = null
+        handler.removeCallbacks(timeUpdateRunnable)
     }
 
     override fun onDestroy() {

@@ -18,6 +18,7 @@ import android.widget.EditText
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import android.text.TextWatcher
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.textfield.TextInputEditText
@@ -56,6 +57,20 @@ class MainActivity : AppCompatActivity() {
         val currentEmail = accountManager.getCurrentUsername() 
 
         setContentView(R.layout.activity_login)
+
+        val editLoginEmail = findViewById<EditText>(R.id.editLoginEmail)
+        editLoginEmail.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                val email = s.toString().trim()
+                if (email.isNotEmpty() && !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                    editLoginEmail.error = "Invalid email format"
+                } else {
+                    editLoginEmail.error = null
+                }
+            }
+        })
 
         loginUIContainer = findViewById(R.id.loginUIContainer)
         loadingLayout = findViewById(R.id.loadingLayout)
@@ -244,8 +259,15 @@ class MainActivity : AppCompatActivity() {
             return
         }
         val email = findViewById<EditText>(R.id.editLoginEmail).text.toString().trim().lowercase()
-        if (email.isEmpty()) return
-        
+        if (email.isEmpty()) {
+            Toast.makeText(this, "Please enter an email address", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            Toast.makeText(this, "Please enter a valid email address", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         statusText.text = "Finding Account..."
         loadingLayout.visibility = View.VISIBLE
         loadingIcon.startAnimation(AnimationUtils.loadAnimation(this, R.anim.quail_jump))
