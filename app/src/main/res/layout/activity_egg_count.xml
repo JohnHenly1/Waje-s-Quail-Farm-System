@@ -51,6 +51,15 @@
                 android:textSize="20sp"
                 android:textStyle="bold" />
 
+            <TextView
+                android:id="@+id/liveTimeText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="12:00 PM\nApr 7, 2026"
+                android:textColor="@color/white"
+                android:textSize="12sp"
+                android:gravity="end" />
+
             <!-- Reset / refresh counts -->
             <ImageButton
                 android:id="@+id/refreshButton"
@@ -428,6 +437,14 @@
                     android:textColor="@color/black"
                     android:textSize="17sp"
                     android:textStyle="bold" />
+
+                <ImageButton
+                    android:id="@+id/calendarBtn"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    app:srcCompat="@android:drawable/ic_menu_my_calendar"
+                    app:tint="@color/dark_green" />
 
                 <ImageButton
                     android:id="@+id/prevWeekBtn"

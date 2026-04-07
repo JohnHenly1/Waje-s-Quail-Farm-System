@@ -534,14 +534,33 @@ public class ProfileActivity extends AppCompatActivity {
         SwitchCompat switchAlerts     = dialogView.findViewById(R.id.switchAlerts);
         SwitchCompat switchGlobalData = dialogView.findViewById(R.id.switchGlobalData);
         SwitchCompat switchSchedule   = dialogView.findViewById(R.id.switchSchedule);
+        SwitchCompat switchEggCount   = dialogView.findViewById(R.id.switchEggCount);
+        Button btnEggCountTime        = dialogView.findViewById(R.id.btnEggCountTime);
 
         switchAlerts.setChecked(accountManager.isAlertsEnabled());
         switchGlobalData.setChecked(accountManager.isGlobalDataEnabled());
         switchSchedule.setChecked(accountManager.isScheduleEnabled());
+        switchEggCount.setChecked(accountManager.isEggCountEnabled());
+
+        // Set time button text
+        int hour = accountManager.getEggCountHour();
+        int minute = accountManager.getEggCountMinute();
+        btnEggCountTime.setText(String.format("%02d:%02d", hour, minute));
+
+        // Time picker for egg count
+        btnEggCountTime.setOnClickListener(v -> {
+            android.app.TimePickerDialog timePicker = new android.app.TimePickerDialog(this, (view, selectedHour, selectedMinute) -> {
+                btnEggCountTime.setText(String.format("%02d:%02d", selectedHour, selectedMinute));
+            }, hour, minute, false);
+            timePicker.show();
+        });
 
         builder.setTitle("Notification Preferences")
                 .setPositiveButton("Save", (dialog, which) -> {
-                    accountManager.saveNotificationPreferences(switchAlerts.isChecked(), switchGlobalData.isChecked(), switchSchedule.isChecked());
+                    String[] selectedTime = btnEggCountTime.getText().toString().split(":");
+                    int eggHour = Integer.parseInt(selectedTime[0]);
+                    int eggMinute = Integer.parseInt(selectedTime[1]);
+                    accountManager.saveNotificationPreferences(switchAlerts.isChecked(), switchGlobalData.isChecked(), switchSchedule.isChecked(), switchEggCount.isChecked(), eggHour, eggMinute);
                     Toast.makeText(this, "Preferences saved", Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("Cancel", null)
@@ -1337,3 +1356,5 @@ public class ProfileActivity extends AppCompatActivity {
         builder.show();
     }
 }
+
+

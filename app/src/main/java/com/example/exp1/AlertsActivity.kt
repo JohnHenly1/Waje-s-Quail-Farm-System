@@ -1,9 +1,14 @@
 package com.example.exp1
 
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.animation.AnimationUtils
+import android.widget.Button
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -17,6 +22,7 @@ import androidx.core.view.WindowInsetsCompat
 
 class AlertsActivity : AppCompatActivity() {
     private lateinit var accountManager: AccountManager
+    private var farmAlertsListener: com.google.firebase.firestore.ListenerRegistration? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,20 +76,48 @@ class AlertsActivity : AppCompatActivity() {
         val switchAlerts = dialogView.findViewById<SwitchCompat>(R.id.switchAlerts)
         val switchGlobalData = dialogView.findViewById<SwitchCompat>(R.id.switchGlobalData)
         val switchSchedule = dialogView.findViewById<SwitchCompat>(R.id.switchSchedule)
+        val switchEggCount = dialogView.findViewById<SwitchCompat>(R.id.switchEggCount)
+        val btnEggCountTime = dialogView.findViewById<Button>(R.id.btnEggCountTime)
 
         // Load current preferences
         switchAlerts.isChecked = accountManager.isAlertsEnabled()
         switchGlobalData.isChecked = accountManager.isGlobalDataEnabled()
         switchSchedule.isChecked = accountManager.isScheduleEnabled()
+        switchEggCount.isChecked = accountManager.isEggCountEnabled()
+
+        // Set time button text
+        val hour = accountManager.getEggCountHour()
+        val minute = accountManager.getEggCountMinute()
+        btnEggCountTime.text = String.format("%02d:%02d", hour, minute)
+
+        // Time picker for egg count
+        btnEggCountTime.setOnClickListener {
+            val timePicker = android.app.TimePickerDialog(this, { _, selectedHour, selectedMinute ->
+                btnEggCountTime.text = String.format("%02d:%02d", selectedHour, selectedMinute)
+            }, hour, minute, false)
+            timePicker.show()
+        }
 
         builder.setTitle("Notification Preferences")
             .setPositiveButton("Save") { _, _ ->
+                val selectedTime = btnEggCountTime.text.toString().split(":")
+                val eggHour = selectedTime[0].toInt()
+                val eggMinute = selectedTime[1].toInt()
                 accountManager.saveNotificationPreferences(
                     switchAlerts.isChecked(),
                     switchGlobalData.isChecked(),
-                    switchSchedule.isChecked()
+                    switchSchedule.isChecked(),
+                    switchEggCount.isChecked(),
+                    eggHour,
+                    eggMinute
                 )
                 Toast.makeText(this, "Preferences saved", Toast.LENGTH_SHORT).show()
+                // Schedule or cancel egg count notification
+                if (switchEggCount.isChecked()) {
+                    scheduleEggCountNotification(eggHour, eggMinute)
+                } else {
+                    cancelEggCountNotification()
+                }
             }
             .setNegativeButton("Cancel", null)
             .show()
@@ -92,6 +126,28 @@ class AlertsActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updateAlertsList()
+        // Listen to FarmRepository alerts
+        farmAlertsListener = FarmRepository.listenToAlerts { alerts ->
+            // Add new alerts to GlobalData if they don't exist
+            for (alert in alerts) {
+                val message = alert["message"] as? String ?: continue
+                val timestamp = alert["timestamp"] as? String ?: continue
+                val type = alert["type"] as? String ?: "Inventory"
+                val isRead = alert["isRead"] as? Boolean ?: false
+                // Check if this alert already exists in GlobalData
+                val existing = GlobalData.getAlerts().find { it.message == message && it.timestamp == timestamp }
+                if (existing == null) {
+                    GlobalData.addAlert(message, timestamp, type)
+                }
+            }
+            updateAlertsList()
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        farmAlertsListener?.remove()
+        farmAlertsListener = null
     }
 
     private fun updateAlertsList() {
@@ -141,6 +197,95 @@ class AlertsActivity : AppCompatActivity() {
                 itemView.startAnimation(slideUp)
 
                 container.addView(itemView)
+            }
+        }
+    }
+
+    private fun scheduleEggCountNotification(hour: Int, minute: Int) {
+        val alarmManager = getSystemService(ALARM_SERVICE) as AlarmManager
+        val intent = Intent(this, EggCountNotificationReceiver::class.java)
+        val pendingIntent = PendingIntent.getBroadcast(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+
+        val calendar = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, hour)
+            set(java.util.Calendar.MINUTE, minute)
+            set(java.util.Calendar.SECOND, 0)
+            if (timeInMillis <= System.currentTimeMillis()) {
+                add(java.util.Calendar.DAY_OF_YEAR, 1) // Schedule for tomorrow if time has passed
+            }
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (alarmManager.canScheduleExactAlarms()) {
+                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, calendar.timeInMillis, pendingIntent)
+            } else {
+                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, calendar.timeInMillis, pendingIntent)
+            }
+        } else {
+            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, calendar.timeInMillis, pendingIntent)
+        }
+    }
+
+    private fun cancelEggCountNotification() {
+        val alarmManager = getSystemService(ALARM_SERVICE) as AlarmManager
+        val intent = Intent(this, EggCountNotificationReceiver::class.java)
+        val pendingIntent = PendingIntent.getBroadcast(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        alarmManager.cancel(pendingIntent)
+    }
+
+    // BroadcastReceiver for egg count notifications
+    class EggCountNotificationReceiver : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context, intent: Intent) {
+            // Create notification channel
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel = android.app.NotificationChannel(
+                    "egg_count_channel",
+                    "Egg Count Reminders",
+                    android.app.NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Daily egg count reminders"
+                    enableLights(true)
+                    enableVibration(true)
+                    setLockscreenVisibility(androidx.core.app.NotificationCompat.VISIBILITY_PUBLIC)
+                }
+                val nm = context.getSystemService(android.app.NotificationManager::class.java)
+                nm?.createNotificationChannel(channel)
+            }
+
+            val accountManager = AccountManager(context)
+            if (!accountManager.isAlertsEnabled() || !accountManager.isEggCountEnabled()) return
+
+            // Get today's egg count from Firebase
+            val database = com.google.firebase.database.FirebaseDatabase.getInstance()
+            val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+            database.getReference("egg_collections").child(today).get().addOnSuccessListener { snapshot ->
+                val total = (snapshot.child("total").value as? Long)?.toInt() ?: 0
+                val message = "Today's egg count: $total eggs"
+
+                // Add to GlobalData
+                val timestamp = java.text.SimpleDateFormat("yyyy/MM/dd hh:mm a", java.util.Locale.getDefault()).format(java.util.Date())
+                GlobalData.addAlert(message, timestamp, "System")
+
+                // Show notification
+                val notificationIntent = Intent(context, AlertsActivity::class.java)
+                notificationIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                val pendingIntent = PendingIntent.getActivity(context, 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+
+                val builder = androidx.core.app.NotificationCompat.Builder(context, "egg_count_channel")
+                    .setSmallIcon(R.drawable.ic_notifications)
+                    .setContentTitle("Daily Egg Count Reminder")
+                    .setContentText(message)
+                    .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+                    .setDefaults(androidx.core.app.NotificationCompat.DEFAULT_ALL)
+                    .setContentIntent(pendingIntent)
+                    .setAutoCancel(true)
+                    .setVisibility(androidx.core.app.NotificationCompat.VISIBILITY_PUBLIC)
+
+                try {
+                    androidx.core.app.NotificationManagerCompat.from(context).notify((System.currentTimeMillis() % Int.MAX_VALUE).toInt(), builder.build())
+                } catch (e: SecurityException) {
+                    e.printStackTrace()
+                }
             }
         }
     }

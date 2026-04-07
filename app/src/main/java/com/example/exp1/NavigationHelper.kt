@@ -8,6 +8,8 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Handler
 import android.os.Looper
+import android.text.TextWatcher
+import android.util.Patterns
 import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -66,7 +68,9 @@ object NavigationHelper {
             }
         }
 
-        cameraButton?.setOnClickListener { }
+        cameraButton?.setOnClickListener {
+            navigateTo(activity, EggCountActivity::class.java, "Opening Camera...", currentEmail)
+        }
 
         scheduleButton?.setOnClickListener {
             if (activity !is ScheduleActivity) {
@@ -287,74 +291,136 @@ object NavigationHelper {
     }
 
     fun showGenerateInviteCodeDialog(activity: Activity, ownerEmail: String) {
-        // Create an input for the intended email to link the code securely
-        val container = LinearLayout(activity)
-        container.orientation = LinearLayout.VERTICAL
-        container.setPadding(64, 40, 64, 10)
+        val dialogView = LayoutInflater.from(activity).inflate(R.layout.dialog_invite_user, null)
+        val editEmail = dialogView.findViewById<EditText>(R.id.inviteEmail)
+        val roleGroup = dialogView.findViewById<android.widget.RadioGroup>(R.id.inviteRoleGroup)
+        
+        val rbStaff = dialogView.findViewById<android.widget.RadioButton>(R.id.radioInviteStaff)
+        val rbBackup = dialogView.findViewById<android.widget.RadioButton>(R.id.radioInviteBackup)
 
-        val emailInput = EditText(activity)
-        emailInput.hint = "Recipient Email"
-        container.addView(emailInput)
-
-        // Add role selector spinner
-        val roleSpinner = Spinner(activity)
-        val roleOptions = listOf("Staff", "Backup Owner")
-        val roleAdapter = android.widget.ArrayAdapter(activity, android.R.layout.simple_spinner_item, roleOptions)
-        roleAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        roleSpinner.adapter = roleAdapter
-        roleSpinner.setSelection(0) // Default to "Staff"
-        container.addView(roleSpinner)
-
-        AlertDialog.Builder(activity)
-            .setTitle("Generate Invite Code")
-            .setView(container)
-            .setPositiveButton("Generate") { _, _ ->
-                val invitedEmail = emailInput.text.toString().trim().lowercase()
-                if (invitedEmail.isEmpty()) {
-                    Toast.makeText(activity, "Please enter an email", Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
+        editEmail.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                val email = s.toString().trim()
+                if (email.isNotEmpty() && !Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                    editEmail.error = "Invalid email format"
+                } else {
+                    editEmail.error = null
                 }
+            }
+        })
 
-                val selectedRole = when (roleSpinner.selectedItemPosition) {
-                    0 -> "staff"
-                    1 -> "backup_owner"
-                    else -> "staff"
-                }
+        // Update availability
+        val db = FirebaseFirestore.getInstance()
+        db.collection("system_settings").document("role_limits").get()
+            .addOnSuccessListener { limitDoc ->
+                val staffLimit = limitDoc.getLong("staff_limit") ?: 5L
+                val backupLimit = limitDoc.getLong("backup_owner_limit") ?: 2L
 
-                val db = FirebaseFirestore.getInstance()
-                // Check if email is already in use (availability check)
-                db.collection("user_access").document(invitedEmail).get()
-                    .addOnSuccessListener { doc ->
-                        if (doc.exists()) {
-                            Toast.makeText(activity, "This email is already registered.", Toast.LENGTH_SHORT).show()
-                        } else {
-                            // Proceed to generate code
-                            val expirationTime = System.currentTimeMillis() + (24 * 60 * 60 * 1000)
-                            val code = "%06d".format(Random.nextInt(1000000))
-
-                            db.collection("invite_codes")
-                                .document(code)
-                                .set(mapOf(
-                                    "role"      to selectedRole,
-                                    "invitedEmail" to invitedEmail,
-                                    "createdBy" to ownerEmail,
-                                    "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp(),
-                                    "expiresAt" to expirationTime 
-                                ))
-                                .addOnSuccessListener {
-                                    showCodeResultDialog(activity, code, invitedEmail, ownerEmail, selectedRole)
-                                }
-                                .addOnFailureListener { e ->
-                                    Toast.makeText(activity, "Failed to generate: ${e.message}", Toast.LENGTH_LONG).show()
-                                }
+                db.collection("user_access")
+                    .whereEqualTo("role", "staff")
+                    .whereEqualTo("status", "approved")
+                    .get()
+                    .addOnSuccessListener { docs ->
+                        val available = (staffLimit - docs.size()).coerceAtLeast(0)
+                        rbStaff.text = "Staff ($available spots left)"
+                        if (available <= 0) {
+                            rbStaff.isEnabled = false
+                            rbStaff.text = "Staff (Full)"
                         }
                     }
-                    .addOnFailureListener { e ->
-                        Toast.makeText(activity, "Error checking email: ${e.message}", Toast.LENGTH_SHORT).show()
+
+                db.collection("user_access")
+                    .whereEqualTo("role", "backup_owner")
+                    .whereEqualTo("status", "approved")
+                    .get()
+                    .addOnSuccessListener { docs ->
+                        val available = (backupLimit - docs.size()).coerceAtLeast(0)
+                        rbBackup.text = "Backup Owner ($available spots left)"
+                        if (available <= 0) {
+                            rbBackup.isEnabled = false
+                            rbBackup.text = "Backup Owner (Full)"
+                        }
                     }
             }
+
+        val builder = AlertDialog.Builder(activity)
+            .setView(dialogView)
+            .setPositiveButton("Generate Invite", null)
             .setNegativeButton("Cancel", null)
-            .show()
+
+        val dialog = builder.create()
+        dialog.show()
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val invitedEmail = editEmail.text.toString().trim().lowercase()
+            if (invitedEmail.isEmpty()) {
+                Toast.makeText(activity, "Please enter an email", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            if (!Patterns.EMAIL_ADDRESS.matcher(invitedEmail).matches()) {
+                Toast.makeText(activity, "Please enter a valid email address", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            val selectedRoleId = roleGroup.checkedRadioButtonId
+            val selectedRole = if (selectedRoleId == R.id.radioInviteBackup) "backup_owner" else "staff"
+
+            // Check role availability
+            db.collection("system_settings").document("role_limits").get()
+                .addOnSuccessListener { limitDoc ->
+                    val limit = limitDoc.getLong("${selectedRole}_limit") ?: 5L
+                    db.collection("user_access")
+                        .whereEqualTo("role", selectedRole)
+                        .whereEqualTo("status", "approved")
+                        .get()
+                        .addOnSuccessListener { users ->
+                            if (users.size() >= limit) {
+                                Toast.makeText(activity, "The limit for $selectedRole has been reached.", Toast.LENGTH_LONG).show()
+                            } else {
+                                // Check if email is already in use
+                                db.collection("user_access").document(invitedEmail).get()
+                                    .addOnSuccessListener { doc ->
+                                        if (doc.exists()) {
+                                            Toast.makeText(activity, "This email is already registered.", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            // Proceed to generate code
+                                            val expirationTime = System.currentTimeMillis() + (24 * 60 * 60 * 1000)
+                                            val code = "%06d".format(Random.nextInt(1000000))
+
+                                            db.collection("invite_codes")
+                                                .document(code)
+                                                .set(mapOf(
+                                                    "role"      to selectedRole,
+                                                    "invitedEmail" to invitedEmail,
+                                                    "createdBy" to ownerEmail,
+                                                    "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp(),
+                                                    "expiresAt" to expirationTime 
+                                                ))
+                                                .addOnSuccessListener {
+                                                    showCodeResultDialog(activity, code, invitedEmail, ownerEmail, selectedRole)
+                                                    dialog.dismiss()
+                                                }
+                                                .addOnFailureListener { e ->
+                                                    Toast.makeText(activity, "Failed to generate: ${e.message}", Toast.LENGTH_LONG).show()
+                                                }
+                                        }
+                                    }
+                                    .addOnFailureListener { e ->
+                                        Toast.makeText(activity, "Error checking email: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                            }
+                        }
+                        .addOnFailureListener { 
+                            Toast.makeText(activity, "Error checking role availability", Toast.LENGTH_SHORT).show()
+                        }
+                }
+                .addOnFailureListener { 
+                    Toast.makeText(activity, "Error fetching role limits", Toast.LENGTH_SHORT).show()
+                }
+        }
     }
 
     private fun showCodeResultDialog(activity: Activity, code: String, email: String, ownerEmail: String, role: String) {

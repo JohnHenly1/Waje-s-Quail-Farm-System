@@ -2,6 +2,8 @@ package com.example.exp1
 
 import android.content.Intent
 import android.os.Bundle
+import android.text.TextWatcher
+import android.util.Patterns
 import android.view.LayoutInflater
 import android.view.View
 import android.view.animation.AnimationUtils
@@ -80,6 +82,19 @@ class RegisterActivity : AppCompatActivity() {
         val rbStaff = dialogView.findViewById<RadioButton>(R.id.radioRequestStaff)
         val rbBackup = dialogView.findViewById<RadioButton>(R.id.radioRequestBackup)
 
+        editEmail.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                val email = s.toString().trim()
+                if (email.isNotEmpty() && !Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                    editEmail.error = "Invalid email format"
+                } else {
+                    editEmail.error = null
+                }
+            }
+        })
+
         updateAvailabilityInButtons(db, rbStaff, rbBackup)
 
         val builder = AlertDialog.Builder(this)
@@ -99,6 +114,11 @@ class RegisterActivity : AppCompatActivity() {
 
             if (email.isEmpty() || name.isEmpty()) {
                 Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                Toast.makeText(this, "Please enter a valid email address", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
