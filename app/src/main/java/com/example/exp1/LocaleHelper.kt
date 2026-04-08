@@ -7,8 +7,8 @@ import java.util.Locale
 object LocaleHelper {
     fun setLocale(context: Context, language: String): Context {
         val locale = when (language) {
-            "Tagalog" -> Locale("tl")
-            "Cebuano" -> Locale("ceb")
+            "Tagalog" -> Locale("fil", "PH")
+            "Cebuano" -> Locale("ceb", "PH")
             else -> Locale("en")
         }
         Locale.setDefault(locale)

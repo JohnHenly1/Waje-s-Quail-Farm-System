@@ -10,11 +10,36 @@
     <string name="menu">Menu</string>
     <string name="notifications">Mga Notipikasyon</string>
     <string name="welcome_message">Hi, User!</string>
+    <string name="welcome_message_dynamic">Hi, %1$s!</string>
     <string name="welcome_back">Maayong Pagbalik!</string>
+    <string name="generating_reports">Naghimo og mga Report&#8230;</string>
+    <string name="fetching_tasks">Nakuha ang mga Buluhaton&#8230;</string>
+    <string name="checking_inventory">Gisusi ang Imbentaryo&#8230;</string>
+    <string name="loading_egg_records">Gi-load ang mga Record sa Itlog&#8230;</string>
+    <string name="reading_sensors">Gibasa ang mga Sensor&#8230;</string>
+    <string name="syncing_farm_stats">Gina-sync ang mga Istatistika sa Farm&#8230;</string>
+    <string name="photo_saved">Na-save na ang litrato!</string>
+    <string name="camera_permission_required">Gikinahanglan ang permiso sa camera</string>
+    <string name="no_camera_app">Walay nakit-an nga camera app</string>
+    <string name="token_refresh_failed">Bigo ang pag-refresh sa token: %1$s</string>
 
     <!-- AI Recommendation -->
-    <string name="ai_recommendation">Rekomendasyon sa AI</string>
-    <string name="recommendation_text">Rekomendasyon sa mga butang nga buhaton sama sa pagpainom o pagpakaon sa pugo</string>
+    <string name="ai_recommendation">Smart Tip na Rekomendasyon</string>
+    <string name="recommendation_text">I-click ang card para sa bag-ong tip!</string>
+
+    <string-array name="smart_tips">
+        <item>Pagpakaon sa Buntag: Pinaka-aktibo ang mga pugo sa buntag. Siguruha nga puno ang mga sudlanan sa pagkaon sa dili pa ang 7 AM.</item>
+        <item>Pagsusi sa Tubig: Susiha ang lebel sa tubig matag 4 ka oras. Ang dehydration makapakunhod pag-ayo sa produksyon sa itlog.</item>
+        <item>Tip sa Suga: Ang 14&#8211;16 ka oras nga suga kada adlaw maayo alang sa makanunayon nga pagpangitlog.</item>
+        <item>Bentilasyon: Ang maayo nga bentilasyon importante aron malikayan ang pagpundok sa ammonia gikan sa kinalibang.</item>
+        <item>Pagkolekta og Itlog: Pagkolekta og mga itlog labing menos kaduha sa usa ka adlaw aron malikayan ang pagkabali.</item>
+        <item>Pagdumala sa Stress: Hupti nga ubos ang saba sa palibot sa mga hawla. Ang kalit nga kusog nga saba makapahunong sa pagpangitlog.</item>
+        <item>Calcium Boost: Ang pagdugang og dinugmok nga kinhason sa pagkaon makatabang sa pagpalig-on sa kabhang sa itlog.</item>
+        <item>Molting: Kung ang mga pugo mohunong sa pagpangitlog ug mangalarot ang balhibo, basin nag-molting sila. Hatagi sila og dugang protina.</item>
+        <item>Paglimpyo sa Hawla: Limpyohi ang mga waste tray kada adlaw aron malikayan ang baho sa ammonia.</item>
+        <item>Bio-security: Hugasi kanunay ang imong mga kamot sa dili pa ug pagkahuman sa paghikap sa mga pugo o ilang mga itlog.</item>
+        <item>Fresh Feed: Itago ang pagkaon sa bugnaw ug uga nga dapit aron dili kini mag-amag.</item>
+    </string-array>
 
     <!-- Shortcuts -->
     <string name="feed_inventory">Imbentaryo sa Pagkaon</string>
@@ -86,6 +111,8 @@
     <string name="version_info">Waje\'s Quail Farm Beta Ver.</string>
     <string name="copyright">© 2026 Tanang katungod gitagana</string>
     <string name="camera">Kamera</string>
+    <string name="previous">Kaniadto</string>
+    <string name="next">Sunod</string>
 
     <!-- Login & Registration -->
     <string name="login_title">Mag-login</string>
@@ -101,6 +128,175 @@
     <string name="initial_farm_setup">Initial nga Setup sa Farm (Tag-iya)</string>
     <string name="role_available">Available: %1$d/%2$d</string>
     <string name="role_full">Puno na ang Papel</string>
-    <string name="previous">Kaniadto</string>
-    <string name="next">Sunod</string>
+
+    <!-- Profile Dialog Strings -->
+    <string name="syncing_profile">Gina-sync ang Profile&#8230;</string>
+    <string name="detected_eggs">Nakakita og %1$d ka mga itlog!</string>
+    <string name="error_loading_farm_data">Error sa pag-load sa data sa farm</string>
+    <string name="edit_name">I-edit ang Pangalan</string>
+    <string name="save">I-save</string>
+    <string name="cancel">Kanselahon</string>
+    <string name="name_empty">Dili mahimo nga walay pangalan</string>
+    <string name="name_updated">Na-update na ang pangalan!</string>
+    <string name="failed_to_update">Bigo sa pag-update</string>
+    <string name="farm_recalibration">Recalibration sa Farm</string>
+    <string name="restart_days">I-restart ang Adlaw</string>
+    <string name="fill_birds_cages">Palihug pun-a ang ihap sa pugo ug hawla</string>
+    <string name="fill_all_location">Palihug pun-a ang tanang field sa lokasyon sa farm o pasagdi silang tanan nga walay sulod</string>
+    <string name="farm_stats_updated">Na-update na ang istatistika ug lokasyon sa farm!</string>
+    <string name="save_failed">Bigo sa pag-save: %1$s</string>
+    <string name="restart_days_title">I-restart ang mga Adlaw nga Nagdagan?</string>
+    <string name="restart_days_message">I-reset ang counter balik sa Day 1?</string>
+    <string name="restart">I-restart</string>
+    <string name="days_restarted">Na-restart na ang mga adlaw!</string>
+    <string name="restart_failed">Bigo sa pag-restart</string>
+    <string name="change_password">Usba ang Password</string>
+    <string name="update">I-update</string>
+    <string name="password_updated">Malamposong na-update ang password</string>
+    <string name="incorrect_password">Sayop nga kasamtangang password</string>
+    <string name="delete_account">I-delete ang Account</string>
+    <string name="confirm_delete_account">Sigurado ka ba nga gusto nimo i-delete ang imong account?</string>
+    <string name="delete">I-delete</string>
+    <string name="preferences_saved">Na-save na ang mga kagustuhan</string>
+    <string name="user_removed">Gikuha na ang user</string>
+    <string name="failed_to_remove_user">Bigo sa pagkuha sa user</string>
+    <string name="role_limits">Mga Limitasyon sa Papel</string>
+    <string name="limits_updated">Na-update na ang mga Limitasyon!</string>
+    <string name="pending_access_requests">Mga Naghulat nga Hangyo sa Access</string>
+    <string name="no_pending_requests">Walay naghulat nga mga hangyo.</string>
+    <string name="request_approved">Giaprobahan ang Hangyo</string>
+    <string name="database_management">Pagdumala sa Database</string>
+    <string name="wipe_everything">I-delete Tanan</string>
+    <string name="confirm_wipe">WARNING: Kini mag-delete sa tanang user, tanang data sa farm, ug i-reset ang system. Mopadayon?</string>
+    <string name="wipe">I-DELETE TANAN</string>
+
+    <!-- Schedule Dialogs & Messages -->
+    <string name="failed_to_load_tasks">Bigo sa pag-load sa mga buluhaton: %1$s</string>
+    <string name="error_updating_status">Error sa pag-update sa status: %1$s</string>
+    <string name="error_deleting">Error sa pag-delete: %1$s</string>
+    <string name="all_recurring_deleted">Na-delete na ang tanang nagbalik-balik nga buluhaton</string>
+    <string name="selected_schedules_deleted">Na-delete na ang mga gipili nga iskedyul</string>
+    <string name="error_deleting_tasks">Error sa pag-delete sa mga buluhaton: %1$s</string>
+    <string name="repeat_every_days_suggestion">I-repeat matag %1$d ka adlaw?</string>
+    <string name="total_dates_selected">Tibuok: %1$d ka petsa ang napili</string>
+    <string name="select_year_range">Pilia ang Saklaw sa Tuig</string>
+    <string name="start_year_after_end">Ang tuig sa pagsugod dili mahimong lapas sa tuig sa pagtapos</string>
+    <string name="invalid_year">Sayop nga tuig</string>
+    <string name="add_new_task">Pagdugang og Bag-ong Buluhaton</string>
+    <string name="please_select_date">Palihug pagpili og labing menos usa ka petsa</string>
+    <string name="confirm_and_save">Kumpirma ug I-save</string>
+    <string name="scheduling_tasks">Nag-iskedyul sa mga buluhaton&#8230; palihug hulata</string>
+    <string name="tasks_scheduled">%1$d ka mga buluhaton ang na-iskedyul!</string>
+    <string name="delete_task_title">I-delete ang Buluhaton</string>
+    <string name="delete_task_msg">Sigurado ka ba nga gusto nimo i-delete kini nga buluhaton?</string>
+    <string name="delete_recurring_title">I-delete ang Nagbalik-balik nga Buluhaton</string>
+    <string name="delete_this_only">I-delete kini nga buluhaton lamang</string>
+    <string name="delete_all_series">I-delete ang tanan niini nga serye</string>
+    <string name="select_schedules_delete">Pilia ang mga Iskedyul nga I-delete</string>
+    <string name="no_tasks_assigned">Walay nakatalaga nga mga buluhaton</string>
+    <string name="all_assigned_tasks">Tanan nga Nakatalaga nga Buluhaton</string>
+    <string name="update_status">I-update ang Status</string>
+    <string name="today_format">"\'Karon, \'MMMM d"</string>
+    <string name="task_reminder_title">Pahinumdom sa Buluhaton: %1$s</string>
+    <string name="task_reminder_msg">Oras na para sa %1$s</string>
+    <string name="server_time">Server Time</string>
+    <string name="_2024_05_20_08_30_pm">2024/05/20 08:30 PM</string>
+
+    <string name="recur_once">Minsan</string>
+    <string name="recur_custom">Custom</string>
+    <string name="recur_weekdays">Mga Adlaw sa Semana</string>
+    <string name="recur_weekends">Sabado ug Domingo</string>
+    <string name="recur_monthly">Kada Buwan</string>
+    <string name="recur_yearly_weekdays">Mga Adlaw sa Semana sa Tibuok Tuig</string>
+    <string name="recur_yearly_weekends">Sabado ug Domingo sa Tibuok Tuig</string>
+    <string name="recur_yearly">Kada Tuig</string>
+    <string name="recur_every_days">Matag %1$d ka adlaw</string>
+
+    <string name="status_pending">Pending</string>
+    <string name="status_ongoing">Nagpadayon</string>
+    <string name="status_done">Human Na</string>
+
+    <string-array name="task_categories">
+        <item>Pagpakaon</item>
+        <item>Pagpainom</item>
+        <item>Paglimpyo</item>
+        <item>Pagkolekta og Itlog</item>
+        <item>Pagpasiga</item>
+        <item>Susi sa Panglawas</item>
+    </string-array>
+
+    <string name="task_title_empty">Dili mahimo nga walay titulo</string>
+    <string name="no_tasks_to_delete">Walay buluhaton nga i-delete</string>
+    <string name="days_unit">Adlaw</string>
+    <string name="task_id_label">ID</string>
+    <string name="task_category_label">Kategorya: %1$s</string>
+    <string name="task_time_label">Oras: %1$s</string>
+    <string name="close">Isira</string>
+    <string name="clear_selection">Limpyohi ang Gipili</string>
+    <string name="full_year">Tibuok Tuig</string>
+    <string name="full_month">Tibuok Buwan</string>
+    <string name="weekends">Sabado ug Domingo</string>
+    <string name="weekdays">Mga Adlaw sa Semana</string>
+    <string name="confirm">Kumpirma</string>
+
+    <string-array name="month_names">
+        <item>Enero</item>
+        <item>Pebrero</item>
+        <item>Marso</item>
+        <item>Abril</item>
+        <item>Mayo</item>
+        <item>Hunyo</item>
+        <item>Hulyo</item>
+        <item>Agosto</item>
+        <item>Septiyembre</item>
+        <item>Oktubre</item>
+        <item>Nobiyembre</item>
+        <item>Disyembre</item>
+    </string-array>
+
+    <!-- Additional Profile Strings -->
+    <string name="data_collection_policy_title">Polisiya sa Pagkolekta og Data</string>
+    <string name="data_usage_purpose_title">Katuyoan sa Paggamit og Data</string>
+    <string name="data_retention_title">Pagtipig og Data</string>
+    <string name="privacy_policy_title">Polisiya sa Privacy</string>
+    <string name="data_ownership_title">Pagtag-iya sa Data</string>
+    <string name="data_sharing_title">Pagpaambit sa Data</string>
+    <string name="access_control_title">Kontrol sa Access</string>
+    <string name="security_implementation_title">Pagpatuman sa Seguridad</string>
+    <string name="encryption_title">Encryption</string>
+    <string name="authentication_title">Pag-verify</string>
+    <string name="access_security_title">Seguridad sa Access</string>
+    <string name="monitoring_compliance_title">Pag-monitor ug Pagsunod</string>
+    <string name="db_monitor_title">Real-Time na Monitor sa Database</string>
+    <string name="db_connection_checking">Koneksyon: Gisusi&#8230;</string>
+    <string name="db_connection_online">Koneksyon: Online</string>
+    <string name="db_connection_offline">Koneksyon: Offline</string>
+    <string name="db_users_loading">Giaprobahan nga mga User: Gi-load&#8230;</string>
+    <string name="db_pending_loading">Naghulat nga mga Hangyo: Gi-load&#8230;</string>
+    <string name="db_users_count">Giaprobahan nga mga User: %1$d</string>
+    <string name="db_pending_count">Naghulat nga mga Hangyo: %1$d</string>
+    <string name="db_last_update">Katapusan nga Update: %1$s</string>
+    <string name="db_importing">Nag-import og data gikan sa backup&#8230;</string>
+    <string name="db_exporting">Nag-export og mga record sa farm ngadto sa CSV&#8230;</string>
+    <string name="db_delete_confirm">Sigurado ka ba? Kini mag-delete sa mga record sa farm lamang apan magpabilin ang mga user account.</string>
+    <string name="db_deleted">Database Na-delete Na</string>
+    <string name="birthday_updated">Ang kaadlawon na-update sa %1$s</string>
+    <string name="birthday_update_failed">Napakyas ang pag-update sa kaadlawon</string>
+    <string name="edit_address_title">Usba ang imong Address</string>
+    <string name="street_address_hint">Address sa Dalan</string>
+    <string name="city_hint">Dakbayan</string>
+    <string name="state_province_hint">Estado/Probinsya</string>
+    <string name="postal_code_hint">Postal Code</string>
+    <string name="fill_all_address">Palihug pun-a ang tanang field sa address</string>
+    <string name="location_updated">Malamposong na-update ang lokasyon</string>
+    <string name="location_update_failed">Napakyas ang pag-update sa lokasyon</string>
+    <string name="max_backup_owners_hint">Max Backup Owners</string>
+    <string name="max_staff_hint">Max Staff</string>
+    <string name="verification_code_msg">Verification Code para kang %1$s: %2$s</string>
+    <string name="send_approval_email">Ipadala ang Approval ug Code pinaagi sa Gmail</string>
+
+    <!-- Analytics Strings -->
+    <string name="performance_excellent">Maayo Kaayo nga Performance!</string>
+    <string name="performance_stable">Stable nga Produksyon</string>
+    <string name="performance_alert">Alerto sa Produksyon</string>
 </resources>

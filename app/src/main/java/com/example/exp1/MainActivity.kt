@@ -21,11 +21,13 @@ import android.widget.Toast
 import android.text.TextWatcher
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import com.google.android.material.textfield.TextInputEditText
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.android.gms.auth.api.signin.*
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInClient
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 
 class MainActivity : AppCompatActivity() {
@@ -49,12 +51,16 @@ class MainActivity : AppCompatActivity() {
     private lateinit var noInternetSection: View
     private lateinit var btnOffline: Button
 
+    // ✅ Token refresh runnable
+    private lateinit var tokenRefreshRunnable: Runnable
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         accountManager = AccountManager(this)
         cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val currentEmail = accountManager.getCurrentUsername() 
+        auth = FirebaseAuth.getInstance()
+        val currentEmail = accountManager.getCurrentUsername()
 
         setContentView(R.layout.activity_login)
 
@@ -84,7 +90,7 @@ class MainActivity : AppCompatActivity() {
         loginUIContainer.visibility = View.GONE
         loadingLayout.visibility = View.VISIBLE
         noInternetSection.visibility = View.GONE
-        
+
         val jump = AnimationUtils.loadAnimation(this, R.anim.quail_jump)
         loadingIcon.startAnimation(jump)
 
@@ -101,16 +107,14 @@ class MainActivity : AppCompatActivity() {
 
         btnOffline.setOnClickListener {
             if (currentEmail != null) {
-                // Enter app in offline mode using cached role
                 val role = accountManager.getRole(currentEmail)
                 enterApp("User", currentEmail, role, false)
             }
         }
 
-        // Start Live Sensor
         registerNetworkSensor(currentEmail)
 
-        auth = FirebaseAuth.getInstance()
+        // Setup Google Sign-In
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(getString(R.string.default_web_client_id))
             .requestEmail()
@@ -135,6 +139,29 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.btnRegister).setOnClickListener {
             startActivity(Intent(this, RegisterActivity::class.java))
         }
+
+        // ✅ Start periodic token refresh
+        setupPeriodicTokenRefresh()
+    }
+
+    private fun setupPeriodicTokenRefresh() {
+        tokenRefreshRunnable = object : Runnable {
+            override fun run() {
+                auth.currentUser?.getIdToken(true)
+                    ?.addOnSuccessListener { result ->
+                        val token = result.token
+                        // Optional: debug print
+                        Log.d("TOKEN_REFRESH", "Token refreshed: ${token?.take(20)}...")
+                    }
+                    ?.addOnFailureListener { e ->
+                        Toast.makeText(this@MainActivity,
+                            "Token refresh failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                // Schedule next refresh in 30 minutes
+                handler.postDelayed(this, 30 * 60 * 1000)
+            }
+        }
+        handler.post(tokenRefreshRunnable)
     }
 
     private fun registerNetworkSensor(email: String?) {
@@ -163,7 +190,6 @@ class MainActivity : AppCompatActivity() {
         }
         cm.registerNetworkCallback(request, networkCallback!!)
 
-        // Initial Check
         if (!isInternetActuallyWorking()) {
             showNoInternetUI(email != null)
         } else {
@@ -175,11 +201,11 @@ class MainActivity : AppCompatActivity() {
         val network = cm.activeNetwork ?: return false
         val caps = cm.getNetworkCapabilities(network) ?: return false
         return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-               caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 
     private fun showNoInternetUI(canGoOffline: Boolean) {
-        handler.removeCallbacksAndMessages(null) 
+        handler.removeCallbacksAndMessages(null)
         loadingIcon.clearAnimation()
         statusText.text = "Connection Required"
         progressBar.visibility = View.GONE
@@ -196,12 +222,12 @@ class MainActivity : AppCompatActivity() {
                 if (progress <= 100) {
                     progressBar.progress = progress
                     percentageText.text = "${progress}%"
-                    
+
                     if (progress == 40 && email != null) {
                         statusText.text = "Syncing with Cloud..."
                         startLivePendingCheck(email)
                     }
-                    
+
                     progress += 4
                     progressHandler.postDelayed(this, 30)
                 } else {
@@ -221,11 +247,8 @@ class MainActivity : AppCompatActivity() {
         firestoreListener = FirebaseFirestore.getInstance().collection("user_access")
             .document(email)
             .addSnapshotListener { snapshot, e ->
-                if (e != null) {
-                    // On error (like timeout), if we have a session, maybe allow entry
-                    return@addSnapshotListener
-                }
-                
+                if (e != null) return@addSnapshotListener
+
                 if (snapshot != null && snapshot.exists()) {
                     val status = snapshot.getString("status") ?: ""
                     val role = snapshot.getString("role") ?: "staff"
@@ -235,7 +258,7 @@ class MainActivity : AppCompatActivity() {
                         val setupDone = snapshot.getBoolean("setupCompleted") ?: false
                         if (setupDone) {
                             statusText.text = "Welcome, $name!"
-                            handler.postDelayed({ enterApp(name, email, role, false) }, 600)
+                            handler.postDelayed({ enterAppWithAuth(name, email, role) }, 600)
                         } else {
                             loadingLayout.visibility = View.GONE
                             loadingIcon.clearAnimation()
@@ -259,12 +282,8 @@ class MainActivity : AppCompatActivity() {
             return
         }
         val email = findViewById<EditText>(R.id.editLoginEmail).text.toString().trim().lowercase()
-        if (email.isEmpty()) {
-            Toast.makeText(this, "Please enter an email address", Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-            Toast.makeText(this, "Please enter a valid email address", Toast.LENGTH_SHORT).show()
+        if (email.isEmpty() || !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            Toast.makeText(this, "Enter valid email", Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -289,7 +308,6 @@ class MainActivity : AppCompatActivity() {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_password_entry, null)
         val tvEmail = dialogView.findViewById<TextView>(R.id.tvPasswordEmail)
         val editPassword = dialogView.findViewById<EditText>(R.id.editLoginPassword)
-        
         tvEmail.text = email
 
         AlertDialog.Builder(this)
@@ -301,7 +319,15 @@ class MainActivity : AppCompatActivity() {
                 if (entered == correctPass) {
                     statusText.text = "Identity Verified!"
                     loadingLayout.visibility = View.VISIBLE
-                    handler.postDelayed({ enterApp(name, email, role, true) }, 800)
+                    auth.signInWithEmailAndPassword(email, correctPass)
+                        .addOnSuccessListener {
+                            auth.currentUser?.getIdToken(true)?.addOnCompleteListener {
+                                enterApp(name, email, role, true)
+                            }
+                        }
+                        .addOnFailureListener { e ->
+                            Toast.makeText(this, "Firebase Auth failed: ${e.message}", Toast.LENGTH_LONG).show()
+                        }
                 } else {
                     Toast.makeText(this, "Incorrect Password", Toast.LENGTH_SHORT).show()
                 }
@@ -313,7 +339,7 @@ class MainActivity : AppCompatActivity() {
     private fun showNotRegisteredDialog() {
         AlertDialog.Builder(this)
             .setTitle("Account Not Found")
-            .setMessage("This email is not registered. Would you like to request access?")
+            .setMessage("This email is not registered. Request access?")
             .setPositiveButton("Request Access") { _, _ ->
                 startActivity(Intent(this, RegisterActivity::class.java))
             }
@@ -343,6 +369,17 @@ class MainActivity : AppCompatActivity() {
         finish()
     }
 
+    private fun enterAppWithAuth(name: String, email: String, role: String) {
+        val user = auth.currentUser
+        if (user != null && user.isEmailVerified) {
+            user.getIdToken(true).addOnCompleteListener {
+                enterApp(name, email, role, true)
+            }
+        } else {
+            stopCheckingAndClear()
+        }
+    }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == RC_SIGN_IN) {
@@ -350,32 +387,30 @@ class MainActivity : AppCompatActivity() {
             try {
                 val account = task.getResult(ApiException::class.java) ?: return
                 val email = account.email?.lowercase() ?: ""
-                
                 statusText.text = "Authenticating..."
                 loadingLayout.visibility = View.VISIBLE
 
-                FirebaseFirestore.getInstance().collection("user_access").document(email).get()
-                    .addOnSuccessListener { doc ->
-                        if (doc.exists()) {
-                            val status = doc.getString("status") ?: "approved"
-                            if (status == "pending") {
-                                loadingLayout.visibility = View.GONE
-                                // Resume pending verification
-                                val intent = Intent(this, RegisterActivity::class.java)
-                                intent.putExtra("pendingEmail", email)
-                                startActivity(intent)
-                                googleSignInClient.signOut()
-                            } else {
-                                val savedPassword = doc.getString("password") ?: ""
-                                loadingLayout.visibility = View.GONE
-                                showPasswordDialog(email, savedPassword, doc.getString("name") ?: "User", doc.getString("role") ?: "staff")
-                            }
-                        } else {
-                            loadingLayout.visibility = View.GONE
-                            showNotRegisteredDialog()
-                            googleSignInClient.signOut()
+                val credential = GoogleAuthProvider.getCredential(account.idToken, null)
+                auth.signInWithCredential(credential).addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        auth.currentUser?.getIdToken(true)?.addOnCompleteListener {
+                            FirebaseFirestore.getInstance().collection("user_access")
+                                .document(email).get()
+                                .addOnSuccessListener { doc ->
+                                    if (doc.exists()) {
+                                        val name = doc.getString("name") ?: email
+                                        val role = doc.getString("role") ?: "staff"
+                                        enterApp(name, email, role, true)
+                                    } else {
+                                        showNotRegisteredDialog()
+                                        googleSignInClient.signOut()
+                                    }
+                                }
                         }
+                    } else {
+                        Toast.makeText(this, "Google sign-in failed", Toast.LENGTH_SHORT).show()
                     }
+                }
             } catch (e: Exception) {
                 Log.e("LOGIN_ERROR", e.message ?: "Error")
             }
@@ -387,6 +422,9 @@ class MainActivity : AppCompatActivity() {
             try { cm.unregisterNetworkCallback(networkCallback!!) } catch (e: Exception) {}
         }
         firestoreListener?.remove()
+        if (::tokenRefreshRunnable.isInitialized) {
+            handler.removeCallbacks(tokenRefreshRunnable)
+        }
         super.onDestroy()
     }
 }

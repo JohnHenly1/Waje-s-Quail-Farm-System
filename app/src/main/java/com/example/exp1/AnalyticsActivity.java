@@ -46,6 +46,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Random;
 import java.util.TreeMap;
 
 import kotlin.Unit;
@@ -414,12 +415,12 @@ public class AnalyticsActivity extends AppCompatActivity {
             int   latest  = values.get(values.size() - 1);
             double average = totalEggs / (double) allData.size();
             calculatePerformance(latest, average);
-            generateSmartTip(latest, values.size() > 1 ? values.get(values.size() - 2) : latest);
+            generateSmartTip(latest, values.size() > 1 ? values.get(values.size() - 2) : latest, profit);
         }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  Performance & smart tip logic (unchanged)
+    //  Performance & smart tip logic
     // ─────────────────────────────────────────────────────────────────────────
 
     private void calculatePerformance(int latest, double average) {
@@ -440,11 +441,29 @@ public class AnalyticsActivity extends AppCompatActivity {
         }
     }
 
-    private void generateSmartTip(int latest, int prev) {
+    private void generateSmartTip(int latest, int prev, double profit) {
         String tip;
-        if      (latest < prev * 0.9) tip = "Critical Tip: Production dropped by 10%. Check for sudden temperature changes or stressors in the cages.";
-        else if (latest > prev * 1.1) tip = "Great Job! Yield is up. Ensure consistent feed supply to maintain this peak production rate.";
-        else                          tip = "Maintenance Tip: Production is stable. Remember to maintain 14-16 hours of daily light exposure for quails.";
+        if (latest < prev * 0.8) {
+            tip = "Urgent: Production dropped significantly (>20%). Check for diseases or extreme environmental stress immediately.";
+        } else if (latest < prev * 0.9) {
+            tip = "Critical Tip: Production dropped by 10%. Check for sudden temperature changes or stressors in the cages.";
+        } else if (latest > prev * 1.2) {
+            tip = "Outstanding! Yield is up by 20%. Analyze if recent changes in feed or lighting contributed to this boost.";
+        } else if (latest > prev * 1.1) {
+            tip = "Great Job! Yield is up. Ensure consistent feed supply to maintain this peak production rate.";
+        } else if (profit < 0) {
+            tip = "Financial Alert: Costs are currently exceeding revenue. Review feed efficiency and waste management.";
+        } else if (latest > 0 && latest < 10) {
+            tip = "Startup Tip: Low volume detected. Ensure your quails have reached laying age (usually 6-7 weeks).";
+        } else {
+            String[] stableTips = {
+                    "Maintenance Tip: Production is stable. Remember to maintain 14-16 hours of daily light exposure for quails.",
+                    "Efficiency Tip: Stable output. This is a good time to audit your bio-security measures.",
+                    "Quality Tip: Ensure you are collecting eggs twice daily to prevent breakage during stable production.",
+                    "Nutrition Tip: Maintain high-protein layer crumbles to sustain this steady production rate."
+            };
+            tip = stableTips[new Random().nextInt(stableTips.length)];
+        }
         if (recommendationText != null) recommendationText.setText(tip);
     }
 }

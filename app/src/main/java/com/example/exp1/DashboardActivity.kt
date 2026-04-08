@@ -23,6 +23,7 @@ import androidx.core.view.GravityCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.drawerlayout.widget.DrawerLayout
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
@@ -34,6 +35,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlin.random.Random
 
 class DashboardActivity : AppCompatActivity() {
 
@@ -50,20 +52,21 @@ class DashboardActivity : AppCompatActivity() {
 
     private var eggListener: ValueEventListener? = null
     private var feedListener: ListenerRegistration? = null
+    private var roleListener: ListenerRegistration? = null
     private lateinit var eggsTodayText: TextView
     private lateinit var feedRemainingText: TextView
 
     private val takePictureLauncher =
         registerForActivityResult(ActivityResultContracts.TakePicture()) { success ->
             if (success && photoUri != null) {
-                Toast.makeText(this, "Photo saved!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.photo_saved), Toast.LENGTH_SHORT).show()
             }
         }
 
     private val requestCameraPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) openCamera()
-            else Toast.makeText(this, "Camera permission is required", Toast.LENGTH_SHORT).show()
+            else Toast.makeText(this, getString(R.string.camera_permission_required), Toast.LENGTH_SHORT).show()
         }
 
 
@@ -76,6 +79,11 @@ class DashboardActivity : AppCompatActivity() {
         username = intent.getStringExtra("username") ?: accountManager.getCurrentUsername() ?: "User"
         userRole = accountManager.getRole(username)
 
+        // ----------------------------
+        // NEW: Force refresh token & sync role
+        // ----------------------------
+        refreshTokenAndSyncRole()
+
         drawerLayout = findViewById(R.id.drawerLayout)
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
@@ -86,14 +94,38 @@ class DashboardActivity : AppCompatActivity() {
 
         setupNavigation()
         setupServerTime()
-        
+
         // Show personalized loading on entry
-        showLoading("Syncing Farm Stats...") {
+        showLoading(getString(R.string.syncing_farm_stats)) {
             fetchUserData()
             setupButtons()
             setupStats()
             applyEntranceAnimations()
             checkAdminAccess()
+        }
+    }
+
+    // ----------------------------
+    // NEW FUNCTION: Refresh Firebase token + sync role
+    // ----------------------------
+    private fun refreshTokenAndSyncRole() {
+        FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+            val token = result.token
+            // Optional: log token for debugging
+            // println("Refreshed token: $token")
+
+            // Fetch user role from Firestore and update local cache
+            val currentEmail = accountManager.getCurrentUsername()?.lowercase() ?: return@addOnSuccessListener
+            FirebaseFirestore.getInstance().collection("user_access").document(currentEmail)
+                .get().addOnSuccessListener { doc ->
+                    if (doc.exists()) {
+                        userRole = doc.getString("role") ?: "staff"
+                        accountManager.updateCachedRole(currentEmail, userRole)
+                        checkAdminAccess()
+                    }
+                }
+        }?.addOnFailureListener { e ->
+            Toast.makeText(this, getString(R.string.token_refresh_failed, e.message), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -122,6 +154,7 @@ class DashboardActivity : AppCompatActivity() {
         super.onDestroy()
         eggListener?.let { FirebaseDatabase.getInstance().getReference("egg_collections").removeEventListener(it) }
         feedListener?.remove()
+        roleListener?.remove()
         if (::updateTimeRunnable.isInitialized) {
             handler.removeCallbacks(updateTimeRunnable)
         }
@@ -146,7 +179,7 @@ class DashboardActivity : AppCompatActivity() {
             if (fallbackIntent.resolveActivity(packageManager) != null) {
                 startActivity(fallbackIntent)
             } else {
-                Toast.makeText(this, "No camera app found", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.no_camera_app), Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -159,7 +192,6 @@ class DashboardActivity : AppCompatActivity() {
         findViewById<View>(R.id.shortcutsGrid)?.startAnimation(slideUp)
         findViewById<View>(R.id.statsGrid)?.startAnimation(slideUp)
     }
-
     fun showLoading(label: String, action: () -> Unit) {
         val loadingLayout = findViewById<View>(R.id.loadingLayout)
         val loadingIcon   = findViewById<View>(R.id.loadingIcon)
@@ -221,7 +253,7 @@ class DashboardActivity : AppCompatActivity() {
     }
 
     private fun updateWelcomeMessage() {
-        findViewById<TextView?>(R.id.welcome_text)?.text = "Hi, $displayName!"
+        findViewById<TextView?>(R.id.welcome_text)?.text = getString(R.string.welcome_message_dynamic, displayName)
     }
 
     private fun setupButtons() {
@@ -230,40 +262,59 @@ class DashboardActivity : AppCompatActivity() {
         }
 
         findViewById<LinearLayout?>(R.id.analyticsButton)?.setOnClickListener {
-            showLoading("Generating Reports...") {
+            showLoading(getString(R.string.generating_reports)) {
                 startActivity(Intent(this, AnalyticsActivity::class.java).putExtra("username", username))
             }
         }
 
         findViewById<android.widget.ImageButton?>(R.id.scheduleButton1)?.setOnClickListener {
-            showLoading("Fetching Tasks...") {
+            showLoading(getString(R.string.fetching_tasks)) {
                 startActivity(Intent(this, ScheduleActivity::class.java).putExtra("username", username))
             }
         }
 
         findViewById<android.view.View?>(R.id.feedInventoryButton)?.setOnClickListener {
-            showLoading("Checking Inventory...") {
+            showLoading(getString(R.string.checking_inventory)) {
                 startActivity(Intent(this, FeedInventoryActivity::class.java).putExtra("username", username))
             }
         }
 
         findViewById<android.view.View?>(R.id.eggCountButton)?.setOnClickListener {
-            showLoading("Loading Egg Records...") {
+            showLoading(getString(R.string.loading_egg_records)) {
                 startActivity(Intent(this, EggCountActivity::class.java).putExtra("username", username))
             }
         }
 
         findViewById<android.view.View?>(R.id.water_level)?.setOnClickListener {
-            showLoading("Reading Sensors...") {
+            showLoading(getString(R.string.reading_sensors)) {
                 startActivity(Intent(this, WaterSensorActivity::class.java).putExtra("username", username))
             }
         }
 
         findViewById<android.view.View?>(R.id.tasksButton)?.setOnClickListener {
-            showLoading("Fetching Tasks...") {
+            showLoading(getString(R.string.fetching_tasks)) {
                 startActivity(Intent(this, ScheduleActivity::class.java).putExtra("username", username))
             }
         }
+
+        // Setup AI Smart Tip Shuffle
+        val aiCard = findViewById<View>(R.id.aiCard)
+        val recommendationText = findViewById<TextView>(R.id.recommendation_text)
+        val tips = resources.getStringArray(R.array.smart_tips)
+
+        fun showRandomTip() {
+            if (tips.isNotEmpty()) {
+                recommendationText?.text = tips[Random.nextInt(tips.size)]
+            }
+        }
+
+        aiCard?.setOnClickListener {
+            showRandomTip()
+            aiCard.startAnimation(AnimationUtils.loadAnimation(this, R.anim.fade_in))
+        }
+
+        // Initial tip
+        showRandomTip()
     }
 
     private fun setupStats() {

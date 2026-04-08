@@ -10,11 +10,45 @@
     <string name="menu">Menu</string>
     <string name="notifications">Notifications</string>
     <string name="welcome_message">Hi, User!</string>
+    <string name="welcome_message_dynamic">Hi, %1$s!</string>
     <string name="welcome_back">Welcome Back!</string>
+    <string name="generating_reports">Generating Reports&#8230;</string>
+    <string name="fetching_tasks">Fetching Tasks&#8230;</string>
+    <string name="checking_inventory">Checking Inventory&#8230;</string>
+    <string name="loading_egg_records">Loading Egg Records&#8230;</string>
+    <string name="reading_sensors">Reading Sensors&#8230;</string>
+    <string name="syncing_farm_stats">Syncing Farm Stats&#8230;</string>
+    <string name="photo_saved">Photo saved!</string>
+    <string name="camera_permission_required">Camera permission is required</string>
+    <string name="no_camera_app">No camera app found</string>
+    <string name="token_refresh_failed">Token refresh failed: %1$s</string>
 
     <!-- AI Recommendation -->
-    <string name="ai_recommendation">AI Recommendation</string>
-    <string name="recommendation_text">Recommendation of things to do like watering quail or feeding quail</string>
+    <string name="ai_recommendation">Smart Tip Recommendation</string>
+    <string name="recommendation_text">Click the card for a new tip!</string>
+
+    <string-array name="smart_tips">
+        <item>Morning Feeding: Quails are most active in the morning. Ensure feed troughs are topped up by 7 AM.</item>
+        <item>Water Check: Check water levels every 4 hours. Dehydration reduces egg production significantly.</item>
+        <item>Lighting Tip: 14&#8211;16 hours of light per day is optimal for consistent egg laying.</item>
+        <item>Airflow: Good ventilation is key to preventing ammonia buildup from droppings.</item>
+        <item>Egg Collection: Collect eggs at least twice daily to prevent breakage or pecking behavior.</item>
+        <item>Stress Management: Keep noise low around the cages. Sudden loud noises can stop quails from laying for days.</item>
+        <item>Calcium Boost: Adding crushed oyster shells to feed helps strengthen eggshells.</item>
+        <item>Molting: If quails stop laying and lose feathers, they may be molting. Provide extra protein during this time.</item>
+        <item>Cage Cleaning: Clean waste trays daily to prevent ammonia odors.</item>
+        <item>Bio-security: Wash your hands regularly before and after touching the quails or their eggs.</item>
+        <item>Fresh Feed: Store feed in a cool, dry place to prevent mold growth.</item>
+        <item>Temperature Control: Keep the quail house between 21°C and 32°C for optimal comfort and production.</item>
+        <item>Humidity: Maintain relative humidity at 50-70% to keep quails healthy and eggs from drying out.</item>
+        <item>Deworming: Consult a vet for a regular deworming schedule to ensure bird health.</item>
+        <item>Predator Protection: Ensure cages are secure against rats, cats, and snakes.</item>
+        <item>Record Keeping: Always track your daily egg counts to identify production trends early.</item>
+        <item>Space: Ensure birds have enough space. Overcrowding leads to stress and cannibalism.</item>
+        <item>Feed Quality: High-protein layer crumbles (around 20-22%) are best for laying quails.</item>
+        <item>Dust Bathing: Provide a box of dry sand; quails love dust baths to stay clean and mite-free.</item>
+        <item>Culling: Regularly identify and remove non-performing or sick birds to protect the flock.</item>
+    </string-array>
 
     <!-- Shortcuts -->
     <string name="feed_inventory">Feed Inventory</string>
@@ -103,4 +137,175 @@
     <string name="initial_farm_setup">Initial Farm Setup (Owner)</string>
     <string name="role_available">Available: %1$d/%2$d</string>
     <string name="role_full">Role Full</string>
+
+    <!-- Profile Dialog Strings -->
+    <string name="syncing_profile">Syncing Profile&#8230;</string>
+    <string name="detected_eggs">Detected %1$d eggs!</string>
+    <string name="error_loading_farm_data">Error loading farm data</string>
+    <string name="edit_name">Edit Name</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="name_empty">Name cannot be empty</string>
+    <string name="name_updated">Name updated!</string>
+    <string name="failed_to_update">Failed to update</string>
+    <string name="farm_recalibration">Farm Recalibration</string>
+    <string name="restart_days">Restart Days</string>
+    <string name="fill_birds_cages">Please fill in birds and cages</string>
+    <string name="fill_all_location">Please fill all farm location fields or leave them all empty</string>
+    <string name="farm_stats_updated">Farm stats and location updated!</string>
+    <string name="save_failed">Save failed: %1$s</string>
+    <string name="restart_days_title">Restart Days Running?</string>
+    <string name="restart_days_message">Reset counter back to Day 1?</string>
+    <string name="restart">Restart</string>
+    <string name="days_restarted">Days restarted!</string>
+    <string name="restart_failed">Restart failed</string>
+    <string name="change_password">Change Password</string>
+    <string name="update">Update</string>
+    <string name="password_updated">Password updated successfully</string>
+    <string name="incorrect_password">Incorrect current password</string>
+    <string name="delete_account">Delete Account</string>
+    <string name="confirm_delete_account">Are you sure you want to delete your account?</string>
+    <string name="delete">Delete</string>
+    <string name="preferences_saved">Preferences saved</string>
+    <string name="user_removed">User removed</string>
+    <string name="failed_to_remove_user">Failed to remove user</string>
+    <string name="role_limits">Role Limits</string>
+    <string name="limits_updated">Limits Updated!</string>
+    <string name="pending_access_requests">Pending Access Requests</string>
+    <string name="no_pending_requests">No pending requests.</string>
+    <string name="request_approved">Request Approved</string>
+    <string name="database_management">Database Management</string>
+    <string name="wipe_everything">Wipe Everything</string>
+    <string name="confirm_wipe">WARNING: This will delete all users, all farm data, and reset the system. Proceed?</string>
+    <string name="wipe">WIPE</string>
+
+    <!-- Schedule Dialogs & Messages -->
+    <string name="failed_to_load_tasks">Failed to load tasks: %1$s</string>
+    <string name="error_updating_status">Error updating status: %1$s</string>
+    <string name="error_deleting">Error deleting: %1$s</string>
+    <string name="all_recurring_deleted">All recurring tasks deleted</string>
+    <string name="selected_schedules_deleted">Selected schedules deleted</string>
+    <string name="error_deleting_tasks">Error deleting tasks: %1$s</string>
+    <string name="repeat_every_days_suggestion">Repeat every %1$d days?</string>
+    <string name="total_dates_selected">Total: %1$d dates selected</string>
+    <string name="select_year_range">Select Year Range</string>
+    <string name="start_year_after_end">Start year cannot be after end year</string>
+    <string name="invalid_year">Invalid year</string>
+    <string name="add_new_task">Add New Task</string>
+    <string name="please_select_date">Please select at least one date</string>
+    <string name="confirm_and_save">Confirm &amp; Save</string>
+    <string name="scheduling_tasks">Scheduling tasks&#8230; please wait</string>
+    <string name="tasks_scheduled">%1$d tasks scheduled!</string>
+    <string name="delete_task_title">Delete Task</string>
+    <string name="delete_task_msg">Are you sure you want to delete this task?</string>
+    <string name="delete_recurring_title">Delete Recurring Task</string>
+    <string name="delete_this_only">Delete this task only</string>
+    <string name="delete_all_series">Delete all in this series</string>
+    <string name="select_schedules_delete">Select Schedules to Delete</string>
+    <string name="no_tasks_assigned">No tasks assigned</string>
+    <string name="all_assigned_tasks">All Assigned Tasks</string>
+    <string name="update_status">Update Status</string>
+    <string name="today_format">"\'Today, \'MMMM d"</string>
+    <string name="task_reminder_title">Task Reminder: %1$s</string>
+    <string name="task_reminder_msg">It\'s time for %1$s</string>
+    <string name="server_time">Server Time</string>
+    <string name="_2024_05_20_08_30_pm">2024/05/20 08:30 PM</string>
+
+    <string name="recur_once">Once</string>
+    <string name="recur_custom">Custom</string>
+    <string name="recur_weekdays">Weekdays</string>
+    <string name="recur_weekends">Weekends</string>
+    <string name="recur_monthly">Monthly</string>
+    <string name="recur_yearly_weekdays">Yearly Weekdays</string>
+    <string name="recur_yearly_weekends">Yearly Weekends</string>
+    <string name="recur_yearly">Yearly</string>
+    <string name="recur_every_days">Every %1$d days</string>
+
+    <string name="status_pending">Pending</string>
+    <string name="status_ongoing">Ongoing</string>
+    <string name="status_done">Done</string>
+
+    <string-array name="task_categories">
+        <item>Feeding</item>
+        <item>Watering</item>
+        <item>Cleaning</item>
+        <item>Egg Collection</item>
+        <item>Lighting</item>
+        <item>Health Check</item>
+    </string-array>
+
+    <string name="task_title_empty">Title cannot be empty</string>
+    <string name="no_tasks_to_delete">No tasks to delete</string>
+    <string name="days_unit">Days</string>
+    <string name="task_id_label">ID</string>
+    <string name="task_category_label">Category: %1$s</string>
+    <string name="task_time_label">Time: %1$s</string>
+    <string name="close">Close</string>
+    <string name="clear_selection">Clear Selection</string>
+    <string name="full_year">Full Year</string>
+    <string name="full_month">Full Month</string>
+    <string name="weekends">Weekends</string>
+    <string name="weekdays">Weekdays</string>
+    <string name="confirm">Confirm</string>
+
+    <string-array name="month_names">
+        <item>January</item>
+        <item>February</item>
+        <item>March</item>
+        <item>April</item>
+        <item>May</item>
+        <item>June</item>
+        <item>July</item>
+        <item>August</item>
+        <item>September</item>
+        <item>October</item>
+        <item>November</item>
+        <item>December</item>
+    </string-array>
+
+    <!-- Additional Profile Strings -->
+    <string name="data_collection_policy_title">Data Collection Policy</string>
+    <string name="data_usage_purpose_title">Data Usage Purpose</string>
+    <string name="data_retention_title">Data Retention</string>
+    <string name="privacy_policy_title">Privacy Policy</string>
+    <string name="data_ownership_title">Data Ownership</string>
+    <string name="data_sharing_title">Data Sharing</string>
+    <string name="access_control_title">Access Control</string>
+    <string name="security_implementation_title">Security Implementation</string>
+    <string name="encryption_title">Encryption</string>
+    <string name="authentication_title">Authentication</string>
+    <string name="access_security_title">Access Security</string>
+    <string name="monitoring_compliance_title">Monitoring &amp; Compliance</string>
+    <string name="db_monitor_title">Real-Time Database Monitor</string>
+    <string name="db_connection_checking">Connection: Checking&#8230;</string>
+    <string name="db_connection_online">Connection: Online</string>
+    <string name="db_connection_offline">Connection: Offline</string>
+    <string name="db_users_loading">Approved Users: Loading&#8230;</string>
+    <string name="db_pending_loading">Pending Requests: Loading&#8230;</string>
+    <string name="db_users_count">Approved Users: %1$d</string>
+    <string name="db_pending_count">Pending Requests: %1$d</string>
+    <string name="db_last_update">Last Update: %1$s</string>
+    <string name="db_importing">Importing data from backup&#8230;</string>
+    <string name="db_exporting">Exporting farm records to CSV&#8230;</string>
+    <string name="db_delete_confirm">Are you sure? This deletes only the farm records but keeps user accounts.</string>
+    <string name="db_deleted">Database Deleted</string>
+    <string name="birthday_updated">Birthday updated to %1$s</string>
+    <string name="birthday_update_failed">Failed to update birthday</string>
+    <string name="edit_address_title">Edit Your Address</string>
+    <string name="street_address_hint">Street Address</string>
+    <string name="city_hint">City</string>
+    <string name="state_province_hint">State/Province</string>
+    <string name="postal_code_hint">Postal Code</string>
+    <string name="fill_all_address">Please fill all address fields</string>
+    <string name="location_updated">Location updated successfully</string>
+    <string name="location_update_failed">Failed to update location</string>
+    <string name="max_backup_owners_hint">Max Backup Owners</string>
+    <string name="max_staff_hint">Max Staff</string>
+    <string name="verification_code_msg">Verification Code for %1$s: %2$s</string>
+    <string name="send_approval_email">Send Approval &amp; Code via Gmail</string>
+
+    <!-- Analytics Strings -->
+    <string name="performance_excellent">Excellent Performance!</string>
+    <string name="performance_stable">Stable Production</string>
+    <string name="performance_alert">Production Alert</string>
 </resources>

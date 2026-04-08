@@ -79,7 +79,7 @@ public class ProfileActivity extends AppCompatActivity {
                 }
             }
             int total = gradeA + gradeB + gradeC;
-            Toast.makeText(this, "Detected " + total + " eggs!", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.detected_eggs, total), Toast.LENGTH_SHORT).show();
         });
         setContentView(R.layout.activity_profile);
 
@@ -111,7 +111,7 @@ public class ProfileActivity extends AppCompatActivity {
 
         firestoreManager = new FirestoreManager(currentEmail);
 
-        showLoading("Syncing Profile...", () -> {
+        showLoading(getString(R.string.syncing_profile), () -> {
             fetchUserData();
             loadFirestoreData();
         });
@@ -273,7 +273,7 @@ public class ProfileActivity extends AppCompatActivity {
 
             @Override
             public void onError(Exception e) {
-                runOnUiThread(() -> Toast.makeText(ProfileActivity.this, "Error loading farm data", Toast.LENGTH_SHORT).show());
+                runOnUiThread(() -> Toast.makeText(ProfileActivity.this, getString(R.string.error_loading_farm_data), Toast.LENGTH_SHORT).show());
             }
         });
     }
@@ -281,17 +281,17 @@ public class ProfileActivity extends AppCompatActivity {
     //  Edit Name dialog (pen button)---------------------------------------------------------------
     private void showEditNameDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Edit Name");
+        builder.setTitle(getString(R.string.edit_name));
 
         final EditText input = new EditText(this);
         input.setText(userNameTv.getText().toString());
         input.setPadding(48, 24, 48, 24);
         builder.setView(input);
 
-        builder.setPositiveButton("Save", (dialog, which) -> {
+        builder.setPositiveButton(getString(R.string.save), (dialog, which) -> {
             String newName = input.getText().toString().trim();
             if (newName.isEmpty()) {
-                Toast.makeText(this, "Name cannot be empty", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, getString(R.string.name_empty), Toast.LENGTH_SHORT).show();
                 return;
             }
             firestoreManager.saveName(newName, new FirestoreManager.OnSaveListener() {
@@ -300,17 +300,17 @@ public class ProfileActivity extends AppCompatActivity {
                     runOnUiThread(() -> {
                         userNameTv.setText(newName);
                         profileInitialTv.setText(String.valueOf(newName.charAt(0)).toUpperCase());
-                        Toast.makeText(ProfileActivity.this, "Name updated!", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(ProfileActivity.this, getString(R.string.name_updated), Toast.LENGTH_SHORT).show();
                     });
                 }
 
                 @Override
                 public void onError(Exception e) {
-                    runOnUiThread(() -> Toast.makeText(ProfileActivity.this, "Failed to update", Toast.LENGTH_SHORT).show());
+                    runOnUiThread(() -> Toast.makeText(ProfileActivity.this, getString(R.string.failed_to_update), Toast.LENGTH_SHORT).show());
                 }
             });
         });
-        builder.setNegativeButton("Cancel", null);
+        builder.setNegativeButton(getString(R.string.cancel), null);
         builder.show();
     }
 
@@ -347,10 +347,10 @@ public class ProfileActivity extends AppCompatActivity {
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setView(dialogView)
-                .setTitle("Farm Recalibration")
-                .setPositiveButton("Save", null)
-                .setNeutralButton("Restart Days", null)
-                .setNegativeButton("Cancel", null)
+                .setTitle(getString(R.string.farm_recalibration))
+                .setPositiveButton(getString(R.string.save), null)
+                .setNeutralButton(getString(R.string.restart_days), null)
+                .setNegativeButton(getString(R.string.cancel), null)
                 .create();
 
         dialog.setOnShowListener(d -> {
@@ -363,14 +363,14 @@ public class ProfileActivity extends AppCompatActivity {
                 String farmLocPostal = editFarmLocationPostal.getText().toString().trim();
 
                 if (birdsStr.isEmpty() || cagesStr.isEmpty()) {
-                    Toast.makeText(ProfileActivity.this, "Please fill in birds and cages", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(ProfileActivity.this, getString(R.string.fill_birds_cages), Toast.LENGTH_SHORT).show();
                     return;
                 }
 
                 // Validate farm location if any field is provided
                 if (!farmLocStreet.isEmpty() || !farmLocCity.isEmpty() || !farmLocState.isEmpty() || !farmLocPostal.isEmpty()) {
                     if (farmLocStreet.isEmpty() || farmLocCity.isEmpty() || farmLocState.isEmpty() || farmLocPostal.isEmpty()) {
-                        Toast.makeText(ProfileActivity.this, "Please fill all farm location fields or leave them all empty", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(ProfileActivity.this, getString(R.string.fill_all_location), Toast.LENGTH_SHORT).show();
                         return;
                     }
                     String locError = validateAddress(farmLocStreet, farmLocCity, farmLocState, farmLocPostal);
@@ -405,36 +405,36 @@ public class ProfileActivity extends AppCompatActivity {
                         runOnUiThread(() -> {
                             totalBirdsValue.setText(String.valueOf(newBirds));
                             activeCagesValue.setText(String.valueOf(newCages));
-                            Toast.makeText(ProfileActivity.this, "Farm stats and location updated!", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(ProfileActivity.this, getString(R.string.farm_stats_updated), Toast.LENGTH_SHORT).show();
                             dialog.dismiss();
                         });
                     })
                     .addOnFailureListener(e -> {
-                        runOnUiThread(() -> Toast.makeText(ProfileActivity.this, "Save failed: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+                        runOnUiThread(() -> Toast.makeText(ProfileActivity.this, getString(R.string.save_failed, e.getMessage()), Toast.LENGTH_SHORT).show());
                     });
             });
 
             dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v -> {
                 new AlertDialog.Builder(ProfileActivity.this)
-                        .setTitle("Restart Days Running?")
-                        .setMessage("Reset counter back to Day 1?")
-                        .setPositiveButton("Restart", (d2, w) -> {
+                        .setTitle(getString(R.string.restart_days_title))
+                        .setMessage(getString(R.string.restart_days_message))
+                        .setPositiveButton(getString(R.string.restart), (d2, w) -> {
                             firestoreManager.restartDaysRunning(new FirestoreManager.OnSaveListener() {
                                 @Override
                                 public void onSuccess() {
                                     runOnUiThread(() -> {
                                         daysRunningValue.setText("1");
-                                        Toast.makeText(ProfileActivity.this, "Days restarted!", Toast.LENGTH_SHORT).show();
+                                        Toast.makeText(ProfileActivity.this, getString(R.string.days_restarted), Toast.LENGTH_SHORT).show();
                                         dialog.dismiss();
                                     });
                                 }
                                 @Override
                                 public void onError(Exception e) {
-                                    runOnUiThread(() -> Toast.makeText(ProfileActivity.this, "Restart failed", Toast.LENGTH_SHORT).show());
+                                    runOnUiThread(() -> Toast.makeText(ProfileActivity.this, getString(R.string.restart_failed), Toast.LENGTH_SHORT).show());
                                 }
                             });
                         })
-                        .setNegativeButton("Cancel", null)
+                        .setNegativeButton(getString(R.string.cancel), null)
                         .show();
             });
         });
@@ -488,32 +488,32 @@ public class ProfileActivity extends AppCompatActivity {
 
     private void showChangePasswordDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Change Password");
+        builder.setTitle(getString(R.string.change_password));
         View view = getLayoutInflater().inflate(R.layout.dialog_change_password, null);
         builder.setView(view);
 
         EditText oldPass = view.findViewById(R.id.oldPassword);
         EditText newPass = view.findViewById(R.id.newPassword);
 
-        builder.setPositiveButton("Update", (dialog, which) -> {
+        builder.setPositiveButton(getString(R.string.update), (dialog, which) -> {
             String oldP = oldPass.getText().toString();
             String newP = newPass.getText().toString();
             String currentUser = accountManager.getCurrentUsername();
             if (currentUser != null && accountManager.updatePassword(currentUser, oldP, newP)) {
-                Toast.makeText(this, "Password updated successfully", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, getString(R.string.password_updated), Toast.LENGTH_SHORT).show();
             } else {
-                Toast.makeText(this, "Incorrect current password", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, getString(R.string.incorrect_password), Toast.LENGTH_SHORT).show();
             }
         });
-        builder.setNegativeButton("Cancel", null);
+        builder.setNegativeButton(getString(R.string.cancel), null);
         builder.show();
     }
 
     private void showDeleteAccountDialog() {
         new AlertDialog.Builder(this)
-                .setTitle("Delete Account")
-                .setMessage("Are you sure you want to delete your account?")
-                .setPositiveButton("Delete", (dialog, which) -> {
+                .setTitle(getString(R.string.delete_account))
+                .setMessage(getString(R.string.confirm_delete_account))
+                .setPositiveButton(getString(R.string.delete), (dialog, which) -> {
                     String currentUser = accountManager.getCurrentUsername();
                     if (currentUser != null && accountManager.deleteAccount(currentUser)) {
                         Intent intent = new Intent(this, MainActivity.class);
@@ -522,7 +522,7 @@ public class ProfileActivity extends AppCompatActivity {
                         finish();
                     }
                 })
-                .setNegativeButton("Cancel", null)
+                .setNegativeButton(getString(R.string.cancel), null)
                 .show();
     }
 
@@ -555,15 +555,15 @@ public class ProfileActivity extends AppCompatActivity {
             timePicker.show();
         });
 
-        builder.setTitle("Notification Preferences")
-                .setPositiveButton("Save", (dialog, which) -> {
+        builder.setTitle(getString(R.string.notification_preferences))
+                .setPositiveButton(getString(R.string.save), (dialog, which) -> {
                     String[] selectedTime = btnEggCountTime.getText().toString().split(":");
                     int eggHour = Integer.parseInt(selectedTime[0]);
                     int eggMinute = Integer.parseInt(selectedTime[1]);
                     accountManager.saveNotificationPreferences(switchAlerts.isChecked(), switchGlobalData.isChecked(), switchSchedule.isChecked(), switchEggCount.isChecked(), eggHour, eggMinute);
-                    Toast.makeText(this, "Preferences saved", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, getString(R.string.preferences_saved), Toast.LENGTH_SHORT).show();
                 })
-                .setNegativeButton("Cancel", null)
+                .setNegativeButton(getString(R.string.cancel), null)
                 .show();
     }
 
@@ -626,18 +626,33 @@ public class ProfileActivity extends AppCompatActivity {
             @Override public void onNothingSelected(AdapterView<?> parent) {}
         });
 
-        builder.setPositiveButton("Save", (dialog, which) -> {
+        builder.setPositiveButton(getString(R.string.save), (dialog, which) -> {
             String selectedLang = spinnerLanguage.getSelectedItem().toString();
             String selectedReg  = spinnerRegion.getSelectedItem().toString();
             String selectedProv = spinnerProvince.getSelectedItem().toString();
+            
+            // 1. Save locally
             accountManager.saveLanguageRegion(selectedLang, selectedReg, selectedProv);
+            
+            // 2. Map to language tag
             String langTag = "en";
-            if (selectedLang.equals("Tagalog")) langTag = "tl";
+            if (selectedLang.equals("Tagalog")) langTag = "fil";
             else if (selectedLang.equals("Cebuano")) langTag = "ceb";
-            AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(langTag));
-            recreate();
+            
+            // 3. Set Locales
+            LocaleListCompat appLocales = LocaleListCompat.forLanguageTags(langTag);
+            AppCompatDelegate.setApplicationLocales(appLocales);
+            
+            // 4. INSTANT REFRESH: Force a clean restart of the activity stack
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                Intent intent = getIntent();
+                finish();
+                overridePendingTransition(0, 0);
+                startActivity(intent);
+                overridePendingTransition(0, 0);
+            }, 100);
         });
-        builder.setNegativeButton("Cancel", null);
+        builder.setNegativeButton(getString(R.string.cancel), null);
         builder.show();
     }
 
@@ -924,10 +939,10 @@ public class ProfileActivity extends AppCompatActivity {
                     // Delete user
                     FirebaseFirestore.getInstance().collection("user_access").document(email).delete()
                         .addOnSuccessListener(a -> {
-                            Toast.makeText(this, "User removed", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(this, getString(R.string.user_removed), Toast.LENGTH_SHORT).show();
                             showUserListDialog(); // Refresh
                         })
-                        .addOnFailureListener(e -> Toast.makeText(this, "Failed to remove user", Toast.LENGTH_SHORT).show());
+                        .addOnFailureListener(e -> Toast.makeText(this, getString(R.string.failed_to_remove_user), Toast.LENGTH_SHORT).show());
                 });
                 rvUserList.setAdapter(adapter);
             })
@@ -943,7 +958,7 @@ public class ProfileActivity extends AppCompatActivity {
 
     private void showRoleLimitsDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Role Limits");
+        builder.setTitle(getString(R.string.role_limits));
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(40, 40, 40, 40);
@@ -965,20 +980,20 @@ public class ProfileActivity extends AppCompatActivity {
             });
 
         builder.setView(layout);
-        builder.setPositiveButton("Save", (d, w) -> {
+        builder.setPositiveButton(getString(R.string.save), (d, w) -> {
             Map<String, Object> limits = new HashMap<>();
             limits.put("backup_owner_limit", Long.parseLong(editBackupLimit.getText().toString()));
             limits.put("staff_limit", Long.parseLong(editStaffLimit.getText().toString()));
 
             FirebaseFirestore.getInstance().collection("system_settings").document("role_limits").set(limits)
-                .addOnSuccessListener(a -> Toast.makeText(this, "Limits Updated!", Toast.LENGTH_SHORT).show());
+                .addOnSuccessListener(a -> Toast.makeText(this, getString(R.string.limits_updated), Toast.LENGTH_SHORT).show());
         });
         builder.show();
     }
 
     private void showPendingRequestsDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Pending Access Requests");
+        builder.setTitle(getString(R.string.pending_access_requests));
         LinearLayout container = new LinearLayout(this);
         container.setOrientation(LinearLayout.VERTICAL);
         container.setPadding(40, 40, 40, 40);
@@ -990,7 +1005,7 @@ public class ProfileActivity extends AppCompatActivity {
                 container.removeAllViews();
                 if (docs.isEmpty()) {
                     TextView tv = new TextView(this);
-                    tv.setText("No pending requests.");
+                    tv.setText(getString(R.string.no_pending_requests));
                     container.addView(tv);
                 }
                 for (DocumentSnapshot doc : docs) {
@@ -1015,7 +1030,7 @@ public class ProfileActivity extends AppCompatActivity {
                         doc.getReference().update(update)
                             .addOnSuccessListener(a -> {
                                 new AlertDialog.Builder(this)
-                                    .setTitle("Request Approved")
+                                    .setTitle(getString(R.string.request_approved))
                                     .setMessage("Verification Code for " + name + ": " + code)
                                     .setPositiveButton("Send Approval & Code via Gmail", (d, w) -> {
                                         String emailBody = "Hello " + name + ",\n\n" +
@@ -1063,7 +1078,7 @@ public class ProfileActivity extends AppCompatActivity {
     private void showDatabaseManagementDialog() {
         String[] items = {"Monitor Database", "Import Database", "Export Database", "Delete Database", "Wipe Everything"};
         new AlertDialog.Builder(this)
-                .setTitle("Database Management")
+                .setTitle(getString(R.string.database_management))
                 .setItems(items, (dialog, which) -> {
                     switch (which) {
                         case 0: showMonitorDatabaseDialog(); break;
@@ -1072,7 +1087,7 @@ public class ProfileActivity extends AppCompatActivity {
                         case 3: deleteDatabase(); break;
                         case 4: wipeEverything(); break;
                     }
-                }).setPositiveButton("Cancel", null).show();
+                }).setPositiveButton(getString(R.string.cancel), null).show();
     }
 
     private void showMonitorDatabaseDialog() {
@@ -1169,19 +1184,19 @@ public class ProfileActivity extends AppCompatActivity {
         new AlertDialog.Builder(this)
             .setTitle("Delete Database")
             .setMessage("Are you sure? This deletes only the farm records but keeps user accounts.")
-            .setPositiveButton("Delete", (d, w) -> Toast.makeText(this, "Database Deleted", Toast.LENGTH_SHORT).show())
-            .setNegativeButton("Cancel", null).show();
+            .setPositiveButton(getString(R.string.delete), (d, w) -> Toast.makeText(this, "Database Deleted", Toast.LENGTH_SHORT).show())
+            .setNegativeButton(getString(R.string.cancel), null).show();
     }
 
     private void wipeEverything() {
         new AlertDialog.Builder(this)
-            .setTitle("Wipe Everything")
-            .setMessage("WARNING: This will delete all users, all farm data, and reset the system. Proceed?")
-            .setPositiveButton("WIPE", (d, w) -> {
+            .setTitle(getString(R.string.wipe_everything))
+            .setMessage(getString(R.string.confirm_wipe))
+            .setPositiveButton(getString(R.string.wipe), (d, w) -> {
                 accountManager.clearSession();
                 finish();
             })
-            .setNegativeButton("Cancel", null).show();
+            .setNegativeButton(getString(R.string.cancel), null).show();
     }
 
     private void showHelpSupportDialog() {
@@ -1320,7 +1335,7 @@ public class ProfileActivity extends AppCompatActivity {
             });
 
         builder.setView(container);
-        builder.setPositiveButton("Save", (dialog, which) -> {
+        builder.setPositiveButton(getString(R.string.save), (dialog, which) -> {
             String street = streetEt.getText().toString().trim();
             String city = cityEt.getText().toString().trim();
             String state = stateEt.getText().toString().trim();
@@ -1352,9 +1367,7 @@ public class ProfileActivity extends AppCompatActivity {
                     Toast.makeText(this, "Failed to update location", Toast.LENGTH_SHORT).show();
                 });
         });
-        builder.setNegativeButton("Cancel", null);
+        builder.setNegativeButton(getString(R.string.cancel), null);
         builder.show();
     }
 }
-
-
