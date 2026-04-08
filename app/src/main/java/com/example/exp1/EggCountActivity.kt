@@ -586,7 +586,10 @@ class EggCountActivity : AppCompatActivity() {
         }
     }
 
-    //  Utility-------------------------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Utility
+    // ─────────────────────────────────────────────────────────────────────────
+
     private fun uriToBitmap(uri: Uri): Bitmap? = try {
         contentResolver.openInputStream(uri)?.use {
             android.graphics.BitmapFactory.decodeStream(it)
@@ -611,24 +614,23 @@ class EggCountActivity : AppCompatActivity() {
     private fun toast(msg: String) =
         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
 
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Lifecycle: manage Realtime Database listener
+    // ─────────────────────────────────────────────────────────────────────────
 
-    //  Lifecycle: manage realtime database listener------------------------------------------------
     override fun onResume() {
         super.onResume()
-        /*
-        this is a listener that re-attaches everytime the screen are visible
-        And any collections saved from another device are reflected immediately without needing a manual refresh.
-        */
+        // Re-attach listener every time the screen becomes visible so that
+        // any collections saved from another device (or another session) are
+        // reflected immediately without needing a manual refresh.
         loadCollectionHistory()
         handler.post(timeUpdateRunnable)
     }
 
     override fun onPause() {
         super.onPause()
-        /*
-        Detach while off-screen to avoid unnecessary network traffic and
-        the risk of updating a detached view hierarchy.
-        */
+        // Detach while off-screen to avoid unnecessary network traffic and
+        // the risk of updating a detached view hierarchy.
         historyListener?.let { historyRef?.removeEventListener(it) }
         historyListener = null
         handler.removeCallbacks(timeUpdateRunnable)
@@ -638,6 +640,7 @@ class EggCountActivity : AppCompatActivity() {
         super.onDestroy()
         cameraExecutor.shutdown()
         detector?.close()
+        // Belt-and-suspenders: remove listener if onPause was somehow skipped
         historyListener?.let { historyRef?.removeEventListener(it) }
     }
 
