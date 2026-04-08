@@ -161,6 +161,13 @@ object FarmRepository {
         ).addOnSuccessListener { onDone?.invoke(null) }
             .addOnFailureListener { e -> onDone?.invoke(e) }
     }
+    // Firestore update for staff (status only)
+    fun updateFeedStatus(firestoreId: String, status: String, onDone: ((Exception?) -> Unit)? = null) {
+        feedCol.document(firestoreId)
+            .update("status", status, "updatedAt", FieldValue.serverTimestamp())
+            .addOnSuccessListener { onDone?.invoke(null) }
+            .addOnFailureListener { e -> onDone?.invoke(e) }
+    }
 
     fun deleteFeedItem(firestoreId: String, onDone: ((Exception?) -> Unit)? = null) {
         feedCol.document(firestoreId).delete()

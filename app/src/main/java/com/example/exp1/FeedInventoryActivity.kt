@@ -165,27 +165,33 @@ class FeedInventoryActivity : AppCompatActivity() {
         builder.setPositiveButton(if (isEdit) "Update" else "Add") { _, _ ->
             val name   = nameInput.text.toString().trim()
             val status = statusSpinner.selectedItem.toString()
-            if (name.isEmpty()) { Toast.makeText(this, "Name cannot be empty", Toast.LENGTH_SHORT).show(); return@setPositiveButton }
+            if (name.isEmpty()) {
+                Toast.makeText(this, "Name cannot be empty", Toast.LENGTH_SHORT).show()
+                return@setPositiveButton
+            }
 
             if (isEdit) {
-                // Update Firestore
-                FarmRepository.updateFeedItem(item!!.firestoreId, name, status) { err ->
-                    if (err != null) Toast.makeText(this, "Update failed: ${err.message}", Toast.LENGTH_SHORT).show()
-                    else {
-                        if (status == "Low") {
-                            FarmRepository.addAlert("Feed Low: $name is now LOW", "Critical")
-                        }
+                if (roleManager.canEditFarm()) {
+                    // Owner / backup_owner → full update
+                    FarmRepository.updateFeedItem(item!!.firestoreId, name, status) { err ->
+                        if (err != null) Toast.makeText(this, "Update failed: ${err.message}", Toast.LENGTH_SHORT).show()
+                        else if (status == "Low") FarmRepository.addAlert("Feed Low: $name is now LOW", "Critical")
+                    }
+                } else {
+                    // Staff → status only
+                    FarmRepository.updateFeedStatus(item!!.firestoreId, status) { err ->
+                        if (err != null) Toast.makeText(this, "Update failed: ${err.message}", Toast.LENGTH_SHORT).show()
+                        else if (status == "Low") FarmRepository.addAlert("Feed Low: ${item.name} is now LOW", "Critical")
                     }
                 }
             } else {
-                // Add to Firestore
+                // Adding new item → only owner/backup_owner can add
                 FarmRepository.addFeedItem(name, status) { err ->
                     if (err != null) Toast.makeText(this, "Add failed: ${err.message}", Toast.LENGTH_SHORT).show()
-                    else if (status == "Low") {
-                        FarmRepository.addAlert("Feed Low: $name added with LOW status", "Critical")
-                    }
+                    else if (status == "Low") FarmRepository.addAlert("Feed Low: $name added with LOW status", "Critical")
                 }
             }
+
         }
         builder.setNegativeButton("Cancel", null)
         builder.show()

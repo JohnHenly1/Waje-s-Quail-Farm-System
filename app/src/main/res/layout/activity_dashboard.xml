@@ -182,6 +182,7 @@
                                     android:textStyle="bold" />
 
                                 <TextView
+                                    android:id="@+id/recommendation_text"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="8dp"
@@ -638,7 +639,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Server Time"
+                android:text="@string/server_time"
                 android:textColor="@color/dark_green"
                 android:textSize="14sp"
                 android:textStyle="bold"
@@ -648,7 +649,7 @@
                 android:id="@+id/serverTimeText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="2024/05/20 08:30 PM"
+                android:text="@string/_2024_05_20_08_30_pm"
                 android:textColor="@color/black"
                 android:textSize="16sp"
                 android:layout_marginTop="8dp"
