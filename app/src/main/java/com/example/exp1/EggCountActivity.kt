@@ -342,7 +342,10 @@ class EggCountActivity : AppCompatActivity() {
         captureBtn.visibility = View.VISIBLE
         retakeBtn.visibility  = View.GONE
         modeSwitchBtn.text    = "Pick Photo"
-        saveBtn.visibility    = View.GONE
+        // Reset save button back to its original label and hidden state
+        saveBtn.text      = "Save Collection"
+        saveBtn.isEnabled = true
+        saveBtn.visibility = View.GONE
         resetCounts()
     }
 
@@ -388,8 +391,12 @@ class EggCountActivity : AppCompatActivity() {
             .setValue(record)
             .addOnSuccessListener {
                 showBanner("✓ Saved $total eggs for $today", isError = false, autoHide = true)
-                saveBtn.isEnabled = true
-                saveBtn.visibility = View.GONE
+                // Keep counts visible after saving — do NOT reset here.
+                // The user can tap "↩ Retake" when they are ready for a new scan.
+                // Update the save button to a "Saved ✓" state so the user knows
+                // the data is recorded, but keep it visible so counts remain on screen.
+                saveBtn.text = "✓ Saved"
+                saveBtn.isEnabled = false
                 // The persistent ValueEventListener on egg_collections will fire
                 // automatically when this write lands, updating the log in real time.
                 toast("Collection saved!")
