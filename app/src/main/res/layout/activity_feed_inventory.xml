@@ -1,365 +1,93 @@
-<?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/main"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@color/white"
-    tools:context=".FeedInventoryActivity">
-
-    <!-- Header -->
-    <androidx.appcompat.widget.Toolbar
-        android:id="@+id/toolbar"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@color/dark_green"
-        android:minHeight="?attr/actionBarSize"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:theme="?attr/actionBarTheme"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingVertical="8dp">
-
-            <ImageButton
-                android:id="@+id/backButton"
-                android:layout_width="30dp"
-                android:layout_height="30dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="Back"
-                android:scaleType="centerInside"
-                app:srcCompat="@drawable/ic_arrow_back"
-                app:tint="@color/white"
-                tools:ignore="TouchTargetSizeCheck" />
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="16dp"
-                android:layout_weight="1"
-                android:fontFamily="sans-serif"
-                android:text="Feed Inventory"
-                android:gravity="center"
-                android:textColor="@color/white"
-                android:textSize="24sp"
-                android:textStyle="bold" />
-
-            <ImageButton
-                android:id="@+id/historyButton"
-                android:layout_width="30dp"
-                android:layout_height="30dp"
-                android:layout_marginEnd="8dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="History"
-                android:scaleType="centerInside"
-                app:srcCompat="@drawable/ic_history"
-                app:tint="@color/white"
-                tools:ignore="TouchTargetSizeCheck" />
-
-            <ImageButton
-                android:id="@+id/addButton"
-                android:layout_width="30dp"
-                android:layout_height="30dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="Add"
-                android:scaleType="centerInside"
-                app:srcCompat="@drawable/ic_add"
-                app:tint="@color/white"
-                tools:ignore="TouchTargetSizeCheck" />
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" xmlns:tools="http://schemas.android.com/tools" android:id="@+id/main" android:layout_width="match_parent" android:layout_height="match_parent" android:background="#F5F5F5" tools:context=".FeedInventoryActivity">
+    <!--  ===== TOP APP BAR =====  -->
+    <androidx.appcompat.widget.Toolbar android:id="@+id/toolbar" android:layout_width="match_parent" android:layout_height="?attr/actionBarSize" android:background="@color/dark_green" android:paddingStart="4dp" android:paddingEnd="8dp" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+            <ImageButton android:id="@+id/backButton" android:layout_width="36dp" android:layout_height="36dp" android:background="?attr/selectableItemBackgroundBorderless" android:contentDescription="Back" android:scaleType="centerInside" app:srcCompat="@drawable/ic_arrow_back" app:tint="@color/white" tools:ignore="TouchTargetSizeCheck"/>
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="8dp" android:gravity="center" android:text="Feed Inventory" android:textColor="@color/white" android:textSize="20sp" android:textStyle="bold" android:fontFamily="sans-serif-medium"/>
+            <ImageButton android:id="@+id/searchButton" android:layout_width="36dp" android:layout_height="36dp" android:layout_marginEnd="4dp" android:background="?attr/selectableItemBackgroundBorderless" android:contentDescription="Search" android:scaleType="centerInside" app:srcCompat="@android:drawable/ic_menu_search" app:tint="@color/white" tools:ignore="TouchTargetSizeCheck"/>
+            <ImageButton android:id="@+id/addButton" android:layout_width="36dp" android:layout_height="36dp" android:background="?attr/selectableItemBackgroundBorderless" android:contentDescription="Add" android:scaleType="centerInside" app:srcCompat="@drawable/ic_add" app:tint="@color/white" tools:ignore="TouchTargetSizeCheck"/>
         </LinearLayout>
     </androidx.appcompat.widget.Toolbar>
-
-    <androidx.core.widget.NestedScrollView
-        android:id="@+id/scrollView"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:fillViewport="true"
-        app:layout_constraintTop_toBottomOf="@id/toolbar"
-        app:layout_constraintBottom_toTopOf="@id/bottomNavContainer"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="16dp">
-
-            <!-- Summary Cards -->
-            <GridLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="24dp"
-                android:columnCount="2"
-                android:rowCount="1">
-
-                <androidx.cardview.widget.CardView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_columnWeight="1"
-                    android:layout_marginEnd="8dp"
-                    app:cardCornerRadius="20dp"
-                    app:cardElevation="2dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:background="@android:color/white"
-                        android:orientation="vertical"
-                        android:padding="16dp">
-
-                        <ImageView
-                            android:layout_width="36dp"
-                            android:layout_height="36dp"
-                            android:background="@drawable/rounded_green_bg"
-                            android:backgroundTint="#E3F2FD"
-                            android:padding="8dp"
-                            app:srcCompat="@drawable/ic_shopping_bag"
-                            app:tint="#2196F3" />
-
-                        <TextView
-                            android:id="@+id/totalItemsValue"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
-                            android:text="--"
-                            android:textColor="@color/black"
-                            android:textSize="24sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Total Items"
-                            android:textColor="@color/dark_gray"
-                            android:textSize="12sp" />
-                    </LinearLayout>
-                </androidx.cardview.widget.CardView>
-
-                <androidx.cardview.widget.CardView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_columnWeight="1"
-                    android:layout_marginStart="8dp"
-                    app:cardCornerRadius="20dp"
-                    app:cardElevation="2dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:background="@android:color/white"
-                        android:orientation="vertical"
-                        android:padding="16dp">
-
-                        <ImageView
-                            android:layout_width="36dp"
-                            android:layout_height="36dp"
-                            android:background="@drawable/rounded_orange_bg"
-                            android:backgroundTint="#FFF3E0"
-                            android:padding="8dp"
-                            app:srcCompat="@drawable/ic_alert_triangle"
-                            app:tint="#F57C00" />
-
-                        <TextView
-                            android:id="@+id/lowStockValue"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
-                            android:text="--"
-                            android:textColor="@color/black"
-                            android:textSize="24sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Low Stock"
-                            android:textColor="@color/dark_gray"
-                            android:textSize="12sp" />
-                    </LinearLayout>
-                </androidx.cardview.widget.CardView>
-            </GridLayout>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                android:text="Stock Levels"
-                android:textColor="@color/black"
-                android:textSize="18sp"
-                android:textStyle="bold" />
-
-            <LinearLayout
-                android:id="@+id/inventoryList"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical" />
-
+    <!--  ===== SCROLLABLE CONTENT =====  -->
+    <androidx.core.widget.NestedScrollView android:id="@+id/scrollView" android:layout_width="match_parent" android:layout_height="0dp" android:fillViewport="true" app:layout_constraintTop_toBottomOf="@id/toolbar" app:layout_constraintBottom_toTopOf="@id/bottomNavContainer" app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+            <!--  ===== TOTAL INVENTORY VALUE BANNER =====  -->
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:background="@color/dark_green" android:paddingStart="20dp" android:paddingEnd="20dp" android:paddingTop="8dp" android:paddingBottom="20dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Total Inventory Value" android:textColor="#CCFFFFFF" android:textSize="13sp" android:fontFamily="sans-serif"/>
+                <TextView android:id="@+id/totalInventoryValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="PHP 0.00" android:textColor="@color/white" android:textSize="28sp" android:textStyle="bold" android:fontFamily="sans-serif-medium"/>
+            </LinearLayout>
+            <!--  ===== MAIN CONTENT =====  -->
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:background="#F5F5F5">
+                <!--  ===== STAT CARDS =====  -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="12dp" android:paddingStart="12dp" android:paddingEnd="12dp" android:paddingBottom="4dp">
+                    <!--  Total Items Card  -->
+                    <androidx.cardview.widget.CardView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginHorizontal="4dp" app:cardCornerRadius="14dp" app:cardElevation="3dp" app:cardBackgroundColor="@color/white">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="14dp">
+                            <ImageView android:layout_width="32dp" android:layout_height="32dp" android:background="@drawable/rounded_blue_bg" android:padding="6dp" app:srcCompat="@drawable/ic_shopping_bag" tools:ignore="ContentDescription"/>
+                            <TextView android:id="@+id/totalItemsValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="0" android:textColor="@color/black" android:textSize="22sp" android:textStyle="bold"/>
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Total Items" android:textColor="#9E9E9E" android:textSize="11sp"/>
+                        </LinearLayout>
+                    </androidx.cardview.widget.CardView>
+                    <!--  Low Stock Card  -->
+                    <androidx.cardview.widget.CardView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginHorizontal="4dp" app:cardCornerRadius="14dp" app:cardElevation="3dp" app:cardBackgroundColor="@color/white">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="14dp">
+                            <ImageView android:layout_width="32dp" android:layout_height="32dp" android:background="@drawable/rounded_red_bg" android:padding="6dp" app:srcCompat="@drawable/ic_alert_triangle" tools:ignore="ContentDescription"/>
+                            <TextView android:id="@+id/lowStockValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="0" android:textColor="@color/black" android:textSize="22sp" android:textStyle="bold"/>
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Low Stock" android:textColor="#9E9E9E" android:textSize="11sp"/>
+                        </LinearLayout>
+                    </androidx.cardview.widget.CardView>
+                    <!--  Locations Card  -->
+                    <androidx.cardview.widget.CardView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginHorizontal="4dp" app:cardCornerRadius="14dp" app:cardElevation="3dp" app:cardBackgroundColor="@color/white">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="14dp">
+                            <ImageView android:layout_width="32dp" android:layout_height="32dp" android:background="@drawable/rounded_green_bg" android:padding="6dp" app:srcCompat="@drawable/ic_location" app:tint="@color/white" tools:ignore="ContentDescription"/>
+                            <TextView android:id="@+id/locationsValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="0" android:textColor="@color/black" android:textSize="22sp" android:textStyle="bold"/>
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Locations" android:textColor="#9E9E9E" android:textSize="11sp"/>
+                        </LinearLayout>
+                    </androidx.cardview.widget.CardView>
+                </LinearLayout>
+                <!--  ===== FILTER TABS =====  -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingStart="16dp" android:paddingEnd="16dp" android:paddingTop="12dp" android:paddingBottom="4dp">
+                    <TextView android:id="@+id/tabAllItems" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:layout_marginEnd="6dp" android:gravity="center" android:text="All Items" android:textSize="13sp" android:textStyle="bold" android:background="@drawable/rounded_dark_green" android:textColor="@color/white" android:fontFamily="sans-serif-medium"/>
+                    <TextView android:id="@+id/tabFeed" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:layout_marginEnd="6dp" android:gravity="center" android:text="Feed" android:textSize="13sp" android:background="@drawable/rounded_gray_bg" android:textColor="@color/dark_gray" android:fontFamily="sans-serif"/>
+                    <TextView android:id="@+id/tabSupplements" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:gravity="center" android:text="Supplements" android:textSize="13sp" android:background="@drawable/rounded_gray_bg" android:textColor="@color/dark_gray" android:fontFamily="sans-serif"/>
+                </LinearLayout>
+                <!--  ===== ITEM COUNT LABEL =====  -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingStart="16dp" android:paddingEnd="16dp" android:paddingTop="10dp" android:paddingBottom="4dp" android:gravity="center_vertical">
+                    <TextView android:id="@+id/itemCountLabel" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="0 items found" android:textColor="#616161" android:textSize="13sp" android:fontFamily="sans-serif"/>
+                </LinearLayout>
+                <!--  ===== INVENTORY LIST =====  -->
+                <LinearLayout android:id="@+id/inventoryList" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingStart="12dp" android:paddingEnd="12dp" android:paddingTop="4dp" android:paddingBottom="16dp"/>
+            </LinearLayout>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
-
-    <!-- Bottom Navigation Bar -->
-    <LinearLayout
-        android:id="@+id/bottomNavContainer"
-        android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:background="@color/dark_green"
-        android:orientation="horizontal"
-        android:gravity="center"
-        android:baselineAligned="false"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <!-- Home Button -->
-        <LinearLayout
-            android:id="@+id/homeButton"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:background="?attr/selectableItemBackground">
-
-            <ImageView
-                android:layout_width="22dp"
-                android:layout_height="24dp"
-                android:scaleType="centerInside"
-                app:srcCompat="@drawable/ic_home"
-                app:tint="@color/white" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/home"
-                android:textColor="@color/white"
-                android:textSize="10sp"
-                android:layout_marginTop="2dp"
-                android:fontFamily="sans-serif" />
+    <!--  ===== BOTTOM NAVIGATION BAR =====  -->
+    <LinearLayout android:id="@+id/bottomNavContainer" android:layout_width="match_parent" android:layout_height="56dp" android:orientation="horizontal" android:gravity="center" android:baselineAligned="false" android:background="@color/dark_green" app:layout_constraintBottom_toBottomOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent">
+        <!--  Home Button  -->
+        <LinearLayout android:id="@+id/homeButton" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:contentDescription="@string/home">
+            <ImageView android:layout_width="22dp" android:layout_height="24dp" android:scaleType="centerInside" app:srcCompat="@drawable/ic_home" app:tint="@color/white" tools:ignore="ContentDescription"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/home" android:textColor="@color/white" android:textSize="10sp" android:layout_marginTop="2dp" android:fontFamily="sans-serif"/>
         </LinearLayout>
-
-        <!-- Analytics Button -->
-        <LinearLayout
-            android:id="@+id/analyticsButton"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:background="?attr/selectableItemBackground">
-
-            <ImageView
-                android:layout_width="22dp"
-                android:layout_height="24dp"
-                android:scaleType="centerInside"
-                app:srcCompat="@drawable/ic_chart"
-                app:tint="@color/white" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/analytics"
-                android:textColor="@color/white"
-                android:textSize="10sp"
-                android:layout_marginTop="2dp"
-                android:fontFamily="sans-serif" />
+        <!--  Analytics Button  -->
+        <LinearLayout android:id="@+id/analyticsButton" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:contentDescription="@string/analytics">
+            <ImageView android:layout_width="22dp" android:layout_height="24dp" android:scaleType="centerInside" app:srcCompat="@drawable/ic_chart" app:tint="@color/white" tools:ignore="ContentDescription"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/analytics" android:textColor="@color/white" android:textSize="10sp" android:layout_marginTop="2dp" android:fontFamily="sans-serif"/>
         </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/CameraButton"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:background="?attr/selectableItemBackground">
-
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:scaleType="centerInside"
-                app:srcCompat="@drawable/ic_camera"
-                app:tint="@color/white" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="camera"
-                android:textColor="@color/white"
-                android:textSize="10sp"
-                android:layout_marginTop="2dp"
-                android:fontFamily="sans-serif" />
+        <!--  Camera Button  -->
+        <LinearLayout android:id="@+id/CameraButton" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:contentDescription="Camera">
+            <ImageView android:layout_width="24dp" android:layout_height="24dp" android:scaleType="centerInside" app:srcCompat="@drawable/ic_camera" app:tint="@color/white" tools:ignore="ContentDescription"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Camera" android:textColor="@color/white" android:textSize="10sp" android:layout_marginTop="2dp" android:fontFamily="sans-serif"/>
         </LinearLayout>
-
-        <!-- Schedule Button -->
-        <LinearLayout
-            android:id="@+id/scheduleButton"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:background="?attr/selectableItemBackground">
-
-            <ImageButton
-                android:id="@+id/scheduleButton1"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:scaleType="centerInside"
-                app:srcCompat="@drawable/ic_schedule"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                tools:ignore="TouchTargetSizeCheck"
-                app:tint="@color/white" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/schedule"
-                android:textColor="@color/white"
-                android:textSize="10sp"
-                android:layout_marginTop="2dp"
-                android:fontFamily="sans-serif" />
-
-
+        <!--  Schedule Button  -->
+        <LinearLayout android:id="@+id/scheduleButton" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:contentDescription="@string/schedule">
+            <ImageButton android:id="@+id/scheduleButton1" android:layout_width="24dp" android:layout_height="24dp" android:scaleType="centerInside" app:srcCompat="@drawable/ic_schedule" android:background="?attr/selectableItemBackgroundBorderless" app:tint="@color/white" tools:ignore="TouchTargetSizeCheck"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/schedule" android:textColor="@color/white" android:textSize="10sp" android:layout_marginTop="2dp" android:fontFamily="sans-serif"/>
         </LinearLayout>
-        <!-- Profile Button -->
-        <LinearLayout
-            android:id="@+id/profileButton"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:background="?attr/selectableItemBackground">
-
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:scaleType="centerInside"
-                app:srcCompat="@drawable/ic_profile"
-                app:tint="@color/white" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/profile"
-                android:textColor="@color/white"
-                android:textSize="10sp"
-                android:layout_marginTop="2dp"
-                android:fontFamily="sans-serif" />
+        <!--  Profile Button  -->
+        <LinearLayout android:id="@+id/profileButton" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:contentDescription="@string/profile">
+            <ImageView android:layout_width="24dp" android:layout_height="24dp" android:scaleType="centerInside" app:srcCompat="@drawable/ic_profile" app:tint="@color/white" tools:ignore="ContentDescription"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/profile" android:textColor="@color/white" android:textSize="10sp" android:layout_marginTop="2dp" android:fontFamily="sans-serif"/>
         </LinearLayout>
-
     </LinearLayout>
-
-    <!-- Include Loading Overlay -->
-    <include layout="@layout/layout_loading" />
-
+    <!--  Loading Overlay  -->
+    <include layout="@layout/layout_loading"/>
 </androidx.constraintlayout.widget.ConstraintLayout>

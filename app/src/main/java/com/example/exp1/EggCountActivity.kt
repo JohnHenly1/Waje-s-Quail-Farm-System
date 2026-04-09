@@ -61,6 +61,12 @@ class EggCountActivity : AppCompatActivity() {
     /** Bounding boxes already counted in live mode (dedup) */
     private val countedBoxes = mutableListOf<android.graphics.RectF>()
 
+    // ── Price / Revenue / Profit ──────────────────────────────────────────────
+    /** Price per quail egg in PHP (user-configurable) */
+    private var pricePerEgg: Double = 3.50
+    /** Total feed + other expenses entered by the user for the day */
+    private var dailyExpenses: Double = 0.0
+
     // ── Firebase Realtime Database ────────────────────────────────────────────
     private val database by lazy { FirebaseDatabase.getInstance() }
     private val auth by lazy { FirebaseAuth.getInstance() }
@@ -169,6 +175,9 @@ class EggCountActivity : AppCompatActivity() {
 
         // Save today's egg count to Firebase Realtime Database
         saveBtn.setOnClickListener { saveCollectionToDatabase() }
+
+        // Price / revenue settings button (optional — safe if not in layout yet)
+        findViewById<View>(R.id.priceSettingsBtn)?.setOnClickListener { showPriceDialog() }
 
         findViewById<View>(R.id.calendarBtn).setOnClickListener { openCalendarPicker() }
         findViewById<View>(R.id.prevWeekBtn).setOnClickListener { weekOffset--; setupUI() }
@@ -376,21 +385,29 @@ class EggCountActivity : AppCompatActivity() {
         saveBtn.isEnabled = false
         val today = dbDateFmt.format(Calendar.getInstance().time)
 
+        val revenue   = total * pricePerEgg
+        val netProfit = revenue - dailyExpenses
+
         val record = mapOf(
-            "date"      to today,
-            "total"     to total,
-            "gradeA"    to gradeA,
-            "gradeB"    to gradeB,
-            "gradeC"    to gradeC,
-            "timestamp" to System.currentTimeMillis(),
-            "savedBy"   to (auth.currentUser?.uid ?: "unknown")
+            "date"        to today,
+            "total"       to total,
+            "gradeA"      to gradeA,
+            "gradeB"      to gradeB,
+            "gradeC"      to gradeC,
+            "pricePerEgg" to pricePerEgg,
+            "revenue"     to revenue,
+            "expenses"    to dailyExpenses,
+            "netProfit"   to netProfit,
+            "timestamp"   to System.currentTimeMillis(),
+            "savedBy"     to (auth.currentUser?.uid ?: "unknown")
         )
 
         database.getReference("egg_collections")
             .child(today)
             .setValue(record)
             .addOnSuccessListener {
-                showBanner("✓ Saved $total eggs for $today", isError = false, autoHide = true)
+                val revenue = total * pricePerEgg
+                showBanner("✓ Saved $total eggs | Revenue: ₱${"%.2f".format(revenue)}", isError = false, autoHide = true)
                 // Keep counts visible after saving — do NOT reset here.
                 // The user can tap "↩ Retake" when they are ready for a new scan.
                 // Update the save button to a "Saved ✓" state so the user knows
@@ -477,6 +494,10 @@ class EggCountActivity : AppCompatActivity() {
         container.removeAllViews()
         val inflater = LayoutInflater.from(this)
         val todayStr = sdf.format(Calendar.getInstance().time)
+
+
+
+
         val cal = Calendar.getInstance().apply {
             // Set to Monday of the week
             set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
@@ -494,12 +515,18 @@ class EggCountActivity : AppCompatActivity() {
             val gA = (record?.get("gradeA") as? Long)?.toInt() ?: 0
             val gB = (record?.get("gradeB") as? Long)?.toInt() ?: 0
             val gC = (record?.get("gradeC") as? Long)?.toInt() ?: 0
+            val revenue   = record?.get("revenue")   as? Double ?: (total * pricePerEgg)
+            val expenses  = record?.get("expenses")  as? Double ?: 0.0
+            val netProfit = record?.get("netProfit") as? Double ?: (revenue - expenses)
             val item = inflater.inflate(R.layout.item_collection_log, container, false)
             item.findViewById<TextView>(R.id.logDate).text = fullDateText
             item.findViewById<TextView>(R.id.logTotal).text = total.toString()
             item.findViewById<TextView>(R.id.logGradeA).text = gA.toString()
             item.findViewById<TextView>(R.id.logGradeB).text = gB.toString()
             item.findViewById<TextView>(R.id.logGradeC).text = gC.toString()
+            // Revenue & profit views (safe — no crash if IDs don't exist yet)
+            item.findViewById<TextView>(R.id.logRevenue)?.text   = "₱${"%.2f".format(revenue)}"
+            item.findViewById<TextView>(R.id.logNetProfit)?.text = "₱${"%.2f".format(netProfit)}"
             item.findViewById<TextView>(R.id.todayBadge).visibility =
                 if (displayDate == todayStr) View.VISIBLE else View.GONE
             container.addView(item)
@@ -553,6 +580,8 @@ class EggCountActivity : AppCompatActivity() {
 
     private fun updateCountUI() {
         val total = gradeA + gradeB + gradeC
+        val revenue   = total * pricePerEgg
+        val netProfit = revenue - dailyExpenses
         findViewById<TextView>(R.id.todayTotalValue).text = total.toString()
         findViewById<TextView>(R.id.gradeAValue).text     = gradeA.toString()
         findViewById<TextView>(R.id.gradeBValue).text     = gradeB.toString()
@@ -562,6 +591,50 @@ class EggCountActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.gradeAPercent).text = pct(gradeA)
         findViewById<TextView>(R.id.gradeBPercent).text = pct(gradeB)
         findViewById<TextView>(R.id.gradeCPercent).text = pct(gradeC)
+        // Revenue & net profit (safe — no crash if IDs not yet in layout)
+        findViewById<TextView>(R.id.revenueValue)?.text   = "₱${"%.2f".format(revenue)}"
+        findViewById<TextView>(R.id.netProfitValue)?.text = "₱${"%.2f".format(netProfit)}"
+        // Price label
+        findViewById<TextView>(R.id.pricePerEggValue)?.text = "₱${"%.2f".format(pricePerEgg)}/egg"
+    }
+
+    /** Shows a dialog to configure price per egg and daily expenses */
+    private fun showPriceDialog() {
+        val ctx = this
+        val layout = android.widget.LinearLayout(ctx).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(64, 32, 64, 16)
+        }
+        val priceEdit = android.widget.EditText(ctx).apply {
+            hint = "Price per egg (₱)"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or
+                    android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+            setText(pricePerEgg.toString())
+        }
+        val expenseEdit = android.widget.EditText(ctx).apply {
+            hint = "Daily expenses (₱) — feed, etc."
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or
+                    android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+            setText(dailyExpenses.toString())
+        }
+        layout.addView(android.widget.TextView(ctx).apply { text = "Price per egg (₱)" })
+        layout.addView(priceEdit)
+        layout.addView(android.widget.TextView(ctx).apply {
+            text = "Daily expenses (₱)"
+            setPadding(0, 24, 0, 0)
+        })
+        layout.addView(expenseEdit)
+
+        android.app.AlertDialog.Builder(ctx)
+            .setTitle("Revenue Settings")
+            .setView(layout)
+            .setPositiveButton("Apply") { _, _ ->
+                pricePerEgg   = priceEdit.text.toString().toDoubleOrNull() ?: pricePerEgg
+                dailyExpenses = expenseEdit.text.toString().toDoubleOrNull() ?: dailyExpenses
+                updateCountUI()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun showBanner(msg: String, isError: Boolean, autoHide: Boolean) {
