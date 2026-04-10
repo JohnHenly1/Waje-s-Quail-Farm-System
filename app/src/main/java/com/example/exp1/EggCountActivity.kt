@@ -29,6 +29,9 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.SetOptions
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -50,8 +53,9 @@ class EggCountActivity : AppCompatActivity() {
     private lateinit var cameraExecutor: ExecutorService
     private var imageCapture: ImageCapture? = null
 
-    // ── Mode: true = live continuous  /  false = frozen on captured frame ─────
-    private var isLiveMode = true
+    // ── Mode: camera is OFF by default, user must manually activate ───────────
+    // false = camera not started | true = live continuous scan
+    private var isLiveMode = false
     private val analyzing = AtomicBoolean(false)
 
     // ── Egg counts ────────────────────────────────────────────────────────────
@@ -62,9 +66,16 @@ class EggCountActivity : AppCompatActivity() {
     private val countedBoxes = mutableListOf<android.graphics.RectF>()
 
     // ── Price / Revenue / Profit ──────────────────────────────────────────────
-    /** Price per quail egg in PHP (user-configurable) */
+    /**
+     * Price per quail egg in PHP.
+     * Loaded from Firestore: farm_data/shared.pricePerEgg
+     * Falls back to 3.50 until Firestore delivers the value.
+     */
     private var pricePerEgg: Double = 3.50
-    /** Total feed + other expenses entered by the user for the day */
+    /**
+     * Daily operating expenses.
+     * Loaded from Firestore: farm_data/shared.dailyExpenses
+     */
     private var dailyExpenses: Double = 0.0
 
     // ── Firebase Realtime Database ────────────────────────────────────────────
@@ -75,6 +86,10 @@ class EggCountActivity : AppCompatActivity() {
     private var historyRef: com.google.firebase.database.DatabaseReference? = null
     /** Cached collection records for populating log without re-fetching */
     private var collectionRecords = mutableMapOf<String, Map<String, Any>>()
+
+    // ── Firestore (centralised pricing under farm_data/shared) ────────────────
+    private val firestore by lazy { FirebaseFirestore.getInstance() }
+    private var pricingListener: ListenerRegistration? = null
 
     // ── Cached views ──────────────────────────────────────────────────────────
     private lateinit var previewView: PreviewView
@@ -103,7 +118,7 @@ class EggCountActivity : AppCompatActivity() {
     private val requestCameraPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) bindCamera()
+        if (granted) { isLiveMode = true; bindCamera() }
         else toast("Camera permission required to scan eggs")
     }
 
@@ -137,12 +152,9 @@ class EggCountActivity : AppCompatActivity() {
         // Load YOLO — degrades gracefully if model can't be loaded
         tryLoadDetector()
 
-        // Start camera
+        // Camera executor is created but camera does NOT start automatically.
+        // The user must tap the preview area or the activate button to start it.
         cameraExecutor = Executors.newSingleThreadExecutor()
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
-            == PackageManager.PERMISSION_GRANTED
-        ) bindCamera()
-        else requestCameraPermission.launch(Manifest.permission.CAMERA)
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -166,8 +178,8 @@ class EggCountActivity : AppCompatActivity() {
         findViewById<View>(R.id.backButton).setOnClickListener { finish() }
         findViewById<View>(R.id.refreshButton).setOnClickListener { resetCounts() }
 
-        captureBtn.setOnClickListener   { captureFrame() }
-        retakeBtn.setOnClickListener    { resumeLive()   }
+        captureBtn.setOnClickListener    { captureFrame() }
+        retakeBtn.setOnClickListener     { resumeLive()   }
         modeSwitchBtn.setOnClickListener {
             if (isLiveMode) pickImageLauncher.launch("image/*")
             else resumeLive()
@@ -184,6 +196,11 @@ class EggCountActivity : AppCompatActivity() {
         findViewById<View>(R.id.nextWeekBtn).setOnClickListener {
             if (weekOffset < 0) { weekOffset++; setupUI() }
         }
+
+        // Tapping the preview area activates the camera when it's off
+        previewView.setOnClickListener {
+            if (imageCapture == null) startCameraIfNeeded()
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -193,7 +210,7 @@ class EggCountActivity : AppCompatActivity() {
     private fun tryLoadDetector() {
         try {
             detector = YoloDetector(this)
-            showBanner("✓ YOLO model ready — point camera at eggs", isError = false, autoHide = true)
+            showBanner("✓ YOLO model ready — tap preview to activate camera", isError = false, autoHide = true)
         } catch (e: Exception) {
             Log.e(TAG, "YoloDetector init failed", e)
             val msg = buildModelErrorMessage(e)
@@ -221,8 +238,25 @@ class EggCountActivity : AppCompatActivity() {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  Camera
+    //  Camera activation — manual trigger only
     // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Activates the camera only when explicitly called by the user.
+     * The camera does NOT start automatically on activity creation.
+     */
+    private fun startCameraIfNeeded() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+            == PackageManager.PERMISSION_GRANTED
+        ) {
+            isLiveMode = true
+            liveScanLabel.text = "● LIVE SCAN"
+            frozenOverlay.visibility = View.GONE
+            bindCamera()
+        } else {
+            requestCameraPermission.launch(Manifest.permission.CAMERA)
+        }
+    }
 
     private fun bindCamera() {
         val future = ProcessCameraProvider.getInstance(this)
@@ -281,18 +315,17 @@ class EggCountActivity : AppCompatActivity() {
     // ─────────────────────────────────────────────────────────────────────────
 
     private fun captureFrame() {
-        val cap = imageCapture
-        if (cap == null) {
-            val bmp = previewView.bitmap
-            if (bmp != null) freezeAndAnalyze(bmp)
-            else toast("Camera not ready yet")
+        // If camera hasn't been activated yet, start it first
+        if (imageCapture == null) {
+            startCameraIfNeeded()
+            toast("Camera activating — try again in a moment")
             return
         }
 
         captureBtn.isEnabled = false
         showBanner("Capturing…", isError = false, autoHide = true)
 
-        cap.takePicture(cameraExecutor, object : ImageCapture.OnImageCapturedCallback() {
+        imageCapture!!.takePicture(cameraExecutor, object : ImageCapture.OnImageCapturedCallback() {
             override fun onCaptureSuccess(proxy: ImageProxy) {
                 val bmp = proxy.toBitmap(); proxy.close()
                 runOnUiThread { freezeAndAnalyze(bmp) }
@@ -329,7 +362,6 @@ class EggCountActivity : AppCompatActivity() {
                 liveScanLabel.text = "● CAPTURED"
                 captureBtn.isEnabled = true
 
-                // Show save button after capture so user can confirm & save
                 saveBtn.visibility = View.VISIBLE
 
                 showBanner(
@@ -351,7 +383,6 @@ class EggCountActivity : AppCompatActivity() {
         captureBtn.visibility = View.VISIBLE
         retakeBtn.visibility  = View.GONE
         modeSwitchBtn.text    = "Pick Photo"
-        // Reset save button back to its original label and hidden state
         saveBtn.text      = "Save Collection"
         saveBtn.isEnabled = true
         saveBtn.visibility = View.GONE
@@ -362,19 +393,6 @@ class EggCountActivity : AppCompatActivity() {
     //  Firebase: Save today's collection to Realtime Database
     // ─────────────────────────────────────────────────────────────────────────
 
-    /**
-     * Data is stored under:
-     *   egg_collections / {dateKey} / total
-     *                              / gradeA
-     *                              / gradeB
-     *                              / gradeC
-     *                              / timestamp
-     *                              / savedBy  (uid of the user who saved)
-     *
-     * Using the date (yyyy-MM-dd) as the node key means one authoritative
-     * record per day.  Subsequent saves on the same day overwrite the node
-     * so the latest scan is always reflected.
-     */
     private fun saveCollectionToDatabase() {
         val total = gradeA + gradeB + gradeC
         if (total == 0) {
@@ -406,16 +424,9 @@ class EggCountActivity : AppCompatActivity() {
             .child(today)
             .setValue(record)
             .addOnSuccessListener {
-                val revenue = total * pricePerEgg
                 showBanner("✓ Saved $total eggs | Revenue: ₱${"%.2f".format(revenue)}", isError = false, autoHide = true)
-                // Keep counts visible after saving — do NOT reset here.
-                // The user can tap "↩ Retake" when they are ready for a new scan.
-                // Update the save button to a "Saved ✓" state so the user knows
-                // the data is recorded, but keep it visible so counts remain on screen.
                 saveBtn.text = "✓ Saved"
                 saveBtn.isEnabled = false
-                // The persistent ValueEventListener on egg_collections will fire
-                // automatically when this write lands, updating the log in real time.
                 toast("Collection saved!")
             }
             .addOnFailureListener { e ->
@@ -430,13 +441,7 @@ class EggCountActivity : AppCompatActivity() {
     //  Firebase: Load collection history for the displayed week
     // ─────────────────────────────────────────────────────────────────────────
 
-    /**
-     * Attaches a realtime ValueEventListener to the egg_collections node.
-     * Any time a new save happens (from this device or another), the log
-     * updates automatically.
-     */
     private fun loadCollectionHistory() {
-        // Remove any previous listener before re-attaching
         historyListener?.let { historyRef?.removeEventListener(it) }
 
         val ref = database.getReference("egg_collections")
@@ -444,7 +449,6 @@ class EggCountActivity : AppCompatActivity() {
 
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                // Build date → record map
                 val records = mutableMapOf<String, Map<String, Any>>()
                 for (child in snapshot.children) {
                     val key  = child.key ?: continue
@@ -452,7 +456,7 @@ class EggCountActivity : AppCompatActivity() {
                     val data = child.value as? Map<String, Any> ?: continue
                     records[key] = data
                 }
-                collectionRecords = records // Cache the records
+                collectionRecords = records
                 runOnUiThread { populateCollectionLog(records) }
             }
 
@@ -465,19 +469,40 @@ class EggCountActivity : AppCompatActivity() {
         historyListener = listener
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Firestore: Centralised egg pricing from farm_data/shared
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Attaches a real-time listener to the farm_data/shared Firestore document.
+     * Reads:
+     *   pricePerEgg   — selling price per quail egg in PHP
+     *   dailyExpenses — default daily operating expenses
+     *
+     * Any change made via the price dialog (or from Firebase console / another
+     * module) is reflected here immediately without restarting the activity.
+     */
+    private fun loadPricingFromFirestore() {
+        pricingListener = firestore
+            .collection("farm_data")
+            .document("shared")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null || snapshot == null || !snapshot.exists()) return@addSnapshotListener
+                snapshot.getDouble("pricePerEgg")?.let { pricePerEgg = it }
+                snapshot.getDouble("dailyExpenses")?.let { dailyExpenses = it }
+                runOnUiThread { updateCountUI() }
+            }
+    }
+
     private fun openCalendarPicker() {
         val cal = Calendar.getInstance()
         val datePicker = DatePickerDialog(this, { _, year, month, day ->
             val selectedCal = Calendar.getInstance().apply { set(year, month, day) }
-            // Calculate weekOffset
-            // First, get the Monday of the current week
             val currentWeekMonday = Calendar.getInstance().apply {
                 set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
             }
-            // Monday of selected week
             val selectedWeekMonday = selectedCal.clone() as Calendar
             selectedWeekMonday.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
-            // Difference in weeks
             val diff = ((selectedWeekMonday.timeInMillis - currentWeekMonday.timeInMillis) / (7 * 24 * 60 * 60 * 1000)).toInt()
             weekOffset = diff
             setupUI()
@@ -485,23 +510,14 @@ class EggCountActivity : AppCompatActivity() {
         datePicker.show()
     }
 
-    /**
-     * Fills the 7-day collection log with data fetched from the database.
-     * Days with no data show zeros (same behaviour as before).
-     */
     private fun populateCollectionLog(records: Map<String, Map<String, Any>>) {
         val container = findViewById<LinearLayout>(R.id.collectionLogList)
         container.removeAllViews()
         val inflater = LayoutInflater.from(this)
         val todayStr = sdf.format(Calendar.getInstance().time)
 
-
-
-
         val cal = Calendar.getInstance().apply {
-            // Set to Monday of the week
             set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
-            // Add weekOffset weeks
             add(Calendar.WEEK_OF_YEAR, weekOffset)
         }
         val dayNames = arrayOf("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
@@ -524,7 +540,6 @@ class EggCountActivity : AppCompatActivity() {
             item.findViewById<TextView>(R.id.logGradeA).text = gA.toString()
             item.findViewById<TextView>(R.id.logGradeB).text = gB.toString()
             item.findViewById<TextView>(R.id.logGradeC).text = gC.toString()
-            // Revenue & profit views (safe — no crash if IDs don't exist yet)
             item.findViewById<TextView>(R.id.logRevenue)?.text   = "₱${"%.2f".format(revenue)}"
             item.findViewById<TextView>(R.id.logNetProfit)?.text = "₱${"%.2f".format(netProfit)}"
             item.findViewById<TextView>(R.id.todayBadge).visibility =
@@ -542,7 +557,6 @@ class EggCountActivity : AppCompatActivity() {
         try { detector?.detect(bmp) ?: emptyList() }
         catch (e: Exception) { Log.e(TAG, "Detection error", e); emptyList() }
 
-    /** Live mode: only count eggs not yet seen (IoU dedup) */
     private fun addNewEggs(results: List<DetectionResult>) {
         for (det in results) {
             val box   = det.boundingBox
@@ -591,14 +605,16 @@ class EggCountActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.gradeAPercent).text = pct(gradeA)
         findViewById<TextView>(R.id.gradeBPercent).text = pct(gradeB)
         findViewById<TextView>(R.id.gradeCPercent).text = pct(gradeC)
-        // Revenue & net profit (safe — no crash if IDs not yet in layout)
         findViewById<TextView>(R.id.revenueValue)?.text   = "₱${"%.2f".format(revenue)}"
         findViewById<TextView>(R.id.netProfitValue)?.text = "₱${"%.2f".format(netProfit)}"
-        // Price label
         findViewById<TextView>(R.id.pricePerEggValue)?.text = "₱${"%.2f".format(pricePerEgg)}/egg"
     }
 
-    /** Shows a dialog to configure price per egg and daily expenses */
+    /**
+     * Shows a dialog to configure price per egg and daily expenses.
+     * Changes are saved back to Firestore (farm_data/shared) so all
+     * modules (Analytics, etc.) immediately see the updated values.
+     */
     private fun showPriceDialog() {
         val ctx = this
         val layout = android.widget.LinearLayout(ctx).apply {
@@ -629,9 +645,23 @@ class EggCountActivity : AppCompatActivity() {
             .setTitle("Revenue Settings")
             .setView(layout)
             .setPositiveButton("Apply") { _, _ ->
-                pricePerEgg   = priceEdit.text.toString().toDoubleOrNull() ?: pricePerEgg
-                dailyExpenses = expenseEdit.text.toString().toDoubleOrNull() ?: dailyExpenses
+                val newPrice    = priceEdit.text.toString().toDoubleOrNull() ?: pricePerEgg
+                val newExpenses = expenseEdit.text.toString().toDoubleOrNull() ?: dailyExpenses
+                pricePerEgg   = newPrice
+                dailyExpenses = newExpenses
                 updateCountUI()
+
+                // Persist centrally to Firestore so Analytics and other modules
+                // automatically pick up the new values via their own listeners.
+                val update = mapOf("pricePerEgg" to newPrice, "dailyExpenses" to newExpenses)
+                firestore.collection("farm_data").document("shared")
+                    .update(update)
+                    .addOnFailureListener {
+                        // Document may not exist yet — use merge to create it
+                        firestore.collection("farm_data").document("shared")
+                            .set(update, SetOptions.merge())
+                    }
+                toast("Pricing updated")
             }
             .setNegativeButton("Cancel", null)
             .show()
@@ -654,7 +684,6 @@ class EggCountActivity : AppCompatActivity() {
         updateCountUI()
         updateWeekLabel()
         populateCollectionLog(collectionRecords)
-        // Hide Save button initially; it appears after a capture
         saveBtn.visibility = View.GONE
     }
 
@@ -695,24 +724,22 @@ class EggCountActivity : AppCompatActivity() {
         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  Lifecycle: manage Realtime Database listener
+    //  Lifecycle
     // ─────────────────────────────────────────────────────────────────────────
 
     override fun onResume() {
         super.onResume()
-        // Re-attach listener every time the screen becomes visible so that
-        // any collections saved from another device (or another session) are
-        // reflected immediately without needing a manual refresh.
         loadCollectionHistory()
+        loadPricingFromFirestore()   // attach real-time pricing listener
         handler.post(timeUpdateRunnable)
     }
 
     override fun onPause() {
         super.onPause()
-        // Detach while off-screen to avoid unnecessary network traffic and
-        // the risk of updating a detached view hierarchy.
         historyListener?.let { historyRef?.removeEventListener(it) }
         historyListener = null
+        pricingListener?.remove()   // detach pricing listener while off-screen
+        pricingListener = null
         handler.removeCallbacks(timeUpdateRunnable)
     }
 
@@ -720,12 +747,12 @@ class EggCountActivity : AppCompatActivity() {
         super.onDestroy()
         cameraExecutor.shutdown()
         detector?.close()
-        // Belt-and-suspenders: remove listener if onPause was somehow skipped
         historyListener?.let { historyRef?.removeEventListener(it) }
+        pricingListener?.remove()
     }
 
     companion object {
-        private const val TAG        = "EggCountActivity"
-        private const val IOU_DEDUP  = 0.4f
+        private const val TAG       = "EggCountActivity"
+        private const val IOU_DEDUP = 0.4f
     }
 }
