@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <cache-path name="camera_photos" path="." />
+    <external-files-path name="documents" path="Documents/" />
 </paths>
+
