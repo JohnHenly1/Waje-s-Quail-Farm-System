@@ -54,8 +54,6 @@ class AlertsActivity : AppCompatActivity() {
 
         findViewById<View>(R.id.clearAllButton).setOnClickListener {
             GlobalData.clearAlerts()
-            // Also clear from Firestore if user is admin?
-            // For now, just local.
             updateAlertsList()
             Toast.makeText(this, "All local alerts cleared", Toast.LENGTH_SHORT).show()
         }
@@ -84,13 +82,16 @@ class AlertsActivity : AppCompatActivity() {
         if (!accountManager.isScheduleEnabled()) return
         
         val now = Calendar.getInstance()
-        val timestamp = SimpleDateFormat("yyyy/MM/dd hh:mm a", Locale.getDefault()).format(now.time)
+        // Use a stable timestamp for the day to prevent per-minute duplicates
+        val dayStamp = SimpleDateFormat("yyyy/MM/dd", Locale.getDefault()).format(now.time)
 
         FirebaseFirestore.getInstance().collection("farm_data")
             .document("shared").collection("tasks")
             .whereEqualTo("status", "Pending")
             .get()
             .addOnSuccessListener { snapshots ->
+                val existingAlerts = GlobalData.getAlerts()
+                
                 for (doc in snapshots) {
                     val year = doc.getLong("year")?.toInt() ?: 0
                     val month = doc.getLong("month")?.toInt() ?: 0
@@ -101,7 +102,14 @@ class AlertsActivity : AppCompatActivity() {
                     taskDate.set(year, month, day, 23, 59) // End of that day
                     
                     if (taskDate.before(now)) {
-                        GlobalData.addAlert("Missed Task: $title was scheduled for ${day}/${month + 1}/${year}", timestamp, "Schedule")
+                        val message = "Missed Task: $title was scheduled for ${day}/${month + 1}/${year}"
+                        
+                        // Check if we already alerted about this SPECIFIC missed task today
+                        val alreadyNotified = existingAlerts.any { it.message == message }
+                        
+                        if (!alreadyNotified) {
+                            GlobalData.addAlert(message, "$dayStamp 11:59 PM", "Schedule")
+                        }
                     }
                 }
                 updateAlertsList()
@@ -144,16 +152,16 @@ class AlertsActivity : AppCompatActivity() {
                 val eggHour = selectedTime[0].toInt()
                 val eggMinute = selectedTime[1].toInt()
                 accountManager.saveNotificationPreferences(
-                    switchAlerts.isChecked(),
-                    switchGlobalData.isChecked(),
-                    switchSchedule.isChecked(),
-                    switchEggCount.isChecked(),
+                    switchAlerts.isChecked,
+                    switchGlobalData.isChecked,
+                    switchSchedule.isChecked,
+                    switchEggCount.isChecked,
                     eggHour,
                     eggMinute
                 )
                 Toast.makeText(this, "Preferences saved", Toast.LENGTH_SHORT).show()
                 // Schedule or cancel egg count notification
-                if (switchEggCount.isChecked()) {
+                if (switchEggCount.isChecked) {
                     scheduleEggCountNotification(eggHour, eggMinute)
                 } else {
                     cancelEggCountNotification()
@@ -167,7 +175,6 @@ class AlertsActivity : AppCompatActivity() {
         super.onResume()
         updateAlertsList()
         
-        // Listen to FarmRepository alerts (Firestore)
         farmAlertsListener = FarmRepository.listenToAlerts { alerts ->
             val sdf = SimpleDateFormat("yyyy/MM/dd hh:mm a", Locale.getDefault())
             
@@ -195,8 +202,7 @@ class AlertsActivity : AppCompatActivity() {
     }
 
     private fun updateAlertsList() {
-        val container = findViewById<LinearLayout>(R.id.alertsContainer)
-        if (container == null) return
+        val container = findViewById<LinearLayout>(R.id.alertsContainer) ?: return
         
         container.removeAllViews()
         val inflater = LayoutInflater.from(this)
@@ -225,7 +231,6 @@ class AlertsActivity : AppCompatActivity() {
                 actionTxt.text = alert.message
                 dateTxt.text = alert.timestamp
 
-                // Customizing based on type
                 when (alert.type) {
                     "System" -> {
                         icon.setImageResource(R.drawable.lc_egg)
@@ -259,11 +264,7 @@ class AlertsActivity : AppCompatActivity() {
                     }
                 }
 
-                if (alert.isRead) {
-                    itemView.alpha = 0.6f
-                } else {
-                    itemView.alpha = 1.0f
-                }
+                itemView.alpha = if (alert.isRead) 0.6f else 1.0f
 
                 slideUp.startOffset = (index * 50).toLong()
                 itemView.startAnimation(slideUp)
@@ -282,6 +283,7 @@ class AlertsActivity : AppCompatActivity() {
             set(Calendar.HOUR_OF_DAY, hour)
             set(Calendar.MINUTE, minute)
             set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
             if (timeInMillis <= System.currentTimeMillis()) {
                 add(Calendar.DAY_OF_YEAR, 1)
             }
@@ -316,6 +318,7 @@ class AlertsActivity : AppCompatActivity() {
                     description = "Daily egg count reminders"
                     enableLights(true)
                     enableVibration(true)
+                    setLockscreenVisibility(android.app.Notification.VISIBILITY_PUBLIC)
                 }
                 val nm = context.getSystemService(android.app.NotificationManager::class.java)
                 nm?.createNotificationChannel(channel)
@@ -341,10 +344,11 @@ class AlertsActivity : AppCompatActivity() {
                     .setSmallIcon(R.drawable.ic_notifications)
                     .setContentTitle("Daily Egg Count Reminder")
                     .setContentText(message)
-                    .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+                    .setPriority(androidx.core.app.NotificationCompat.PRIORITY_MAX)
                     .setDefaults(androidx.core.app.NotificationCompat.DEFAULT_ALL)
                     .setContentIntent(pendingIntent)
                     .setAutoCancel(true)
+                    .setVisibility(androidx.core.app.NotificationCompat.VISIBILITY_PUBLIC)
 
                 try {
                     androidx.core.app.NotificationManagerCompat.from(context).notify(2002, builder.build())
@@ -369,6 +373,7 @@ class AlertsActivity : AppCompatActivity() {
                 set(Calendar.HOUR_OF_DAY, hour)
                 set(Calendar.MINUTE, minute)
                 set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
             }
             
             alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, calendar.timeInMillis, pendingIntent)

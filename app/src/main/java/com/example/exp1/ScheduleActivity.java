@@ -874,7 +874,6 @@ public class ScheduleActivity extends AppCompatActivity {
                     taskView.setAlpha(0.7f);
                     taskView.setClickable(false);
                     statusIndicator.setBackgroundColor(Color.parseColor("#DC2626")); // Red for missed
-                    // Show "Missed" label?
                     titleTv.setText(task.title + " (MISSED)");
                 } else {
                     taskView.setOnClickListener(v -> {
@@ -925,6 +924,7 @@ public class ScheduleActivity extends AppCompatActivity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel("task_reminder_channel", "Task Reminders", NotificationManager.IMPORTANCE_HIGH);
             channel.setDescription("Notifications for farm tasks");
+            channel.setLockscreenVisibility(NotificationCompat.VISIBILITY_PUBLIC);
             NotificationManager nm = getSystemService(NotificationManager.class);
             if (nm != null) nm.createNotificationChannel(channel);
         }
@@ -1003,13 +1003,17 @@ public class ScheduleActivity extends AppCompatActivity {
         if (am == null) return;
         Calendar calendar = Calendar.getInstance();
         calendar.set(task.year, task.month, task.day, hour, minute, 0);
+        calendar.set(Calendar.SECOND, 0);
         calendar.set(Calendar.MILLISECOND, 0);
         if (calendar.before(Calendar.getInstance())) return;
+        
         Intent intent = new Intent(this, TaskAlarmReceiver.class);
         intent.putExtra("taskTitle", task.title);
         intent.putExtra("taskCategory", task.category);
+        
         int rc = (task.title + task.year + task.month + task.day + hour + minute).hashCode();
         PendingIntent pi = PendingIntent.getBroadcast(this, rc, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (am.canScheduleExactAlarms()) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, calendar.getTimeInMillis(), pi);
             else am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, calendar.getTimeInMillis(), pi);
@@ -1082,15 +1086,20 @@ public class ScheduleActivity extends AppCompatActivity {
             String title = intent.getStringExtra("taskTitle");
             String category = intent.getStringExtra("taskCategory");
             createChannel(context);
+            
             String timestamp = new SimpleDateFormat("yyyy/MM/dd hh:mm a", Locale.getDefault()).format(new Date());
             try {
                 AccountManager accountManager = new AccountManager(context);
                 if (!accountManager.isScheduleEnabled()) return;
-                if (accountManager.isGlobalDataEnabled()) GlobalData.INSTANCE.addAlert(context.getString(R.string.task_reminder_title, title) + " (" + category + ")", timestamp, "System");
+                if (accountManager.isGlobalDataEnabled()) {
+                    GlobalData.INSTANCE.addAlert(context.getString(R.string.task_reminder_title, title) + " (" + category + ")", timestamp, "System");
+                }
             } catch (Exception e) { e.printStackTrace(); }
+            
             Intent alertIntent = new Intent(context, AlertsActivity.class);
             alertIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             PendingIntent pi = PendingIntent.getActivity(context, 0, alertIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            
             NotificationCompat.Builder builder = new NotificationCompat.Builder(context, "task_reminder_channel")
                 .setSmallIcon(R.drawable.ic_notifications)
                 .setContentTitle(context.getString(R.string.task_reminder_title, title))
@@ -1100,16 +1109,21 @@ public class ScheduleActivity extends AppCompatActivity {
                 .setContentIntent(pi)
                 .setAutoCancel(true)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
+                
             try {
                 NotificationManagerCompat nm = NotificationManagerCompat.from(context);
-                nm.notify((int) System.currentTimeMillis(), builder.build());
+                // Use hash of title and category as ID to prevent multiple notification icons for the same task
+                int notificationId = (title + category).hashCode();
+                nm.notify(notificationId, builder.build());
             } catch (SecurityException e) { e.printStackTrace(); }
         }
+        
         private static void createChannel(Context context) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 NotificationChannel channel = new NotificationChannel("task_reminder_channel", "Task Reminders", NotificationManager.IMPORTANCE_HIGH);
                 channel.setDescription("Notifications for farm tasks");
-                channel.enableLights(true); channel.enableVibration(true);
+                channel.enableLights(true); 
+                channel.enableVibration(true);
                 channel.setLockscreenVisibility(NotificationCompat.VISIBILITY_PUBLIC);
                 NotificationManager nm = context.getSystemService(NotificationManager.class);
                 if (nm != null) nm.createNotificationChannel(channel);
