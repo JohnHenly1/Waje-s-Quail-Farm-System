@@ -122,30 +122,41 @@ class RegisterActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            checkRoleAvailability(db, role) { available ->
-                if (!available) {
-                    Toast.makeText(this, "The limit for $role has been reached.", Toast.LENGTH_LONG).show()
-                } else {
-                    val requestMap = hashMapOf(
-                        "name" to name,
-                        "email" to email,
-                        "status" to "pending",
-                        "role" to role,
-                        "requestedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
-                    )
+            // Prevent duplicate email requests
+            db.collection("user_access").document(email).get()
+                .addOnSuccessListener { doc ->
+                    if (doc.exists()) {
+                        Toast.makeText(this, "This email is already registered or has a pending request.", Toast.LENGTH_LONG).show()
+                    } else {
+                        checkRoleAvailability(db, role) { available ->
+                            if (!available) {
+                                Toast.makeText(this, "The limit for $role has been reached.", Toast.LENGTH_LONG).show()
+                            } else {
+                                val requestMap = hashMapOf(
+                                    "name" to name,
+                                    "email" to email,
+                                    "status" to "pending",
+                                    "role" to role,
+                                    "requestedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
+                                )
 
-                    db.collection("user_access")
-                        .document(email)
-                        .set(requestMap)
-                        .addOnSuccessListener {
-                            dialog.dismiss()
-                            startPendingVerification(email)
+                                db.collection("user_access")
+                                    .document(email)
+                                    .set(requestMap)
+                                    .addOnSuccessListener {
+                                        dialog.dismiss()
+                                        startPendingVerification(email)
+                                    }
+                                    .addOnFailureListener { e ->
+                                        Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                            }
                         }
-                        .addOnFailureListener { e ->
-                            Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                        }
+                    }
                 }
-            }
+                .addOnFailureListener { e ->
+                    Toast.makeText(this, "Error checking email: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
         }
     }
 

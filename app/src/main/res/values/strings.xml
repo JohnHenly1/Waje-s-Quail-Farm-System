@@ -137,6 +137,13 @@
     <string name="initial_farm_setup">Initial Farm Setup (Owner)</string>
     <string name="role_available">Available: %1$d/%2$d</string>
     <string name="role_full">Role Full</string>
+    <string name="forgot_password_label">Forgot Password?</string>
+    <string name="reset_password">Reset Password</string>
+    <string name="new_password_hint">Enter New Password</string>
+    <string name="update_password">Update Password</string>
+    <string name="verify_email_msg">Please enter your email to verify your account.</string>
+    <string name="email_not_found">Email not found in our records</string>
+    <string name="password_updated_success">Password updated successfully!</string>
 
     <!-- Profile Dialog Strings -->
     <string name="syncing_profile">Syncing Profile&#8230;</string>
@@ -224,6 +231,7 @@
     <string name="status_pending">Pending</string>
     <string name="status_ongoing">Ongoing</string>
     <string name="status_done">Done</string>
+    <string name="status_missed">MISSED</string>
 
     <string-array name="task_categories">
         <item>Feeding</item>

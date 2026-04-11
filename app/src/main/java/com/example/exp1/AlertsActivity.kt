@@ -2,6 +2,7 @@ package com.example.exp1
 
 import android.app.AlarmManager
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -19,6 +20,12 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.firestore.FirebaseFirestore
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 class AlertsActivity : AppCompatActivity() {
     private lateinit var accountManager: AccountManager
@@ -47,8 +54,10 @@ class AlertsActivity : AppCompatActivity() {
 
         findViewById<View>(R.id.clearAllButton).setOnClickListener {
             GlobalData.clearAlerts()
+            // Also clear from Firestore if user is admin?
+            // For now, just local.
             updateAlertsList()
-            Toast.makeText(this, "All alerts cleared", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "All local alerts cleared", Toast.LENGTH_SHORT).show()
         }
 
         findViewById<View>(R.id.markAllReadBtn).setOnClickListener {
@@ -66,6 +75,37 @@ class AlertsActivity : AppCompatActivity() {
 
         updateAlertsList()
         NavigationHelper.setupBottomNavigation(this)
+        
+        // Check for missed tasks immediately
+        checkMissedTasks()
+    }
+
+    private fun checkMissedTasks() {
+        if (!accountManager.isScheduleEnabled()) return
+        
+        val now = Calendar.getInstance()
+        val timestamp = SimpleDateFormat("yyyy/MM/dd hh:mm a", Locale.getDefault()).format(now.time)
+
+        FirebaseFirestore.getInstance().collection("farm_data")
+            .document("shared").collection("tasks")
+            .whereEqualTo("status", "Pending")
+            .get()
+            .addOnSuccessListener { snapshots ->
+                for (doc in snapshots) {
+                    val year = doc.getLong("year")?.toInt() ?: 0
+                    val month = doc.getLong("month")?.toInt() ?: 0
+                    val day = doc.getLong("day")?.toInt() ?: 0
+                    val title = doc.getString("title") ?: "Task"
+                    
+                    val taskDate = Calendar.getInstance()
+                    taskDate.set(year, month, day, 23, 59) // End of that day
+                    
+                    if (taskDate.before(now)) {
+                        GlobalData.addAlert("Missed Task: $title was scheduled for ${day}/${month + 1}/${year}", timestamp, "Schedule")
+                    }
+                }
+                updateAlertsList()
+            }
     }
 
     private fun showNotificationPrefsDialog() {
@@ -126,21 +166,25 @@ class AlertsActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updateAlertsList()
-        // Listen to FarmRepository alerts
+        
+        // Listen to FarmRepository alerts (Firestore)
         farmAlertsListener = FarmRepository.listenToAlerts { alerts ->
-            // Add new alerts to GlobalData if they don't exist
+            val sdf = SimpleDateFormat("yyyy/MM/dd hh:mm a", Locale.getDefault())
+            
             for (alert in alerts) {
                 val message = alert["message"] as? String ?: continue
-                val timestamp = alert["timestamp"] as? String ?: continue
                 val type = alert["type"] as? String ?: "Inventory"
-                val isRead = alert["isRead"] as? Boolean ?: false
-                // Check if this alert already exists in GlobalData
-                val existing = GlobalData.getAlerts().find { it.message == message && it.timestamp == timestamp }
-                if (existing == null) {
-                    GlobalData.addAlert(message, timestamp, type)
+                
+                val firestoreTs = alert["timestamp"]
+                val timestampStr = when (firestoreTs) {
+                    is com.google.firebase.Timestamp -> sdf.format(firestoreTs.toDate())
+                    is String -> firestoreTs
+                    else -> "Just now"
                 }
+
+                GlobalData.addAlert(message, timestampStr, type)
             }
-            updateAlertsList()
+            runOnUiThread { updateAlertsList() }
         }
     }
 
@@ -152,15 +196,17 @@ class AlertsActivity : AppCompatActivity() {
 
     private fun updateAlertsList() {
         val container = findViewById<LinearLayout>(R.id.alertsContainer)
+        if (container == null) return
+        
         container.removeAllViews()
         val inflater = LayoutInflater.from(this)
 
         val alerts = GlobalData.getAlerts()
 
         // Update counters
-        findViewById<TextView>(R.id.totalCount).text = alerts.size.toString()
-        findViewById<TextView>(R.id.criticalCount).text = alerts.count { it.type == "Critical" }.toString()
-        findViewById<TextView>(R.id.warningCount).text = alerts.count { it.type == "System" }.toString()
+        findViewById<TextView>(R.id.totalCount)?.text = alerts.size.toString()
+        findViewById<TextView>(R.id.criticalCount)?.text = alerts.count { it.type == "Critical" }.toString()
+        findViewById<TextView>(R.id.warningCount)?.text = alerts.count { it.type == "System" || it.type == "Inventory" || it.type == "Schedule" }.toString()
 
         if (alerts.isEmpty()) {
             val emptyTxt = TextView(this)
@@ -180,19 +226,45 @@ class AlertsActivity : AppCompatActivity() {
                 dateTxt.text = alert.timestamp
 
                 // Customizing based on type
-                if (alert.type == "System") {
-                    icon.setImageResource(R.drawable.ic_schedule)
-                    icon.setColorFilter(getColor(R.color.dark_green))
+                when (alert.type) {
+                    "System" -> {
+                        icon.setImageResource(R.drawable.lc_egg)
+                        icon.setBackgroundResource(R.drawable.rounded_green_bg)
+                        icon.backgroundTintList = getColorStateList(R.color.light_green)
+                        icon.setColorFilter(getColor(R.color.dark_green))
+                    }
+                    "Inventory" -> {
+                        icon.setImageResource(R.drawable.ic_shopping_bag)
+                        icon.setBackgroundResource(R.drawable.rounded_green_bg)
+                        icon.backgroundTintList = getColorStateList(R.color.light_orange)
+                        icon.setColorFilter(getColor(R.color.orange))
+                    }
+                    "Schedule" -> {
+                        icon.setImageResource(R.drawable.ic_calendar)
+                        icon.setBackgroundResource(R.drawable.rounded_green_bg)
+                        icon.backgroundTintList = getColorStateList(R.color.light_blue)
+                        icon.setColorFilter(getColor(R.color.dark_blue))
+                    }
+                    "Critical" -> {
+                        icon.setImageResource(R.drawable.ic_alert_circle)
+                        icon.setBackgroundResource(R.drawable.rounded_green_bg)
+                        icon.backgroundTintList = getColorStateList(R.color.light_red)
+                        icon.setColorFilter(getColor(R.color.red))
+                    }
+                    else -> {
+                        icon.setImageResource(R.drawable.ic_info)
+                        icon.setBackgroundResource(R.drawable.rounded_green_bg)
+                        icon.backgroundTintList = getColorStateList(R.color.light_gray)
+                        icon.setColorFilter(getColor(R.color.dark_gray))
+                    }
                 }
 
-                // Dim the alert if it's already read
                 if (alert.isRead) {
-                    itemView.alpha = 0.5f
+                    itemView.alpha = 0.6f
                 } else {
                     itemView.alpha = 1.0f
                 }
 
-                // Cascading animation effect
                 slideUp.startOffset = (index * 50).toLong()
                 itemView.startAnimation(slideUp)
 
@@ -202,16 +274,16 @@ class AlertsActivity : AppCompatActivity() {
     }
 
     private fun scheduleEggCountNotification(hour: Int, minute: Int) {
-        val alarmManager = getSystemService(ALARM_SERVICE) as AlarmManager
+        val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(this, EggCountNotificationReceiver::class.java)
-        val pendingIntent = PendingIntent.getBroadcast(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val pendingIntent = PendingIntent.getBroadcast(this, 1001, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
-        val calendar = java.util.Calendar.getInstance().apply {
-            set(java.util.Calendar.HOUR_OF_DAY, hour)
-            set(java.util.Calendar.MINUTE, minute)
-            set(java.util.Calendar.SECOND, 0)
+        val calendar = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, hour)
+            set(Calendar.MINUTE, minute)
+            set(Calendar.SECOND, 0)
             if (timeInMillis <= System.currentTimeMillis()) {
-                add(java.util.Calendar.DAY_OF_YEAR, 1) // Schedule for tomorrow if time has passed
+                add(Calendar.DAY_OF_YEAR, 1)
             }
         }
 
@@ -227,16 +299,14 @@ class AlertsActivity : AppCompatActivity() {
     }
 
     private fun cancelEggCountNotification() {
-        val alarmManager = getSystemService(ALARM_SERVICE) as AlarmManager
+        val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(this, EggCountNotificationReceiver::class.java)
-        val pendingIntent = PendingIntent.getBroadcast(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val pendingIntent = PendingIntent.getBroadcast(this, 1001, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         alarmManager.cancel(pendingIntent)
     }
 
-    // BroadcastReceiver for egg count notifications
     class EggCountNotificationReceiver : android.content.BroadcastReceiver() {
-        override fun onReceive(context: android.content.Context, intent: Intent) {
-            // Create notification channel
+        override fun onReceive(context: Context, intent: Intent) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val channel = android.app.NotificationChannel(
                     "egg_count_channel",
@@ -246,7 +316,6 @@ class AlertsActivity : AppCompatActivity() {
                     description = "Daily egg count reminders"
                     enableLights(true)
                     enableVibration(true)
-                    setLockscreenVisibility(androidx.core.app.NotificationCompat.VISIBILITY_PUBLIC)
                 }
                 val nm = context.getSystemService(android.app.NotificationManager::class.java)
                 nm?.createNotificationChannel(channel)
@@ -255,18 +324,15 @@ class AlertsActivity : AppCompatActivity() {
             val accountManager = AccountManager(context)
             if (!accountManager.isAlertsEnabled() || !accountManager.isEggCountEnabled()) return
 
-            // Get today's egg count from Firebase
-            val database = com.google.firebase.database.FirebaseDatabase.getInstance()
-            val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+            val database = FirebaseDatabase.getInstance()
+            val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
             database.getReference("egg_collections").child(today).get().addOnSuccessListener { snapshot ->
                 val total = (snapshot.child("total").value as? Long)?.toInt() ?: 0
-                val message = "Today's egg count: $total eggs"
+                val message = "Today's egg count summary: $total eggs collected."
 
-                // Add to GlobalData
-                val timestamp = java.text.SimpleDateFormat("yyyy/MM/dd hh:mm a", java.util.Locale.getDefault()).format(java.util.Date())
+                val timestamp = SimpleDateFormat("yyyy/MM/dd hh:mm a", Locale.getDefault()).format(Date())
                 GlobalData.addAlert(message, timestamp, "System")
 
-                // Show notification
                 val notificationIntent = Intent(context, AlertsActivity::class.java)
                 notificationIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 val pendingIntent = PendingIntent.getActivity(context, 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
@@ -279,14 +345,33 @@ class AlertsActivity : AppCompatActivity() {
                     .setDefaults(androidx.core.app.NotificationCompat.DEFAULT_ALL)
                     .setContentIntent(pendingIntent)
                     .setAutoCancel(true)
-                    .setVisibility(androidx.core.app.NotificationCompat.VISIBILITY_PUBLIC)
 
                 try {
-                    androidx.core.app.NotificationManagerCompat.from(context).notify((System.currentTimeMillis() % Int.MAX_VALUE).toInt(), builder.build())
+                    androidx.core.app.NotificationManagerCompat.from(context).notify(2002, builder.build())
                 } catch (e: SecurityException) {
                     e.printStackTrace()
                 }
+                
+                // Reschedule for tomorrow
+                val hour = accountManager.getEggCountHour()
+                val minute = accountManager.getEggCountMinute()
+                rescheduleNext(context, hour, minute)
             }
+        }
+        
+        private fun rescheduleNext(context: Context, hour: Int, minute: Int) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val intent = Intent(context, EggCountNotificationReceiver::class.java)
+            val pendingIntent = PendingIntent.getBroadcast(context, 1001, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            
+            val calendar = Calendar.getInstance().apply {
+                add(Calendar.DAY_OF_YEAR, 1)
+                set(Calendar.HOUR_OF_DAY, hour)
+                set(Calendar.MINUTE, minute)
+                set(Calendar.SECOND, 0)
+            }
+            
+            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, calendar.timeInMillis, pendingIntent)
         }
     }
 }

@@ -96,6 +96,35 @@
             android:paddingStart="12dp"
             android:textSize="16sp" />
 
+        <!-- Edit Buffer (Grace Period) -->
+        <LinearLayout
+            android:id="@+id/layoutBuffer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="Modification Window (mins prior)"
+                android:textColor="@color/dark_green"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <EditText
+                android:id="@+id/editModificationBuffer"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/rounded_corner"
+                android:hint="10-60 mins"
+                android:inputType="number"
+                android:padding="12dp"
+                android:textSize="16sp" />
+        </LinearLayout>
+
         <!-- Smart Selection Toolbox -->
         <TextView
             android:layout_width="wrap_content"

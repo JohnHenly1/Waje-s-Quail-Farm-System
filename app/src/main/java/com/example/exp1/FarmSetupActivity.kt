@@ -3,6 +3,8 @@ package com.example.exp1
 import android.app.DatePickerDialog
 import android.content.Intent
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.util.Log
 import android.widget.EditText
 import android.widget.ImageView
@@ -16,6 +18,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
+import com.google.android.material.textfield.TextInputLayout
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FirebaseFirestore
@@ -41,6 +44,7 @@ class FarmSetupActivity : AppCompatActivity() {
     private lateinit var setupAddressState: EditText
     private lateinit var setupAddressPostal: EditText
     private lateinit var setupPassword: EditText
+    private lateinit var setupPasswordLayout: TextInputLayout
     private lateinit var ownerProfilePic: ImageView
     
     private val calendar = Calendar.getInstance()
@@ -72,12 +76,28 @@ class FarmSetupActivity : AppCompatActivity() {
         setupAddressState = findViewById(R.id.setupAddressState)
         setupAddressPostal = findViewById(R.id.setupAddressPostal)
         setupPassword = findViewById(R.id.setupPassword)
+        setupPasswordLayout = setupPassword.parent.parent as TextInputLayout
         ownerProfilePic = findViewById(R.id.ownerProfilePic)
 
         // Setup Birthday Date Picker
         setupBirthday.setOnClickListener {
             showDatePicker()
         }
+
+        // Auto-detect password format
+        setupPassword.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                val pass = s.toString()
+                if (pass.isNotEmpty()) {
+                    val error = getPasswordStrengthError(pass)
+                    setupPasswordLayout.error = error
+                } else {
+                    setupPasswordLayout.error = null
+                }
+            }
+        })
 
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(getString(R.string.default_web_client_id))
@@ -123,6 +143,7 @@ class FarmSetupActivity : AppCompatActivity() {
             // Strong Password Restriction
             val passwordError = getPasswordStrengthError(pass)
             if (passwordError != null) {
+                setupPasswordLayout.error = passwordError
                 Toast.makeText(this, passwordError, Toast.LENGTH_LONG).show()
                 return@setOnClickListener
             }

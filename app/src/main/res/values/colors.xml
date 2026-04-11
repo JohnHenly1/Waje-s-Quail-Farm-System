@@ -11,7 +11,10 @@
     <color name="gray">#888</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="dark_blue"></color>
+    <color name="dark_blue">#1976D2</color>
+    <color name="light_blue">#E3F2FD</color>
+    <color name="red">#D32F2F</color>
+    <color name="light_red">#FFEBEE</color>
     <color name="lime">#32CD32</color>
 
     <!-- Dashboard colors -->

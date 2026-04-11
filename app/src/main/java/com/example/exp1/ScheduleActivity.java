@@ -32,7 +32,6 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
-//Alerts mostly imports
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -42,14 +41,12 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
-//Firebase Imports (important connection to the firebase)
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
-//Calendar mostly imports
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -98,7 +95,6 @@ public class ScheduleActivity extends AppCompatActivity {
         monthNames = getResources().getStringArray(R.array.month_names);
 
         cameraHelper = new CameraHelper(this, (uri, results) -> {
-            // Count detections
             int gradeA = 0, gradeB = 0, gradeC = 0;
             for (DetectionResult r : results) {
                 switch (r.getLabel()) {
@@ -120,7 +116,6 @@ public class ScheduleActivity extends AppCompatActivity {
             currentUserEmail = "default_user";
         }
 
-        // gET USER ROLE----------------------------------------------------------------------------
         AccountManager accountManager = new AccountManager(this);
         roleManager = new RoleManager(accountManager.getCurrentRole());
 
@@ -130,7 +125,6 @@ public class ScheduleActivity extends AppCompatActivity {
             return insets;
         });
 
-        // This is calendar-------------------------------------------------------------------------
         today = Calendar.getInstance();
         selectedDate = (Calendar) today.clone();
         currentWeekCalendar = (Calendar) today.clone();
@@ -233,7 +227,6 @@ public class ScheduleActivity extends AppCompatActivity {
                 });
     }
 
-    // Request Notification from phone---------------------------------------------------------------
     private void requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
@@ -293,7 +286,6 @@ public class ScheduleActivity extends AppCompatActivity {
                 });
     }
 
-    // Bulk Delete/ Delete all Task-----------------------------------------------------------------
     private void bulkDeleteFromFirestore(List<Task> tasksToDelete) {
         com.google.firebase.firestore.WriteBatch batch = db.batch();
         for (Task task : tasksToDelete) {
@@ -479,50 +471,62 @@ public class ScheduleActivity extends AppCompatActivity {
 
         btnFullYear.setOnClickListener(v -> {
             View yearDialogView = LayoutInflater.from(this).inflate(R.layout.dialog_year_range, null);
-            EditText editStartYear = yearDialogView.findViewById(R.id.editStartYear);
-            EditText editEndYear = yearDialogView.findViewById(R.id.editEndYear);
+            TextView textStartDate = yearDialogView.findViewById(R.id.textStartDate);
+            TextView textEndDate = yearDialogView.findViewById(R.id.textEndDate);
             RadioGroup rgFilter = yearDialogView.findViewById(R.id.rgYearFilter);
-            editStartYear.setText(String.valueOf(viewCalendar.get(Calendar.YEAR)));
-            editEndYear.setText(String.valueOf(viewCalendar.get(Calendar.YEAR)));
+            
+            final Calendar startCal = Calendar.getInstance();
+            final Calendar endCal = Calendar.getInstance();
+            endCal.set(Calendar.MONTH, Calendar.DECEMBER);
+            endCal.set(Calendar.DAY_OF_MONTH, 31);
+            
+            SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+            textStartDate.setText(df.format(startCal.getTime()));
+            textEndDate.setText(df.format(endCal.getTime()));
+            
+            textStartDate.setOnClickListener(vStart -> {
+                new DatePickerDialog(this, (view, year, month, day) -> {
+                    startCal.set(year, month, day);
+                    textStartDate.setText(df.format(startCal.getTime()));
+                }, startCal.get(Calendar.YEAR), startCal.get(Calendar.MONTH), startCal.get(Calendar.DAY_OF_MONTH)).show();
+            });
+            
+            textEndDate.setOnClickListener(vEnd -> {
+                new DatePickerDialog(this, (view, year, month, day) -> {
+                    endCal.set(year, month, day);
+                    textEndDate.setText(df.format(endCal.getTime()));
+                }, endCal.get(Calendar.YEAR), endCal.get(Calendar.MONTH), endCal.get(Calendar.DAY_OF_MONTH)).show();
+            });
 
             new AlertDialog.Builder(this)
                     .setTitle(getString(R.string.select_year_range))
                     .setView(yearDialogView)
                     .setPositiveButton(getString(R.string.confirm), (d, w) -> {
                         try {
-                            int startY = Integer.parseInt(editStartYear.getText().toString());
-                            int endY = Integer.parseInt(editEndYear.getText().toString());
-                            if (startY > endY) { Toast.makeText(this, getString(R.string.start_year_after_end), Toast.LENGTH_SHORT).show(); return; }
+                            if (startCal.after(endCal)) { Toast.makeText(this, getString(R.string.start_year_after_end), Toast.LENGTH_SHORT).show(); return; }
 
                             int checkedId = rgFilter.getCheckedRadioButtonId();
                             if (checkedId == R.id.rbYearlyWeekdays) selectedRecurrence[0] = getString(R.string.recur_yearly_weekdays);
                             else if (checkedId == R.id.rbYearlyWeekends) selectedRecurrence[0] = getString(R.string.recur_yearly_weekends);
                             else selectedRecurrence[0] = getString(R.string.recur_yearly);
 
-                            Calendar cal = Calendar.getInstance();
+                            Calendar cal = (Calendar) startCal.clone();
                             cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0);
-                            for (int y = startY; y <= endY; y++) {
-                                cal.set(Calendar.YEAR, y);
-                                for (int m = 0; m < 12; m++) {
-                                    cal.set(Calendar.MONTH, m);
-                                    int days = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
-                                    for (int d_i = 1; d_i <= days; d_i++) {
-                                        cal.set(Calendar.DAY_OF_MONTH, d_i);
-                                        int dow = cal.get(Calendar.DAY_OF_WEEK);
-
-                                        boolean match = true;
-                                        if (checkedId == R.id.rbYearlyWeekdays) {
-                                            match = (dow != Calendar.SATURDAY && dow != Calendar.SUNDAY);
-                                        } else if (checkedId == R.id.rbYearlyWeekends) {
-                                            match = (dow == Calendar.SATURDAY || dow == Calendar.SUNDAY);
-                                        }
-
-                                        if (match) {
-                                            long key = cal.getTimeInMillis();
-                                            if (!selectedDates.contains(key)) selectedDates.add(key);
-                                        }
-                                    }
+                            
+                            while (!cal.after(endCal)) {
+                                int dow = cal.get(Calendar.DAY_OF_WEEK);
+                                boolean match = true;
+                                if (checkedId == R.id.rbYearlyWeekdays) {
+                                    match = (dow != Calendar.SATURDAY && dow != Calendar.SUNDAY);
+                                } else if (checkedId == R.id.rbYearlyWeekends) {
+                                    match = (dow == Calendar.SATURDAY || dow == Calendar.SUNDAY);
                                 }
+
+                                if (match) {
+                                    long key = cal.getTimeInMillis();
+                                    if (!selectedDates.contains(key)) selectedDates.add(key);
+                                }
+                                cal.add(Calendar.DAY_OF_MONTH, 1);
                             }
                             updateGrid.run();
                         } catch (Exception e) { Toast.makeText(this, getString(R.string.invalid_year), Toast.LENGTH_SHORT).show(); }
@@ -568,7 +572,6 @@ public class ScheduleActivity extends AppCompatActivity {
             if (title.isEmpty()) { Toast.makeText(this, getString(R.string.task_title_empty), Toast.LENGTH_SHORT).show(); return; }
             if (selectedDates.isEmpty()) { Toast.makeText(this, getString(R.string.please_select_date), Toast.LENGTH_SHORT).show(); return; }
 
-            // SHOW PREVIEW DIALOG BEFORE SAVING
             View previewView = LayoutInflater.from(this).inflate(R.layout.dialog_schedule_preview, null);
             ((TextView) previewView.findViewById(R.id.previewTitle)).setText(title);
             ((TextView) previewView.findViewById(R.id.previewCategory)).setText(category);
@@ -580,18 +583,16 @@ public class ScheduleActivity extends AppCompatActivity {
                     .setPositiveButton(getString(R.string.confirm_and_save), (dConfirm, wConfirm) -> {
                         String groupId = UUID.randomUUID().toString();
 
-                        // Show progress dialog to prevent freeze
                         AlertDialog progress = new AlertDialog.Builder(this)
                                 .setMessage(getString(R.string.scheduling_tasks))
                                 .setCancelable(false)
                                 .show();
 
-                        int batchSize = 400; // Safe limit (Firestore max is 500)
+                        int batchSize = 400;
                         int totalTasks = selectedDates.size();
                         final int[] completedBatches = {0};
                         int numBatches = (totalTasks + batchSize - 1) / batchSize;
 
-                        // Limit notifications to avoid Binder transaction limit / system overhead
                         int notificationLimit = 50;
                         int notificationsCreated = 0;
 
@@ -681,7 +682,6 @@ public class ScheduleActivity extends AppCompatActivity {
             info.setText(infoText);
             time.setText(first.time);
 
-            // Set indicator color based on status of first task
             if (getString(R.string.status_done).equals(first.status)) indicator.setBackgroundResource(R.drawable.bg_status_done);
             else if (getString(R.string.status_ongoing).equals(first.status)) indicator.setBackgroundResource(R.drawable.bg_status_ongoing);
             else indicator.setBackgroundResource(R.drawable.bg_status_pending);
@@ -714,7 +714,6 @@ public class ScheduleActivity extends AppCompatActivity {
         View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_all_task_details, null);
         LinearLayout container = dialogView.findViewById(R.id.allTasksContainer);
 
-        // Group tasks by recurrenceGroupId. If null, use a unique ID for each.
         Map<String, List<Task>> groups = new LinkedHashMap<>();
         for (Task task : taskList) {
             String key = task.recurrenceGroupId;
@@ -751,14 +750,12 @@ public class ScheduleActivity extends AppCompatActivity {
             timeTv.setText(first.time);
             statusTextTv.setText(first.status);
 
-            // Date Info Mixed with Category
             if (groupTasks.size() > 1) {
                 dateInfoTv.setText(first.recurrence + " " + first.category + " (" + groupTasks.size() + " " + getString(R.string.days_unit) + ")");
             } else {
                 dateInfoTv.setText(first.day + " " + monthNames[first.month] + " " + first.year + " (" + first.category + ")");
             }
 
-            // Status Indicator color
             if (getString(R.string.status_done).equals(first.status)) statusIndicator.setBackgroundResource(R.drawable.bg_status_done);
             else if (getString(R.string.status_ongoing).equals(first.status)) statusIndicator.setBackgroundResource(R.drawable.bg_status_ongoing);
             else statusIndicator.setBackgroundResource(R.drawable.bg_status_pending);
@@ -810,7 +807,6 @@ public class ScheduleActivity extends AppCompatActivity {
             statusTv.setTypeface(null, Typeface.BOLD);
             statusTv.setTextColor(Color.WHITE);
 
-            // Apply status background
             if (getString(R.string.status_done).equals(t.status)) statusTv.setBackgroundResource(R.drawable.bg_status_done);
             else if (getString(R.string.status_ongoing).equals(t.status)) statusTv.setBackgroundResource(R.drawable.bg_status_ongoing);
             else statusTv.setBackgroundResource(R.drawable.bg_status_pending);
@@ -819,7 +815,6 @@ public class ScheduleActivity extends AppCompatActivity {
             row.addView(statusTv);
             datesContainer.addView(row);
 
-            // Divider
             View divider = new View(this);
             divider.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1));
             divider.setBackgroundColor(Color.parseColor("#F3F4F6"));
@@ -840,7 +835,6 @@ public class ScheduleActivity extends AppCompatActivity {
         int selMonth = selectedDate.get(Calendar.MONTH);
         int selDay   = selectedDate.get(Calendar.DAY_OF_MONTH);
 
-        // Group tasks by category
         Map<String, List<Task>> categoryGroups = new TreeMap<>();
         for (Task task : taskList) {
             if (task.year != selYear || task.month != selMonth || task.day != selDay) continue;
@@ -854,6 +848,9 @@ public class ScheduleActivity extends AppCompatActivity {
             else if (getString(R.string.status_ongoing).equals(task.status)) ongoing++;
             else pending++;
         }
+
+        Calendar now = Calendar.getInstance();
+        boolean isPastDate = selectedDate.before(now) && !isSameDay(selectedDate, now);
 
         for (Map.Entry<String, List<Task>> entry : categoryGroups.entrySet()) {
             addCategoryHeader(entry.getKey());
@@ -871,22 +868,35 @@ public class ScheduleActivity extends AppCompatActivity {
                 timeTv.setText(task.time);
                 if (recurrenceTv != null) recurrenceTv.setText(task.recurrence != null ? task.recurrence : RECUR_ONCE);
 
-                taskView.setOnClickListener(v -> {
-                    String[] statuses = {getString(R.string.status_pending), getString(R.string.status_ongoing), getString(R.string.status_done)};
-                    new AlertDialog.Builder(this).setTitle(getString(R.string.update_status)).setItems(statuses, (dialog, which) -> {
-                        task.status = statuses[which];
-                        updateTaskStatus(task);
-                    }).show();
-                });
+                boolean isMissed = isPastDate && (getString(R.string.status_pending).equals(task.status) || getString(R.string.status_ongoing).equals(task.status));
+
+                if (isMissed) {
+                    taskView.setAlpha(0.7f);
+                    taskView.setClickable(false);
+                    statusIndicator.setBackgroundColor(Color.parseColor("#DC2626")); // Red for missed
+                    // Show "Missed" label?
+                    titleTv.setText(task.title + " (MISSED)");
+                } else {
+                    taskView.setOnClickListener(v -> {
+                        String[] statuses = {getString(R.string.status_pending), getString(R.string.status_ongoing), getString(R.string.status_done)};
+                        new AlertDialog.Builder(this).setTitle(getString(R.string.update_status)).setItems(statuses, (dialog, which) -> {
+                            task.status = statuses[which];
+                            updateTaskStatus(task);
+                        }).show();
+                    });
+                }
 
                 deleteBtn.setVisibility(roleManager.canDeleteTask() ? View.VISIBLE : View.GONE);
                 if (roleManager.canDeleteTask()) {
                     deleteBtn.setOnClickListener(v -> showDeleteOptions(task));
                 }
 
-                if (getString(R.string.status_done).equals(task.status)) statusIndicator.setBackgroundResource(R.drawable.bg_status_done);
-                else if (getString(R.string.status_ongoing).equals(task.status)) statusIndicator.setBackgroundResource(R.drawable.bg_status_ongoing);
-                else statusIndicator.setBackgroundResource(R.drawable.bg_status_pending);
+                if (!isMissed) {
+                    if (getString(R.string.status_done).equals(task.status)) statusIndicator.setBackgroundResource(R.drawable.bg_status_done);
+                    else if (getString(R.string.status_ongoing).equals(task.status)) statusIndicator.setBackgroundResource(R.drawable.bg_status_ongoing);
+                    else statusIndicator.setBackgroundResource(R.drawable.bg_status_pending);
+                }
+
                 tasksContainer.addView(taskView);
             }
         }

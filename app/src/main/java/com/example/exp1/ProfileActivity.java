@@ -5,6 +5,8 @@ import android.app.DatePickerDialog;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -34,6 +36,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
+import com.google.android.material.textfield.TextInputLayout;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 
@@ -494,10 +497,33 @@ public class ProfileActivity extends AppCompatActivity {
 
         EditText oldPass = view.findViewById(R.id.oldPassword);
         EditText newPass = view.findViewById(R.id.newPassword);
+        TextInputLayout newPasswordLayout = view.findViewById(R.id.newPasswordLayout);
+
+        // Auto-detect new password format
+        newPass.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable s) {
+                String pass = s.toString();
+                if (!pass.isEmpty()) {
+                    String error = getPasswordStrengthError(pass);
+                    newPasswordLayout.setError(error);
+                } else {
+                    newPasswordLayout.setError(null);
+                }
+            }
+        });
 
         builder.setPositiveButton(getString(R.string.update), (dialog, which) -> {
             String oldP = oldPass.getText().toString();
             String newP = newPass.getText().toString();
+            
+            String error = getPasswordStrengthError(newP);
+            if (error != null) {
+                Toast.makeText(this, error, Toast.LENGTH_LONG).show();
+                return;
+            }
+
             String currentUser = accountManager.getCurrentUsername();
             if (currentUser != null && accountManager.updatePassword(currentUser, oldP, newP)) {
                 Toast.makeText(this, getString(R.string.password_updated), Toast.LENGTH_SHORT).show();
@@ -507,6 +533,26 @@ public class ProfileActivity extends AppCompatActivity {
         });
         builder.setNegativeButton(getString(R.string.cancel), null);
         builder.show();
+    }
+
+    private String getPasswordStrengthError(String password) {
+        if (password.length() < 8) return "Password must be at least 8 characters long";
+        boolean hasUpper = false, hasLower = false, hasDigit = false, hasSymbol = false;
+        String symbols = "!@#$%^&*()_+-=[]{}|;':\",./<>?";
+        
+        for (char c : password.toCharArray()) {
+            if (Character.isUpperCase(c)) hasUpper = true;
+            else if (Character.isLowerCase(c)) hasLower = true;
+            else if (Character.isDigit(c)) hasDigit = true;
+            else if (symbols.indexOf(c) >= 0) hasSymbol = true;
+        }
+        
+        if (!hasUpper) return "Password must contain at least one uppercase letter";
+        if (!hasLower) return "Password must contain at least one lowercase letter";
+        if (!hasDigit) return "Password must contain at least one digit";
+        if (!hasSymbol) return "Password must contain at least one special character";
+        
+        return null;
     }
 
     private void showDeleteAccountDialog() {
@@ -695,7 +741,7 @@ public class ProfileActivity extends AppCompatActivity {
         // Title
         TextView title = new TextView(this);
         title.setText("Data Collection Policy");
-        title.setTextSize(2, 18);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
         title.setTextColor(getResources().getColor(android.R.color.darker_gray));
         title.setPadding(0, 0, 0, 16);
@@ -714,7 +760,7 @@ public class ProfileActivity extends AppCompatActivity {
         for (String dataType : dataTypes) {
             TextView tvData = new TextView(this);
             tvData.setText(dataType);
-            tvData.setTextSize(2, 14);
+            tvData.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
             tvData.setPadding(0, 8, 0, 0);
             tvData.setLineSpacing(4, 1.0f);
             container.addView(tvData);
@@ -723,7 +769,7 @@ public class ProfileActivity extends AppCompatActivity {
         // Purpose
         TextView purposeTitle = new TextView(this);
         purposeTitle.setText("\nData Usage Purpose");
-        purposeTitle.setTextSize(2, 16);
+        purposeTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         purposeTitle.setTypeface(null, android.graphics.Typeface.BOLD);
         purposeTitle.setTextColor(getResources().getColor(android.R.color.darker_gray));
         purposeTitle.setPadding(0, 16, 0, 8);
@@ -731,14 +777,14 @@ public class ProfileActivity extends AppCompatActivity {
         
         TextView purposeText = new TextView(this);
         purposeText.setText("Your data is collected to:\n• Generate personalized farm reports\n• Provide analytics on farm performance\n• Calculate regional trends (anonymized)\n• Improve app features and accuracy");
-        purposeText.setTextSize(2, 14);
+        purposeText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         purposeText.setLineSpacing(4, 1.0f);
         container.addView(purposeText);
         
         // Retention
         TextView retentionTitle = new TextView(this);
         retentionTitle.setText("\nData Retention");
-        retentionTitle.setTextSize(2, 16);
+        retentionTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         retentionTitle.setTypeface(null, android.graphics.Typeface.BOLD);
         retentionTitle.setTextColor(getResources().getColor(android.R.color.darker_gray));
         retentionTitle.setPadding(0, 16, 0, 8);
@@ -746,7 +792,7 @@ public class ProfileActivity extends AppCompatActivity {
         
         TextView retentionText = new TextView(this);
         retentionText.setText("Data is retained for:\n• 5 years for financial records\n• 2 years for production records\n• 1 year for temporary logs\n• Indefinitely for farm configuration");
-        retentionText.setTextSize(2, 14);
+        retentionText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         retentionText.setLineSpacing(4, 1.0f);
         container.addView(retentionText);
         
@@ -767,7 +813,7 @@ public class ProfileActivity extends AppCompatActivity {
         // Title
         TextView title = new TextView(this);
         title.setText("Privacy Policy");
-        title.setTextSize(2, 18);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
         title.setTextColor(getResources().getColor(android.R.color.darker_gray));
         title.setPadding(0, 0, 0, 16);
@@ -776,7 +822,7 @@ public class ProfileActivity extends AppCompatActivity {
         // Data Ownership
         TextView ownershipTitle = new TextView(this);
         ownershipTitle.setText("Data Ownership");
-        ownershipTitle.setTextSize(2, 16);
+        ownershipTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         ownershipTitle.setTypeface(null, android.graphics.Typeface.BOLD);
         ownershipTitle.setTextColor(getResources().getColor(android.R.color.darker_gray));
         ownershipTitle.setPadding(0, 0, 0, 8);
@@ -784,14 +830,14 @@ public class ProfileActivity extends AppCompatActivity {
         
         TextView ownershipText = new TextView(this);
         ownershipText.setText("✓ You own all your data\n✓ You control access to your farm data\n✓ You can request data deletion anytime");
-        ownershipText.setTextSize(2, 14);
+        ownershipText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         ownershipText.setLineSpacing(4, 1.0f);
         container.addView(ownershipText);
         
         // Data Sharing
         TextView sharingTitle = new TextView(this);
         sharingTitle.setText("\nData Sharing");
-        sharingTitle.setTextSize(2, 16);
+        sharingTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         sharingTitle.setTypeface(null, android.graphics.Typeface.BOLD);
         sharingTitle.setTextColor(getResources().getColor(android.R.color.darker_gray));
         sharingTitle.setPadding(0, 16, 0, 8);
@@ -799,14 +845,14 @@ public class ProfileActivity extends AppCompatActivity {
         
         TextView sharingText = new TextView(this);
         sharingText.setText("✗ We DO NOT share personal data with 3rd parties\n✓ We analyze anonymized farm data for regional trends\n✓ You can opt-out of regional analytics");
-        sharingText.setTextSize(2, 14);
+        sharingText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         sharingText.setLineSpacing(4, 1.0f);
         container.addView(sharingText);
         
         // Access Control
         TextView accessTitle = new TextView(this);
         accessTitle.setText("\nAccess Control");
-        accessTitle.setTextSize(2, 16);
+        accessTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         accessTitle.setTypeface(null, android.graphics.Typeface.BOLD);
         accessTitle.setTextColor(getResources().getColor(android.R.color.darker_gray));
         accessTitle.setPadding(0, 16, 0, 8);
@@ -814,7 +860,7 @@ public class ProfileActivity extends AppCompatActivity {
         
         TextView accessText = new TextView(this);
         accessText.setText("✓ Owner: Full access to all farm data\n✓ Backup Owner: Access to reports\n✓ Staff: Limited to assigned tasks");
-        accessText.setTextSize(2, 14);
+        accessText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         accessText.setLineSpacing(4, 1.0f);
         container.addView(accessText);
         
@@ -835,7 +881,7 @@ public class ProfileActivity extends AppCompatActivity {
         // Title
         TextView title = new TextView(this);
         title.setText("Security Implementation");
-        title.setTextSize(2, 18);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
         title.setTextColor(getResources().getColor(android.R.color.darker_gray));
         title.setPadding(0, 0, 0, 16);
@@ -844,7 +890,7 @@ public class ProfileActivity extends AppCompatActivity {
         // Encryption
         TextView encryptTitle = new TextView(this);
         encryptTitle.setText("Encryption");
-        encryptTitle.setTextSize(2, 16);
+        encryptTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         encryptTitle.setTypeface(null, android.graphics.Typeface.BOLD);
         encryptTitle.setTextColor(getResources().getColor(android.R.color.darker_gray));
         encryptTitle.setPadding(0, 0, 0, 8);
@@ -852,14 +898,14 @@ public class ProfileActivity extends AppCompatActivity {
         
         TextView encryptText = new TextView(this);
         encryptText.setText("✓ Data in transit: TLS 1.2+ encryption\n✓ Data at rest: Firebase automatic encryption\n✓ Sensitive fields: AES-256 encryption");
-        encryptText.setTextSize(2, 14);
+        encryptText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         encryptText.setLineSpacing(4, 1.0f);
         container.addView(encryptText);
         
         // Authentication
         TextView authTitle = new TextView(this);
         authTitle.setText("\nAuthentication");
-        authTitle.setTextSize(2, 16);
+        authTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         authTitle.setTypeface(null, android.graphics.Typeface.BOLD);
         authTitle.setTextColor(getResources().getColor(android.R.color.darker_gray));
         authTitle.setPadding(0, 16, 0, 8);
@@ -867,14 +913,14 @@ public class ProfileActivity extends AppCompatActivity {
         
         TextView authText = new TextView(this);
         authText.setText("✓ Google Sign-In (OAuth 2.0)\n✓ Strong password requirements (8+ chars, mixed case, numbers, symbols)\n✓ Session timeout after inactivity");
-        authText.setTextSize(2, 14);
+        authText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         authText.setLineSpacing(4, 1.0f);
         container.addView(authText);
         
         // Access Security
         TextView accessSecTitle = new TextView(this);
         accessSecTitle.setText("\nAccess Security");
-        accessSecTitle.setTextSize(2, 16);
+        accessSecTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         accessSecTitle.setTypeface(null, android.graphics.Typeface.BOLD);
         accessSecTitle.setTextColor(getResources().getColor(android.R.color.darker_gray));
         accessSecTitle.setPadding(0, 16, 0, 8);
@@ -882,14 +928,14 @@ public class ProfileActivity extends AppCompatActivity {
         
         TextView accessSecText = new TextView(this);
         accessSecText.setText("✓ Role-based access control (RBAC)\n✓ Email verification for new users\n✓ Invite codes locked to specific emails\n✓ Admin approval required for access");
-        accessSecText.setTextSize(2, 14);
+        accessSecText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         accessSecText.setLineSpacing(4, 1.0f);
         container.addView(accessSecText);
         
         // Monitoring
         TextView monitorTitle = new TextView(this);
         monitorTitle.setText("\nMonitoring & Compliance");
-        monitorTitle.setTextSize(2, 16);
+        monitorTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         monitorTitle.setTypeface(null, android.graphics.Typeface.BOLD);
         monitorTitle.setTextColor(getResources().getColor(android.R.color.darker_gray));
         monitorTitle.setPadding(0, 16, 0, 8);
@@ -897,7 +943,7 @@ public class ProfileActivity extends AppCompatActivity {
         
         TextView monitorText = new TextView(this);
         monitorText.setText("✓ Real-time activity logs\n✓ Firestore security rules (test mode)\n✓ Regular security audits");
-        monitorText.setTextSize(2, 14);
+        monitorText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         monitorText.setLineSpacing(4, 1.0f);
         container.addView(monitorText);
         
@@ -922,6 +968,7 @@ public class ProfileActivity extends AppCompatActivity {
         view.findViewById(R.id.btnRoleLimits).setOnClickListener(v -> showRoleLimitsDialog());
         view.findViewById(R.id.btnPendingReq).setOnClickListener(v -> showPendingRequestsDialog());
         view.findViewById(R.id.btnInviteNew).setOnClickListener(v -> NavigationHelper.INSTANCE.showGenerateInviteCodeDialog(this, currentEmail));
+        view.findViewById(R.id.btnViewCodes).setOnClickListener(v -> showInviteCodesManagementDialog());
 
         // Show loading
         progressBar.setVisibility(View.VISIBLE);
@@ -953,6 +1000,49 @@ public class ProfileActivity extends AppCompatActivity {
             });
 
         builder.setPositiveButton("Done", null);
+        builder.show();
+    }
+
+    private void showInviteCodesManagementDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Generated Invite Codes");
+        
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(40, 40, 40, 40);
+        
+        FirebaseFirestore.getInstance().collection("invite_codes").get()
+            .addOnSuccessListener(docs -> {
+                container.removeAllViews();
+                if (docs.isEmpty()) {
+                    TextView tv = new TextView(this);
+                    tv.setText("No active invite codes.");
+                    container.addView(tv);
+                }
+                for (DocumentSnapshot doc : docs) {
+                    View row = getLayoutInflater().inflate(R.layout.item_user_manage, null);
+                    String code = doc.getId();
+                    String invitedEmail = doc.getString("invitedEmail");
+                    String role = doc.getString("role");
+
+                    ((TextView)row.findViewById(R.id.userNameText)).setText("Code: " + code + " (" + invitedEmail + ")");
+                    ((TextView)row.findViewById(R.id.userRoleText)).setText("Role: " + role);
+
+                    ImageButton deleteBtn = (ImageButton) row.findViewById(R.id.deleteUserBtn);
+                    deleteBtn.setOnClickListener(v -> {
+                        doc.getReference().delete().addOnSuccessListener(a -> {
+                            Toast.makeText(this, "Invite code deleted", Toast.LENGTH_SHORT).show();
+                            showInviteCodesManagementDialog(); // refresh
+                        });
+                    });
+                    container.addView(row);
+                }
+            });
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(container);
+        builder.setView(scroll);
+        builder.setPositiveButton("Close", null);
         builder.show();
     }
 
@@ -1256,7 +1346,7 @@ public class ProfileActivity extends AppCompatActivity {
 
         TextView titleTv = new TextView(this);
         titleTv.setText("Edit Your Address");
-        titleTv.setTextSize(2, 18);
+        titleTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
         titleTv.setTypeface(null, android.graphics.Typeface.BOLD);
         titleTv.setTextColor(getResources().getColor(android.R.color.darker_gray));
         titleTv.setPadding(0, 0, 0, 16);

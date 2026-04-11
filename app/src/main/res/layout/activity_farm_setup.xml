@@ -227,11 +227,14 @@
                     android:padding="12dp" />
 
                 <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/setupPasswordLayout"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
                     app:passwordToggleEnabled="true"
-                    app:passwordToggleTint="@color/dark_green">
+                    app:passwordToggleTint="@color/dark_green"
+                    app:errorIconDrawable="@null"
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/setupPassword"
