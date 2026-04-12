@@ -390,7 +390,7 @@ class EggCountActivity : AppCompatActivity() {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  Firebase: Save today's collection to Realtime Database
+    //  Firebase: Save today's collection to Realtime Database with Adding and Total EVery Scan
     // ─────────────────────────────────────────────────────────────────────────
 
     private fun saveCollectionToDatabase() {
@@ -403,38 +403,59 @@ class EggCountActivity : AppCompatActivity() {
         saveBtn.isEnabled = false
         val today = dbDateFmt.format(Calendar.getInstance().time)
 
-        val revenue   = total * pricePerEgg
-        val netProfit = revenue - dailyExpenses
+        val ref = database.getReference("egg_collections").child(today)
 
-        val record = mapOf(
-            "date"        to today,
-            "total"       to total,
-            "gradeA"      to gradeA,
-            "gradeB"      to gradeB,
-            "gradeC"      to gradeC,
-            "pricePerEgg" to pricePerEgg,
-            "revenue"     to revenue,
-            "expenses"    to dailyExpenses,
-            "netProfit"   to netProfit,
-            "timestamp"   to System.currentTimeMillis(),
-            "savedBy"     to (auth.currentUser?.uid ?: "unknown")
-        )
+        ref.get().addOnSuccessListener { snapshot ->
 
-        database.getReference("egg_collections")
-            .child(today)
-            .setValue(record)
-            .addOnSuccessListener {
-                showBanner("✓ Saved $total eggs | Revenue: ₱${"%.2f".format(revenue)}", isError = false, autoHide = true)
-                saveBtn.text = "✓ Saved"
-                saveBtn.isEnabled = false
-                toast("Collection saved!")
-            }
-            .addOnFailureListener { e ->
-                Log.e(TAG, "Save failed", e)
-                showBanner("✗ Save failed: ${e.message?.take(80)}", isError = true, autoHide = false)
-                saveBtn.isEnabled = true
-                toast("Save failed — check internet connection.")
-            }
+            val prevTotal = snapshot.child("total").getValue(Int::class.java) ?: 0
+            val prevA = snapshot.child("gradeA").getValue(Int::class.java) ?: 0
+            val prevB = snapshot.child("gradeB").getValue(Int::class.java) ?: 0
+            val prevC = snapshot.child("gradeC").getValue(Int::class.java) ?: 0
+
+            val updatedTotal = prevTotal + total
+            val updatedA = prevA + gradeA
+            val updatedB = prevB + gradeB
+            val updatedC = prevC + gradeC
+
+            val revenue = updatedTotal * pricePerEgg
+            val netProfit = revenue - dailyExpenses
+
+            val updatedRecord = mapOf(
+                "date" to today,
+                "total" to updatedTotal,
+                "gradeA" to updatedA,
+                "gradeB" to updatedB,
+                "gradeC" to updatedC,
+                "pricePerEgg" to pricePerEgg,
+                "revenue" to revenue,
+                "expenses" to dailyExpenses,
+                "netProfit" to netProfit,
+                "timestamp" to System.currentTimeMillis(),
+                "savedBy" to (auth.currentUser?.uid ?: "unknown")
+            )
+
+            ref.setValue(updatedRecord)
+                .addOnSuccessListener {
+                    showBanner(
+                        "✓ Saved $updatedTotal eggs | Revenue: ₱${"%.2f".format(revenue)}",
+                        isError = false,
+                        autoHide = true
+                    )
+                    saveBtn.text = "✓ Saved"
+                    saveBtn.isEnabled = false
+                    toast("Collection updated!")
+                }
+                .addOnFailureListener { e ->
+                    Log.e(TAG, "Save failed", e)
+                    showBanner(
+                        "✗ Save failed: ${e.message?.take(80)}",
+                        isError = true,
+                        autoHide = false
+                    )
+                    saveBtn.isEnabled = true
+                    toast("Save failed — check internet connection.")
+                }
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
