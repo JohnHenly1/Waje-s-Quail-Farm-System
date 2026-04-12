@@ -328,7 +328,7 @@ class EggCountActivity : AppCompatActivity() {
         imageCapture!!.takePicture(cameraExecutor, object : ImageCapture.OnImageCapturedCallback() {
             override fun onCaptureSuccess(proxy: ImageProxy) {
                 val bmp = proxy.toBitmap(); proxy.close()
-                runOnUiThread { freezeAndAnalyze(bmp) }
+                runOnUiThread { freezeAndAnalyze(bmp, true) }
             }
             override fun onError(exc: ImageCaptureException) {
                 Log.e(TAG, "Capture failed", exc)
@@ -338,7 +338,7 @@ class EggCountActivity : AppCompatActivity() {
     }
 
     /** Freeze live feed, run YOLO on [bmp], display results */
-    private fun freezeAndAnalyze(bmp: Bitmap) {
+    private fun freezeAndAnalyze(bmp: Bitmap, saveToGallery: Boolean = false) {
         isLiveMode = false
         frozenOverlay.visibility = View.VISIBLE
         liveScanLabel.text = "● ANALYZING"
@@ -370,7 +370,9 @@ class EggCountActivity : AppCompatActivity() {
                     isError = detector == null,
                     autoHide = detector != null
                 )
-                trySaveToGallery(bmp)
+                if (saveToGallery) {
+                    trySaveToGallery(bmp)
+                }
             }
         }
     }
