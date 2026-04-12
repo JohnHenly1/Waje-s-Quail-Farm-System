@@ -27,10 +27,10 @@ import java.util.Date;
 import java.util.Locale;
 
 /**
- does 2 things
-  1. Re-schedule every future task alarm.
-  2. Show a "missed alarm" notification for any task whose alarm fired while the phone was off.
- Reads tasks from the SHARED collection  farm_data/tasks  so all users see sync data.
+ * Handles system boot and power-on events to:
+ * 1. Re-schedule future task alarms.
+ * 2. Show a "missed alarm" notification for tasks that should have fired while the phone was off.
+ * Only notifies for missed tasks from the CURRENT day to avoid spamming old tasks.
  */
 public class BootReceiver extends BroadcastReceiver {
 
@@ -86,28 +86,6 @@ public class BootReceiver extends BroadcastReceiver {
                     auth.removeAuthStateListener(this);
                     return;
                 }
-
-                // ── Read from the SHARED farm_data/tasks collection ────────────
-                FirebaseFirestore.getInstance()
-                        .collection("farm_data")
-                        .document("tasks")    // sub-collection under farm_data
-                        // Actually we need the collection directly:
-                        .getParent()          // back to farm_data collection
-                        .document("tasks")    // this is a doc — we want the collection below it
-                        .collection("tasks")  // farm_data → "tasks" sub-collection doesn't exist
-                        // CORRECT path: farm_data/tasks is a collection, not a document.
-                        // Use FirebaseFirestore directly:
-                        .get()
-                        .addOnSuccessListener(querySnapshot -> {
-                            // This branch is unreachable — see below for correct call.
-                        });
-
-                // Correct flat collection read:
-                FirebaseFirestore.getInstance()
-                        .collection("farm_data").document("tasks_placeholder").getParent()
-                        // The correct approach — call the collection directly:
-                        .get()
-                        .addOnSuccessListener(unused -> { /* ignore */ });
 
                 // ── Correct implementation ─────────────────────────────────────
                 readSharedTasksAndReschedule(context, auth, this);
@@ -193,9 +171,11 @@ public class BootReceiver extends BroadcastReceiver {
                                 scheduleAlarm(context, alarmManager, alarmCal.getTimeInMillis(), pi);
                                 rescheduled++;
                             } else {
-                                // Missed alarm — notify immediately
-                                showMissedAlarmNotification(context, title, category, time);
-                                missed++;
+                                // Missed alarm — only notify if it was for TODAY
+                                if (isSameDay(alarmCal, now)) {
+                                    showMissedAlarmNotification(context, title, category, time);
+                                    missed++;
+                                }
                             }
                         } catch (Exception e) {
                             Log.e(TAG, "Error processing task on boot: " + e.getMessage());
@@ -221,7 +201,7 @@ public class BootReceiver extends BroadcastReceiver {
                 .setSmallIcon(R.drawable.ic_notifications)
                 .setContentTitle("⚠ Missed Task: " + title)
                 .setContentText("Scheduled at " + scheduledTime + " (" + category + ") — phone was off.")
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setDefaults(NotificationCompat.DEFAULT_ALL)
                 .setContentIntent(tapPi)
                 .setAutoCancel(true)
@@ -229,7 +209,8 @@ public class BootReceiver extends BroadcastReceiver {
 
         try {
             NotificationManagerCompat nm = NotificationManagerCompat.from(context);
-            nm.notify((int) System.currentTimeMillis(), builder.build());
+            // Use stable ID to prevent spamming multiple notifications for the same task
+            nm.notify(title.hashCode(), builder.build());
         } catch (SecurityException e) {
             Log.e(TAG, "Cannot post missed-alarm notification: " + e.getMessage());
         }
@@ -244,13 +225,6 @@ public class BootReceiver extends BroadcastReceiver {
                 am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pi);
             } else {
                 am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pi);
-                try {
-                    Intent settingsIntent = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM);
-                    settingsIntent.setData(
-                            android.net.Uri.parse("package:" + context.getPackageName()));
-                    settingsIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    context.startActivity(settingsIntent);
-                } catch (Exception ignored) { }
             }
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pi);
@@ -259,7 +233,10 @@ public class BootReceiver extends BroadcastReceiver {
         }
     }
 
-    // ── Time parser ────────────────────────────────────────────────────────────
+    private boolean isSameDay(Calendar cal1, Calendar cal2) {
+        return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
+               cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR);
+    }
 
     private int[] parseTime(String timeStr) {
         if (timeStr == null || timeStr.isEmpty()) return null;

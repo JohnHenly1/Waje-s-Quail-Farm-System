@@ -18,7 +18,7 @@
         <View
             android:id="@+id/statusIndicator"
             android:layout_width="6dp"
-            android:layout_height="44dp"
+            android:layout_height="52dp"
             android:background="@drawable/bg_status_pending" />
 
         <LinearLayout
@@ -45,6 +45,17 @@
                 android:text="Feeding"
                 android:textColor="@color/schedule_task_subtitle"
                 android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/taskDeadline"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:text="Deadline: 09:00 AM"
+                android:textColor="#E11D48"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
         </LinearLayout>
 
         <LinearLayout

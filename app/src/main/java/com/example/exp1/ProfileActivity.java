@@ -115,7 +115,7 @@ public class ProfileActivity extends AppCompatActivity {
         firestoreManager = new FirestoreManager(currentEmail);
 
         showLoading(getString(R.string.syncing_profile), () -> {
-            fetchUserData();
+            fetchUserData() ;
             loadFirestoreData();
         });
 
@@ -258,7 +258,7 @@ public class ProfileActivity extends AppCompatActivity {
     }
 
     private boolean isAdmin() {
-        return "owner".equals(userRole);
+        return "owner".equals(userRole) || "backup_owner".equals(userRole);
     }
 
     //  Firestore load ---------------------------------------------------------------------------
@@ -1203,11 +1203,32 @@ public class ProfileActivity extends AppCompatActivity {
         tvPending.setTextSize(16);
         layout.addView(tvPending);
 
+        TextView tvTasksCount = new TextView(this);
+        tvTasksCount.setText("Total Tasks: Loading...");
+        tvTasksCount.setTextSize(16);
+        layout.addView(tvTasksCount);
+
+        TextView tvInviteCodes = new TextView(this);
+        tvInviteCodes.setText("Active Invite Codes: Loading...");
+        tvInviteCodes.setTextSize(16);
+        layout.addView(tvInviteCodes);
+
         TextView tvLastUpdate = new TextView(this);
         tvLastUpdate.setText("Last Update: " + new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(new java.util.Date()));
         tvLastUpdate.setTextSize(14);
         tvLastUpdate.setTextColor(getResources().getColor(android.R.color.darker_gray));
         layout.addView(tvLastUpdate);
+
+        // Add action buttons
+        Button btnViewFarmStats = new Button(this);
+        btnViewFarmStats.setText("View Farm Stats Data");
+        btnViewFarmStats.setOnClickListener(v -> showFarmStatsExplorer());
+        layout.addView(btnViewFarmStats);
+
+        Button btnManageCodes = new Button(this);
+        btnManageCodes.setText("Manage Active Invite Codes");
+        btnManageCodes.setOnClickListener(v -> showInviteCodesManagementDialog());
+        layout.addView(btnManageCodes);
 
         builder.setView(layout);
         builder.setPositiveButton("Close", null);
@@ -1225,7 +1246,7 @@ public class ProfileActivity extends AppCompatActivity {
             runOnUiThread(() -> tvConnection.setText("Connection: Offline"));
         });
 
-        // Approved users
+        // Approved users listener
         com.google.firebase.firestore.ListenerRegistration approvedListener = db.collection("user_access")
             .whereEqualTo("status", "approved")
             .addSnapshotListener((querySnapshot, e) -> {
@@ -1240,7 +1261,7 @@ public class ProfileActivity extends AppCompatActivity {
                 });
             });
 
-        // Pending requests
+        // Pending requests listener
         com.google.firebase.firestore.ListenerRegistration pendingListener = db.collection("user_access")
             .whereEqualTo("status", "pending")
             .addSnapshotListener((querySnapshot, e) -> {
@@ -1249,17 +1270,75 @@ public class ProfileActivity extends AppCompatActivity {
                     return;
                 }
                 int count = querySnapshot != null ? querySnapshot.size() : 0;
-                runOnUiThread(() -> {
-                    tvPending.setText("Pending Requests: " + count);
-                    tvLastUpdate.setText("Last Update: " + new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(new java.util.Date()));
-                });
+                runOnUiThread(() -> tvPending.setText("Pending Requests: " + count));
+            });
+
+        // Tasks listener
+        com.google.firebase.firestore.ListenerRegistration tasksListener = db.collection("farm_data")
+            .document("shared").collection("tasks")
+            .addSnapshotListener((querySnapshot, e) -> {
+                if (e != null) return;
+                int count = querySnapshot != null ? querySnapshot.size() : 0;
+                runOnUiThread(() -> tvTasksCount.setText("Total Tasks: " + count));
+            });
+
+        // Invite codes listener
+        com.google.firebase.firestore.ListenerRegistration codesListener = db.collection("invite_codes")
+            .addSnapshotListener((querySnapshot, e) -> {
+                if (e != null) return;
+                int count = querySnapshot != null ? querySnapshot.size() : 0;
+                runOnUiThread(() -> tvInviteCodes.setText("Active Invite Codes: " + count));
             });
 
         // Remove listeners on dismiss
         dialog.setOnDismissListener(dialogInterface -> {
             approvedListener.remove();
             pendingListener.remove();
+            tasksListener.remove();
+            codesListener.remove();
         });
+    }
+
+    private void showFarmStatsExplorer() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Farm Stats Explorer");
+        
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(40, 40, 40, 40);
+
+        TextView tvData = new TextView(this);
+        tvData.setText("Fetching stats...");
+        layout.addView(tvData);
+
+        FirebaseFirestore.getInstance().collection("farm_data").document("stats").get()
+            .addOnSuccessListener(doc -> {
+                if (doc.exists()) {
+                    String data = "Birds: " + doc.getLong("totalBirds") + 
+                                 "\nCages: " + doc.getLong("activeCages") +
+                                 "\nStart Date: " + (doc.getTimestamp("farmStartDate") != null ? doc.getTimestamp("farmStartDate").toDate().toString() : "N/A");
+                    tvData.setText(data);
+                    
+                    Button btnReset = new Button(this);
+                    btnReset.setText("Reset Stats to Zero");
+                    btnReset.setOnClickListener(v -> {
+                        Map<String, Object> reset = new HashMap<>();
+                        reset.put("totalBirds", 0);
+                        reset.put("activeCages", 0);
+                        doc.getReference().update(reset).addOnSuccessListener(a -> {
+                            Toast.makeText(this, "Stats reset", Toast.LENGTH_SHORT).show();
+                            showFarmStatsExplorer(); // refresh
+                        });
+                    });
+                    layout.addView(btnReset);
+                } else {
+                    tvData.setText("No farm stats found.");
+                }
+            });
+
+        builder.setView(layout);
+        builder.setPositiveButton("Close", null);
+        builder.show();
     }
 
     private void importDatabase() {

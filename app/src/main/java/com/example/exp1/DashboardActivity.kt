@@ -106,6 +106,23 @@ class DashboardActivity : AppCompatActivity() {
             applyEntranceAnimations()
             checkAdminAccess()
             setupAlertListener()
+
+            // Handle deep link from notification
+            if (intent.getBooleanExtra("OPEN_ALERTS", false)) {
+                intent.removeExtra("OPEN_ALERTS") // Prevent re-triggering on rotation/re-entry
+                startActivity(Intent(this, AlertsActivity::class.java).putExtra("username", username))
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent?.getBooleanExtra("OPEN_ALERTS", false) == true) {
+            showLoading("Opening Alerts...") {
+                intent.removeExtra("OPEN_ALERTS")
+                startActivity(Intent(this, AlertsActivity::class.java).putExtra("username", username))
+            }
         }
     }
 

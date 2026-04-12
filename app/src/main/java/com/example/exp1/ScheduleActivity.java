@@ -13,6 +13,8 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.text.InputType;
 import android.view.GestureDetector;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -47,6 +49,7 @@ import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -84,6 +87,14 @@ public class ScheduleActivity extends AppCompatActivity {
     private RoleManager roleManager;
 
     private String[] monthNames;
+    private Handler autoUpdateHandler = new Handler();
+    private Runnable autoUpdateRunnable = new Runnable() {
+        @Override
+        public void run() {
+            updateTasksUI();
+            autoUpdateHandler.postDelayed(this, 60000); // Refresh every minute for status changes
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -190,6 +201,18 @@ public class ScheduleActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        autoUpdateHandler.post(autoUpdateRunnable);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        autoUpdateHandler.removeCallbacks(autoUpdateRunnable);
+    }
+
+    @Override
     protected void onDestroy() {
         super.onDestroy();
         if (tasksListener != null) tasksListener.remove();
@@ -220,6 +243,8 @@ public class ScheduleActivity extends AppCompatActivity {
                                     doc.getString("recurrence") != null ? doc.getString("recurrence") : RECUR_ONCE,
                                     doc.getString("recurrenceGroupId")
                             );
+                            task.extensionMinutes = doc.getLong("extensionMinutes") != null ? doc.getLong("extensionMinutes").intValue() : 0;
+                            task.workWindowMinutes = doc.getLong("workWindowMinutes") != null ? doc.getLong("workWindowMinutes").intValue() : 60;
                             taskList.add(task);
                         }
                     }
@@ -248,6 +273,8 @@ public class ScheduleActivity extends AppCompatActivity {
         data.put("day",                task.day);
         data.put("recurrence",         task.recurrence);
         data.put("recurrenceGroupId",  task.recurrenceGroupId);
+        data.put("extensionMinutes",   task.extensionMinutes);
+        data.put("workWindowMinutes",  task.workWindowMinutes);
         data.put("createdAt", com.google.firebase.firestore.FieldValue.serverTimestamp());
         return data;
     }
@@ -256,7 +283,7 @@ public class ScheduleActivity extends AppCompatActivity {
         if (task.firestoreId == null) return;
         db.collection("farm_data").document("shared")
                 .collection("tasks").document(task.firestoreId)
-                .update("status", task.status)
+                .update("status", task.status, "extensionMinutes", task.extensionMinutes, "workWindowMinutes", task.workWindowMinutes)
                 .addOnFailureListener(e ->
                         Toast.makeText(this, getString(R.string.error_updating_status, e.getMessage()), Toast.LENGTH_SHORT).show());
     }
@@ -307,6 +334,7 @@ public class ScheduleActivity extends AppCompatActivity {
         EditText    editTaskTitle        = dialogView.findViewById(R.id.editTaskTitle);
         Spinner     spinnerCategory      = dialogView.findViewById(R.id.spinnerCategory);
         TextView    textTime             = dialogView.findViewById(R.id.textTime);
+        EditText    editWorkWindow       = dialogView.findViewById(R.id.editWorkWindow);
         TextView    txtCurrentMonth      = dialogView.findViewById(R.id.txtCurrentMonth);
         GridLayout  calendarGrid         = dialogView.findViewById(R.id.calendarGrid);
         ImageButton btnPrevMonth         = dialogView.findViewById(R.id.btnPrevMonth);
@@ -569,6 +597,9 @@ public class ScheduleActivity extends AppCompatActivity {
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             String title = editTaskTitle.getText().toString().trim();
             String category = spinnerCategory.getSelectedItem().toString();
+            String windowStr = editWorkWindow.getText().toString();
+            int window = windowStr.isEmpty() ? getDefaultWorkWindow(category) : Integer.parseInt(windowStr);
+
             if (title.isEmpty()) { Toast.makeText(this, getString(R.string.task_title_empty), Toast.LENGTH_SHORT).show(); return; }
             if (selectedDates.isEmpty()) { Toast.makeText(this, getString(R.string.please_select_date), Toast.LENGTH_SHORT).show(); return; }
 
@@ -607,6 +638,7 @@ public class ScheduleActivity extends AppCompatActivity {
                                 Task t = new Task(null, title, category, selectedTime[0], "Pending",
                                         cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH),
                                         selectedRecurrence[0], groupId);
+                                t.workWindowMinutes = window;
 
                                 DocumentReference ref = db.collection("farm_data").document("shared")
                                         .collection("tasks").document();
@@ -634,6 +666,17 @@ public class ScheduleActivity extends AppCompatActivity {
                     .setNegativeButton(getString(R.string.back), null)
                     .show();
         });
+    }
+
+    private int getDefaultWorkWindow(String category) {
+        switch (category) {
+            case "Cleaning": return 120; // 2 hours
+            case "Egg Collection": return 90; // 1.5 hours
+            case "Health Check": return 90;
+            case "Feeding": return 60;
+            case "Watering": return 45;
+            default: return 60;
+        }
     }
 
     private void showDeleteOptions(Task task) {
@@ -839,6 +882,10 @@ public class ScheduleActivity extends AppCompatActivity {
         for (Task task : taskList) {
             if (task.year != selYear || task.month != selMonth || task.day != selDay) continue;
 
+            if (!getString(R.string.status_done).equals(task.status)) {
+                task.status = getAutoStatus(task);
+            }
+
             if (!categoryGroups.containsKey(task.category)) {
                 categoryGroups.put(task.category, new ArrayList<>());
             }
@@ -849,9 +896,6 @@ public class ScheduleActivity extends AppCompatActivity {
             else pending++;
         }
 
-        Calendar now = Calendar.getInstance();
-        boolean isPastDate = selectedDate.before(now) && !isSameDay(selectedDate, now);
-
         for (Map.Entry<String, List<Task>> entry : categoryGroups.entrySet()) {
             addCategoryHeader(entry.getKey());
             for (Task task : entry.getValue()) {
@@ -859,6 +903,7 @@ public class ScheduleActivity extends AppCompatActivity {
                 TextView titleTv = taskView.findViewById(R.id.taskTitle);
                 TextView categoryTv = taskView.findViewById(R.id.taskCategory);
                 TextView timeTv = taskView.findViewById(R.id.taskTime);
+                TextView deadlineTv = taskView.findViewById(R.id.taskDeadline);
                 TextView recurrenceTv = taskView.findViewById(R.id.taskRecurrence);
                 View statusIndicator = taskView.findViewById(R.id.statusIndicator);
                 ImageButton deleteBtn = taskView.findViewById(R.id.deleteTaskBtn);
@@ -868,32 +913,53 @@ public class ScheduleActivity extends AppCompatActivity {
                 timeTv.setText(task.time);
                 if (recurrenceTv != null) recurrenceTv.setText(task.recurrence != null ? task.recurrence : RECUR_ONCE);
 
-                boolean isMissed = isPastDate && (getString(R.string.status_pending).equals(task.status) || getString(R.string.status_ongoing).equals(task.status));
+                boolean isDone = getString(R.string.status_done).equals(task.status);
+                boolean isOngoing = getString(R.string.status_ongoing).equals(task.status);
+                boolean isMissed = getString(R.string.status_missed).equals(task.status);
+
+                if (isOngoing || isMissed) {
+                    deadlineTv.setVisibility(View.VISIBLE);
+                    deadlineTv.setText("| Deadline: " + calculateDeadlineTime(task));
+                } else {
+                    deadlineTv.setVisibility(View.GONE);
+                }
 
                 if (isMissed) {
-                    taskView.setAlpha(0.7f);
-                    taskView.setClickable(false);
-                    statusIndicator.setBackgroundColor(Color.parseColor("#DC2626")); // Red for missed
+                    statusIndicator.setBackgroundColor(Color.parseColor("#DC2626"));
                     titleTv.setText(task.title + " (MISSED)");
+                } else if (isDone) {
+                    statusIndicator.setBackgroundResource(R.drawable.bg_status_done);
+                } else if (isOngoing) {
+                    statusIndicator.setBackgroundResource(R.drawable.bg_status_ongoing);
                 } else {
-                    taskView.setOnClickListener(v -> {
-                        String[] statuses = {getString(R.string.status_pending), getString(R.string.status_ongoing), getString(R.string.status_done)};
-                        new AlertDialog.Builder(this).setTitle(getString(R.string.update_status)).setItems(statuses, (dialog, which) -> {
-                            task.status = statuses[which];
-                            updateTaskStatus(task);
-                        }).show();
-                    });
+                    statusIndicator.setBackgroundResource(R.drawable.bg_status_pending);
                 }
+
+                taskView.setOnClickListener(v -> {
+                    if (isDone) {
+                        Toast.makeText(this, "Task already completed", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    if (isMissed) {
+                        if (roleManager.canEditFarm()) {
+                            showManagerOverrideDialog(task);
+                        } else {
+                            Toast.makeText(this, "Task was missed. Contact manager.", Toast.LENGTH_SHORT).show();
+                        }
+                        return;
+                    }
+                    if (!isOngoing) {
+                        // Manager Work Window dialog removed from here
+                        Toast.makeText(this, "Can only update status when Ongoing (at " + task.time + ")", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    showStatusUpdateDialog(task);
+                });
 
                 deleteBtn.setVisibility(roleManager.canDeleteTask() ? View.VISIBLE : View.GONE);
                 if (roleManager.canDeleteTask()) {
                     deleteBtn.setOnClickListener(v -> showDeleteOptions(task));
-                }
-
-                if (!isMissed) {
-                    if (getString(R.string.status_done).equals(task.status)) statusIndicator.setBackgroundResource(R.drawable.bg_status_done);
-                    else if (getString(R.string.status_ongoing).equals(task.status)) statusIndicator.setBackgroundResource(R.drawable.bg_status_ongoing);
-                    else statusIndicator.setBackgroundResource(R.drawable.bg_status_pending);
                 }
 
                 tasksContainer.addView(taskView);
@@ -905,6 +971,99 @@ public class ScheduleActivity extends AppCompatActivity {
         if (pendingCount != null) pendingCount.setText(String.valueOf(pending));
         View placeholder = findViewById(R.id.noTasksPlaceholder);
         if (placeholder != null) placeholder.setVisibility(tasksContainer.getChildCount() == 0 ? View.VISIBLE : View.GONE);
+    }
+
+    private String calculateDeadlineTime(Task task) {
+        Calendar taskCal = Calendar.getInstance();
+        try {
+            Date date = new SimpleDateFormat("hh:mm a", Locale.getDefault()).parse(task.time);
+            Calendar timePart = Calendar.getInstance();
+            timePart.setTime(date);
+            taskCal.set(task.year, task.month, task.day, timePart.get(Calendar.HOUR_OF_DAY), timePart.get(Calendar.MINUTE), 0);
+            taskCal.set(Calendar.MILLISECOND, 0);
+            
+            taskCal.add(Calendar.MINUTE, task.workWindowMinutes + task.extensionMinutes);
+            return new SimpleDateFormat("hh:mm a", Locale.getDefault()).format(taskCal.getTime());
+        } catch (ParseException e) {
+            return "N/A";
+        }
+    }
+
+    private String getAutoStatus(Task task) {
+        Calendar taskCal = Calendar.getInstance();
+        try {
+            Date date = new SimpleDateFormat("hh:mm a", Locale.getDefault()).parse(task.time);
+            Calendar timePart = Calendar.getInstance();
+            timePart.setTime(date);
+            taskCal.set(task.year, task.month, task.day, timePart.get(Calendar.HOUR_OF_DAY), timePart.get(Calendar.MINUTE), 0);
+            taskCal.set(Calendar.MILLISECOND, 0);
+        } catch (ParseException e) {
+            return getString(R.string.status_pending);
+        }
+
+        Calendar now = Calendar.getInstance();
+        if (taskCal.after(now)) return getString(R.string.status_pending);
+
+        int totalWindow = task.workWindowMinutes + task.extensionMinutes;
+        Calendar expireCal = (Calendar) taskCal.clone();
+        expireCal.add(Calendar.MINUTE, totalWindow);
+
+        if (now.after(taskCal) && now.before(expireCal)) return getString(R.string.status_ongoing);
+        return getString(R.string.status_missed);
+    }
+
+    private void showStatusUpdateDialog(Task task) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Update Task Status");
+        
+        String[] options = {"Mark as Done", "Request 30min Extension"};
+        builder.setItems(options, (dialog, which) -> {
+            if (which == 0) {
+                task.status = getString(R.string.status_done);
+                updateTaskStatus(task);
+                Toast.makeText(this, "Task completed!", Toast.LENGTH_SHORT).show();
+            } else {
+                task.extensionMinutes += 30;
+                updateTaskStatus(task);
+                Toast.makeText(this, "Extension granted. New deadline updated.", Toast.LENGTH_SHORT).show();
+            }
+        });
+        builder.show();
+    }
+
+    private void showManagerWorkWindowDialog(Task task) {
+        EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setText(String.valueOf(task.workWindowMinutes));
+        input.setHint("Minutes for work window");
+
+        new AlertDialog.Builder(this)
+                .setTitle("Customize Work Window")
+                .setMessage("Category: " + task.category + "\nSet how many minutes staff have to complete this task.")
+                .setView(input)
+                .setPositiveButton("Set Window", (d, w) -> {
+                    String val = input.getText().toString();
+                    if (!val.isEmpty()) {
+                        task.workWindowMinutes = Integer.parseInt(val);
+                        updateTaskStatus(task);
+                        Toast.makeText(this, "Default work window updated for this task", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void showManagerOverrideDialog(Task task) {
+        new AlertDialog.Builder(this)
+                .setTitle("Manager Override")
+                .setMessage("Task '" + task.title + "' is MISSED. Reset it to Ongoing?")
+                .setPositiveButton("Reset to Ongoing", (d, w) -> {
+                    task.extensionMinutes += 60; // Add an hour to make it ongoing again
+                    updateTaskStatus(task);
+                    Toast.makeText(this, "Task reset to Ongoing (1 hour added)", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void addCategoryHeader(String category) {
@@ -1065,6 +1224,8 @@ public class ScheduleActivity extends AppCompatActivity {
         int    year, month, day;
         String recurrence;
         String recurrenceGroupId;
+        int extensionMinutes = 0;
+        int workWindowMinutes = 60; // default
 
         Task(String firestoreId, String title, String category, String time, String status, int year, int month, int day, String recurrence, String recurrenceGroupId) {
             this.firestoreId = firestoreId;
@@ -1112,7 +1273,6 @@ public class ScheduleActivity extends AppCompatActivity {
                 
             try {
                 NotificationManagerCompat nm = NotificationManagerCompat.from(context);
-                // Use hash of title and category as ID to prevent multiple notification icons for the same task
                 int notificationId = (title + category).hashCode();
                 nm.notify(notificationId, builder.build());
             } catch (SecurityException e) { e.printStackTrace(); }
