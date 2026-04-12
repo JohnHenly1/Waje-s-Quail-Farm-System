@@ -1257,7 +1257,7 @@ public class ScheduleActivity extends AppCompatActivity {
                 }
             } catch (Exception e) { e.printStackTrace(); }
             
-            Intent alertIntent = new Intent(context, AlertsActivity.class);
+            Intent alertIntent = new Intent(context, MainActivity.class);
             alertIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             PendingIntent pi = PendingIntent.getActivity(context, 0, alertIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             

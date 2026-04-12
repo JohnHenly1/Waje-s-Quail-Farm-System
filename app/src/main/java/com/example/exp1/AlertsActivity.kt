@@ -336,7 +336,7 @@ class AlertsActivity : AppCompatActivity() {
                 val timestamp = SimpleDateFormat("yyyy/MM/dd hh:mm a", Locale.getDefault()).format(Date())
                 GlobalData.addAlert(message, timestamp, "System")
 
-                val notificationIntent = Intent(context, AlertsActivity::class.java)
+                val notificationIntent = Intent(context, MainActivity::class.java)
                 notificationIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 val pendingIntent = PendingIntent.getActivity(context, 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 

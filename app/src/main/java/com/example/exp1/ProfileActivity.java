@@ -60,6 +60,7 @@ public class ProfileActivity extends AppCompatActivity {
     private TextView daysRunningValue;
     private TextView userNameTv;
     private TextView userEmailTv;
+    private TextView userRoleTv;
     private TextView profileInitialTv;
     private ImageView profileImageView;
 
@@ -101,8 +102,14 @@ public class ProfileActivity extends AppCompatActivity {
         daysRunningValue = findViewById(R.id.daysRunningValue);
         userNameTv       = findViewById(R.id.userName);
         userEmailTv      = findViewById(R.id.userEmail);
+        userRoleTv       = findViewById(R.id.userRole);
         profileInitialTv = findViewById(R.id.profileInitial);
         profileImageView = findViewById(R.id.profileImage);
+
+        if (userRoleTv != null) {
+            String roleDisplayName = (userRole != null ? userRole.replace("_", " ") : "Staff");
+            userRoleTv.setText(getString(R.string.role_label, roleDisplayName));
+        }
 
         // Resolve email
         currentEmail = getIntent().getStringExtra("username");
@@ -238,12 +245,17 @@ public class ProfileActivity extends AppCompatActivity {
                 if (doc.exists()) {
                     String name = doc.getString("name");
                     String photoUrl = doc.getString("profilePic");
+                    String role = doc.getString("role");
                     
                     if (name != null) {
                         userNameTv.setText(name);
                         profileInitialTv.setText(String.valueOf(name.charAt(0)).toUpperCase());
                     }
                     userEmailTv.setText(currentEmail);
+
+                    if (userRoleTv != null && role != null) {
+                        userRoleTv.setText(getString(R.string.role_label, role.replace("_", " ")));
+                    }
                     
                     if (photoUrl != null && !photoUrl.isEmpty()) {
                         profileInitialTv.setVisibility(View.GONE);
@@ -1109,6 +1121,23 @@ public class ProfileActivity extends AppCompatActivity {
 
                     ImageButton approveBtn = (ImageButton) row.findViewById(R.id.deleteUserBtn);
                     approveBtn.setImageResource(android.R.drawable.ic_menu_save); // reuse button for approve
+                    
+                    ImageButton rejectBtn = (ImageButton) row.findViewById(R.id.rejectBtn);
+                    rejectBtn.setVisibility(View.VISIBLE);
+                    
+                    rejectBtn.setOnClickListener(v -> {
+                        new AlertDialog.Builder(this)
+                            .setTitle(getString(R.string.reject_request))
+                            .setMessage(getString(R.string.confirm_reject_msg, name))
+                            .setPositiveButton(getString(R.string.reject), (d, w) -> {
+                                doc.getReference().delete().addOnSuccessListener(a -> {
+                                    Toast.makeText(this, getString(R.string.request_rejected), Toast.LENGTH_SHORT).show();
+                                    showPendingRequestsDialog(); // refresh
+                                });
+                            })
+                            .setNegativeButton(getString(R.string.cancel), null)
+                            .show();
+                    });
 
                     approveBtn.setOnClickListener(v -> {
                         String code = String.format(Locale.getDefault(), "%06d", new Random().nextInt(999999));

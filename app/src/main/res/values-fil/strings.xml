@@ -295,6 +295,12 @@
     <string name="verification_code_msg">Verification Code para kay %1$s: %2$s</string>
     <string name="send_approval_email">Ipadala ang Approval at Code sa pamamagitan ng Gmail</string>
 
+    <string name="role_label">Papel: %1$s</string>
+    <string name="reject_request">Tanggihan ang Kahilingan</string>
+    <string name="confirm_reject_msg">Sigurado ka bang gusto mong tanggihan ang kahilingan mula kay %1$s?</string>
+    <string name="request_rejected">Tinanggihan ang kahilingan</string>
+    <string name="reject">Tanggihan</string>
+
     <!-- Analytics Strings -->
     <string name="performance_excellent">Napakahusay na Pagganap!</string>
     <string name="performance_stable">Matatag na Produksyon</string>

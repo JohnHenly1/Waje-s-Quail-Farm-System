@@ -295,6 +295,12 @@
     <string name="verification_code_msg">Verification Code para kang %1$s: %2$s</string>
     <string name="send_approval_email">Ipadala ang Approval ug Code pinaagi sa Gmail</string>
 
+    <string name="role_label">Papel: %1$s</string>
+    <string name="reject_request">I-reject ang Hangyo</string>
+    <string name="confirm_reject_msg">Sigurado ka ba nga gusto nimo i-reject ang hangyo gikan kang %1$s?</string>
+    <string name="request_rejected">Gireject ang hangyo</string>
+    <string name="reject">Reject</string>
+
     <!-- Analytics Strings -->
     <string name="performance_excellent">Maayo Kaayo nga Performance!</string>
     <string name="performance_stable">Stable nga Produksyon</string>

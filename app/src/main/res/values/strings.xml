@@ -137,13 +137,13 @@
     <string name="initial_farm_setup">Initial Farm Setup (Owner)</string>
     <string name="role_available">Available: %1$d/%2$d</string>
     <string name="role_full">Role Full</string>
-    <string name="forgot_password_label">Forgot Password?</string>
-    <string name="reset_password">Reset Password</string>
-    <string name="new_password_hint">Enter New Password</string>
-    <string name="update_password">Update Password</string>
-    <string name="verify_email_msg">Please enter your email to verify your account.</string>
-    <string name="email_not_found">Email not found in our records</string>
-    <string name="password_updated_success">Password updated successfully!</string>
+    <string name="forgot_password_label" translatable="false">Forgot Password?</string>
+    <string name="reset_password" translatable="false">Reset Password</string>
+    <string name="new_password_hint" translatable="false">Enter New Password</string>
+    <string name="update_password" translatable="false">Update Password</string>
+    <string name="verify_email_msg" translatable="false">Please enter your email to verify your account.</string>
+    <string name="email_not_found" translatable="false">Email not found in our records</string>
+    <string name="password_updated_success" translatable="false">Password updated successfully!</string>
 
     <!-- Profile Dialog Strings -->
     <string name="syncing_profile">Syncing Profile&#8230;</string>
@@ -231,7 +231,7 @@
     <string name="status_pending">Pending</string>
     <string name="status_ongoing">Ongoing</string>
     <string name="status_done">Done</string>
-    <string name="status_missed">MISSED</string>
+    <string name="status_missed" translatable="false">MISSED</string>
 
     <string-array name="task_categories">
         <item>Feeding</item>
@@ -311,6 +311,12 @@
     <string name="max_staff_hint">Max Staff</string>
     <string name="verification_code_msg">Verification Code for %1$s: %2$s</string>
     <string name="send_approval_email">Send Approval &amp; Code via Gmail</string>
+
+    <string name="role_label">Role: %1$s</string>
+    <string name="reject_request">Reject Request</string>
+    <string name="confirm_reject_msg">Are you sure you want to reject the request from %1$s?</string>
+    <string name="request_rejected">Request rejected</string>
+    <string name="reject">Reject</string>
 
     <!-- Analytics Strings -->
     <string name="performance_excellent">Excellent Performance!</string>
