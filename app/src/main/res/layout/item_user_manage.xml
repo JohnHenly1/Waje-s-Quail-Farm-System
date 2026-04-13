@@ -65,16 +65,35 @@
                 android:layout_marginTop="2dp" />
         </LinearLayout>
 
-        <ImageButton
-            android:id="@+id/deleteUserBtn"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_trash"
-            app:tint="@color/logout_red"
-            android:padding="10dp"
-            android:scaleType="centerInside"
-            android:contentDescription="Action Button" />
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:baselineAligned="false">
+
+            <ImageButton
+                android:id="@+id/rejectBtn"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_trash"
+                app:tint="@color/logout_red"
+                android:padding="10dp"
+                android:scaleType="centerInside"
+                android:visibility="gone"
+                android:contentDescription="@string/reject" />
+
+            <ImageButton
+                android:id="@+id/deleteUserBtn"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_trash"
+                app:tint="@color/logout_red"
+                android:padding="10dp"
+                android:scaleType="centerInside"
+                android:contentDescription="Action Button" />
+        </LinearLayout>
 
     </LinearLayout>
 </androidx.cardview.widget.CardView>

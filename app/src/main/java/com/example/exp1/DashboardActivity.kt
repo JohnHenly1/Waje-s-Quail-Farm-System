@@ -53,8 +53,10 @@ class DashboardActivity : AppCompatActivity() {
     private var eggListener: ValueEventListener? = null
     private var feedListener: ListenerRegistration? = null
     private var roleListener: ListenerRegistration? = null
+    private var alertsListener: ListenerRegistration? = null
     private lateinit var eggsTodayText: TextView
     private lateinit var feedRemainingText: TextView
+    private lateinit var notificationBadge: TextView
 
     private val takePictureLauncher =
         registerForActivityResult(ActivityResultContracts.TakePicture()) { success ->
@@ -85,6 +87,7 @@ class DashboardActivity : AppCompatActivity() {
         refreshTokenAndSyncRole()
 
         drawerLayout = findViewById(R.id.drawerLayout)
+        notificationBadge = findViewById(R.id.notificationBadge)
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -102,6 +105,66 @@ class DashboardActivity : AppCompatActivity() {
             setupStats()
             applyEntranceAnimations()
             checkAdminAccess()
+            setupAlertListener()
+
+            // Handle deep link from notification
+            if (intent.getBooleanExtra("OPEN_ALERTS", false)) {
+                intent.removeExtra("OPEN_ALERTS") // Prevent re-triggering on rotation/re-entry
+                startActivity(Intent(this, AlertsActivity::class.java).putExtra("username", username))
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent?.getBooleanExtra("OPEN_ALERTS", false) == true) {
+            showLoading("Opening Alerts...") {
+                intent.removeExtra("OPEN_ALERTS")
+                startActivity(Intent(this, AlertsActivity::class.java).putExtra("username", username))
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateNotificationBadge()
+    }
+
+    private fun updateNotificationBadge() {
+        val unreadCount = GlobalData.getUnreadCount()
+        if (unreadCount > 0) {
+            notificationBadge.visibility = View.VISIBLE
+            notificationBadge.text = if (unreadCount > 99) "99+" else unreadCount.toString()
+        } else {
+            notificationBadge.visibility = View.GONE
+        }
+    }
+
+    private fun setupAlertListener() {
+        val sdf = SimpleDateFormat("yyyy/MM/dd hh:mm a", Locale.getDefault())
+        alertsListener = FarmRepository.listenToAlerts { alerts ->
+            var newAlertAdded = false
+            for (alert in alerts) {
+                val message = alert["message"] as? String ?: continue
+                val type = alert["type"] as? String ?: "Inventory"
+                
+                val firestoreTs = alert["timestamp"]
+                val timestampStr = when (firestoreTs) {
+                    is com.google.firebase.Timestamp -> sdf.format(firestoreTs.toDate())
+                    is String -> firestoreTs
+                    else -> "Just now"
+                }
+
+                val existing = GlobalData.getAlerts().find { it.message == message && it.timestamp == timestampStr }
+                if (existing == null) {
+                    GlobalData.addAlert(message, timestampStr, type)
+                    newAlertAdded = true
+                }
+            }
+            if (newAlertAdded) {
+                runOnUiThread { updateNotificationBadge() }
+            }
         }
     }
 
@@ -155,6 +218,7 @@ class DashboardActivity : AppCompatActivity() {
         eggListener?.let { FirebaseDatabase.getInstance().getReference("egg_collections").removeEventListener(it) }
         feedListener?.remove()
         roleListener?.remove()
+        alertsListener?.remove()
         if (::updateTimeRunnable.isInitialized) {
             handler.removeCallbacks(updateTimeRunnable)
         }
@@ -343,7 +407,8 @@ class DashboardActivity : AppCompatActivity() {
                 return@addSnapshotListener
             }
             val docs = querySnapshot?.documents ?: emptyList()
-            val remaining = docs.count { (it["status"] as? String) != "Low" }
+            // Updated to check for "Low Stock" instead of "Low"
+            val remaining = docs.count { (it["status"] as? String) != "Low Stock" }
             feedRemainingText.text = remaining.toString()
         }
     }

@@ -13,6 +13,8 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.text.InputType;
 import android.view.GestureDetector;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -32,7 +34,6 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
-//Alerts mostly imports
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -42,14 +43,13 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
-//Firebase Imports (important connection to the firebase)
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
-//Calendar mostly imports
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -87,6 +87,14 @@ public class ScheduleActivity extends AppCompatActivity {
     private RoleManager roleManager;
 
     private String[] monthNames;
+    private Handler autoUpdateHandler = new Handler();
+    private Runnable autoUpdateRunnable = new Runnable() {
+        @Override
+        public void run() {
+            updateTasksUI();
+            autoUpdateHandler.postDelayed(this, 60000); // Refresh every minute for status changes
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -98,7 +106,6 @@ public class ScheduleActivity extends AppCompatActivity {
         monthNames = getResources().getStringArray(R.array.month_names);
 
         cameraHelper = new CameraHelper(this, (uri, results) -> {
-            // Count detections
             int gradeA = 0, gradeB = 0, gradeC = 0;
             for (DetectionResult r : results) {
                 switch (r.getLabel()) {
@@ -120,7 +127,6 @@ public class ScheduleActivity extends AppCompatActivity {
             currentUserEmail = "default_user";
         }
 
-        // gET USER ROLE----------------------------------------------------------------------------
         AccountManager accountManager = new AccountManager(this);
         roleManager = new RoleManager(accountManager.getCurrentRole());
 
@@ -130,7 +136,6 @@ public class ScheduleActivity extends AppCompatActivity {
             return insets;
         });
 
-        // This is calendar-------------------------------------------------------------------------
         today = Calendar.getInstance();
         selectedDate = (Calendar) today.clone();
         currentWeekCalendar = (Calendar) today.clone();
@@ -196,6 +201,18 @@ public class ScheduleActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        autoUpdateHandler.post(autoUpdateRunnable);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        autoUpdateHandler.removeCallbacks(autoUpdateRunnable);
+    }
+
+    @Override
     protected void onDestroy() {
         super.onDestroy();
         if (tasksListener != null) tasksListener.remove();
@@ -226,6 +243,8 @@ public class ScheduleActivity extends AppCompatActivity {
                                     doc.getString("recurrence") != null ? doc.getString("recurrence") : RECUR_ONCE,
                                     doc.getString("recurrenceGroupId")
                             );
+                            task.extensionMinutes = doc.getLong("extensionMinutes") != null ? doc.getLong("extensionMinutes").intValue() : 0;
+                            task.workWindowMinutes = doc.getLong("workWindowMinutes") != null ? doc.getLong("workWindowMinutes").intValue() : 60;
                             taskList.add(task);
                         }
                     }
@@ -233,7 +252,6 @@ public class ScheduleActivity extends AppCompatActivity {
                 });
     }
 
-    // Request Notification from phone---------------------------------------------------------------
     private void requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
@@ -255,6 +273,8 @@ public class ScheduleActivity extends AppCompatActivity {
         data.put("day",                task.day);
         data.put("recurrence",         task.recurrence);
         data.put("recurrenceGroupId",  task.recurrenceGroupId);
+        data.put("extensionMinutes",   task.extensionMinutes);
+        data.put("workWindowMinutes",  task.workWindowMinutes);
         data.put("createdAt", com.google.firebase.firestore.FieldValue.serverTimestamp());
         return data;
     }
@@ -263,7 +283,7 @@ public class ScheduleActivity extends AppCompatActivity {
         if (task.firestoreId == null) return;
         db.collection("farm_data").document("shared")
                 .collection("tasks").document(task.firestoreId)
-                .update("status", task.status)
+                .update("status", task.status, "extensionMinutes", task.extensionMinutes, "workWindowMinutes", task.workWindowMinutes)
                 .addOnFailureListener(e ->
                         Toast.makeText(this, getString(R.string.error_updating_status, e.getMessage()), Toast.LENGTH_SHORT).show());
     }
@@ -293,7 +313,6 @@ public class ScheduleActivity extends AppCompatActivity {
                 });
     }
 
-    // Bulk Delete/ Delete all Task-----------------------------------------------------------------
     private void bulkDeleteFromFirestore(List<Task> tasksToDelete) {
         com.google.firebase.firestore.WriteBatch batch = db.batch();
         for (Task task : tasksToDelete) {
@@ -315,6 +334,7 @@ public class ScheduleActivity extends AppCompatActivity {
         EditText    editTaskTitle        = dialogView.findViewById(R.id.editTaskTitle);
         Spinner     spinnerCategory      = dialogView.findViewById(R.id.spinnerCategory);
         TextView    textTime             = dialogView.findViewById(R.id.textTime);
+        EditText    editWorkWindow       = dialogView.findViewById(R.id.editWorkWindow);
         TextView    txtCurrentMonth      = dialogView.findViewById(R.id.txtCurrentMonth);
         GridLayout  calendarGrid         = dialogView.findViewById(R.id.calendarGrid);
         ImageButton btnPrevMonth         = dialogView.findViewById(R.id.btnPrevMonth);
@@ -479,50 +499,62 @@ public class ScheduleActivity extends AppCompatActivity {
 
         btnFullYear.setOnClickListener(v -> {
             View yearDialogView = LayoutInflater.from(this).inflate(R.layout.dialog_year_range, null);
-            EditText editStartYear = yearDialogView.findViewById(R.id.editStartYear);
-            EditText editEndYear = yearDialogView.findViewById(R.id.editEndYear);
+            TextView textStartDate = yearDialogView.findViewById(R.id.textStartDate);
+            TextView textEndDate = yearDialogView.findViewById(R.id.textEndDate);
             RadioGroup rgFilter = yearDialogView.findViewById(R.id.rgYearFilter);
-            editStartYear.setText(String.valueOf(viewCalendar.get(Calendar.YEAR)));
-            editEndYear.setText(String.valueOf(viewCalendar.get(Calendar.YEAR)));
+            
+            final Calendar startCal = Calendar.getInstance();
+            final Calendar endCal = Calendar.getInstance();
+            endCal.set(Calendar.MONTH, Calendar.DECEMBER);
+            endCal.set(Calendar.DAY_OF_MONTH, 31);
+            
+            SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+            textStartDate.setText(df.format(startCal.getTime()));
+            textEndDate.setText(df.format(endCal.getTime()));
+            
+            textStartDate.setOnClickListener(vStart -> {
+                new DatePickerDialog(this, (view, year, month, day) -> {
+                    startCal.set(year, month, day);
+                    textStartDate.setText(df.format(startCal.getTime()));
+                }, startCal.get(Calendar.YEAR), startCal.get(Calendar.MONTH), startCal.get(Calendar.DAY_OF_MONTH)).show();
+            });
+            
+            textEndDate.setOnClickListener(vEnd -> {
+                new DatePickerDialog(this, (view, year, month, day) -> {
+                    endCal.set(year, month, day);
+                    textEndDate.setText(df.format(endCal.getTime()));
+                }, endCal.get(Calendar.YEAR), endCal.get(Calendar.MONTH), endCal.get(Calendar.DAY_OF_MONTH)).show();
+            });
 
             new AlertDialog.Builder(this)
                     .setTitle(getString(R.string.select_year_range))
                     .setView(yearDialogView)
                     .setPositiveButton(getString(R.string.confirm), (d, w) -> {
                         try {
-                            int startY = Integer.parseInt(editStartYear.getText().toString());
-                            int endY = Integer.parseInt(editEndYear.getText().toString());
-                            if (startY > endY) { Toast.makeText(this, getString(R.string.start_year_after_end), Toast.LENGTH_SHORT).show(); return; }
+                            if (startCal.after(endCal)) { Toast.makeText(this, getString(R.string.start_year_after_end), Toast.LENGTH_SHORT).show(); return; }
 
                             int checkedId = rgFilter.getCheckedRadioButtonId();
                             if (checkedId == R.id.rbYearlyWeekdays) selectedRecurrence[0] = getString(R.string.recur_yearly_weekdays);
                             else if (checkedId == R.id.rbYearlyWeekends) selectedRecurrence[0] = getString(R.string.recur_yearly_weekends);
                             else selectedRecurrence[0] = getString(R.string.recur_yearly);
 
-                            Calendar cal = Calendar.getInstance();
+                            Calendar cal = (Calendar) startCal.clone();
                             cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0);
-                            for (int y = startY; y <= endY; y++) {
-                                cal.set(Calendar.YEAR, y);
-                                for (int m = 0; m < 12; m++) {
-                                    cal.set(Calendar.MONTH, m);
-                                    int days = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
-                                    for (int d_i = 1; d_i <= days; d_i++) {
-                                        cal.set(Calendar.DAY_OF_MONTH, d_i);
-                                        int dow = cal.get(Calendar.DAY_OF_WEEK);
-
-                                        boolean match = true;
-                                        if (checkedId == R.id.rbYearlyWeekdays) {
-                                            match = (dow != Calendar.SATURDAY && dow != Calendar.SUNDAY);
-                                        } else if (checkedId == R.id.rbYearlyWeekends) {
-                                            match = (dow == Calendar.SATURDAY || dow == Calendar.SUNDAY);
-                                        }
-
-                                        if (match) {
-                                            long key = cal.getTimeInMillis();
-                                            if (!selectedDates.contains(key)) selectedDates.add(key);
-                                        }
-                                    }
+                            
+                            while (!cal.after(endCal)) {
+                                int dow = cal.get(Calendar.DAY_OF_WEEK);
+                                boolean match = true;
+                                if (checkedId == R.id.rbYearlyWeekdays) {
+                                    match = (dow != Calendar.SATURDAY && dow != Calendar.SUNDAY);
+                                } else if (checkedId == R.id.rbYearlyWeekends) {
+                                    match = (dow == Calendar.SATURDAY || dow == Calendar.SUNDAY);
                                 }
+
+                                if (match) {
+                                    long key = cal.getTimeInMillis();
+                                    if (!selectedDates.contains(key)) selectedDates.add(key);
+                                }
+                                cal.add(Calendar.DAY_OF_MONTH, 1);
                             }
                             updateGrid.run();
                         } catch (Exception e) { Toast.makeText(this, getString(R.string.invalid_year), Toast.LENGTH_SHORT).show(); }
@@ -565,10 +597,12 @@ public class ScheduleActivity extends AppCompatActivity {
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             String title = editTaskTitle.getText().toString().trim();
             String category = spinnerCategory.getSelectedItem().toString();
+            String windowStr = editWorkWindow.getText().toString();
+            int window = windowStr.isEmpty() ? getDefaultWorkWindow(category) : Integer.parseInt(windowStr);
+
             if (title.isEmpty()) { Toast.makeText(this, getString(R.string.task_title_empty), Toast.LENGTH_SHORT).show(); return; }
             if (selectedDates.isEmpty()) { Toast.makeText(this, getString(R.string.please_select_date), Toast.LENGTH_SHORT).show(); return; }
 
-            // SHOW PREVIEW DIALOG BEFORE SAVING
             View previewView = LayoutInflater.from(this).inflate(R.layout.dialog_schedule_preview, null);
             ((TextView) previewView.findViewById(R.id.previewTitle)).setText(title);
             ((TextView) previewView.findViewById(R.id.previewCategory)).setText(category);
@@ -580,18 +614,16 @@ public class ScheduleActivity extends AppCompatActivity {
                     .setPositiveButton(getString(R.string.confirm_and_save), (dConfirm, wConfirm) -> {
                         String groupId = UUID.randomUUID().toString();
 
-                        // Show progress dialog to prevent freeze
                         AlertDialog progress = new AlertDialog.Builder(this)
                                 .setMessage(getString(R.string.scheduling_tasks))
                                 .setCancelable(false)
                                 .show();
 
-                        int batchSize = 400; // Safe limit (Firestore max is 500)
+                        int batchSize = 400;
                         int totalTasks = selectedDates.size();
                         final int[] completedBatches = {0};
                         int numBatches = (totalTasks + batchSize - 1) / batchSize;
 
-                        // Limit notifications to avoid Binder transaction limit / system overhead
                         int notificationLimit = 50;
                         int notificationsCreated = 0;
 
@@ -606,6 +638,7 @@ public class ScheduleActivity extends AppCompatActivity {
                                 Task t = new Task(null, title, category, selectedTime[0], "Pending",
                                         cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH),
                                         selectedRecurrence[0], groupId);
+                                t.workWindowMinutes = window;
 
                                 DocumentReference ref = db.collection("farm_data").document("shared")
                                         .collection("tasks").document();
@@ -633,6 +666,17 @@ public class ScheduleActivity extends AppCompatActivity {
                     .setNegativeButton(getString(R.string.back), null)
                     .show();
         });
+    }
+
+    private int getDefaultWorkWindow(String category) {
+        switch (category) {
+            case "Cleaning": return 120; // 2 hours
+            case "Egg Collection": return 90; // 1.5 hours
+            case "Health Check": return 90;
+            case "Feeding": return 60;
+            case "Watering": return 45;
+            default: return 60;
+        }
     }
 
     private void showDeleteOptions(Task task) {
@@ -681,7 +725,6 @@ public class ScheduleActivity extends AppCompatActivity {
             info.setText(infoText);
             time.setText(first.time);
 
-            // Set indicator color based on status of first task
             if (getString(R.string.status_done).equals(first.status)) indicator.setBackgroundResource(R.drawable.bg_status_done);
             else if (getString(R.string.status_ongoing).equals(first.status)) indicator.setBackgroundResource(R.drawable.bg_status_ongoing);
             else indicator.setBackgroundResource(R.drawable.bg_status_pending);
@@ -714,7 +757,6 @@ public class ScheduleActivity extends AppCompatActivity {
         View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_all_task_details, null);
         LinearLayout container = dialogView.findViewById(R.id.allTasksContainer);
 
-        // Group tasks by recurrenceGroupId. If null, use a unique ID for each.
         Map<String, List<Task>> groups = new LinkedHashMap<>();
         for (Task task : taskList) {
             String key = task.recurrenceGroupId;
@@ -751,14 +793,12 @@ public class ScheduleActivity extends AppCompatActivity {
             timeTv.setText(first.time);
             statusTextTv.setText(first.status);
 
-            // Date Info Mixed with Category
             if (groupTasks.size() > 1) {
                 dateInfoTv.setText(first.recurrence + " " + first.category + " (" + groupTasks.size() + " " + getString(R.string.days_unit) + ")");
             } else {
                 dateInfoTv.setText(first.day + " " + monthNames[first.month] + " " + first.year + " (" + first.category + ")");
             }
 
-            // Status Indicator color
             if (getString(R.string.status_done).equals(first.status)) statusIndicator.setBackgroundResource(R.drawable.bg_status_done);
             else if (getString(R.string.status_ongoing).equals(first.status)) statusIndicator.setBackgroundResource(R.drawable.bg_status_ongoing);
             else statusIndicator.setBackgroundResource(R.drawable.bg_status_pending);
@@ -810,7 +850,6 @@ public class ScheduleActivity extends AppCompatActivity {
             statusTv.setTypeface(null, Typeface.BOLD);
             statusTv.setTextColor(Color.WHITE);
 
-            // Apply status background
             if (getString(R.string.status_done).equals(t.status)) statusTv.setBackgroundResource(R.drawable.bg_status_done);
             else if (getString(R.string.status_ongoing).equals(t.status)) statusTv.setBackgroundResource(R.drawable.bg_status_ongoing);
             else statusTv.setBackgroundResource(R.drawable.bg_status_pending);
@@ -819,7 +858,6 @@ public class ScheduleActivity extends AppCompatActivity {
             row.addView(statusTv);
             datesContainer.addView(row);
 
-            // Divider
             View divider = new View(this);
             divider.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1));
             divider.setBackgroundColor(Color.parseColor("#F3F4F6"));
@@ -840,10 +878,13 @@ public class ScheduleActivity extends AppCompatActivity {
         int selMonth = selectedDate.get(Calendar.MONTH);
         int selDay   = selectedDate.get(Calendar.DAY_OF_MONTH);
 
-        // Group tasks by category
         Map<String, List<Task>> categoryGroups = new TreeMap<>();
         for (Task task : taskList) {
             if (task.year != selYear || task.month != selMonth || task.day != selDay) continue;
+
+            if (!getString(R.string.status_done).equals(task.status)) {
+                task.status = getAutoStatus(task);
+            }
 
             if (!categoryGroups.containsKey(task.category)) {
                 categoryGroups.put(task.category, new ArrayList<>());
@@ -862,6 +903,7 @@ public class ScheduleActivity extends AppCompatActivity {
                 TextView titleTv = taskView.findViewById(R.id.taskTitle);
                 TextView categoryTv = taskView.findViewById(R.id.taskCategory);
                 TextView timeTv = taskView.findViewById(R.id.taskTime);
+                TextView deadlineTv = taskView.findViewById(R.id.taskDeadline);
                 TextView recurrenceTv = taskView.findViewById(R.id.taskRecurrence);
                 View statusIndicator = taskView.findViewById(R.id.statusIndicator);
                 ImageButton deleteBtn = taskView.findViewById(R.id.deleteTaskBtn);
@@ -871,12 +913,48 @@ public class ScheduleActivity extends AppCompatActivity {
                 timeTv.setText(task.time);
                 if (recurrenceTv != null) recurrenceTv.setText(task.recurrence != null ? task.recurrence : RECUR_ONCE);
 
+                boolean isDone = getString(R.string.status_done).equals(task.status);
+                boolean isOngoing = getString(R.string.status_ongoing).equals(task.status);
+                boolean isMissed = getString(R.string.status_missed).equals(task.status);
+
+                if (isOngoing || isMissed) {
+                    deadlineTv.setVisibility(View.VISIBLE);
+                    deadlineTv.setText("| Deadline: " + calculateDeadlineTime(task));
+                } else {
+                    deadlineTv.setVisibility(View.GONE);
+                }
+
+                if (isMissed) {
+                    statusIndicator.setBackgroundColor(Color.parseColor("#DC2626"));
+                    titleTv.setText(task.title + " (MISSED)");
+                } else if (isDone) {
+                    statusIndicator.setBackgroundResource(R.drawable.bg_status_done);
+                } else if (isOngoing) {
+                    statusIndicator.setBackgroundResource(R.drawable.bg_status_ongoing);
+                } else {
+                    statusIndicator.setBackgroundResource(R.drawable.bg_status_pending);
+                }
+
                 taskView.setOnClickListener(v -> {
-                    String[] statuses = {getString(R.string.status_pending), getString(R.string.status_ongoing), getString(R.string.status_done)};
-                    new AlertDialog.Builder(this).setTitle(getString(R.string.update_status)).setItems(statuses, (dialog, which) -> {
-                        task.status = statuses[which];
-                        updateTaskStatus(task);
-                    }).show();
+                    if (isDone) {
+                        Toast.makeText(this, "Task already completed", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    if (isMissed) {
+                        if (roleManager.canEditFarm()) {
+                            showManagerOverrideDialog(task);
+                        } else {
+                            Toast.makeText(this, "Task was missed. Contact manager.", Toast.LENGTH_SHORT).show();
+                        }
+                        return;
+                    }
+                    if (!isOngoing) {
+                        // Manager Work Window dialog removed from here
+                        Toast.makeText(this, "Can only update status when Ongoing (at " + task.time + ")", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    showStatusUpdateDialog(task);
                 });
 
                 deleteBtn.setVisibility(roleManager.canDeleteTask() ? View.VISIBLE : View.GONE);
@@ -884,9 +962,6 @@ public class ScheduleActivity extends AppCompatActivity {
                     deleteBtn.setOnClickListener(v -> showDeleteOptions(task));
                 }
 
-                if (getString(R.string.status_done).equals(task.status)) statusIndicator.setBackgroundResource(R.drawable.bg_status_done);
-                else if (getString(R.string.status_ongoing).equals(task.status)) statusIndicator.setBackgroundResource(R.drawable.bg_status_ongoing);
-                else statusIndicator.setBackgroundResource(R.drawable.bg_status_pending);
                 tasksContainer.addView(taskView);
             }
         }
@@ -896,6 +971,99 @@ public class ScheduleActivity extends AppCompatActivity {
         if (pendingCount != null) pendingCount.setText(String.valueOf(pending));
         View placeholder = findViewById(R.id.noTasksPlaceholder);
         if (placeholder != null) placeholder.setVisibility(tasksContainer.getChildCount() == 0 ? View.VISIBLE : View.GONE);
+    }
+
+    private String calculateDeadlineTime(Task task) {
+        Calendar taskCal = Calendar.getInstance();
+        try {
+            Date date = new SimpleDateFormat("hh:mm a", Locale.getDefault()).parse(task.time);
+            Calendar timePart = Calendar.getInstance();
+            timePart.setTime(date);
+            taskCal.set(task.year, task.month, task.day, timePart.get(Calendar.HOUR_OF_DAY), timePart.get(Calendar.MINUTE), 0);
+            taskCal.set(Calendar.MILLISECOND, 0);
+            
+            taskCal.add(Calendar.MINUTE, task.workWindowMinutes + task.extensionMinutes);
+            return new SimpleDateFormat("hh:mm a", Locale.getDefault()).format(taskCal.getTime());
+        } catch (ParseException e) {
+            return "N/A";
+        }
+    }
+
+    private String getAutoStatus(Task task) {
+        Calendar taskCal = Calendar.getInstance();
+        try {
+            Date date = new SimpleDateFormat("hh:mm a", Locale.getDefault()).parse(task.time);
+            Calendar timePart = Calendar.getInstance();
+            timePart.setTime(date);
+            taskCal.set(task.year, task.month, task.day, timePart.get(Calendar.HOUR_OF_DAY), timePart.get(Calendar.MINUTE), 0);
+            taskCal.set(Calendar.MILLISECOND, 0);
+        } catch (ParseException e) {
+            return getString(R.string.status_pending);
+        }
+
+        Calendar now = Calendar.getInstance();
+        if (taskCal.after(now)) return getString(R.string.status_pending);
+
+        int totalWindow = task.workWindowMinutes + task.extensionMinutes;
+        Calendar expireCal = (Calendar) taskCal.clone();
+        expireCal.add(Calendar.MINUTE, totalWindow);
+
+        if (now.after(taskCal) && now.before(expireCal)) return getString(R.string.status_ongoing);
+        return getString(R.string.status_missed);
+    }
+
+    private void showStatusUpdateDialog(Task task) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Update Task Status");
+        
+        String[] options = {"Mark as Done", "Request 30min Extension"};
+        builder.setItems(options, (dialog, which) -> {
+            if (which == 0) {
+                task.status = getString(R.string.status_done);
+                updateTaskStatus(task);
+                Toast.makeText(this, "Task completed!", Toast.LENGTH_SHORT).show();
+            } else {
+                task.extensionMinutes += 30;
+                updateTaskStatus(task);
+                Toast.makeText(this, "Extension granted. New deadline updated.", Toast.LENGTH_SHORT).show();
+            }
+        });
+        builder.show();
+    }
+
+    private void showManagerWorkWindowDialog(Task task) {
+        EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setText(String.valueOf(task.workWindowMinutes));
+        input.setHint("Minutes for work window");
+
+        new AlertDialog.Builder(this)
+                .setTitle("Customize Work Window")
+                .setMessage("Category: " + task.category + "\nSet how many minutes staff have to complete this task.")
+                .setView(input)
+                .setPositiveButton("Set Window", (d, w) -> {
+                    String val = input.getText().toString();
+                    if (!val.isEmpty()) {
+                        task.workWindowMinutes = Integer.parseInt(val);
+                        updateTaskStatus(task);
+                        Toast.makeText(this, "Default work window updated for this task", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void showManagerOverrideDialog(Task task) {
+        new AlertDialog.Builder(this)
+                .setTitle("Manager Override")
+                .setMessage("Task '" + task.title + "' is MISSED. Reset it to Ongoing?")
+                .setPositiveButton("Reset to Ongoing", (d, w) -> {
+                    task.extensionMinutes += 60; // Add an hour to make it ongoing again
+                    updateTaskStatus(task);
+                    Toast.makeText(this, "Task reset to Ongoing (1 hour added)", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void addCategoryHeader(String category) {
@@ -915,6 +1083,7 @@ public class ScheduleActivity extends AppCompatActivity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel("task_reminder_channel", "Task Reminders", NotificationManager.IMPORTANCE_HIGH);
             channel.setDescription("Notifications for farm tasks");
+            channel.setLockscreenVisibility(NotificationCompat.VISIBILITY_PUBLIC);
             NotificationManager nm = getSystemService(NotificationManager.class);
             if (nm != null) nm.createNotificationChannel(channel);
         }
@@ -993,13 +1162,17 @@ public class ScheduleActivity extends AppCompatActivity {
         if (am == null) return;
         Calendar calendar = Calendar.getInstance();
         calendar.set(task.year, task.month, task.day, hour, minute, 0);
+        calendar.set(Calendar.SECOND, 0);
         calendar.set(Calendar.MILLISECOND, 0);
         if (calendar.before(Calendar.getInstance())) return;
+        
         Intent intent = new Intent(this, TaskAlarmReceiver.class);
         intent.putExtra("taskTitle", task.title);
         intent.putExtra("taskCategory", task.category);
+        
         int rc = (task.title + task.year + task.month + task.day + hour + minute).hashCode();
         PendingIntent pi = PendingIntent.getBroadcast(this, rc, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (am.canScheduleExactAlarms()) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, calendar.getTimeInMillis(), pi);
             else am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, calendar.getTimeInMillis(), pi);
@@ -1051,6 +1224,8 @@ public class ScheduleActivity extends AppCompatActivity {
         int    year, month, day;
         String recurrence;
         String recurrenceGroupId;
+        int extensionMinutes = 0;
+        int workWindowMinutes = 60; // default
 
         Task(String firestoreId, String title, String category, String time, String status, int year, int month, int day, String recurrence, String recurrenceGroupId) {
             this.firestoreId = firestoreId;
@@ -1072,15 +1247,20 @@ public class ScheduleActivity extends AppCompatActivity {
             String title = intent.getStringExtra("taskTitle");
             String category = intent.getStringExtra("taskCategory");
             createChannel(context);
+            
             String timestamp = new SimpleDateFormat("yyyy/MM/dd hh:mm a", Locale.getDefault()).format(new Date());
             try {
                 AccountManager accountManager = new AccountManager(context);
                 if (!accountManager.isScheduleEnabled()) return;
-                if (accountManager.isGlobalDataEnabled()) GlobalData.INSTANCE.addAlert(context.getString(R.string.task_reminder_title, title) + " (" + category + ")", timestamp, "System");
+                if (accountManager.isGlobalDataEnabled()) {
+                    GlobalData.INSTANCE.addAlert(context.getString(R.string.task_reminder_title, title) + " (" + category + ")", timestamp, "System");
+                }
             } catch (Exception e) { e.printStackTrace(); }
-            Intent alertIntent = new Intent(context, AlertsActivity.class);
+            
+            Intent alertIntent = new Intent(context, MainActivity.class);
             alertIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             PendingIntent pi = PendingIntent.getActivity(context, 0, alertIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            
             NotificationCompat.Builder builder = new NotificationCompat.Builder(context, "task_reminder_channel")
                 .setSmallIcon(R.drawable.ic_notifications)
                 .setContentTitle(context.getString(R.string.task_reminder_title, title))
@@ -1090,16 +1270,20 @@ public class ScheduleActivity extends AppCompatActivity {
                 .setContentIntent(pi)
                 .setAutoCancel(true)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
+                
             try {
                 NotificationManagerCompat nm = NotificationManagerCompat.from(context);
-                nm.notify((int) System.currentTimeMillis(), builder.build());
+                int notificationId = (title + category).hashCode();
+                nm.notify(notificationId, builder.build());
             } catch (SecurityException e) { e.printStackTrace(); }
         }
+        
         private static void createChannel(Context context) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 NotificationChannel channel = new NotificationChannel("task_reminder_channel", "Task Reminders", NotificationManager.IMPORTANCE_HIGH);
                 channel.setDescription("Notifications for farm tasks");
-                channel.enableLights(true); channel.enableVibration(true);
+                channel.enableLights(true); 
+                channel.enableVibration(true);
                 channel.setLockscreenVisibility(NotificationCompat.VISIBILITY_PUBLIC);
                 NotificationManager nm = context.getSystemService(NotificationManager.class);
                 if (nm != null) nm.createNotificationChannel(channel);

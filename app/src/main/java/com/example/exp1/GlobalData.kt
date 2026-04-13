@@ -25,20 +25,33 @@ object GlobalData {
     }
 
     @JvmStatic
+    @Synchronized
     fun addAlert(message: String, timestamp: String, type: String = "Inventory") {
         val list = loadAlerts().toMutableList()
+        
+        // Prevent exact duplicates (same message and timestamp)
+        val isDuplicate = list.any { it.message == message && it.timestamp == timestamp }
+        if (isDuplicate) return
+
         list.add(0, AlertItem(message, timestamp, type))
-        saveAlerts(list)
+        
+        // Keep only last 50 alerts to prevent SharedPreferences bloat
+        val trimmedList = if (list.size > 50) list.take(50) else list
+        saveAlerts(trimmedList)
     }
 
+    @Synchronized
     fun getAlerts(): List<AlertItem> = loadAlerts()
 
+    @Synchronized
     fun markAllAsRead() {
         saveAlerts(loadAlerts().map { it.copy(isRead = true) })
     }
 
+    @Synchronized
     fun clearAlerts() = saveAlerts(emptyList())
 
+    @Synchronized
     fun getUnreadCount(): Int = loadAlerts().count { !it.isRead }
 
     // -------------------------------------------------------------------------

@@ -88,9 +88,17 @@ object FarmRepository {
             .addOnFailureListener { e -> onDone?.invoke(e) }
     }
 
-    fun updateTaskStatus(firestoreId: String, newStatus: String, onDone: ((Exception?) -> Unit)? = null) {
-        tasksCol.document(firestoreId).update("status", newStatus)
-            .addOnSuccessListener { onDone?.invoke(null) }
+    fun updateTaskStatus(firestoreId: String, newStatus: String, extensionMinutes: Int = 0, onDone: ((Exception?) -> Unit)? = null) {
+        val update = mapOf(
+            "status" to newStatus,
+            "extensionMinutes" to extensionMinutes,
+            "statusUpdatedAt" to FieldValue.serverTimestamp()
+        )
+        tasksCol.document(firestoreId).update(update)
+            .addOnSuccessListener { 
+                // Status updated in Firestore, Alerts will be handled by the listener in the apps
+                onDone?.invoke(null) 
+            }
             .addOnFailureListener { e -> onDone?.invoke(e) }
     }
 

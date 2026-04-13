@@ -156,6 +156,18 @@
                     app:layout_constraintTop_toBottomOf="@id/userName"
                     app:layout_constraintStart_toStartOf="parent" />
 
+                <TextView
+                    android:id="@+id/userRole"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/user_role"
+                    android:textColor="#B3FFFFFF"
+                    android:textSize="14sp"
+                    android:textStyle="italic"
+                    app:layout_constraintTop_toBottomOf="@id/userEmail"
+                    app:layout_constraintStart_toStartOf="parent" />
+
             </androidx.constraintlayout.widget.ConstraintLayout>
 
             <!-- Stats Grid -->

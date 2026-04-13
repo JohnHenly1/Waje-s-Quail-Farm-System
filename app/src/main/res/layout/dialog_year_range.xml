@@ -1,78 +1,197 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:padding="20dp">
+    android:background="@color/white">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Select Year Range"
-        android:textColor="@color/dark_green"
-        android:textSize="18sp"
-        android:textStyle="bold" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="Start Year"
-        android:textSize="14sp" />
-
-    <EditText
-        android:id="@+id/editStartYear"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="2024"
-        android:inputType="number" />
+        android:orientation="vertical"
+        android:padding="24dp">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:text="End Year"
-        android:textSize="14sp" />
+        <!-- Modern Header -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:layout_marginBottom="28dp">
 
-    <EditText
-        android:id="@+id/editEndYear"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="2025"
-        android:inputType="number" />
+            <View
+                android:layout_width="40dp"
+                android:layout_height="4dp"
+                android:layout_marginBottom="20dp"
+                android:background="#E0E0E0"
+                android:backgroundTint="#E0E0E0" />
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="Filter By"
-        android:textSize="14sp" />
+            <FrameLayout
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:background="@drawable/circle_white"
+                android:backgroundTint="#F3F4F6"
+                android:layout_marginBottom="16dp">
+                <ImageView
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_calendar"
+                    app:tint="@color/dark_gray" />
+            </FrameLayout>
 
-    <RadioGroup
-        android:id="@+id/rgYearFilter"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:orientation="vertical">
+            <TextView
+                android:id="@+id/dialogTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Date Range Selection"
+                android:textColor="@color/dark_green"
+                android:textSize="22sp"
+                android:textStyle="bold" />
 
-        <RadioButton
-            android:id="@+id/rbAllDays"
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Select the start and end period for tasks"
+                android:textColor="@color/dark_gray"
+                android:textSize="14sp"
+                android:layout_marginTop="4dp"/>
+        </LinearLayout>
+
+        <!-- Date Fields Container -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/rounded_gray_bg"
+            android:padding="16dp">
+
+            <!-- Start Date -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="START DATE"
+                android:textColor="@color/dark_green"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.1" />
+
+            <TextView
+                android:id="@+id/textStartDate"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/rounded_corner"
+                android:backgroundTint="@color/white"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:text="2024-01-01"
+                android:textColor="@color/black"
+                android:textSize="16sp"
+                android:clickable="true"
+                android:focusable="true"
+                app:drawableEndCompat="@drawable/ic_calendar"
+                android:drawablePadding="12dp"
+                android:elevation="2dp" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="16dp" />
+
+            <!-- End Date -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="END DATE"
+                android:textColor="@color/dark_green"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.1" />
+
+            <TextView
+                android:id="@+id/textEndDate"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/rounded_corner"
+                android:backgroundTint="@color/white"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:text="2024-12-31"
+                android:textColor="@color/black"
+                android:textSize="16sp"
+                android:clickable="true"
+                android:focusable="true"
+                app:drawableEndCompat="@drawable/ic_calendar"
+                android:drawablePadding="12dp"
+                android:elevation="2dp" />
+
+        </LinearLayout>
+
+        <!-- Filter Options Section -->
+        <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="All Days"
-            android:checked="true" />
+            android:layout_marginTop="28dp"
+            android:text="REPEAT OPTIONS"
+            android:textColor="@color/dark_green"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.1" />
 
-        <RadioButton
-            android:id="@+id/rbYearlyWeekdays"
-            android:layout_width="wrap_content"
+        <RadioGroup
+            android:id="@+id/rgYearFilter"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Weekdays Only (Mon-Fri)" />
+            android:layout_marginTop="12dp"
+            android:orientation="vertical">
 
-        <RadioButton
-            android:id="@+id/rbYearlyWeekends"
-            android:layout_width="wrap_content"
+            <RadioButton
+                android:id="@+id/rbAllDays"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Everyday"
+                android:textColor="@color/black"
+                android:checked="true"
+                android:padding="14dp"
+                android:buttonTint="@color/dark_green"
+                android:layout_marginBottom="8dp"
+                android:background="@drawable/rounded_gray_bg" />
+
+            <RadioButton
+                android:id="@+id/rbYearlyWeekdays"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Weekdays only (Mon - Fri)"
+                android:textColor="@color/black"
+                android:padding="14dp"
+                android:buttonTint="@color/dark_green"
+                android:layout_marginBottom="8dp"
+                android:background="@drawable/rounded_gray_bg" />
+
+            <RadioButton
+                android:id="@+id/rbYearlyWeekends"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Weekends only (Sat - Sun)"
+                android:textColor="@color/black"
+                android:padding="14dp"
+                android:buttonTint="@color/dark_green"
+                android:background="@drawable/rounded_gray_bg" />
+        </RadioGroup>
+
+        <!-- Action Note -->
+        <TextView
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Weekends Only (Sat-Sun)" />
-    </RadioGroup>
+            android:layout_marginTop="24dp"
+            android:text="You can confirm these dates in the next step."
+            android:textColor="@color/dark_gray"
+            android:textSize="12sp"
+            android:gravity="center"
+            android:textStyle="italic" />
 
-</LinearLayout>
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

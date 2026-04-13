@@ -30,11 +30,11 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Limits"
-            android:textSize="12sp"
+            android:textSize="11sp"
             app:cornerRadius="12dp"
             app:strokeColor="@color/dark_green"
             android:textColor="@color/dark_green"
-            android:layout_marginEnd="4dp"/>
+            android:layout_marginEnd="2dp"/>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnPendingReq"
@@ -43,11 +43,24 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Pending"
-            android:textSize="12sp"
+            android:textSize="11sp"
             app:cornerRadius="12dp"
             app:strokeColor="@color/dark_green"
             android:textColor="@color/dark_green"
-            android:layout_marginHorizontal="4dp"/>
+            android:layout_marginHorizontal="2dp"/>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnViewCodes"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Codes"
+            android:textSize="11sp"
+            app:cornerRadius="12dp"
+            app:strokeColor="@color/dark_green"
+            android:textColor="@color/dark_green"
+            android:layout_marginHorizontal="2dp"/>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnInviteNew"
@@ -56,10 +69,10 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Invite"
-            android:textSize="12sp"
+            android:textSize="11sp"
             app:cornerRadius="12dp"
             app:backgroundTint="@color/dark_green"
-            android:layout_marginStart="4dp"/>
+            android:layout_marginStart="2dp"/>
     </LinearLayout>
 
     <TextView
