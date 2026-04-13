@@ -42,9 +42,9 @@
     </string-array>
 
     <!-- Shortcuts -->
-    <string name="feed_inventory">Imbentaryo sa Pagkaon</string>
+    <string name="feed_inventory">Imbentaryo</string>
     <string name="egg_count">Ihap sa Itlog</string>
-    <string name="report">Report</string>
+    <string name="report">"Taho "</string>
     <string name="tasks">Mga Buluhaton</string>
     <string name="water_level">Lebel sa Tubig</string>
 

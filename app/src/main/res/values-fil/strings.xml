@@ -42,7 +42,7 @@
     </string-array>
 
     <!-- Shortcuts -->
-    <string name="feed_inventory">Imbentaryo ng Pakain</string>
+    <string name="feed_inventory">Imbentaryo</string>
     <string name="egg_count">Bilang ng Itlog</string>
     <string name="report">Ulat</string>
     <string name="tasks">Mga Gawain</string>

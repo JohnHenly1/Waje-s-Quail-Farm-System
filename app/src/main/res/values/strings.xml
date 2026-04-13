@@ -51,7 +51,7 @@
     </string-array>
 
     <!-- Shortcuts -->
-    <string name="feed_inventory">Feed Inventory</string>
+    <string name="feed_inventory">Inventory</string>
     <string name="egg_count">Egg Count</string>
     <string name="report">Report</string>
     <string name="tasks">Tasks</string>
