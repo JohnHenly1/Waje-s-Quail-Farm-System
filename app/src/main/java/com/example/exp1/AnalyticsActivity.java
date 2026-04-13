@@ -496,7 +496,7 @@ public class AnalyticsActivity extends AppCompatActivity {
                 "📋  FARM ANALYTICS REPORT\n" +
                         "Generated: " + ts + "\n\n" +
                         "🥚  EGG PRODUCTION\n" +
-                        "   Total Eggs Collected : " + totalEggs + " eggs\n\n" +
+                        "   Total Month Eggs Collected : " + totalEggs + " eggs\n\n" +
                         "💰  REVENUE\n" +
                         "   Price per Egg        : " + currencyFormat.format(pricePerEgg) + "\n" +
                         "   Egg Sales Revenue    : " + currencyFormat.format(revenue) + "\n\n" +
@@ -563,7 +563,7 @@ public class AnalyticsActivity extends AppCompatActivity {
 
             // Egg Production
             drawSectionTitle(canvas, "Egg Production", y); y += 28;
-            drawRow(canvas, "Total Eggs Collected", totalEggs + " eggs", y, Color.BLACK); y += 14;
+            drawRow(canvas, "Total Month Eggs Collected", totalEggs + " eggs", y, Color.BLACK); y += 14;
             canvas.drawLine(20, y, 575, y, divider); y += 20;
 
             // Performance
@@ -575,7 +575,7 @@ public class AnalyticsActivity extends AppCompatActivity {
             canvas.drawLine(20, y, 575, y, divider); y += 20;
 
             // AI Recommendation
-            drawSectionTitle(canvas, "AI Recommendation", y); y += 28;
+            drawSectionTitle(canvas, "Smart Recommendation", y); y += 28;
             y = drawWrappedText(canvas, tip, 24, y, 550, body);
             canvas.drawLine(20, y + 6, 575, y + 6, divider);
 

@@ -130,7 +130,8 @@ class RegisterActivity : AppCompatActivity() {
                     } else {
                         checkRoleAvailability(db, role) { available ->
                             if (!available) {
-                                Toast.makeText(this, "The limit for $role has been reached.", Toast.LENGTH_LONG).show()
+                                val roleDisplayName = RoleManager.displayName(role)
+                                Toast.makeText(this, "The limit for $roleDisplayName has been reached.", Toast.LENGTH_LONG).show()
                             } else {
                                 val requestMap = hashMapOf(
                                     "name" to name,
@@ -218,10 +219,10 @@ class RegisterActivity : AppCompatActivity() {
                     .get()
                     .addOnSuccessListener { docs ->
                         val available = (staffLimit - docs.size()).coerceAtLeast(0)
-                        rbStaff.text = "Staff ($available spots left)"
+                        rbStaff.text = "Farm Staff ($available spots left)"
                         if (available <= 0) {
                             rbStaff.isEnabled = false
-                            rbStaff.text = "Staff (Full)"
+                            rbStaff.text = "Farm Staff (Full)"
                         }
                     }
 
@@ -231,10 +232,10 @@ class RegisterActivity : AppCompatActivity() {
                     .get()
                     .addOnSuccessListener { docs ->
                         val available = (backupLimit - docs.size()).coerceAtLeast(0)
-                        rbBackup.text = "Backup Owner ($available spots left)"
+                        rbBackup.text = "Co Farm Owner ($available spots left)"
                         if (available <= 0) {
                             rbBackup.isEnabled = false
-                            rbBackup.text = "Backup Owner (Full)"
+                            rbBackup.text = "Co Farm Owner (Full)"
                         }
                     }
             }

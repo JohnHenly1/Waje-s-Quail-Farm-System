@@ -324,10 +324,10 @@ object NavigationHelper {
                     .get()
                     .addOnSuccessListener { docs ->
                         val available = (staffLimit - docs.size()).coerceAtLeast(0)
-                        rbStaff.text = "Staff ($available spots left)"
+                        rbStaff.text = "Farm Staff ($available spots left)"
                         if (available <= 0) {
                             rbStaff.isEnabled = false
-                            rbStaff.text = "Staff (Full)"
+                            rbStaff.text = "Farm Staff (Full)"
                         }
                     }
 
@@ -337,10 +337,10 @@ object NavigationHelper {
                     .get()
                     .addOnSuccessListener { docs ->
                         val available = (backupLimit - docs.size()).coerceAtLeast(0)
-                        rbBackup.text = "Backup Owner ($available spots left)"
+                        rbBackup.text = "Co Farm Owner ($available spots left)"
                         if (available <= 0) {
                             rbBackup.isEnabled = false
-                            rbBackup.text = "Backup Owner (Full)"
+                            rbBackup.text = "Co Farm Owner (Full)"
                         }
                     }
             }
@@ -378,7 +378,8 @@ object NavigationHelper {
                         .get()
                         .addOnSuccessListener { users ->
                             if (users.size() >= limit) {
-                                Toast.makeText(activity, "The limit for $selectedRole has been reached.", Toast.LENGTH_LONG).show()
+                                val roleDisplayName = RoleManager.displayName(selectedRole)
+                                Toast.makeText(activity, "The limit for $roleDisplayName has been reached.", Toast.LENGTH_LONG).show()
                             } else {
                                 // Check if email is already in use
                                 db.collection("user_access").document(invitedEmail).get()
@@ -424,11 +425,7 @@ object NavigationHelper {
     }
 
     private fun showCodeResultDialog(activity: Activity, code: String, email: String, ownerEmail: String, role: String) {
-        val roleDisplayName = when(role) {
-            "staff" -> "Staff"
-            "backup_owner" -> "Backup Owner"
-            else -> "Staff"
-        }
+        val roleDisplayName = RoleManager.displayName(role)
         val message = "Share this code with $email:\n\nCode: $code\nRole: $roleDisplayName\n\nIt will expire in 24 hours."
         AlertDialog.Builder(activity)
             .setTitle("Invite Code Ready")
@@ -443,11 +440,7 @@ object NavigationHelper {
     }
 
     private fun sendCodeByEmail(activity: Activity, code: String, email: String, ownerEmail: String, role: String) {
-        val roleDisplayName = when(role) {
-            "staff" -> "Staff"
-            "backup_owner" -> "Backup Owner"
-            else -> "Staff"
-        }
+        val roleDisplayName = RoleManager.displayName(role)
         val emailBody = """
 Hello,
 

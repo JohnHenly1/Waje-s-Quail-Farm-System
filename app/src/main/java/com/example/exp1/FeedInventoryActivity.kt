@@ -279,6 +279,13 @@ class FeedInventoryActivity : AppCompatActivity() {
         card.findViewById<TextView>(R.id.unitPriceText).text   = currency.format(item.unitPrice)
         card.findViewById<TextView>(R.id.totalValueText).text  = currency.format(item.totalValue)
 
+        val qtyLabel = card.findViewById<TextView>(R.id.quantityLabel)
+        qtyLabel.text = when (item.category) {
+            "Feed" -> "Quantity (Sack)"
+            "Supplements" -> "Quantity (Bottle)"
+            else -> "Quantity"
+        }
+
         val badge = card.findViewById<TextView>(R.id.statusBadge)
         badge.text = item.status
         when (item.status) {
@@ -359,6 +366,7 @@ class FeedInventoryActivity : AppCompatActivity() {
         val invInput      = dialogView.findViewById<EditText>(R.id.foodInvInput)
         val locationInput = dialogView.findViewById<EditText>(R.id.foodLocationInput)
         val qtyInput      = dialogView.findViewById<EditText>(R.id.foodQtyInput)
+        val qtyLabel      = dialogView.findViewById<TextView>(R.id.foodQtyLabel)
         val priceInput    = dialogView.findViewById<EditText>(R.id.foodPriceInput)
         val catSpinner    = dialogView.findViewById<Spinner>(R.id.categorySpinner)
         val statusSpinner = dialogView.findViewById<Spinner>(R.id.statusSpinner)
@@ -370,6 +378,18 @@ class FeedInventoryActivity : AppCompatActivity() {
         val statusAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, statusOptions)
         statusAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         statusSpinner.adapter = statusAdapter
+
+        catSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val selected = categoryOptions[position]
+                qtyLabel.text = when (selected) {
+                    "Feed" -> "Quantity (Sack)"
+                    "Supplements" -> "Quantity (Bottle)"
+                    else -> "Quantity"
+                }
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
 
         if (isEdit && item != null) {
             nameInput.setText(item.name)
@@ -483,4 +503,3 @@ class FeedInventoryActivity : AppCompatActivity() {
         return "#INV$next"
     }
 }
-

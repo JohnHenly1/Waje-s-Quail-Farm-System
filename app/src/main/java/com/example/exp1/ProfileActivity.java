@@ -107,7 +107,7 @@ public class ProfileActivity extends AppCompatActivity {
         profileImageView = findViewById(R.id.profileImage);
 
         if (userRoleTv != null) {
-            String roleDisplayName = (userRole != null ? userRole.replace("_", " ") : "Staff");
+            String roleDisplayName = RoleManager.Companion.displayName(userRole != null ? userRole : "staff");
             userRoleTv.setText(getString(R.string.role_label, roleDisplayName));
         }
 
@@ -254,7 +254,7 @@ public class ProfileActivity extends AppCompatActivity {
                     userEmailTv.setText(currentEmail);
 
                     if (userRoleTv != null && role != null) {
-                        userRoleTv.setText(getString(R.string.role_label, role.replace("_", " ")));
+                        userRoleTv.setText(getString(R.string.role_label, RoleManager.Companion.displayName(role)));
                     }
                     
                     if (photoUrl != null && !photoUrl.isEmpty()) {
@@ -526,9 +526,15 @@ public class ProfileActivity extends AppCompatActivity {
             }
         });
 
-        builder.setPositiveButton(getString(R.string.update), (dialog, which) -> {
-            String oldP = oldPass.getText().toString();
-            String newP = newPass.getText().toString();
+        builder.setPositiveButton(getString(R.string.update), null);
+        builder.setNegativeButton(getString(R.string.cancel), null);
+        
+        AlertDialog dialog = builder.create();
+        dialog.show();
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String oldP = oldPass.getText().toString().trim();
+            String newP = newPass.getText().toString().trim();
             
             String error = getPasswordStrengthError(newP);
             if (error != null) {
@@ -536,15 +542,41 @@ public class ProfileActivity extends AppCompatActivity {
                 return;
             }
 
-            String currentUser = accountManager.getCurrentUsername();
-            if (currentUser != null && accountManager.updatePassword(currentUser, oldP, newP)) {
-                Toast.makeText(this, getString(R.string.password_updated), Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(this, getString(R.string.incorrect_password), Toast.LENGTH_SHORT).show();
-            }
+            if (currentEmail == null || currentEmail.isEmpty()) return;
+
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(false);
+
+            FirebaseFirestore.getInstance().collection("user_access").document(currentEmail).get()
+                .addOnSuccessListener(doc -> {
+                    if (doc.exists()) {
+                        String remotePass = doc.getString("password");
+                        if (remotePass != null && remotePass.equals(oldP)) {
+                            // Match! Update Remote
+                            doc.getReference().update("password", newP)
+                                .addOnSuccessListener(aVoid -> {
+                                    // Update Local Cache
+                                    accountManager.forceUpdatePassword(currentEmail, newP);
+                                    Toast.makeText(ProfileActivity.this, getString(R.string.password_updated), Toast.LENGTH_SHORT).show();
+                                    dialog.dismiss();
+                                })
+                                .addOnFailureListener(e -> {
+                                    Toast.makeText(ProfileActivity.this, "Failed to update database", Toast.LENGTH_SHORT).show();
+                                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(true);
+                                });
+                        } else {
+                            Toast.makeText(ProfileActivity.this, getString(R.string.incorrect_password), Toast.LENGTH_SHORT).show();
+                            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(true);
+                        }
+                    } else {
+                        Toast.makeText(ProfileActivity.this, "User profile not found", Toast.LENGTH_SHORT).show();
+                        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(true);
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(ProfileActivity.this, "Network error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(true);
+                });
         });
-        builder.setNegativeButton(getString(R.string.cancel), null);
-        builder.show();
     }
 
     private String getPasswordStrengthError(String password) {
@@ -871,7 +903,7 @@ public class ProfileActivity extends AppCompatActivity {
         container.addView(accessTitle);
         
         TextView accessText = new TextView(this);
-        accessText.setText("✓ Owner: Full access to all farm data\n✓ Backup Owner: Access to reports\n✓ Staff: Limited to assigned tasks");
+        accessText.setText("✓ Farm Owner: Full access to all farm data\n✓ Co Farm Owner: Access to reports\n✓ Farm Staff: Limited to assigned tasks");
         accessText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         accessText.setLineSpacing(4, 1.0f);
         container.addView(accessText);
@@ -1038,7 +1070,7 @@ public class ProfileActivity extends AppCompatActivity {
                     String role = doc.getString("role");
 
                     ((TextView)row.findViewById(R.id.userNameText)).setText("Code: " + code + " (" + invitedEmail + ")");
-                    ((TextView)row.findViewById(R.id.userRoleText)).setText("Role: " + role);
+                    ((TextView)row.findViewById(R.id.userRoleText)).setText("Role: " + RoleManager.Companion.displayName(role));
 
                     ImageButton deleteBtn = (ImageButton) row.findViewById(R.id.deleteUserBtn);
                     deleteBtn.setOnClickListener(v -> {
@@ -1066,11 +1098,11 @@ public class ProfileActivity extends AppCompatActivity {
         layout.setPadding(40, 40, 40, 40);
 
         EditText editBackupLimit = new EditText(this);
-        editBackupLimit.setHint("Max Backup Owners");
+        editBackupLimit.setHint("Max Co Farm Owners");
         layout.addView(editBackupLimit);
 
         EditText editStaffLimit = new EditText(this);
-        editStaffLimit.setHint("Max Staff");
+        editStaffLimit.setHint("Max Farm Staff");
         layout.addView(editStaffLimit);
 
         FirebaseFirestore.getInstance().collection("system_settings").document("role_limits").get()
@@ -1117,7 +1149,7 @@ public class ProfileActivity extends AppCompatActivity {
                     String email = doc.getId();
 
                     ((TextView)row.findViewById(R.id.userNameText)).setText(name + " (" + email + ")");
-                    ((TextView)row.findViewById(R.id.userRoleText)).setText("Role: " + role);
+                    ((TextView)row.findViewById(R.id.userRoleText)).setText("Role: " + RoleManager.Companion.displayName(role));
 
                     ImageButton approveBtn = (ImageButton) row.findViewById(R.id.deleteUserBtn);
                     approveBtn.setImageResource(android.R.drawable.ic_menu_save); // reuse button for approve
