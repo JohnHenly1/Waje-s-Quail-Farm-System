@@ -1,5 +1,6 @@
 package com.example.exp1
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.net.ConnectivityManager
@@ -129,8 +130,8 @@ class MainActivity : AppCompatActivity() {
             if (currentEmail != null) {
 
                 val role = accountManager.getRole(currentEmail)
-
-                enterApp("User", currentEmail, role, false)
+                // For offline, we rely on cached data in AccountManager
+                enterApp("User", currentEmail, role, "cached", false)
             }
         }
 
@@ -509,7 +510,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             if (entered == correctPass) {
-                enterApp(name, email, role, true)
+                enterApp(name, email, role, entered, true)
                 dialog.dismiss()
             } else {
                 passwordInputLayout.error = "Incorrect Password"
@@ -599,6 +600,7 @@ class MainActivity : AppCompatActivity() {
         progressHandler.post(runnable)
     }
 
+    @SuppressLint("SetTextI18n")
     private fun startLivePendingCheck(email: String) {
 
         firestoreListener?.remove()
@@ -620,6 +622,8 @@ class MainActivity : AppCompatActivity() {
 
                         val name =
                             snapshot.getString("name") ?: email
+                        
+                        val password = snapshot.getString("password") ?: ""
 
                         if (status == "approved") {
 
@@ -638,6 +642,7 @@ class MainActivity : AppCompatActivity() {
                                         name,
                                         email,
                                         role,
+                                        password,
                                         true
                                     )
 
@@ -662,7 +667,7 @@ class MainActivity : AppCompatActivity() {
                         } else if (status == "pending") {
 
                             statusText.text =
-                                "Waiting for Owner Approval..."
+                                "Waiting for Farm Owner Approval..."
 
                         } else {
 
@@ -701,6 +706,7 @@ class MainActivity : AppCompatActivity() {
         name: String,
         email: String,
         role: String,
+        password: String,
         showToast: Boolean
     ) {
 
@@ -716,7 +722,7 @@ class MainActivity : AppCompatActivity() {
         accountManager.registerAccount(
             email,
             email,
-            "verified",
+            password,
             role
         )
 

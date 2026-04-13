@@ -42,7 +42,7 @@ public class UserAdapter extends RecyclerView.Adapter<UserAdapter.UserViewHolder
         String email = doc.getId();
 
         holder.userNameText.setText(name != null ? name : "Unknown");
-        holder.userRoleText.setText(role != null ? role : "Unknown");
+        holder.userRoleText.setText(role != null ? RoleManager.Companion.displayName(role) : "Unknown");
 
         if ("owner".equals(role)) {
             holder.deleteBtn.setVisibility(View.GONE);

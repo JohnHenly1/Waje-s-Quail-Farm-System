@@ -118,4 +118,12 @@ public class FirestoreManager {
                 .addOnSuccessListener(v -> listener.onSuccess())
                 .addOnFailureListener(listener::onError);
     }
+
+    public void updatePassword(String newPassword, OnSaveListener listener) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("password", newPassword);
+        userAccessDoc().update(data)
+                .addOnSuccessListener(v -> listener.onSuccess())
+                .addOnFailureListener(listener::onError);
+    }
 }

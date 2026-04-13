@@ -78,6 +78,10 @@ class AccountManager(context: Context) {
         return true
     }
 
+    fun forceUpdatePassword(username: String, newPassword: String) {
+        sharedPreferences.edit().putString("${username}_password", newPassword).apply()
+    }
+
     fun deleteAccount(username: String): Boolean {
         if (!accountExists(username)) return false
         val email = getEmail(username)

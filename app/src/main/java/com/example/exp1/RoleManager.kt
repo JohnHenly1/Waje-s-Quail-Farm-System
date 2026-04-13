@@ -8,10 +8,10 @@ class RoleManager(val role: String) {
         const val STAFF         = "staff"
 
         fun displayName(role: String): String = when (role) {
-            OWNER        -> "Owner"
-            BACKUP_OWNER -> "Backup Owner"
-            STAFF        -> "Staff"
-            else         -> "Staff"
+            OWNER        -> "Farm Owner"
+            BACKUP_OWNER -> "Co Farm Owner"
+            STAFF        -> "Farm Staff"
+            else         -> "Farm Staff"
         }
     }
 
