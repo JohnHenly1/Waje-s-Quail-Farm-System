@@ -22,10 +22,15 @@
     <string name="camera_permission_required">Kailangan ng pahintulot sa camera</string>
     <string name="no_camera_app">Walang nahanap na camera app</string>
     <string name="token_refresh_failed">Bigo ang pag-refresh ng token: %1$s</string>
+    <string name="quick_actions">MABILIS NA AKSYON</string>
+    <string name="todays_overview">OVERVIEW NGAYON</string>
+    <string name="total_today">Kabuuan ngayong araw</string>
+    <string name="remaining">Natitira</string>
+    <string name="zero">0</string>
 
     <!-- AI Recommendation -->
     <string name="ai_recommendation">Smart Tip na Rekomendasyon</string>
-    <string name="recommendation_text">Rekomendasyon ng mga dapat gawin tulad ng pagpapatubig o pagpapakain sa pugo</string>
+    <string name="recommendation_text">I-click ang card para sa bagong tip!</string>
 
     <string-array name="smart_tips">
         <item>Pagpapakain sa Umaga: Pinaka-aktibo ang mga pugo sa umaga. Siguraduhing puno ang mga kainan bago mag-7 AM.</item>
@@ -39,6 +44,15 @@
         <item>Paglilinis ng Kulungan: Linisin ang mga waste tray araw-araw upang maiwasan ang amoy ng ammonia.</item>
         <item>Bio-security: Hugasan nang regular ang iyong mga kamot bago at pagkatapos hawakan ang mga pugo o ang kanilang mga itlog.</item>
         <item>Sariwang Pakain: Itago ang pakain sa isang malalamig at tuyong lugar upang maiwasan ang paglaki ng amag.</item>
+        <item>Pagkontrol ng Temperatura: Panatilihin ang bahay ng pugo sa pagitan ng 21°C at 32°C para sa pinakamainam na ginhawa at produksyon.</item>
+        <item>Katubigan: Panatilihin ang relative humidity sa 50-70% upang mapanatiling malusog ang mga pugo at hindi matuyo ang mga itlog.</item>
+        <item>Pagpupurga: Kumunsulta sa isang vet para sa regular na iskedyul ng pagpupurga upang matiyak ang kalusugan ng ibon.</item>
+        <item>Proteksyon sa Maninila: Siguraduhing ligtas ang mga kulungan laban sa mga daga, pusa, at ahas.</item>
+        <item>Pagtatala: Laging subaybayan ang iyong pang-araw-araw na bilang ng itlog upang maagang matukoy ang mga trend ng produksyon.</item>
+        <item>Espasyo: Siguraduhing may sapat na espasyo ang mga ibon. Ang pagsisikip ay humahantong sa stress at cannibalism.</item>
+        <item>Kalidad ng Pakain: Ang high-protein layer crumbles (mga 20-22%) ay pinakamainam para sa mga nangingitlog na pugo.</item>
+        <item>Dust Bathing: Magbigay ng kahon ng tuyong buhangin; gustong-gusto ng mga pugo ang dust bath upang manatiling malinis at walang kuto.</item>
+        <item>Pag-cull: Regular na tukuyin at alisin ang mga hindi nagpeperform o may sakit na ibon upang maprotektahan ang kawan.</item>
     </string-array>
 
     <!-- Shortcuts -->
@@ -53,6 +67,7 @@
     <string name="eggs_count">0</string>
     <string name="feed_remaining">Natitirang Pakain</string>
     <string name="feed_weight">0</string>
+    <string name="kg_unit">kg</string>
 
     <!-- Footer Nav -->
     <string name="home">Home</string>
@@ -120,6 +135,9 @@
     <string name="register_account">Magrehistro ng Account</string>
     <string name="system_access">Access sa System</string>
     <string name="enter_email_hint">Ilagay ang Email Address</string>
+    <string name="enter_approved_email_hint">Ilagay ang Inaprubahang Email</string>
+    <string name="login_with_email">Mag-login gamit ang Email</string>
+    <string name="or_separator">— O —</string>
     <string name="select_role">Pumili ng Papel:</string>
     <string name="role_staff">Farm Staff</string>
     <string name="role_backup_owner">Co Farm Owner</string>
@@ -167,7 +185,7 @@
     <string name="request_approved">Inaprubahan ang Kahilingan</string>
     <string name="database_management">Pamamahala ng Database</string>
     <string name="wipe_everything">Burahin Lahat</string>
-    <string name="confirm_wipe">BABALA: Buburahin nito ang lahat ng user, lahat ng data ng farm, at i-i-reset ang system. Magpatuloy?</string>
+    <string name="confirm_wipe">BABALA: Buburahin nito ang lahat ng user, lahat ng data ng farm, at i-i-reset ang system. Proceed?</string>
     <string name="wipe">BURAHIN</string>
 
     <!-- Schedule Dialogs & Messages -->
@@ -305,4 +323,17 @@
     <string name="performance_excellent">Napakahusay na Pagganap!</string>
     <string name="performance_stable">Matatag na Produksyon</string>
     <string name="performance_alert">Alerto sa Produksyon</string>
+
+    <!-- New Profile Activity Strings -->
+    <string name="profile_image">Larawan ng Profile</string>
+    <string name="birds_icon">Icon ng mga Ibon</string>
+    <string name="cages_icon">Icon ng mga Kulungan</string>
+    <string name="days_icon">Icon ng mga Araw</string>
+    <string name="placeholder_dashes">--</string>
+    <string name="chevron_icon">Icon ng Chevron</string>
+    <string name="admin_group_label">MGA USER NG FARM AT PAMAMAHALA NG DATABASE</string>
+    <string name="user_access_list">Listahan ng Access ng User</string>
+    <string name="generate_invite_code">Gumawa ng Invite Code</string>
+    <string name="manage_users">Pamahalaan ang mga User</string>
+
 </resources>

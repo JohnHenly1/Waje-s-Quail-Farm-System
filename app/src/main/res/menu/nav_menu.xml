@@ -1,23 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
-    <item
-        android:id="@+id/nav_dashboard"
-        android:icon="@drawable/ic_home"
-        android:title="Dashboard" />
-    <item
-        android:id="@+id/nav_settings"
-        android:icon="@drawable/ic_settings"
-        android:title="Settings" />
-    <item
-        android:id="@+id/nav_help"
-        android:icon="@drawable/ic_help_circle"
-        android:title="Help" />
-    <item
-        android:id="@+id/nav_invite_user"
-        android:icon="@drawable/ic_add"
-        android:title="Invite User" />
-    <item
-        android:id="@+id/nav_logout"
-        android:icon="@drawable/lc_logout"
-        android:title="Logout" />
+
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_dashboard"
+            android:icon="@drawable/ic_home"
+            android:title="Dashboard" />
+        <item
+            android:id="@+id/nav_invite_user"
+            android:icon="@drawable/ic_add"
+            android:title="Invite User" />
+    </group>
+
+    <item android:title="Support &amp; Settings">
+        <menu>
+            <item
+                android:id="@+id/nav_settings"
+                android:icon="@drawable/ic_settings"
+                android:title="Settings" />
+            <item
+                android:id="@+id/nav_help"
+                android:icon="@drawable/ic_help_circle"
+                android:title="Help &amp; Support" />
+        </menu>
+    </item>
+
+    <item android:title="">
+        <menu>
+            <item
+                android:id="@+id/nav_logout"
+                android:icon="@drawable/lc_logout"
+                android:title="Logout" />
+        </menu>
+    </item>
+
 </menu>

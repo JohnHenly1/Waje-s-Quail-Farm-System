@@ -111,7 +111,7 @@
                             android:layout_height="match_parent"
                             android:scaleType="centerCrop"
                             android:visibility="gone"
-                            android:contentDescription="Profile Image" />
+                            android:contentDescription="@string/profile_image" />
                     </FrameLayout>
 
                     <ImageButton
@@ -196,13 +196,14 @@
                             android:background="@drawable/bg_stat_blue"
                             android:padding="8dp"
                             android:src="@drawable/quailbird_icon"
-                            app:tint="@color/white" />
+                            app:tint="@color/white"
+                            android:contentDescription="@string/birds_icon" />
                         <TextView
                             android:id="@+id/totalBirdsValue"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="6dp"
-                            android:text="--"
+                            android:text="@string/placeholder_dashes"
                             android:textColor="@color/black"
                             android:textSize="18sp"
                             android:textStyle="bold" />
@@ -238,13 +239,14 @@
                             android:background="@drawable/bg_stat_green"
                             android:padding="8dp"
                             android:src="@drawable/cageicon"
-                            app:tint="@color/white" />
+                            app:tint="@color/white"
+                            android:contentDescription="@string/cages_icon" />
                         <TextView
                             android:id="@+id/activeCagesValue"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="6dp"
-                            android:text="--"
+                            android:text="@string/placeholder_dashes"
                             android:textColor="@color/black"
                             android:textSize="18sp"
                             android:textStyle="bold" />
@@ -280,13 +282,14 @@
                             android:background="@drawable/bg_stat_orange"
                             android:padding="8dp"
                             android:src="@drawable/day_icon"
-                            app:tint="@color/white" />
+                            app:tint="@color/white"
+                            android:contentDescription="@string/days_icon" />
                         <TextView
                             android:id="@+id/daysRunningValue"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="6dp"
-                            android:text="--"
+                            android:text="@string/placeholder_dashes"
                             android:textColor="@color/black"
                             android:textSize="18sp"
                             android:textStyle="bold" />
@@ -361,7 +364,8 @@
                             android:layout_width="20dp"
                             android:layout_height="20dp"
                             android:src="@drawable/ic_chevron_right"
-                            app:tint="#D1D5DB" />
+                            app:tint="#D1D5DB"
+                            android:contentDescription="@string/chevron_icon" />
                     </LinearLayout>
 
                     <View
@@ -402,7 +406,8 @@
                             android:layout_width="20dp"
                             android:layout_height="20dp"
                             android:src="@drawable/ic_chevron_right"
-                            app:tint="#D1D5DB" />
+                            app:tint="#D1D5DB"
+                            android:contentDescription="@string/chevron_icon" />
                     </LinearLayout>
 
                     <View
@@ -434,7 +439,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="16dp"
                             android:layout_weight="1"
-                            android:text="Farm Recalibration"
+                            android:text="@string/farm_recalibration"
                             android:textColor="@color/black"
                             android:textSize="16sp"
                             android:fontFamily="sans-serif-medium" />
@@ -443,17 +448,32 @@
                             android:layout_width="20dp"
                             android:layout_height="20dp"
                             android:src="@drawable/ic_chevron_right"
-                            app:tint="#D1D5DB" />
+                            app:tint="#D1D5DB"
+                            android:contentDescription="@string/chevron_icon" />
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
             <!-- Admin Group (only for owners) -->
+            <TextView
+                android:id="@+id/adminGroupLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="28dp"
+                android:layout_marginStart="4dp"
+                android:layout_marginBottom="12dp"
+                android:text="@string/admin_group_label"
+                android:textColor="@color/dark_gray"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textAllCaps="true"
+                android:letterSpacing="0.1"
+                android:visibility="gone" />
+
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/adminCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
                 android:visibility="gone"
                 app:cardCornerRadius="16dp"
                 app:cardElevation="2dp"
@@ -465,6 +485,91 @@
                     android:background="@android:color/white"
                     android:orientation="vertical">
 
+                    <!-- User List -->
+                    <LinearLayout
+                        android:id="@+id/userListButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="64dp"
+                        android:background="?attr/selectableItemBackground"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="16dp">
+
+                        <View
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:background="@drawable/rounded_corner"
+                            android:backgroundTint="@color/bg_blue_100"
+                            android:foreground="@drawable/ic_users"
+                            android:foregroundGravity="center"
+                            android:foregroundTint="@color/text_blue_600" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="16dp"
+                            android:layout_weight="1"
+                            android:text="@string/user_access_list"
+                            android:textColor="@color/black"
+                            android:textSize="16sp"
+                            android:fontFamily="sans-serif-medium" />
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:src="@drawable/ic_chevron_right"
+                            app:tint="#D1D5DB"
+                            android:contentDescription="@string/chevron_icon" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="#F3F4F6"
+                        android:layout_marginHorizontal="16dp" />
+
+                    <!-- Database Management -->
+                    <LinearLayout
+                        android:id="@+id/databaseManagementButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="64dp"
+                        android:background="?attr/selectableItemBackground"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="16dp">
+
+                        <View
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:background="@drawable/rounded_corner"
+                            android:backgroundTint="@color/bg_orange_100"
+                            android:foreground="@drawable/ic_lock"
+                            android:foregroundGravity="center"
+                            android:foregroundTint="@color/text_orange_600" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="16dp"
+                            android:layout_weight="1"
+                            android:text="@string/database_management"
+                            android:textColor="@color/black"
+                            android:textSize="16sp"
+                            android:fontFamily="sans-serif-medium" />
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:src="@drawable/ic_chevron_right"
+                            app:tint="#D1D5DB"
+                            android:contentDescription="@string/chevron_icon" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="#F3F4F6"
+                        android:layout_marginHorizontal="16dp" />
+
+                    <!-- Generate Invite Code -->
                     <LinearLayout
                         android:id="@+id/generateInviteButton"
                         android:layout_width="match_parent"
@@ -487,7 +592,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="16dp"
                             android:layout_weight="1"
-                            android:text="Generate Invite Code"
+                            android:text="@string/generate_invite_code"
                             android:textColor="@color/black"
                             android:textSize="16sp"
                             android:fontFamily="sans-serif-medium" />
@@ -496,7 +601,8 @@
                             android:layout_width="20dp"
                             android:layout_height="20dp"
                             android:src="@drawable/ic_chevron_right"
-                            app:tint="#D1D5DB" />
+                            app:tint="#D1D5DB"
+                            android:contentDescription="@string/chevron_icon" />
                     </LinearLayout>
 
                     <View
@@ -505,6 +611,7 @@
                         android:background="#F3F4F6"
                         android:layout_marginHorizontal="16dp" />
 
+                    <!-- Manage Users -->
                     <LinearLayout
                         android:id="@+id/manageUsersButton"
                         android:layout_width="match_parent"
@@ -527,7 +634,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="16dp"
                             android:layout_weight="1"
-                            android:text="Manage Users"
+                            android:text="@string/manage_users"
                             android:textColor="@color/black"
                             android:textSize="16sp"
                             android:fontFamily="sans-serif-medium" />
@@ -536,7 +643,8 @@
                             android:layout_width="20dp"
                             android:layout_height="20dp"
                             android:src="@drawable/ic_chevron_right"
-                            app:tint="#D1D5DB" />
+                            app:tint="#D1D5DB"
+                            android:contentDescription="@string/chevron_icon" />
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -599,7 +707,8 @@
                             android:layout_width="20dp"
                             android:layout_height="20dp"
                             android:src="@drawable/ic_chevron_right"
-                            app:tint="#D1D5DB" />
+                            app:tint="#D1D5DB"
+                            android:contentDescription="@string/chevron_icon" />
                     </LinearLayout>
 
                     <View
@@ -639,7 +748,8 @@
                             android:layout_width="20dp"
                             android:layout_height="20dp"
                             android:src="@drawable/ic_chevron_right"
-                            app:tint="#D1D5DB" />
+                            app:tint="#D1D5DB"
+                            android:contentDescription="@string/chevron_icon" />
                     </LinearLayout>
 
                     <View
@@ -680,7 +790,8 @@
                             android:layout_width="20dp"
                             android:layout_height="20dp"
                             android:src="@drawable/ic_chevron_right"
-                            app:tint="#D1D5DB" />
+                            app:tint="#D1D5DB"
+                            android:contentDescription="@string/chevron_icon" />
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -791,32 +902,6 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/analytics"
-                android:textColor="@color/white"
-                android:textSize="11sp"
-                android:layout_marginTop="4dp" />
-        </LinearLayout>
-
-        <!-- Camera/Center Button -->
-        <LinearLayout
-            android:id="@+id/CameraButton"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:background="?attr/selectableItemBackground">
-
-            <ImageView
-                android:layout_width="26dp"
-                android:layout_height="26dp"
-                android:src="@drawable/ic_camera"
-                android:contentDescription="@string/camera"
-                app:tint="@color/white" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/camera"
                 android:textColor="@color/white"
                 android:textSize="11sp"
                 android:layout_marginTop="4dp" />

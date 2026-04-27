@@ -22,6 +22,11 @@
     <string name="camera_permission_required">Gikinahanglan ang permiso sa camera</string>
     <string name="no_camera_app">Walay nakit-an nga camera app</string>
     <string name="token_refresh_failed">Bigo ang pag-refresh sa token: %1$s</string>
+    <string name="quick_actions">DALI NGA AKSYON</string>
+    <string name="todays_overview">OVERVIEW KARONG ADLAWA</string>
+    <string name="total_today">Tibuok karong adlawa</string>
+    <string name="remaining">Nabilin</string>
+    <string name="zero">0</string>
 
     <!-- AI Recommendation -->
     <string name="ai_recommendation">Smart Tip na Rekomendasyon</string>
@@ -39,6 +44,15 @@
         <item>Paglimpyo sa Hawla: Limpyohi ang mga waste tray kada adlaw aron malikayan ang baho sa ammonia.</item>
         <item>Bio-security: Hugasi kanunay ang imong mga kamot sa dili pa ug pagkahuman sa paghikap sa mga pugo o ilang mga itlog.</item>
         <item>Fresh Feed: Itago ang pagkaon sa bugnaw ug uga nga dapit aron dili kini mag-amag.</item>
+        <item>Pagkontrol sa Temperatura: Hupti ang balay sa pugo tali sa 21°C ug 32°C alang sa labing maayo nga kahupayan ug produksyon.</item>
+        <item>Kabasa: Hupti ang relative humidity sa 50-70% aron magpabiling himsog ang mga pugo ug dili mamala ang mga itlog.</item>
+        <item>Pagpurga: Pakigkita sa usa ka vet alang sa regular nga iskedyul sa pagpurga aron masiguro ang kahimsog sa langgam.</item>
+        <item>Proteksyon sa Manunukob: Siguruha nga luwas ang mga hawla batok sa mga ilaga, iring, ug bitin.</item>
+        <item>Paghupot og Record: Kanunay nga bantayan ang imong adlaw-adlaw nga ihap sa itlog aron mailhan ang mga trend sa produksyon sayo.</item>
+        <item>Luna: Siguruha nga ang mga langgam adunay igo nga luna. Ang paghuot mosangpot sa stress ug cannibalism.</item>
+        <item>Kalidad sa Pagkaon: Ang high-protein layer crumbles (mga 20-22%) mao ang labing maayo alang sa mga nangingitlog nga pugo.</item>
+        <item>Dust Bathing: Paghatag og kahon sa uga nga balas; ang mga pugo ganahan og dust bath aron magpabiling limpyo ug walay kuto.</item>
+        <item>Pag-cull: Regular nga ilha ug kuhaa ang mga dili maayo nga performance o nasakit nga mga langgam aron mapanalipdan ang kawan.</item>
     </string-array>
 
     <!-- Shortcuts -->
@@ -53,6 +67,7 @@
     <string name="eggs_count">0</string>
     <string name="feed_remaining">Nabilin nga Pagkaon</string>
     <string name="feed_weight">0</string>
+    <string name="kg_unit">kg</string>
 
     <!-- Footer Nav -->
     <string name="home">Home</string>
@@ -120,6 +135,9 @@
     <string name="register_account">Pagrehistro og Account</string>
     <string name="system_access">Access sa System</string>
     <string name="enter_email_hint">Ibutang ang Email Address</string>
+    <string name="enter_approved_email_hint">Ibutang ang Inaprubahang Email</string>
+    <string name="login_with_email">Mag-login gamit ang Email</string>
+    <string name="or_separator">— O —</string>
     <string name="select_role">Pilia ang Papel:</string>
     <string name="role_staff">Farm Staff</string>
     <string name="role_backup_owner">Co Farm Owner</string>
@@ -163,7 +181,7 @@
     <string name="role_limits">Mga Limitasyon sa Papel</string>
     <string name="limits_updated">Na-update na ang mga Limitasyon!</string>
     <string name="pending_access_requests">Mga Naghulat nga Hangyo sa Access</string>
-    <string name="no_pending_requests">Walay naghulat nga mga hangyo.</string>
+    <string name="no_pending_requests">Walang naghulat nga mga hangyo.</string>
     <string name="request_approved">Giaprobahan ang Hangyo</string>
     <string name="database_management">Pagdumala sa Database</string>
     <string name="wipe_everything">I-delete Tanan</string>
@@ -305,4 +323,17 @@
     <string name="performance_excellent">Maayo Kaayo nga Performance!</string>
     <string name="performance_stable">Stable nga Produksyon</string>
     <string name="performance_alert">Alerto sa Produksyon</string>
+
+    <!-- New Profile Activity Strings -->
+    <string name="profile_image">Larawan sa Profile</string>
+    <string name="birds_icon">Icon sa mga Langgam</string>
+    <string name="cages_icon">Icon sa mga Hawla</string>
+    <string name="days_icon">Icon sa mga Adlaw</string>
+    <string name="placeholder_dashes">--</string>
+    <string name="chevron_icon">Icon sa Chevron</string>
+    <string name="admin_group_label">MGA USER SA FARM UG PAGDUMALA SA DATABASE</string>
+    <string name="user_access_list">Listahan sa Access sa User</string>
+    <string name="generate_invite_code">Paghimo og Invite Code</string>
+    <string name="manage_users">Pagdumala sa mga User</string>
+
 </resources>

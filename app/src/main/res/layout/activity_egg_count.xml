@@ -620,29 +620,6 @@
         </LinearLayout>
 
         <!-- Camera -->
-        <LinearLayout
-            android:id="@+id/CameraButton"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center">
-
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:scaleType="centerInside"
-                app:srcCompat="@drawable/ic_camera"
-                app:tint="@color/white"/>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/camera"
-                android:textColor="@color/white"
-                android:textSize="10sp"
-                android:layout_marginTop="2dp"/>
-        </LinearLayout>
 
         <!-- Schedule -->
         <LinearLayout

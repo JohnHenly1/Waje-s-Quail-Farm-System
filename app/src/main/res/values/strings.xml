@@ -22,6 +22,11 @@
     <string name="camera_permission_required">Camera permission is required</string>
     <string name="no_camera_app">No camera app found</string>
     <string name="token_refresh_failed">Token refresh failed: %1$s</string>
+    <string name="quick_actions">QUICK ACTIONS</string>
+    <string name="todays_overview">TODAY\'S OVERVIEW</string>
+    <string name="total_today">Total today</string>
+    <string name="remaining">Remaining</string>
+    <string name="zero">0</string>
 
     <!-- AI Recommendation -->
     <string name="ai_recommendation">Smart Tip Recommendation</string>
@@ -61,6 +66,7 @@
     <string name="eggs_count">0</string>
     <string name="feed_remaining">Inventory Remaining</string>
     <string name="feed_weight">0</string>
+    <string name="kg_unit">kg</string>
 
     <!-- Footer Nav -->
     <string name="home">Home</string>
@@ -129,6 +135,9 @@
     <string name="register_account">Register Account</string>
     <string name="system_access">System Access</string>
     <string name="enter_email_hint">Enter Email Address</string>
+    <string name="enter_approved_email_hint">Enter Approved Email</string>
+    <string name="login_with_email">Login with Email</string>
+    <string name="or_separator">— OR —</string>
     <string name="select_role">Select Desired Role:</string>
     <string name="role_staff">Farm Staff</string>
     <string name="role_backup_owner">Co Farm Owner</string>
@@ -318,8 +327,49 @@
     <string name="request_rejected">Request rejected</string>
     <string name="reject">Reject</string>
 
+    <!-- Percent Placeholder -->
+    <string name="percent_placeholder">%1$d%%</string>
+
+    <!-- Additional Database Monitor Strings -->
+    <string name="no_active_invite_codes">No active invite codes.</string>
+    <string name="invite_code_placeholder">Code: %1$s (%2$s)</string>
+    <string name="role_display_placeholder">Role: %1$s</string>
+    <string name="user_email_placeholder">%1$s (%2$s)</string>
+    <string name="monitor_db">Monitor Database</string>
+    <string name="import_db">Import Database</string>
+    <string name="export_db">Export Database</string>
+    <string name="delete_db">Delete Database</string>
+    <string name="wipe_everything_label">Wipe Everything</string>
+    <string name="total_tasks_loading">Total Tasks: Loading&#8230;</string>
+    <string name="active_invite_codes_loading">Active Invite Codes: Loading&#8230;</string>
+    <string name="view_farm_stats_btn">View Farm Stats Data</string>
+    <string name="manage_invite_codes_btn">Manage Active Invite Codes</string>
+    <string name="approved_users_error">Approved Users: Error</string>
+    <string name="pending_requests_error">Pending Requests: Error</string>
+    <string name="total_tasks_count_placeholder">Total Tasks: %1$d</string>
+    <string name="active_invite_codes_count_placeholder">Active Invite Codes: %1$d</string>
+    <string name="farm_stats_explorer_title">Farm Stats Explorer</string>
+    <string name="fetching_stats_placeholder">Fetching stats&#8230;</string>
+    <string name="farm_stats_display_format">Birds: %1$d\nCages: %2$d\nStart Date: %3$s</string>
+    <string name="reset_stats_btn">Reset Stats to Zero</string>
+    <string name="no_farm_stats_found">No farm stats found.</string>
+    <string name="delete_database_title">Delete Database</string>
+
     <!-- Analytics Strings -->
     <string name="performance_excellent">Excellent Performance!</string>
     <string name="performance_stable">Stable Production</string>
     <string name="performance_alert">Production Alert</string>
+
+    <!-- New Profile Activity Strings -->
+    <string name="profile_image">Profile Image</string>
+    <string name="birds_icon">Birds Icon</string>
+    <string name="cages_icon">Cages Icon</string>
+    <string name="days_icon">Days Icon</string>
+    <string name="placeholder_dashes">--</string>
+    <string name="chevron_icon">Chevron Icon</string>
+    <string name="admin_group_label">FARM USERS &amp; DATABASE MANAGEMENT</string>
+    <string name="user_access_list">User Access List</string>
+    <string name="generate_invite_code">Generate Invite Code</string>
+    <string name="manage_users">Manage Users</string>
+
 </resources>

@@ -28,6 +28,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.appcompat.widget.SwitchCompat;
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.os.LocaleListCompat;
 import androidx.core.view.ViewCompat;
@@ -47,6 +48,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Random;
 import java.text.SimpleDateFormat;
 
@@ -151,13 +153,45 @@ public class ProfileActivity extends AppCompatActivity {
 
         //  Notification Preferences -----------------------------------------------------------
         View notificationPrefsButton = findViewById(R.id.notificationPreferencesButton);
-        if (isAdmin()) {
-            notificationPrefsButton.setVisibility(View.VISIBLE);
-            notificationPrefsButton.setOnClickListener(v -> showNotificationPrefsDialog());
-        } else {
-            notificationPrefsButton.setVisibility(View.GONE);
+        if (notificationPrefsButton != null) {
+            if (isAdmin()) {
+                notificationPrefsButton.setVisibility(View.VISIBLE);
+                notificationPrefsButton.setOnClickListener(v -> showNotificationPrefsDialog());
+            } else {
+                notificationPrefsButton.setVisibility(View.GONE);
+            }
         }
 
+        //  Admin Management Section -----------------------------------------------------------
+        View adminGroupLabel = findViewById(R.id.adminGroupLabel);
+        View adminCard = findViewById(R.id.adminCard);
+        View userListButton = findViewById(R.id.userListButton);
+        View databaseManagementButton = findViewById(R.id.databaseManagementButton);
+
+        if (isAdmin()) {
+            if (adminGroupLabel != null) adminGroupLabel.setVisibility(View.VISIBLE);
+            if (adminCard != null) adminCard.setVisibility(View.VISIBLE);
+            
+            if (userListButton != null) {
+                userListButton.setOnClickListener(v -> showUserListDialog());
+            }
+            if (databaseManagementButton != null) {
+                databaseManagementButton.setOnClickListener(v -> showDatabaseManagementDialog());
+            }
+
+            // Also keep the existing ones if they exist in XML
+            View generateInviteButton = findViewById(R.id.generateInviteButton);
+            if (generateInviteButton != null) {
+                generateInviteButton.setOnClickListener(v -> NavigationHelper.INSTANCE.showGenerateInviteCodeDialog(this, currentEmail));
+            }
+            View manageUsersButton = findViewById(R.id.manageUsersButton);
+            if (manageUsersButton != null) {
+                manageUsersButton.setOnClickListener(v -> showPendingRequestsDialog());
+            }
+        } else {
+            if (adminGroupLabel != null) adminGroupLabel.setVisibility(View.GONE);
+            if (adminCard != null) adminCard.setVisibility(View.GONE);
+        }
 
         //  Language & Region -----------------------------------------------------------
         View languageRegionButton = findViewById(R.id.languageRegionButton);
@@ -203,10 +237,6 @@ public class ProfileActivity extends AppCompatActivity {
 
         NavigationHelper.INSTANCE.setupBottomNavigation(this);
 
-        LinearLayout cameraButton = findViewById(R.id.CameraButton);
-        if (cameraButton != null) {
-            cameraButton.setOnClickListener(v -> cameraHelper.launch());
-        }
     }
 
     private void showLoading(String label, Runnable action) {
@@ -227,7 +257,7 @@ public class ProfileActivity extends AppCompatActivity {
                 public void run() {
                     if (progress[0] <= 100) {
                         progressBar.setProgress(progress[0]);
-                        percentText.setText(progress[0] + "%");
+                        percentText.setText(getString(R.string.percent_placeholder, progress[0]));
                         progress[0] += 10;
                         handler.postDelayed(this, 50);
                     } else {
@@ -334,6 +364,7 @@ public class ProfileActivity extends AppCompatActivity {
     }
 
     //  Farm Recalibration dialog ------------------------------------------------------------------
+    @SuppressWarnings("unchecked")
     private void showRecalibrationDialog() {
         LayoutInflater inflater = getLayoutInflater();
         View dialogView = inflater.inflate(R.layout.dialog_recalibrate_farm, null);
@@ -405,7 +436,7 @@ public class ProfileActivity extends AppCompatActivity {
                 accountManager.saveFarmStats(newBirds, newCages);
                 
                 // Update both farm stats and farm location
-                FirebaseFirestore db = FirebaseFirestore.getInstance();
+                FirebaseFirestore db_ = FirebaseFirestore.getInstance();
                 Map<String, Object> updates = new HashMap<>();
                 updates.put("totalBirds", newBirds);
                 updates.put("activeCages", newCages);
@@ -419,7 +450,7 @@ public class ProfileActivity extends AppCompatActivity {
                     }});
                 }
 
-                db.collection("farm_data").document("stats").update(updates)
+                db_.collection("farm_data").document("stats").update(updates)
                     .addOnSuccessListener(a -> {
                         runOnUiThread(() -> {
                             totalBirdsValue.setText(String.valueOf(newBirds));
@@ -428,34 +459,28 @@ public class ProfileActivity extends AppCompatActivity {
                             dialog.dismiss();
                         });
                     })
-                    .addOnFailureListener(e -> {
-                        runOnUiThread(() -> Toast.makeText(ProfileActivity.this, getString(R.string.save_failed, e.getMessage()), Toast.LENGTH_SHORT).show());
-                    });
+                    .addOnFailureListener(e -> runOnUiThread(() -> Toast.makeText(ProfileActivity.this, getString(R.string.save_failed, e.getMessage()), Toast.LENGTH_SHORT).show()));
             });
 
-            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v -> {
-                new AlertDialog.Builder(ProfileActivity.this)
-                        .setTitle(getString(R.string.restart_days_title))
-                        .setMessage(getString(R.string.restart_days_message))
-                        .setPositiveButton(getString(R.string.restart), (d2, w) -> {
-                            firestoreManager.restartDaysRunning(new FirestoreManager.OnSaveListener() {
-                                @Override
-                                public void onSuccess() {
-                                    runOnUiThread(() -> {
-                                        daysRunningValue.setText("1");
-                                        Toast.makeText(ProfileActivity.this, getString(R.string.days_restarted), Toast.LENGTH_SHORT).show();
-                                        dialog.dismiss();
-                                    });
-                                }
-                                @Override
-                                public void onError(Exception e) {
-                                    runOnUiThread(() -> Toast.makeText(ProfileActivity.this, getString(R.string.restart_failed), Toast.LENGTH_SHORT).show());
-                                }
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v -> new AlertDialog.Builder(ProfileActivity.this)
+                    .setTitle(getString(R.string.restart_days_title))
+                    .setMessage(getString(R.string.restart_days_message))
+                    .setPositiveButton(getString(R.string.restart), (d2, w) -> firestoreManager.restartDaysRunning(new FirestoreManager.OnSaveListener() {
+                        @Override
+                        public void onSuccess() {
+                            runOnUiThread(() -> {
+                                daysRunningValue.setText("1");
+                                Toast.makeText(ProfileActivity.this, getString(R.string.days_restarted), Toast.LENGTH_SHORT).show();
+                                dialog.dismiss();
                             });
-                        })
-                        .setNegativeButton(getString(R.string.cancel), null)
-                        .show();
-            });
+                        }
+                        @Override
+                        public void onError(Exception e) {
+                            runOnUiThread(() -> Toast.makeText(ProfileActivity.this, getString(R.string.restart_failed), Toast.LENGTH_SHORT).show());
+                        }
+                    }))
+                    .setNegativeButton(getString(R.string.cancel), null)
+                    .show());
         });
         dialog.show();
     }
@@ -639,13 +664,11 @@ public class ProfileActivity extends AppCompatActivity {
         // Set time button text
         int hour = accountManager.getEggCountHour();
         int minute = accountManager.getEggCountMinute();
-        btnEggCountTime.setText(String.format("%02d:%02d", hour, minute));
+        btnEggCountTime.setText(String.format(Locale.getDefault(), "%02d:%02d", hour, minute));
 
         // Time picker for egg count
         btnEggCountTime.setOnClickListener(v -> {
-            android.app.TimePickerDialog timePicker = new android.app.TimePickerDialog(this, (view, selectedHour, selectedMinute) -> {
-                btnEggCountTime.setText(String.format("%02d:%02d", selectedHour, selectedMinute));
-            }, hour, minute, false);
+            android.app.TimePickerDialog timePicker = new android.app.TimePickerDialog(this, (view, selectedHour, selectedMinute) -> btnEggCountTime.setText(String.format(Locale.getDefault(), "%02d:%02d", selectedHour, selectedMinute)), hour, minute, false);
             timePicker.show();
         });
 
@@ -677,7 +700,7 @@ public class ProfileActivity extends AppCompatActivity {
         spinnerLanguage.setSelection(Arrays.asList(languages).indexOf(accountManager.getSelectedLanguage()));
 
         Map<String, List<String>> regionProvinceMap = new HashMap<>();
-        regionProvinceMap.put("National Capital Region (NCR)", Arrays.asList("Metro Manila"));
+        regionProvinceMap.put("National Capital Region (NCR)", List.of("Metro Manila"));
         regionProvinceMap.put("Ilocos Region (Region I)", Arrays.asList("Ilocos Norte", "Ilocos Sur", "La Union", "Pangasinan"));
         regionProvinceMap.put("Cagayan Valley (Region II)", Arrays.asList("Batanes", "Cagayan", "Isabela", "Nueva Vizcaya", "Quirino"));
         regionProvinceMap.put("Central Luzon (Region III)", Arrays.asList("Aurora", "Bataan", "Bulacan", "Nueva Ecija", "Pampanga", "Tarlac", "Zambales"));
@@ -755,10 +778,6 @@ public class ProfileActivity extends AppCompatActivity {
         View view = getLayoutInflater().inflate(R.layout.dialog_privacy_security, null);
         builder.setView(view);
 
-        View adminSection = view.findViewById(R.id.adminOnlySection);
-        View btnUserList = view.findViewById(R.id.btnUserList);
-        View btnDatabase = view.findViewById(R.id.btnDatabaseManagement);
-
         // Content Sections (Non-admin clickable)
         View sectionDataCollection = view.findViewById(R.id.sectionDataCollection);
         View sectionPrivacyContent = view.findViewById(R.id.sectionPrivacyContent);
@@ -768,13 +787,7 @@ public class ProfileActivity extends AppCompatActivity {
         if (sectionPrivacyContent != null) sectionPrivacyContent.setOnClickListener(v -> showPrivacyContentDetails());
         if (sectionSecurityMeasures != null) sectionSecurityMeasures.setOnClickListener(v -> showSecurityMeasuresDetails());
 
-        if (isAdmin()) {
-            if (adminSection != null) adminSection.setVisibility(View.VISIBLE);
-            if (btnUserList != null) btnUserList.setOnClickListener(v -> showUserListDialog());
-            if (btnDatabase != null) btnDatabase.setOnClickListener(v -> showDatabaseManagementDialog());
-        }
-
-        builder.setPositiveButton("Close", null);
+        builder.setPositiveButton(getString(R.string.close), null);
         builder.show();
     }
 
@@ -788,10 +801,10 @@ public class ProfileActivity extends AppCompatActivity {
         
         // Title
         TextView title = new TextView(this);
-        title.setText("Data Collection Policy");
+        title.setText(R.string.data_collection_policy_title);
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
-        title.setTextColor(getResources().getColor(android.R.color.darker_gray));
+        title.setTextColor(ContextCompat.getColor(this, android.R.color.darker_gray));
         title.setPadding(0, 0, 0, 16);
         container.addView(title);
         
@@ -816,10 +829,10 @@ public class ProfileActivity extends AppCompatActivity {
         
         // Purpose
         TextView purposeTitle = new TextView(this);
-        purposeTitle.setText("\nData Usage Purpose");
+        purposeTitle.setText(getString(R.string.data_usage_purpose_title));
         purposeTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         purposeTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-        purposeTitle.setTextColor(getResources().getColor(android.R.color.darker_gray));
+        purposeTitle.setTextColor(ContextCompat.getColor(this, android.R.color.darker_gray));
         purposeTitle.setPadding(0, 16, 0, 8);
         container.addView(purposeTitle);
         
@@ -831,10 +844,10 @@ public class ProfileActivity extends AppCompatActivity {
         
         // Retention
         TextView retentionTitle = new TextView(this);
-        retentionTitle.setText("\nData Retention");
+        retentionTitle.setText(getString(R.string.data_retention_title));
         retentionTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         retentionTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-        retentionTitle.setTextColor(getResources().getColor(android.R.color.darker_gray));
+        retentionTitle.setTextColor(ContextCompat.getColor(this, android.R.color.darker_gray));
         retentionTitle.setPadding(0, 16, 0, 8);
         container.addView(retentionTitle);
         
@@ -846,7 +859,7 @@ public class ProfileActivity extends AppCompatActivity {
         
         scrollView.addView(container);
         builder.setView(scrollView);
-        builder.setPositiveButton("Close", null);
+        builder.setPositiveButton(getString(R.string.close), null);
         builder.show();
     }
 
@@ -860,19 +873,19 @@ public class ProfileActivity extends AppCompatActivity {
         
         // Title
         TextView title = new TextView(this);
-        title.setText("Privacy Policy");
+        title.setText(R.string.privacy_policy_title);
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
-        title.setTextColor(getResources().getColor(android.R.color.darker_gray));
+        title.setTextColor(ContextCompat.getColor(this, android.R.color.darker_gray));
         title.setPadding(0, 0, 0, 16);
         container.addView(title);
         
         // Data Ownership
         TextView ownershipTitle = new TextView(this);
-        ownershipTitle.setText("Data Ownership");
+        ownershipTitle.setText(R.string.data_ownership_title);
         ownershipTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         ownershipTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-        ownershipTitle.setTextColor(getResources().getColor(android.R.color.darker_gray));
+        ownershipTitle.setTextColor(ContextCompat.getColor(this, android.R.color.darker_gray));
         ownershipTitle.setPadding(0, 0, 0, 8);
         container.addView(ownershipTitle);
         
@@ -884,10 +897,10 @@ public class ProfileActivity extends AppCompatActivity {
         
         // Data Sharing
         TextView sharingTitle = new TextView(this);
-        sharingTitle.setText("\nData Sharing");
+        sharingTitle.setText(getString(R.string.data_sharing_title));
         sharingTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         sharingTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-        sharingTitle.setTextColor(getResources().getColor(android.R.color.darker_gray));
+        sharingTitle.setTextColor(ContextCompat.getColor(this, android.R.color.darker_gray));
         sharingTitle.setPadding(0, 16, 0, 8);
         container.addView(sharingTitle);
         
@@ -899,10 +912,10 @@ public class ProfileActivity extends AppCompatActivity {
         
         // Access Control
         TextView accessTitle = new TextView(this);
-        accessTitle.setText("\nAccess Control");
+        accessTitle.setText(getString(R.string.access_control_title));
         accessTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         accessTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-        accessTitle.setTextColor(getResources().getColor(android.R.color.darker_gray));
+        accessTitle.setTextColor(ContextCompat.getColor(this, android.R.color.darker_gray));
         accessTitle.setPadding(0, 16, 0, 8);
         container.addView(accessTitle);
         
@@ -914,7 +927,7 @@ public class ProfileActivity extends AppCompatActivity {
         
         scrollView.addView(container);
         builder.setView(scrollView);
-        builder.setPositiveButton("Close", null);
+        builder.setPositiveButton(getString(R.string.close), null);
         builder.show();
     }
 
@@ -928,19 +941,19 @@ public class ProfileActivity extends AppCompatActivity {
         
         // Title
         TextView title = new TextView(this);
-        title.setText("Security Implementation");
+        title.setText(R.string.security_implementation_title);
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
-        title.setTextColor(getResources().getColor(android.R.color.darker_gray));
+        title.setTextColor(ContextCompat.getColor(this, android.R.color.darker_gray));
         title.setPadding(0, 0, 0, 16);
         container.addView(title);
         
         // Encryption
         TextView encryptTitle = new TextView(this);
-        encryptTitle.setText("Encryption");
+        encryptTitle.setText(R.string.encryption_title);
         encryptTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         encryptTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-        encryptTitle.setTextColor(getResources().getColor(android.R.color.darker_gray));
+        encryptTitle.setTextColor(ContextCompat.getColor(this, android.R.color.darker_gray));
         encryptTitle.setPadding(0, 0, 0, 8);
         container.addView(encryptTitle);
         
@@ -952,10 +965,10 @@ public class ProfileActivity extends AppCompatActivity {
         
         // Authentication
         TextView authTitle = new TextView(this);
-        authTitle.setText("\nAuthentication");
+        authTitle.setText(getString(R.string.authentication_title));
         authTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         authTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-        authTitle.setTextColor(getResources().getColor(android.R.color.darker_gray));
+        authTitle.setTextColor(ContextCompat.getColor(this, android.R.color.darker_gray));
         authTitle.setPadding(0, 16, 0, 8);
         container.addView(authTitle);
         
@@ -967,10 +980,10 @@ public class ProfileActivity extends AppCompatActivity {
         
         // Access Security
         TextView accessSecTitle = new TextView(this);
-        accessSecTitle.setText("\nAccess Security");
+        accessSecTitle.setText(getString(R.string.access_security_title));
         accessSecTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         accessSecTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-        accessSecTitle.setTextColor(getResources().getColor(android.R.color.darker_gray));
+        accessSecTitle.setTextColor(ContextCompat.getColor(this, android.R.color.darker_gray));
         accessSecTitle.setPadding(0, 16, 0, 8);
         container.addView(accessSecTitle);
         
@@ -982,10 +995,10 @@ public class ProfileActivity extends AppCompatActivity {
         
         // Monitoring
         TextView monitorTitle = new TextView(this);
-        monitorTitle.setText("\nMonitoring & Compliance");
+        monitorTitle.setText(getString(R.string.monitoring_compliance_title));
         monitorTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         monitorTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-        monitorTitle.setTextColor(getResources().getColor(android.R.color.darker_gray));
+        monitorTitle.setTextColor(ContextCompat.getColor(this, android.R.color.darker_gray));
         monitorTitle.setPadding(0, 16, 0, 8);
         container.addView(monitorTitle);
         
@@ -997,7 +1010,7 @@ public class ProfileActivity extends AppCompatActivity {
         
         scrollView.addView(container);
         builder.setView(scrollView);
-        builder.setPositiveButton("Close", null);
+        builder.setPositiveButton(getString(R.string.close), null);
         builder.show();
     }
 
@@ -1047,7 +1060,7 @@ public class ProfileActivity extends AppCompatActivity {
                 rvUserList.setVisibility(View.GONE);
             });
 
-        builder.setPositiveButton("Done", null);
+        builder.setPositiveButton(getString(R.string.close), null);
         builder.show();
     }
 
@@ -1064,25 +1077,23 @@ public class ProfileActivity extends AppCompatActivity {
                 container.removeAllViews();
                 if (docs.isEmpty()) {
                     TextView tv = new TextView(this);
-                    tv.setText("No active invite codes.");
+                    tv.setText(R.string.no_active_invite_codes);
                     container.addView(tv);
                 }
                 for (DocumentSnapshot doc : docs) {
-                    View row = getLayoutInflater().inflate(R.layout.item_user_manage, null);
+                    View row = getLayoutInflater().inflate(R.layout.item_user_manage, container, false);
                     String code = doc.getId();
                     String invitedEmail = doc.getString("invitedEmail");
                     String role = doc.getString("role");
 
-                    ((TextView)row.findViewById(R.id.userNameText)).setText("Code: " + code + " (" + invitedEmail + ")");
-                    ((TextView)row.findViewById(R.id.userRoleText)).setText("Role: " + RoleManager.Companion.displayName(role));
+                    ((TextView)row.findViewById(R.id.userNameText)).setText(getString(R.string.invite_code_placeholder, code, invitedEmail));
+                    ((TextView)row.findViewById(R.id.userRoleText)).setText(getString(R.string.role_display_placeholder, RoleManager.Companion.displayName(role != null ? role : "staff")));
 
-                    ImageButton deleteBtn = (ImageButton) row.findViewById(R.id.deleteUserBtn);
-                    deleteBtn.setOnClickListener(v -> {
-                        doc.getReference().delete().addOnSuccessListener(a -> {
-                            Toast.makeText(this, "Invite code deleted", Toast.LENGTH_SHORT).show();
-                            showInviteCodesManagementDialog(); // refresh
-                        });
-                    });
+                    ImageButton deleteBtn = row.findViewById(R.id.deleteUserBtn);
+                    deleteBtn.setOnClickListener(v -> doc.getReference().delete().addOnSuccessListener(a -> {
+                        Toast.makeText(this, "Invite code deleted", Toast.LENGTH_SHORT).show();
+                        showInviteCodesManagementDialog(); // refresh
+                    }));
                     container.addView(row);
                 }
             });
@@ -1090,7 +1101,7 @@ public class ProfileActivity extends AppCompatActivity {
         ScrollView scroll = new ScrollView(this);
         scroll.addView(container);
         builder.setView(scroll);
-        builder.setPositiveButton("Close", null);
+        builder.setPositiveButton(getString(R.string.close), null);
         builder.show();
     }
 
@@ -1102,11 +1113,11 @@ public class ProfileActivity extends AppCompatActivity {
         layout.setPadding(40, 40, 40, 40);
 
         EditText editBackupLimit = new EditText(this);
-        editBackupLimit.setHint("Max Co Farm Owners");
+        editBackupLimit.setHint(R.string.max_backup_owners_hint);
         layout.addView(editBackupLimit);
 
         EditText editStaffLimit = new EditText(this);
-        editStaffLimit.setHint("Max Farm Staff");
+        editStaffLimit.setHint(R.string.max_staff_hint);
         layout.addView(editStaffLimit);
 
         FirebaseFirestore.getInstance().collection("system_settings").document("role_limits").get()
@@ -1147,33 +1158,29 @@ public class ProfileActivity extends AppCompatActivity {
                     container.addView(tv);
                 }
                 for (DocumentSnapshot doc : docs) {
-                    View row = getLayoutInflater().inflate(R.layout.item_user_manage, null);
+                    View row = getLayoutInflater().inflate(R.layout.item_user_manage, container, false);
                     String name = doc.getString("name");
                     String role = doc.getString("role");
                     String email = doc.getId();
 
-                    ((TextView)row.findViewById(R.id.userNameText)).setText(name + " (" + email + ")");
-                    ((TextView)row.findViewById(R.id.userRoleText)).setText("Role: " + RoleManager.Companion.displayName(role));
+                    ((TextView)row.findViewById(R.id.userNameText)).setText(getString(R.string.user_email_placeholder, name, email));
+                    ((TextView)row.findViewById(R.id.userRoleText)).setText(getString(R.string.role_display_placeholder, RoleManager.Companion.displayName(role != null ? role : "staff")));
 
-                    ImageButton approveBtn = (ImageButton) row.findViewById(R.id.deleteUserBtn);
+                    ImageButton approveBtn = row.findViewById(R.id.deleteUserBtn);
                     approveBtn.setImageResource(android.R.drawable.ic_menu_save); // reuse button for approve
                     
-                    ImageButton rejectBtn = (ImageButton) row.findViewById(R.id.rejectBtn);
+                    ImageButton rejectBtn = row.findViewById(R.id.rejectBtn);
                     rejectBtn.setVisibility(View.VISIBLE);
                     
-                    rejectBtn.setOnClickListener(v -> {
-                        new AlertDialog.Builder(this)
-                            .setTitle(getString(R.string.reject_request))
-                            .setMessage(getString(R.string.confirm_reject_msg, name))
-                            .setPositiveButton(getString(R.string.reject), (d, w) -> {
-                                doc.getReference().delete().addOnSuccessListener(a -> {
-                                    Toast.makeText(this, getString(R.string.request_rejected), Toast.LENGTH_SHORT).show();
-                                    showPendingRequestsDialog(); // refresh
-                                });
-                            })
-                            .setNegativeButton(getString(R.string.cancel), null)
-                            .show();
-                    });
+                    rejectBtn.setOnClickListener(v -> new AlertDialog.Builder(this)
+                        .setTitle(getString(R.string.reject_request))
+                        .setMessage(getString(R.string.confirm_reject_msg, name))
+                        .setPositiveButton(getString(R.string.reject), (d, w) -> doc.getReference().delete().addOnSuccessListener(a -> {
+                            Toast.makeText(this, getString(R.string.request_rejected), Toast.LENGTH_SHORT).show();
+                            showPendingRequestsDialog(); // refresh
+                        }))
+                        .setNegativeButton(getString(R.string.cancel), null)
+                        .show());
 
                     approveBtn.setOnClickListener(v -> {
                         String code = String.format(Locale.getDefault(), "%06d", new Random().nextInt(999999));
@@ -1183,55 +1190,59 @@ public class ProfileActivity extends AppCompatActivity {
                         update.put("approvedAt", com.google.firebase.firestore.FieldValue.serverTimestamp());
 
                         doc.getReference().update(update)
-                            .addOnSuccessListener(a -> {
-                                new AlertDialog.Builder(this)
-                                    .setTitle(getString(R.string.request_approved))
-                                    .setMessage("Verification Code for " + name + ": " + code)
-                                    .setPositiveButton("Send Approval & Code via Gmail", (d, w) -> {
-                                        String emailBody = "Hello " + name + ",\n\n" +
-                                            "Congratulations! Your request for access to the Quail Farm Management System has been APPROVED.\n\n" +
-                                            "Your 6-digit verification code is: " + code + "\n\n" +
-                                            "Steps to complete registration:\n" +
-                                            "1. Open the Quail Farm app\n" +
-                                            "2. Select 'Enter Code' during registration\n" +
-                                            "3. Enter your 6-digit code: " + code + "\n" +
-                                            "4. Complete your profile setup\n\n" +
-                                            "This code will expire in 24 hours.\n\n" +
-                                            "Best regards,\n" +
-                                            "Quail Farm Management System";
+                            .addOnSuccessListener(a -> new AlertDialog.Builder(this)
+                                .setTitle(getString(R.string.request_approved))
+                                .setMessage(getString(R.string.verification_code_msg, name, code))
+                                .setPositiveButton(R.string.send_approval_email, (d, w) -> {
+                                    String emailBody = "Hello " + name + ",\n\n" +
+                                        "Congratulations! Your request for access to the Quail Farm Management System has been APPROVED.\n\n" +
+                                        "Your 6-digit verification code is: " + code + "\n\n" +
+                                        "Steps to complete registration:\n" +
+                                        "1. Open the Quail Farm app\n" +
+                                        "2. Select 'Enter Code' during registration\n" +
+                                        "3. Enter your 6-digit code: " + code + "\n" +
+                                        "4. Complete your profile setup\n\n" +
+                                        "This code will expire in 24 hours.\n\n" +
+                                        "Best regards,\n" +
+                                        "Quail Farm Management System";
 
-                                        Intent intent = new Intent(Intent.ACTION_SEND);
-                                        intent.setType("message/rfc822");
-                                        intent.putExtra(Intent.EXTRA_EMAIL, new String[]{email});
-                                        intent.putExtra(Intent.EXTRA_CC, new String[]{currentEmail});
-                                        intent.putExtra(Intent.EXTRA_SUBJECT, "Quail Farm Access Approved - Code: " + code);
-                                        intent.putExtra(Intent.EXTRA_TEXT, emailBody);
-                                        intent.setPackage("com.google.android.gm");
-                                        
-                                        try {
-                                            startActivity(intent);
-                                        } catch (Exception e) {
-                                            intent.setPackage(null);
-                                            startActivity(Intent.createChooser(intent, "Send Email"));
-                                        }
-                                        
-                                        new Handler(Looper.getMainLooper()).postDelayed(this::showPendingRequestsDialog, 2000);
-                                    })
-                                    .setNegativeButton("Close", (d, w) -> showPendingRequestsDialog())
-                                    .show();
-                            });
+                                    Intent intent = new Intent(Intent.ACTION_SEND);
+                                    intent.setType("message/rfc822");
+                                    intent.putExtra(Intent.EXTRA_EMAIL, new String[]{email});
+                                    intent.putExtra(Intent.EXTRA_CC, new String[]{currentEmail});
+                                    intent.putExtra(Intent.EXTRA_SUBJECT, "Quail Farm Access Approved - Code: " + code);
+                                    intent.putExtra(Intent.EXTRA_TEXT, emailBody);
+                                    intent.setPackage("com.google.android.gm");
+                                    
+                                    try {
+                                        startActivity(intent);
+                                    } catch (Exception e) {
+                                        intent.setPackage(null);
+                                        startActivity(Intent.createChooser(intent, "Send Email"));
+                                    }
+                                    
+                                    new Handler(Looper.getMainLooper()).postDelayed(this::showPendingRequestsDialog, 2000);
+                                })
+                                .setNegativeButton(R.string.close, (d, w) -> showPendingRequestsDialog())
+                                .show());
                     });
                     container.addView(row);
                 }
             });
 
         builder.setView(container);
-        builder.setPositiveButton("Close", null);
+        builder.setPositiveButton(getString(R.string.close), null);
         builder.show();
     }
 
     private void showDatabaseManagementDialog() {
-        String[] items = {"Monitor Database", "Import Database", "Export Database", "Delete Database", "Wipe Everything"};
+        String[] items = {
+            getString(R.string.monitor_db),
+            getString(R.string.import_db),
+            getString(R.string.export_db),
+            getString(R.string.delete_db),
+            getString(R.string.wipe_everything_label)
+        };
         new AlertDialog.Builder(this)
                 .setTitle(getString(R.string.database_management))
                 .setItems(items, (dialog, which) -> {
@@ -1247,112 +1258,108 @@ public class ProfileActivity extends AppCompatActivity {
 
     private void showMonitorDatabaseDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Real-Time Database Monitor");
+        builder.setTitle(R.string.db_monitor_title);
 
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(40, 40, 40, 40);
 
         TextView tvConnection = new TextView(this);
-        tvConnection.setText("Connection: Checking...");
+        tvConnection.setText(R.string.db_connection_checking);
         tvConnection.setTextSize(16);
         layout.addView(tvConnection);
 
         TextView tvUsers = new TextView(this);
-        tvUsers.setText("Approved Users: Loading...");
+        tvUsers.setText(R.string.db_users_loading);
         tvUsers.setTextSize(16);
         layout.addView(tvUsers);
 
         TextView tvPending = new TextView(this);
-        tvPending.setText("Pending Requests: Loading...");
+        tvPending.setText(R.string.db_pending_loading);
         tvPending.setTextSize(16);
         layout.addView(tvPending);
 
         TextView tvTasksCount = new TextView(this);
-        tvTasksCount.setText("Total Tasks: Loading...");
+        tvTasksCount.setText(R.string.total_tasks_loading);
         tvTasksCount.setTextSize(16);
         layout.addView(tvTasksCount);
 
         TextView tvInviteCodes = new TextView(this);
-        tvInviteCodes.setText("Active Invite Codes: Loading...");
+        tvInviteCodes.setText(R.string.active_invite_codes_loading);
         tvInviteCodes.setTextSize(16);
         layout.addView(tvInviteCodes);
 
         TextView tvLastUpdate = new TextView(this);
-        tvLastUpdate.setText("Last Update: " + new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(new java.util.Date()));
+        tvLastUpdate.setText(getString(R.string.db_last_update, new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new java.util.Date())));
         tvLastUpdate.setTextSize(14);
-        tvLastUpdate.setTextColor(getResources().getColor(android.R.color.darker_gray));
+        tvLastUpdate.setTextColor(ContextCompat.getColor(this, android.R.color.darker_gray));
         layout.addView(tvLastUpdate);
 
         // Add action buttons
         Button btnViewFarmStats = new Button(this);
-        btnViewFarmStats.setText("View Farm Stats Data");
+        btnViewFarmStats.setText(R.string.view_farm_stats_btn);
         btnViewFarmStats.setOnClickListener(v -> showFarmStatsExplorer());
         layout.addView(btnViewFarmStats);
 
         Button btnManageCodes = new Button(this);
-        btnManageCodes.setText("Manage Active Invite Codes");
+        btnManageCodes.setText(R.string.manage_invite_codes_btn);
         btnManageCodes.setOnClickListener(v -> showInviteCodesManagementDialog());
         layout.addView(btnManageCodes);
 
         builder.setView(layout);
-        builder.setPositiveButton("Close", null);
+        builder.setPositiveButton(getString(R.string.close), null);
 
         AlertDialog dialog = builder.create();
         dialog.show();
 
         // Real-time listeners
-        FirebaseFirestore db = FirebaseFirestore.getInstance();
+        FirebaseFirestore db_ = FirebaseFirestore.getInstance();
 
         // Connection check
-        db.collection("user_access").limit(1).get().addOnSuccessListener(querySnapshot -> {
-            runOnUiThread(() -> tvConnection.setText("Connection: Online"));
-        }).addOnFailureListener(e -> {
-            runOnUiThread(() -> tvConnection.setText("Connection: Offline"));
-        });
+        db_.collection("user_access").limit(1).get().addOnSuccessListener(querySnapshot -> runOnUiThread(() -> tvConnection.setText(R.string.db_connection_online))).addOnFailureListener(e -> runOnUiThread(() -> tvConnection.setText(R.string.db_connection_offline)));
 
         // Approved users listener
-        com.google.firebase.firestore.ListenerRegistration approvedListener = db.collection("user_access")
+        com.google.firebase.firestore.ListenerRegistration approvedListener = db_.collection("user_access")
             .whereEqualTo("status", "approved")
             .addSnapshotListener((querySnapshot, e) -> {
                 if (e != null) {
-                    runOnUiThread(() -> tvUsers.setText("Approved Users: Error"));
+                    runOnUiThread(() -> tvUsers.setText(R.string.approved_users_error));
                     return;
                 }
                 int count = querySnapshot != null ? querySnapshot.size() : 0;
                 runOnUiThread(() -> {
-                    tvUsers.setText("Approved Users: " + count);
-                    tvLastUpdate.setText("Last Update: " + new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(new java.util.Date()));
+                    tvUsers.setText(getString(R.string.db_users_count, count));
+                    tvLastUpdate.setText(getString(R.string.db_last_update, new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new java.util.Date())));
                 });
             });
 
         // Pending requests listener
-        com.google.firebase.firestore.ListenerRegistration pendingListener = db.collection("user_access")
+        com.google.firebase.firestore.ListenerRegistration pendingListener = db_.collection("user_access")
             .whereEqualTo("status", "pending")
             .addSnapshotListener((querySnapshot, e) -> {
                 if (e != null) {
-                    runOnUiThread(() -> tvPending.setText("Pending Requests: Error"));
+                    runOnUiThread(() -> tvPending.setText(R.string.pending_requests_error));
                     return;
                 }
                 int count = querySnapshot != null ? querySnapshot.size() : 0;
-                runOnUiThread(() -> tvPending.setText("Pending Requests: " + count));
+                runOnUiThread(() -> tvPending.setText(getString(R.string.db_pending_count, count)));
             });
 
         // Tasks listener
-        com.google.firebase.firestore.ListenerRegistration tasksListener = db.collection("farm_data")
+        com.google.firebase.firestore.ListenerRegistration tasksListener = db_.collection("farm_data")
             .document("shared").collection("tasks")
             .addSnapshotListener((querySnapshot, e) -> {
                 if (e != null) return;
                 int count = querySnapshot != null ? querySnapshot.size() : 0;
-                runOnUiThread(() -> tvTasksCount.setText("Total Tasks: " + count));
+                runOnUiThread(() -> tvTasksCount.setText(getString(R.string.total_tasks_count_placeholder, count)));
             });
 
         // Invite codes listener
-        com.google.firebase.firestore.ListenerRegistration codesListener = db.collection("invite_codes")
+        com.google.firebase.firestore.ListenerRegistration codesListener = db_.collection("invite_codes")
             .addSnapshotListener((querySnapshot, e) -> {
                 if (e != null) return;
                 int count = querySnapshot != null ? querySnapshot.size() : 0;
-                runOnUiThread(() -> tvInviteCodes.setText("Active Invite Codes: " + count));
+                runOnUiThread(() -> tvInviteCodes.setText(getString(R.string.active_invite_codes_count_placeholder, count)));
             });
 
         // Remove listeners on dismiss
@@ -1366,26 +1373,27 @@ public class ProfileActivity extends AppCompatActivity {
 
     private void showFarmStatsExplorer() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Farm Stats Explorer");
+        builder.setTitle(R.string.farm_stats_explorer_title);
         
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(40, 40, 40, 40);
 
         TextView tvData = new TextView(this);
-        tvData.setText("Fetching stats...");
+        tvData.setText(R.string.fetching_stats_placeholder);
         layout.addView(tvData);
 
         FirebaseFirestore.getInstance().collection("farm_data").document("stats").get()
             .addOnSuccessListener(doc -> {
                 if (doc.exists()) {
-                    String data = "Birds: " + doc.getLong("totalBirds") + 
-                                 "\nCages: " + doc.getLong("activeCages") +
-                                 "\nStart Date: " + (doc.getTimestamp("farmStartDate") != null ? doc.getTimestamp("farmStartDate").toDate().toString() : "N/A");
+                    String data = getString(R.string.farm_stats_display_format,
+                            doc.getLong("totalBirds"),
+                            doc.getLong("activeCages"),
+                            (doc.getTimestamp("farmStartDate") != null ? Objects.requireNonNull(doc.getTimestamp("farmStartDate")).toDate().toString() : "N/A"));
                     tvData.setText(data);
                     
                     Button btnReset = new Button(this);
-                    btnReset.setText("Reset Stats to Zero");
+                    btnReset.setText(R.string.reset_stats_btn);
                     btnReset.setOnClickListener(v -> {
                         Map<String, Object> reset = new HashMap<>();
                         reset.put("totalBirds", 0);
@@ -1397,28 +1405,28 @@ public class ProfileActivity extends AppCompatActivity {
                     });
                     layout.addView(btnReset);
                 } else {
-                    tvData.setText("No farm stats found.");
+                    tvData.setText(R.string.no_farm_stats_found);
                 }
             });
 
         builder.setView(layout);
-        builder.setPositiveButton("Close", null);
+        builder.setPositiveButton(getString(R.string.close), null);
         builder.show();
     }
 
     private void importDatabase() {
-        Toast.makeText(this, "Importing data from backup...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, getString(R.string.db_importing), Toast.LENGTH_SHORT).show();
     }
 
     private void exportDatabase() {
-        Toast.makeText(this, "Exporting farm records to CSV...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, getString(R.string.db_exporting), Toast.LENGTH_SHORT).show();
     }
 
     private void deleteDatabase() {
         new AlertDialog.Builder(this)
-            .setTitle("Delete Database")
-            .setMessage("Are you sure? This deletes only the farm records but keeps user accounts.")
-            .setPositiveButton(getString(R.string.delete), (d, w) -> Toast.makeText(this, "Database Deleted", Toast.LENGTH_SHORT).show())
+            .setTitle(R.string.delete_database_title)
+            .setMessage(R.string.db_delete_confirm)
+            .setPositiveButton(getString(R.string.delete), (d, w) -> Toast.makeText(this, getString(R.string.db_deleted), Toast.LENGTH_SHORT).show())
             .setNegativeButton(getString(R.string.cancel), null).show();
     }
 
@@ -1437,7 +1445,7 @@ public class ProfileActivity extends AppCompatActivity {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         View view = getLayoutInflater().inflate(R.layout.dialog_help_support, null);
         builder.setView(view);
-        builder.setPositiveButton("Close", null);
+        builder.setPositiveButton(getString(R.string.close), null);
         builder.show();
     }
 
@@ -1462,12 +1470,8 @@ public class ProfileActivity extends AppCompatActivity {
             // Update in Firestore
             FirebaseFirestore.getInstance().collection("user_access").document(currentEmail)
                 .update("birthday", newBirthday)
-                .addOnSuccessListener(a -> {
-                    Toast.makeText(this, "Birthday updated to " + newBirthday, Toast.LENGTH_SHORT).show();
-                })
-                .addOnFailureListener(e -> {
-                    Toast.makeText(this, "Failed to update birthday", Toast.LENGTH_SHORT).show();
-                });
+                .addOnSuccessListener(a -> Toast.makeText(this, getString(R.string.birthday_updated, newBirthday), Toast.LENGTH_SHORT).show())
+                .addOnFailureListener(e -> Toast.makeText(this, getString(R.string.birthday_update_failed), Toast.LENGTH_SHORT).show());
         };
 
         new DatePickerDialog(
@@ -1481,7 +1485,6 @@ public class ProfileActivity extends AppCompatActivity {
 
     private void showEditLocationDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        View view = getLayoutInflater().inflate(R.layout.activity_setup_account, null);
         
         // Create a layout for location input with 4 fields
         LinearLayout container = new LinearLayout(this);
@@ -1489,15 +1492,15 @@ public class ProfileActivity extends AppCompatActivity {
         container.setPadding(24, 24, 24, 24);
 
         TextView titleTv = new TextView(this);
-        titleTv.setText("Edit Your Address");
+        titleTv.setText(R.string.edit_address_title);
         titleTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
         titleTv.setTypeface(null, android.graphics.Typeface.BOLD);
-        titleTv.setTextColor(getResources().getColor(android.R.color.darker_gray));
+        titleTv.setTextColor(ContextCompat.getColor(this, android.R.color.darker_gray));
         titleTv.setPadding(0, 0, 0, 16);
         container.addView(titleTv);
 
         EditText streetEt = new EditText(this);
-        streetEt.setHint("Street Address");
+        streetEt.setHint(R.string.street_address_hint);
         streetEt.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
         streetEt.setBackgroundResource(R.drawable.rounded_corner);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
@@ -1518,7 +1521,7 @@ public class ProfileActivity extends AppCompatActivity {
         cityStateLayout.setWeightSum(2);
 
         EditText cityEt = new EditText(this);
-        cityEt.setHint("City");
+        cityEt.setHint(R.string.city_hint);
         cityEt.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
         cityEt.setBackgroundResource(R.drawable.rounded_corner);
         LinearLayout.LayoutParams cityParams = new LinearLayout.LayoutParams(0, 200);
@@ -1529,7 +1532,7 @@ public class ProfileActivity extends AppCompatActivity {
         cityStateLayout.addView(cityEt);
 
         EditText stateEt = new EditText(this);
-        stateEt.setHint("State/Province");
+        stateEt.setHint(R.string.state_province_hint);
         stateEt.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
         stateEt.setBackgroundResource(R.drawable.rounded_corner);
         LinearLayout.LayoutParams stateParams = new LinearLayout.LayoutParams(0, 200);
@@ -1541,7 +1544,7 @@ public class ProfileActivity extends AppCompatActivity {
         container.addView(cityStateLayout);
 
         EditText postalEt = new EditText(this);
-        postalEt.setHint("Postal Code");
+        postalEt.setHint(R.string.postal_code_hint);
         postalEt.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
         postalEt.setBackgroundResource(R.drawable.rounded_corner);
         LinearLayout.LayoutParams postalParams = new LinearLayout.LayoutParams(
@@ -1576,7 +1579,7 @@ public class ProfileActivity extends AppCompatActivity {
             String postal = postalEt.getText().toString().trim();
 
             if (street.isEmpty() || city.isEmpty() || state.isEmpty() || postal.isEmpty()) {
-                Toast.makeText(this, "Please fill all address fields", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, R.string.fill_all_address, Toast.LENGTH_SHORT).show();
                 return;
             }
 
@@ -1594,12 +1597,8 @@ public class ProfileActivity extends AppCompatActivity {
 
             FirebaseFirestore.getInstance().collection("user_access").document(currentEmail)
                 .update("address", addressMap)
-                .addOnSuccessListener(a -> {
-                    Toast.makeText(this, "Location updated successfully", Toast.LENGTH_SHORT).show();
-                })
-                .addOnFailureListener(e -> {
-                    Toast.makeText(this, "Failed to update location", Toast.LENGTH_SHORT).show();
-                });
+                .addOnSuccessListener(a -> Toast.makeText(this, getString(R.string.location_updated), Toast.LENGTH_SHORT).show())
+                .addOnFailureListener(e -> Toast.makeText(this, getString(R.string.location_update_failed), Toast.LENGTH_SHORT).show());
         });
         builder.setNegativeButton(getString(R.string.cancel), null);
         builder.show();
