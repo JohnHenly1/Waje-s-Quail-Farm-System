@@ -29,6 +29,7 @@ class FeedInventoryActivity : AppCompatActivity() {
     //   category    : String   "Starter Feed" | "Grower Feed" | "Layer Feed" | "Supplements" | "Specialty Feed"
     //   location    : String   e.g. "Shop 1"
     //   quantity    : Long
+    //   initialQuantity : Long (Baseline for auto-status)
     //   unitPrice   : Double
     //   status      : String   "In Stock" | "Medium" | "Low Stock"
     //   updatedAt   : Timestamp
@@ -41,6 +42,7 @@ class FeedInventoryActivity : AppCompatActivity() {
         val category: String,
         val location: String,
         val quantity: Long,
+        val initialQuantity: Long,
         val unitPrice: Double,
         val status: String
     ) {
@@ -62,6 +64,7 @@ class FeedInventoryActivity : AppCompatActivity() {
 
     private val db       = FirebaseFirestore.getInstance()
     private val feedCol  get() = db.collection("farm_data").document("shared").collection("feed")
+    private val historyCol get() = db.collection("farm_data").document("shared").collection("feed_history")
     val currency = NumberFormat.getCurrencyInstance(Locale("en", "PH"))
 
     // View references
@@ -135,6 +138,11 @@ class FeedInventoryActivity : AppCompatActivity() {
         }
 
         findViewById<View>(R.id.searchButton).setOnClickListener { showSearchDialog() }
+        
+        // History button
+        findViewById<View>(R.id.historyButton).setOnClickListener {
+            startActivity(Intent(this, FeedHistoryActivity::class.java))
+        }
 
         val addBtn = findViewById<View>(R.id.addButton)
         if (roleManager.canEditFarm()) {
@@ -196,6 +204,8 @@ class FeedInventoryActivity : AppCompatActivity() {
             }
             allItems.clear()
             snaps?.documents?.forEach { doc ->
+                val qty = doc.getLong("quantity") ?: 0L
+                val initQty = doc.getLong("initialQuantity") ?: qty
                 allItems.add(
                     FeedItem(
                         firestoreId = doc.id,
@@ -204,27 +214,32 @@ class FeedInventoryActivity : AppCompatActivity() {
                         description = doc.getString("description") ?: "",
                         category    = doc.getString("category")    ?: "Feed",
                         location    = doc.getString("location")    ?: "Location Info",
-                        quantity    = doc.getLong("quantity")      ?: 0L,
+                        quantity    = qty,
+                        initialQuantity = initQty,
                         unitPrice   = doc.getDouble("unitPrice")   ?: 0.0,
                         status      = doc.getString("status")      ?: "In Stock"
                     )
                 )
             }
-            updateSummaryCards()
+            updateSummaryStats()
             renderList()
         }
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // Summary cards
+    // Summary Stats - Updated to reflect active filters
     // ──────────────────────────────────────────────────────────────────────────
-    private fun updateSummaryCards() {
-        val totalValue  = allItems.sumOf { it.totalValue }
-        val lowCount    = allItems.count { it.status == "Low Stock" }
-        val locationSet = allItems.map { it.location }.toSet()
+    private fun updateSummaryStats() {
+        val filteredForStats = allItems.filter { item ->
+            activeTab == "All Items" || item.category == activeTab
+        }
+        
+        val totalValue  = filteredForStats.sumOf { it.totalValue }
+        val lowCount    = filteredForStats.count { it.status == "Low Stock" }
+        val locationSet = filteredForStats.map { it.location }.toSet()
 
         totalInventoryTv.text = currency.format(totalValue)
-        totalItemsTv.text     = allItems.size.toString()
+        totalItemsTv.text     = filteredForStats.size.toString()
         lowStockTv.text       = lowCount.toString()
         locationsTv.text      = locationSet.size.toString()
     }
@@ -255,15 +270,17 @@ class FeedInventoryActivity : AppCompatActivity() {
                 setTextColor(ContextCompat.getColor(this@FeedInventoryActivity, R.color.dark_gray))
             }
             inventoryList.addView(empty)
-            return
+        } else {
+            val inflater = LayoutInflater.from(this)
+            filtered.forEach { item ->
+                val card = inflater.inflate(R.layout.item_feed_inventory, inventoryList, false)
+                bindItemCard(card, item)
+                inventoryList.addView(card)
+            }
         }
-
-        val inflater = LayoutInflater.from(this)
-        filtered.forEach { item ->
-            val card = inflater.inflate(R.layout.item_feed_inventory, inventoryList, false)
-            bindItemCard(card, item)
-            inventoryList.addView(card)
-        }
+        
+        // Also update summary whenever list renders (to keep stats in sync with tabs)
+        updateSummaryStats()
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -295,6 +312,15 @@ class FeedInventoryActivity : AppCompatActivity() {
             else        -> applyBadgeStyle(badge, "#E8F5E9", "#2E7D32")
         }
 
+        // Tapping the supply card
+        card.setOnClickListener {
+            if (item.quantity <= 0L) {
+                showZeroQuantityPopup(item)
+            } else {
+                showAddEditDialog(item)
+            }
+        }
+
         card.findViewById<View>(R.id.editButton).setOnClickListener {
             showAddEditDialog(item)
         }
@@ -316,6 +342,29 @@ class FeedInventoryActivity : AppCompatActivity() {
         }
         badge.background = bg
         badge.setTextColor(android.graphics.Color.parseColor(textHex))
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Zero Quantity Popup
+    // ──────────────────────────────────────────────────────────────────────────
+    private fun showZeroQuantityPopup(item: FeedItem) {
+        if (roleManager.canEditFarm()) {
+            // Owner/Backup Owner role
+            AlertDialog.Builder(this)
+                .setTitle("Out of Stock: ${item.name}")
+                .setMessage("This supply is currently at 0 quantity. Would you like to restock it or delete the entry?")
+                .setPositiveButton("Restock") { _, _ -> showAddEditDialog(item) }
+                .setNegativeButton("Delete") { _, _ -> showDeleteConfirmation(item) }
+                .setNeutralButton("Cancel", null)
+                .show()
+        } else {
+            // Staff role
+            AlertDialog.Builder(this)
+                .setTitle("Out of Stock")
+                .setMessage("\"${item.name}\" has run out of stock. Please notify the owner for replenishment.")
+                .setPositiveButton("OK", null)
+                .show()
+        }
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -353,9 +402,6 @@ class FeedInventoryActivity : AppCompatActivity() {
 
     // ──────────────────────────────────────────────────────────────────────────
     // Add / Edit dialog
-    // FIX #4: pass null listener to setPositiveButton then override with
-    //         setOnShowListener so we can validate without return@setPositiveButton
-    //         (which causes "Return type mismatch" — Unit vs DialogInterface)
     // ──────────────────────────────────────────────────────────────────────────
     private fun showAddEditDialog(item: FeedItem?) {
         val isEdit     = item != null
@@ -370,14 +416,43 @@ class FeedInventoryActivity : AppCompatActivity() {
         val priceInput    = dialogView.findViewById<EditText>(R.id.foodPriceInput)
         val catSpinner    = dialogView.findViewById<Spinner>(R.id.categorySpinner)
         val statusSpinner = dialogView.findViewById<Spinner>(R.id.statusSpinner)
+        val existSpinner  = dialogView.findViewById<Spinner>(R.id.existingItemsSpinner)
+
+        // Auto-status logic: hide the manual status spinner
+        statusSpinner.visibility = View.GONE
+        dialogView.findViewById<TextView>(R.id.statusLabel)?.let { it.visibility = View.GONE }
 
         val catAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, categoryOptions)
         catAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         catSpinner.adapter = catAdapter
 
-        val statusAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, statusOptions)
-        statusAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        statusSpinner.adapter = statusAdapter
+        // Populate Existing Items Selector
+        val spinnerData = mutableListOf("--- Create New Item ---")
+        spinnerData.addAll(allItems.map { "${it.name} (${it.location})" })
+        val existAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, spinnerData)
+        existAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        existSpinner.adapter = existAdapter
+
+        if (isEdit) {
+            // Hide selector when explicitly editing a specific item
+            dialogView.findViewById<View>(R.id.selectItemLabel)?.visibility = View.GONE
+            dialogView.findViewById<View>(R.id.selectItemContainer)?.visibility = View.GONE
+        }
+
+        existSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
+                if (pos > 0) {
+                    val selected = allItems[pos - 1]
+                    nameInput.setText(selected.name)
+                    descInput.setText(selected.description)
+                    invInput.setText(selected.invNumber)
+                    locationInput.setText(selected.location)
+                    priceInput.setText(selected.unitPrice.toString())
+                    catSpinner.setSelection(categoryOptions.indexOf(selected.category).coerceAtLeast(0))
+                }
+            }
+            override fun onNothingSelected(p: AdapterView<*>?) {}
+        }
 
         catSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
@@ -399,15 +474,19 @@ class FeedInventoryActivity : AppCompatActivity() {
             qtyInput.setText(item.quantity.toString())
             priceInput.setText(item.unitPrice.toString())
             catSpinner.setSelection(categoryOptions.indexOf(item.category).coerceAtLeast(0))
-            statusSpinner.setSelection(statusOptions.indexOf(item.status).coerceAtLeast(0))
+            
+            // ROLE BASED RESTRICTIONS: Staff can only change Quantity
             if (!roleManager.canEditFarm()) {
-                nameInput.isEnabled  = false
-                priceInput.isEnabled = false
-                invInput.isEnabled   = false
+                nameInput.isEnabled     = false
+                descInput.isEnabled     = false
+                invInput.isEnabled      = false
+                locationInput.isEnabled = false
+                priceInput.isEnabled    = false
+                catSpinner.isEnabled    = false
+                existSpinner.isEnabled  = false
             }
         }
 
-        // Pass null so the dialog does NOT auto-dismiss on positive button click
         val dialog = AlertDialog.Builder(this)
             .setTitle(if (isEdit) "Edit Feed Item" else "Add Feed Item")
             .setView(dialogView)
@@ -420,61 +499,95 @@ class FeedInventoryActivity : AppCompatActivity() {
                 val name = nameInput.text.toString().trim()
                 if (name.isEmpty()) {
                     nameInput.error = "Name cannot be empty"
-                    return@setOnClickListener          // safe early exit — no type mismatch
+                    return@setOnClickListener
                 }
 
-                val desc     = descInput.text.toString().trim()
-                val inv      = invInput.text.toString().trim().ifEmpty { generateInvNumber() }
                 val location = locationInput.text.toString().trim().ifEmpty { "Location Info" }
-                val qty      = qtyInput.text.toString().toLongOrNull() ?: 0L
                 val price    = priceInput.text.toString().toDoubleOrNull() ?: 0.0
+                val qtyIn    = qtyInput.text.toString().toLongOrNull() ?: 0L
                 val cat      = catSpinner.selectedItem.toString()
-                val status   = statusSpinner.selectedItem.toString()
+                var desc     = descInput.text.toString().trim()
+                val inv      = invInput.text.toString().trim().ifEmpty { generateInvNumber() }
 
-                val data = hashMapOf<String, Any>(
-                    "name"        to name,
-                    "description" to desc,
-                    "invNumber"   to inv,
-                    "location"    to location,
-                    "quantity"    to qty,
-                    "unitPrice"   to price,
-                    "category"    to cat,
-                    "status"      to status,
-                    "updatedAt"   to FieldValue.serverTimestamp()
-                )
+                // Check for duplicate Name + Location + Price
+                val matchingItem = allItems.find {
+                    it.name.equals(name, true) &&
+                    it.location.equals(location, true) &&
+                    it.unitPrice == price
+                }
 
-                if (isEdit && item != null) {
-                    if (roleManager.canEditFarm()) {
+                // If Name exists but Location/Price is different, auto-adjust description to differentiate
+                val nameExists = allItems.any { it.name.equals(name, true) }
+                if (nameExists && matchingItem == null) {
+                    if (!desc.contains(location, true)) {
+                        desc = if (desc.isEmpty()) "Located at $location" else "$desc ($location)"
+                    }
+                }
+
+                if (matchingItem != null) {
+                    // MERGE LOGIC
+                    val finalQty = if (isEdit && item?.firestoreId == matchingItem.firestoreId) {
+                        qtyIn // Just standard update if editing the same doc
+                    } else {
+                        matchingItem.quantity + qtyIn // Add to existing quantity
+                    }
+
+                    val finalInit = if (finalQty > matchingItem.initialQuantity) finalQty else matchingItem.initialQuantity
+                    val status = calculateStatus(finalQty, finalInit)
+
+                    val updateData = hashMapOf<String, Any>(
+                        "name"        to name,
+                        "description" to desc,
+                        "quantity"    to finalQty,
+                        "initialQuantity" to finalInit,
+                        "status"      to status,
+                        "updatedAt"   to FieldValue.serverTimestamp()
+                    )
+
+                    feedCol.document(matchingItem.firestoreId).update(updateData)
+                        .addOnSuccessListener {
+                            logHistory(if (isEdit) "UPDATE" else "RESTOCK", matchingItem.name, qtyIn, price, matchingItem.category)
+                            // If we were editing A and it merged into B, delete A
+                            if (isEdit && item != null && item.firestoreId != matchingItem.firestoreId) {
+                                feedCol.document(item.firestoreId).delete()
+                            }
+                            dialog.dismiss()
+                        }
+                        .addOnFailureListener { e ->
+                            Toast.makeText(this, "Operation failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                } else {
+                    // NEW ITEM OR STANDARD UPDATE (No collision)
+                    val status = calculateStatus(qtyIn, qtyIn)
+                    val data = hashMapOf<String, Any>(
+                        "name"        to name,
+                        "description" to desc,
+                        "invNumber"   to inv,
+                        "location"    to location,
+                        "quantity"    to qtyIn,
+                        "initialQuantity" to qtyIn,
+                        "unitPrice"   to price,
+                        "category"    to cat,
+                        "status"      to status,
+                        "updatedAt"   to FieldValue.serverTimestamp()
+                    )
+
+                    if (isEdit && item != null) {
                         feedCol.document(item.firestoreId).set(data)
-                            .addOnFailureListener { e ->
-                                Toast.makeText(this, "Update failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                            .addOnSuccessListener { 
+                                logHistory("UPDATE", name, qtyIn, price, cat)
+                                dialog.dismiss() 
                             }
                     } else {
-                        feedCol.document(item.firestoreId).update(
-                            "status", status,
-                            "quantity", qty,
-                            "updatedAt", FieldValue.serverTimestamp()
-                        ).addOnFailureListener { e ->
-                            Toast.makeText(this, "Update failed: ${e.message}", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                    if (status == "Low Stock") {
-                        FarmRepository.addAlert("Feed Low: $name is now LOW", "Critical")
-                    }
-                } else {
-                    feedCol.add(data)
-                        .addOnFailureListener { e ->
-                            Toast.makeText(this, "Add failed: ${e.message}", Toast.LENGTH_SHORT).show()
-                        }
-                    if (status == "Low Stock") {
-                        FarmRepository.addAlert("Feed Low: $name added with LOW status", "Critical")
+                        feedCol.add(data)
+                            .addOnSuccessListener { 
+                                logHistory("ADDED", name, qtyIn, price, cat)
+                                dialog.dismiss() 
+                            }
                     }
                 }
-
-                dialog.dismiss()
             }
         }
-
         dialog.show()
     }
 
@@ -486,6 +599,7 @@ class FeedInventoryActivity : AppCompatActivity() {
             .setTitle("Delete Feed Item")
             .setMessage("Are you sure you want to delete \"${item.name}\"?")
             .setPositiveButton("Delete") { _: DialogInterface, _: Int ->
+                logHistory("DELETED", item.name, item.quantity, item.unitPrice, item.category)
                 feedCol.document(item.firestoreId).delete()
                     .addOnFailureListener { e ->
                         Toast.makeText(this, "Delete failed: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -498,6 +612,28 @@ class FeedInventoryActivity : AppCompatActivity() {
     // ──────────────────────────────────────────────────────────────────────────
     // Helpers
     // ──────────────────────────────────────────────────────────────────────────
+    private fun logHistory(type: String, name: String, qty: Long, price: Double, category: String) {
+        val entry = hashMapOf(
+            "type" to type,
+            "name" to name,
+            "quantity" to qty,
+            "unitPrice" to price,
+            "category" to category,
+            "timestamp" to FieldValue.serverTimestamp()
+        )
+        historyCol.add(entry)
+    }
+
+    private fun calculateStatus(qty: Long, initialQty: Long): String {
+        if (initialQty <= 0) return "In Stock"
+        val ratio = qty.toDouble() / initialQty.toDouble()
+        return when {
+            ratio <= 0.2 -> "Low Stock"
+            ratio <= 0.5 -> "Medium"
+            else -> "In Stock"
+        }
+    }
+
     private fun generateInvNumber(): String {
         val next = (allItems.size + 1).toString().padStart(4, '0')
         return "#INV$next"

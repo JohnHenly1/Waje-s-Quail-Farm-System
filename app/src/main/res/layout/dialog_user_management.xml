@@ -4,8 +4,8 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="20dp"
-    android:background="@color/white">
+    android:padding="24dp"
+    android:background="@android:color/white">
 
     <TextView
         android:layout_width="wrap_content"
@@ -14,14 +14,16 @@
         android:textSize="22sp"
         android:textStyle="bold"
         android:textColor="@color/dark_green"
-        android:layout_marginBottom="20dp" />
+        android:fontFamily="sans-serif-medium"
+        android:layout_marginBottom="24dp" />
 
+    <!-- Action Buttons Row -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center"
-        android:layout_marginBottom="24dp">
+        android:layout_marginBottom="28dp">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnRoleLimits"
@@ -34,7 +36,11 @@
             app:cornerRadius="12dp"
             app:strokeColor="@color/dark_green"
             android:textColor="@color/dark_green"
-            android:layout_marginEnd="2dp"/>
+            android:layout_marginEnd="4dp"
+            android:paddingVertical="8dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:textAllCaps="false"/>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnPendingReq"
@@ -47,7 +53,11 @@
             app:cornerRadius="12dp"
             app:strokeColor="@color/dark_green"
             android:textColor="@color/dark_green"
-            android:layout_marginHorizontal="2dp"/>
+            android:layout_marginHorizontal="2dp"
+            android:paddingVertical="8dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:textAllCaps="false"/>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnViewCodes"
@@ -60,7 +70,11 @@
             app:cornerRadius="12dp"
             app:strokeColor="@color/dark_green"
             android:textColor="@color/dark_green"
-            android:layout_marginHorizontal="2dp"/>
+            android:layout_marginHorizontal="2dp"
+            android:paddingVertical="8dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:textAllCaps="false"/>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnInviteNew"
@@ -72,43 +86,54 @@
             android:textSize="11sp"
             app:cornerRadius="12dp"
             app:backgroundTint="@color/dark_green"
-            android:layout_marginStart="2dp"/>
+            android:layout_marginStart="4dp"
+            android:paddingVertical="8dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:textAllCaps="false"/>
     </LinearLayout>
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Approved Members"
-        android:textSize="14sp"
+        android:text="APPROVED MEMBERS"
+        android:textSize="12sp"
         android:textStyle="bold"
         android:textColor="@color/gray"
-        android:layout_marginBottom="12dp" />
+        android:letterSpacing="0.1"
+        android:layout_marginBottom="12dp"
+        android:layout_marginStart="2dp" />
 
-    <!-- Progress Bar -->
-    <ProgressBar
-        android:id="@+id/progressBar"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:visibility="gone"
-        android:layout_marginBottom="12dp" />
-
-    <!-- Error Message -->
-    <TextView
-        android:id="@+id/errorTextView"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Failed to load users"
-        android:textColor="@color/logout_red"
-        android:visibility="gone"
-        android:layout_gravity="center"
-        android:layout_marginBottom="12dp" />
-
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvUserList"
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="300dp"
-        android:clipToPadding="false"
-        android:paddingBottom="8dp" />
+        android:layout_height="wrap_content"
+        android:minHeight="200dp">
+
+        <ProgressBar
+            android:id="@+id/progressBar"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_gravity="center"
+            android:visibility="gone"
+            android:indeterminateTint="@color/dark_green" />
+
+        <TextView
+            android:id="@+id/errorTextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Failed to load users"
+            android:textColor="@color/logout_red"
+            android:visibility="gone"
+            android:layout_gravity="center"
+            android:textSize="14sp" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvUserList"
+            android:layout_width="match_parent"
+            android:layout_height="320dp"
+            android:clipToPadding="false"
+            android:paddingBottom="12dp"
+            android:overScrollMode="never" />
+    </FrameLayout>
 
 </LinearLayout>

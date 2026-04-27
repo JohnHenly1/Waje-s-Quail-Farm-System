@@ -14,6 +14,7 @@ import android.graphics.Typeface;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.text.InputType;
 import android.view.GestureDetector;
 import android.view.Gravity;
@@ -635,13 +636,15 @@ public class ScheduleActivity extends AppCompatActivity {
                                 Long time = selectedDates.get(j);
                                 Calendar cal = Calendar.getInstance();
                                 cal.setTimeInMillis(time);
-                                Task t = new Task(null, title, category, selectedTime[0], "Pending",
+                                
+                                DocumentReference ref = db.collection("farm_data").document("shared")
+                                        .collection("tasks").document();
+                                        
+                                Task t = new Task(ref.getId(), title, category, selectedTime[0], "Pending",
                                         cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH),
                                         selectedRecurrence[0], groupId);
                                 t.workWindowMinutes = window;
 
-                                DocumentReference ref = db.collection("farm_data").document("shared")
-                                        .collection("tasks").document();
                                 batch.set(ref, buildTaskMap(t));
 
                                 if (notificationsCreated < notificationLimit) {
@@ -1169,6 +1172,7 @@ public class ScheduleActivity extends AppCompatActivity {
         Intent intent = new Intent(this, TaskAlarmReceiver.class);
         intent.putExtra("taskTitle", task.title);
         intent.putExtra("taskCategory", task.category);
+        intent.putExtra("taskId", task.firestoreId);
         
         int rc = (task.title + task.year + task.month + task.day + hour + minute).hashCode();
         PendingIntent pi = PendingIntent.getBroadcast(this, rc, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
@@ -1244,16 +1248,44 @@ public class ScheduleActivity extends AppCompatActivity {
     public static class TaskAlarmReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
+            String taskId = intent.getStringExtra("taskId");
+            if (taskId == null) {
+                // Fallback for legacy alarms without ID
+                showNotification(context, intent);
+                return;
+            }
+
+            final PendingResult result = goAsync();
+            // Check if task still exists and is not done before notifying
+            FirebaseFirestore.getInstance().collection("farm_data")
+                .document("shared").collection("tasks").document(taskId)
+                .get()
+                .addOnCompleteListener(task -> {
+                    try {
+                        if (task.isSuccessful() && task.getResult() != null && task.getResult().exists()) {
+                            String status = task.getResult().getString("status");
+                            if (!"Done".equals(status)) {
+                                showNotification(context, intent);
+                            }
+                        }
+                    } finally {
+                        result.finish();
+                    }
+                });
+        }
+        
+        private void showNotification(Context context, Intent intent) {
             String title = intent.getStringExtra("taskTitle");
             String category = intent.getStringExtra("taskCategory");
             createChannel(context);
             
-            String timestamp = new SimpleDateFormat("yyyy/MM/dd hh:mm a", Locale.getDefault()).format(new Date());
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd hh:mm a", Locale.getDefault());
+            String timestamp = sdf.format(new Date());
             try {
                 AccountManager accountManager = new AccountManager(context);
                 if (!accountManager.isScheduleEnabled()) return;
                 if (accountManager.isGlobalDataEnabled()) {
-                    GlobalData.INSTANCE.addAlert(context.getString(R.string.task_reminder_title, title) + " (" + category + ")", timestamp, "System");
+                    GlobalData.addAlert(context.getString(R.string.task_reminder_title, title) + " (" + category + ")", timestamp, "System");
                 }
             } catch (Exception e) { e.printStackTrace(); }
             
@@ -1285,7 +1317,7 @@ public class ScheduleActivity extends AppCompatActivity {
                 channel.enableLights(true); 
                 channel.enableVibration(true);
                 channel.setLockscreenVisibility(NotificationCompat.VISIBILITY_PUBLIC);
-                NotificationManager nm = context.getSystemService(NotificationManager.class);
+                NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
                 if (nm != null) nm.createNotificationChannel(channel);
             }
         }

@@ -18,7 +18,7 @@ object GlobalData {
     private const val PREFS_NAME = "global_data_prefs"
     private const val KEY_ALERTS = "alerts"
 
-    // Call this from MyApplication.onCreate() — passing `this` (the Application)
+    // Call this from MyApplication.onCreate()
     fun init(context: Context) {
         prefs = context.applicationContext
             .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -29,15 +29,26 @@ object GlobalData {
     fun addAlert(message: String, timestamp: String, type: String = "Inventory") {
         val list = loadAlerts().toMutableList()
         
-        // Prevent exact duplicates (same message and timestamp)
-        val isDuplicate = list.any { it.message == message && it.timestamp == timestamp }
+        // Prevent duplicates: same message on the same day (assuming YYYY/MM/DD prefix)
+        val dayStamp = if (timestamp.contains("/")) timestamp.substringBefore(" ") else ""
+        val isDuplicate = list.any { 
+            it.message == message && (if (dayStamp.isNotEmpty()) it.timestamp.startsWith(dayStamp) else it.timestamp == timestamp)
+        }
         if (isDuplicate) return
 
         list.add(0, AlertItem(message, timestamp, type))
         
-        // Keep only last 50 alerts to prevent SharedPreferences bloat
-        val trimmedList = if (list.size > 50) list.take(50) else list
+        // Keep last 100 alerts
+        val trimmedList = if (list.size > 100) list.take(100) else list
         saveAlerts(trimmedList)
+    }
+
+    /**
+     * Replaces the current local alerts with a new list (useful for syncing with cloud)
+     */
+    @Synchronized
+    fun syncWithCloud(cloudAlerts: List<AlertItem>) {
+        saveAlerts(cloudAlerts)
     }
 
     @Synchronized

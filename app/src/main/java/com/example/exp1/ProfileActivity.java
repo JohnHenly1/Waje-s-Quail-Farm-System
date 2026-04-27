@@ -151,9 +151,13 @@ public class ProfileActivity extends AppCompatActivity {
 
         //  Notification Preferences -----------------------------------------------------------
         View notificationPrefsButton = findViewById(R.id.notificationPreferencesButton);
-        if (notificationPrefsButton != null) {
+        if (isAdmin()) {
+            notificationPrefsButton.setVisibility(View.VISIBLE);
             notificationPrefsButton.setOnClickListener(v -> showNotificationPrefsDialog());
+        } else {
+            notificationPrefsButton.setVisibility(View.GONE);
         }
+
 
         //  Language & Region -----------------------------------------------------------
         View languageRegionButton = findViewById(R.id.languageRegionButton);

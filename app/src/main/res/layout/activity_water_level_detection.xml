@@ -64,14 +64,16 @@
                         android:textSize="12sp" />
                 </LinearLayout>
 
+                <!-- Simulation Refresh Button -->
                 <ImageButton
-                    android:id="@+id/notificationButton"
+                    android:id="@+id/refreshSimulationBtn"
                     android:layout_width="40dp"
                     android:layout_height="40dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:src="@drawable/ic_notifications"
-                    android:contentDescription="Notifications"
+                    android:contentDescription="Refresh Simulation"
+                    android:src="@android:drawable/ic_popup_sync"
                     app:tint="@color/white" />
+
             </LinearLayout>
         </LinearLayout>
 

@@ -133,7 +133,7 @@ class EnterCodeActivity : AppCompatActivity() {
                 if (detectedEmail.isEmpty() || email == detectedEmail) {
                     proceedToSetup(account)
                 } else {
-                    Toast.makeText(this, "This code was issued to $detectedEmail.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, "This code was issued to another email.", Toast.LENGTH_LONG).show()
                     googleSignInClient.signOut()
                 }
             } catch (e: Exception) {

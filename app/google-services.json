@@ -15,6 +15,22 @@
       },
       "oauth_client": [
         {
+          "client_id": "441160922275-h5385jeju4o8pthjp0n59bm1m4n6rg4o.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.exp1",
+            "certificate_hash": "87cf7e9f70280baf80a68e1ca97b6abc28309c93"
+          }
+        },
+        {
+          "client_id": "441160922275-th62adj1edva5b7u5h0vv71ckeht8i8a.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.exp1",
+            "certificate_hash": "4e2c5c358643aa4c61c0632b7fcca782fc876f1c"
+          }
+        },
+        {
           "client_id": "441160922275-vvlj2qkape3kffv4u1rrdicro0idh5ae.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
@@ -57,6 +73,22 @@
           "android_info": {
             "package_name": "com.wajequailfarm.qa",
             "certificate_hash": "0700014c5bd602f10bae5a6fd3082bada4aee6f4"
+          }
+        },
+        {
+          "client_id": "441160922275-at83b6ufqpmc2dmokkccmk7sp11hq6ie.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.wajequailfarm.qa",
+            "certificate_hash": "87cf7e9f70280baf80a68e1ca97b6abc28309c93"
+          }
+        },
+        {
+          "client_id": "441160922275-o1rq6fanfre8575kmfvr91jn8al5k74b.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.wajequailfarm.qa",
+            "certificate_hash": "4e2c5c358643aa4c61c0632b7fcca782fc876f1c"
           }
         },
         {

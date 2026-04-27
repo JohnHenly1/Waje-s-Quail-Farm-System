@@ -17,7 +17,7 @@ object FarmRepository {
     //    farm_data/stats                   ← document (birds, cages, start date)
     //    farm_data/shared/tasks/{id}       ← sub-collection under document "shared"
     //    farm_data/shared/feed/{id}        ← sub-collection under document "shared"
-    //    farm_data/shared/alerts/{id}      ← sub-collection under document "shared"
+    //    farm_data/shared/alert/{id}      ← sub-collection under document "shared"
 
 
     private val statsDoc  get() = db.collection("farm_data").document("stats")
@@ -25,7 +25,7 @@ object FarmRepository {
 
     private val tasksCol  get() = sharedDoc.collection("tasks")
     private val feedCol   get() = sharedDoc.collection("feed")
-    private val alertsCol get() = sharedDoc.collection("alerts")
+    private val alertsCol get() = sharedDoc.collection("alert")
 
     //  Farm Stats----------------------------------------------------------------------------------
 

@@ -59,7 +59,7 @@
     <!-- Quick Stats -->
     <string name="total_eggs_today">Total Eggs Today</string>
     <string name="eggs_count">0</string>
-    <string name="feed_remaining">Feed Remaining</string>
+    <string name="feed_remaining">Inventory Remaining</string>
     <string name="feed_weight">0</string>
 
     <!-- Footer Nav -->

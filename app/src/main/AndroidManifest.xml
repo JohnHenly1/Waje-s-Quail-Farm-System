@@ -94,6 +94,9 @@
             android:name=".FeedInventoryActivity"
             android:exported="true"/>
         <activity
+            android:name=".FeedHistoryActivity"
+            android:exported="true"/>
+        <activity
             android:name=".EggCountActivity"
             android:exported="true"/>
         <activity
