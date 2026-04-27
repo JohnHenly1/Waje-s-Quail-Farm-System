@@ -23,6 +23,7 @@ class EnterCodeActivity : AppCompatActivity() {
     private var enteredCode: String = ""
     private var detectedEmail: String = ""
     private var detectedRole: String = "staff"
+    private var detectedName: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,7 +39,6 @@ class EnterCodeActivity : AppCompatActivity() {
         editInviteCode = findViewById(R.id.editInviteCode)
 
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken(getString(R.string.default_web_client_id))
             .requestEmail()
             .build()
 
@@ -52,7 +52,6 @@ class EnterCodeActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            // 1. Detect if code is Email-bound or Generic
             verifyAndDetectAccount()
         }
 
@@ -64,7 +63,7 @@ class EnterCodeActivity : AppCompatActivity() {
     private fun verifyAndDetectAccount() {
         val db = FirebaseFirestore.getInstance()
         
-        // Step A: Check user_access (Codes assigned to specific emails)
+        // Step A: Check user_access (Request Access flow - Email bound)
         db.collection("user_access")
             .whereEqualTo("verificationCode", enteredCode)
             .get()
@@ -73,10 +72,11 @@ class EnterCodeActivity : AppCompatActivity() {
                     val doc = snapshots.documents[0]
                     detectedEmail = doc.id
                     detectedRole = doc.getString("role") ?: "staff"
+                    detectedName = doc.getString("name") ?: ""
                     
-                    attemptAutoSignIn()
+                    showRegistrationChoice()
                 } else {
-                    // Step B: Check invite_codes (Generic numeric codes)
+                    // Step B: Check invite_codes (Generic invite codes)
                     db.collection("invite_codes").document(enteredCode).get()
                         .addOnSuccessListener { doc ->
                             if (doc.exists()) {
@@ -86,7 +86,13 @@ class EnterCodeActivity : AppCompatActivity() {
                                 } else {
                                     detectedEmail = doc.getString("invitedEmail") ?: ""
                                     detectedRole = doc.getString("role") ?: "staff"
-                                    triggerManualSignIn()
+                                    
+                                    if (detectedEmail.isNotEmpty()) {
+                                        showRegistrationChoice()
+                                    } else {
+                                        // No email established yet, MUST use Google to get an email
+                                        triggerManualSignIn()
+                                    }
                                 }
                             } else {
                                 Toast.makeText(this, "Invalid Code. Please check your email.", Toast.LENGTH_LONG).show()
@@ -97,6 +103,20 @@ class EnterCodeActivity : AppCompatActivity() {
             .addOnFailureListener {
                 Toast.makeText(this, "Connection Error", Toast.LENGTH_SHORT).show()
             }
+    }
+
+    private fun showRegistrationChoice() {
+        AlertDialog.Builder(this)
+            .setTitle("Code Verified")
+            .setMessage("This code is linked to $detectedEmail.\n\nHow would you like to continue?")
+            .setPositiveButton("Google Account") { _, _ ->
+                attemptAutoSignIn()
+            }
+            .setNeutralButton("Manual Setup") { _, _ ->
+                proceedToSetupWithoutAccount()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun attemptAutoSignIn() {
@@ -133,11 +153,16 @@ class EnterCodeActivity : AppCompatActivity() {
                 if (detectedEmail.isEmpty() || email == detectedEmail) {
                     proceedToSetup(account)
                 } else {
-                    Toast.makeText(this, "This code was issued to another email.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, "This code was issued for $detectedEmail.", Toast.LENGTH_LONG).show()
                     googleSignInClient.signOut()
                 }
             } catch (e: Exception) {
-                Toast.makeText(this, "Sign-In Failed", Toast.LENGTH_SHORT).show()
+                if (detectedEmail.isNotEmpty()) {
+                    // Fail-safe: if Google fails but we know the email, offer manual
+                    proceedToSetupWithoutAccount()
+                } else {
+                    Toast.makeText(this, "Sign-In Failed", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
@@ -145,8 +170,17 @@ class EnterCodeActivity : AppCompatActivity() {
     private fun proceedToSetup(account: GoogleSignInAccount) {
         val intent = Intent(this, SetupAccountActivity::class.java)
         intent.putExtra("email", account.email?.lowercase())
-        intent.putExtra("name", account.displayName ?: "")
+        intent.putExtra("name", account.displayName ?: detectedName)
         intent.putExtra("photoUrl", account.photoUrl?.toString() ?: "")
+        intent.putExtra("role", detectedRole)
+        startActivity(intent)
+        finish()
+    }
+
+    private fun proceedToSetupWithoutAccount() {
+        val intent = Intent(this, SetupAccountActivity::class.java)
+        intent.putExtra("email", detectedEmail)
+        intent.putExtra("name", detectedName)
         intent.putExtra("role", detectedRole)
         startActivity(intent)
         finish()

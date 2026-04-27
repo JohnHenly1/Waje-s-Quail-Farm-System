@@ -113,10 +113,11 @@ class SetupAccountActivity : AppCompatActivity() {
             }
 
             val db = FirebaseFirestore.getInstance()
-            // Check if email is already registered
+            // Check if email is already FULLY registered (setupCompleted = true)
+            // Note: For Request Access, a document with the email already exists but setupCompleted is false.
             db.collection("user_access").document(email).get()
                 .addOnSuccessListener { doc ->
-                    if (doc.exists()) {
+                    if (doc.exists() && doc.getBoolean("setupCompleted") == true) {
                         Toast.makeText(this, "This email is already registered.", Toast.LENGTH_SHORT).show()
                     } else {
                         val addressMap = if (street.isNotEmpty()) {
