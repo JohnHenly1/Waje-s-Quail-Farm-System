@@ -10,6 +10,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.bumptech.glide.Glide
 import com.google.android.material.textfield.TextInputLayout
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -35,10 +36,17 @@ class SetupAccountActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_setup_account)
 
-        email = intent.getStringExtra("email") ?: ""
+        // Ensure email is lowercased and trimmed for consistency
+        email = intent.getStringExtra("email")?.trim()?.lowercase() ?: ""
         role = intent.getStringExtra("role") ?: "staff"
         val googleName = intent.getStringExtra("name") ?: ""
         photoUrl = intent.getStringExtra("photoUrl") ?: ""
+
+        if (email.isEmpty()) {
+            Toast.makeText(this, "Critical Error: No email provided", Toast.LENGTH_LONG).show()
+            finish()
+            return
+        }
 
         editName = findViewById(R.id.editSetupName)
         editBirthday = findViewById(R.id.editSetupBirthday)
@@ -113,56 +121,56 @@ class SetupAccountActivity : AppCompatActivity() {
             }
 
             val db = FirebaseFirestore.getInstance()
-            // Check if email is already FULLY registered (setupCompleted = true)
-            // Note: For Request Access, a document with the email already exists but setupCompleted is false.
-            db.collection("user_access").document(email).get()
-                .addOnSuccessListener { doc ->
-                    if (doc.exists() && doc.getBoolean("setupCompleted") == true) {
-                        Toast.makeText(this, "This email is already registered.", Toast.LENGTH_SHORT).show()
-                    } else {
-                        val addressMap = if (street.isNotEmpty()) {
-                            mapOf(
-                                "street" to street,
-                                "city" to city,
-                                "state" to state,
-                                "postalCode" to postal
-                            )
-                        } else {
-                            mapOf<String, String>()
-                        }
+            
+            val addressMap = if (street.isNotEmpty()) {
+                mapOf(
+                    "street" to street,
+                    "city" to city,
+                    "state" to state,
+                    "postalCode" to postal
+                )
+            } else {
+                null
+            }
 
-                        val userData = hashMapOf(
-                            "name" to name,
-                            "email" to email,
-                            "birthday" to bday,
-                            "address" to addressMap,
-                            "password" to pass,
-                            "role" to role,
-                            "profilePic" to photoUrl,
-                            "status" to "approved",
-                            "setupCompleted" to true,
-                            "verifiedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
-                        )
+            val userData = mutableMapOf<String, Any>(
+                "name" to name,
+                "email" to email,
+                "birthday" to bday,
+                "password" to pass,
+                "role" to role,
+                "profilePic" to photoUrl,
+                "status" to "approved",
+                "setupCompleted" to true,
+                "verifiedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
+            )
+            
+            if (addressMap != null) {
+                userData["address"] = addressMap
+            }
 
-                        db.collection("user_access").document(email).set(userData)
-                            .addOnSuccessListener {
-                                val accountManager = AccountManager(this)
-                                accountManager.registerAccount(name, email, pass, role)
-                                accountManager.saveCurrentSession(email)
+            btnComplete.isEnabled = false
+            btnComplete.text = "Saving..."
 
-                                Toast.makeText(this, "Profile Setup Complete!", Toast.LENGTH_SHORT).show()
-                                val intent = Intent(this, DashboardActivity::class.java)
-                                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                                startActivity(intent)
-                                finish()
-                            }
-                            .addOnFailureListener {
-                                Toast.makeText(this, "Error saving data", Toast.LENGTH_SHORT).show()
-                            }
-                    }
+            // Use merge to update the existing approved request record
+            db.collection("user_access").document(email).set(userData, SetOptions.merge())
+                .addOnSuccessListener {
+                    val accountManager = AccountManager(this)
+                    // Use email as the key to remain consistent with MainActivity
+                    accountManager.registerAccount(email, email, pass, role)
+                    accountManager.saveCurrentSession(email)
+
+                    Toast.makeText(this, "Profile Setup Complete!", Toast.LENGTH_SHORT).show()
+                    val intent = Intent(this, DashboardActivity::class.java)
+                    intent.putExtra("username", email)
+                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    startActivity(intent)
+                    finish()
                 }
-                .addOnFailureListener {
-                    Toast.makeText(this, "Error checking email", Toast.LENGTH_SHORT).show()
+                .addOnFailureListener { e ->
+                    btnComplete.isEnabled = true
+                    btnComplete.text = "Complete Setup"
+                    Toast.makeText(this, "Error saving data: ${e.message}", Toast.LENGTH_LONG).show()
                 }
         }
     }
@@ -173,7 +181,6 @@ class SetupAccountActivity : AppCompatActivity() {
         if (state.length < 2) return "State/Province must be at least 2 characters"
         if (postal.length < 3) return "Postal code must be at least 3 characters"
         
-        // Check for suspicious characters
         val invalidChars = "!@#$%^&*()=[]{}|;':\",<>?"
         if (street.any { it in invalidChars } || city.any { it in invalidChars } || 
             state.any { it in invalidChars } || postal.any { it in invalidChars }) {
