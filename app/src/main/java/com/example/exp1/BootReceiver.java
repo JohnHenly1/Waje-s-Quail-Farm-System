@@ -159,6 +159,7 @@ public class BootReceiver extends BroadcastReceiver {
                                     new Intent(context, ScheduleActivity.TaskAlarmReceiver.class);
                             alarmIntent.putExtra("taskTitle",    title);
                             alarmIntent.putExtra("taskCategory", category);
+                            alarmIntent.putExtra("taskId",       doc.getId()); // enables Firestore status check at fire time
 
                             int rc = (title + yearL.intValue() + monthL.intValue()
                                     + dayL.intValue() + hm[0] + hm[1]).hashCode();
@@ -235,7 +236,7 @@ public class BootReceiver extends BroadcastReceiver {
 
     private boolean isSameDay(Calendar cal1, Calendar cal2) {
         return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
-               cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR);
+                cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR);
     }
 
     private int[] parseTime(String timeStr) {

@@ -1,4 +1,3 @@
-<?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -7,23 +6,21 @@
     android:layout_height="match_parent"
     android:background="#F8F9FA"
     tools:context=".ProfileActivity">
-
-    <!-- Header Gradient Background -->
+    <!--  Header Gradient Background  -->
     <View
         android:id="@+id/headerBackground"
         android:layout_width="match_parent"
         android:layout_height="220dp"
         android:background="@drawable/bg_profile_header_gradient"
         app:layout_constraintTop_toTopOf="parent" />
-
-    <!-- Header Content -->
+    <!--  Header Content  -->
     <LinearLayout
         android:id="@+id/headerContent"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
+        android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingHorizontal="8dp"
-        android:gravity="center_vertical"
         app:layout_constraintTop_toTopOf="parent">
 
         <ImageButton
@@ -31,36 +28,35 @@
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_arrow_back"
             android:contentDescription="@string/back"
+            android:src="@drawable/ic_arrow_back"
             app:tint="@color/white" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
+            android:fontFamily="sans-serif-medium"
             android:text="@string/profile"
             android:textColor="@color/white"
             android:textSize="20sp"
-            android:textStyle="bold"
-            android:fontFamily="sans-serif-medium" />
+            android:textStyle="bold" />
     </LinearLayout>
 
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:fillViewport="true"
         android:clipToPadding="false"
-        app:layout_constraintTop_toBottomOf="@id/headerContent"
-        app:layout_constraintBottom_toTopOf="@id/bottomNavContainer">
+        android:fillViewport="true"
+        app:layout_constraintBottom_toTopOf="@id/bottomNavContainer"
+        app:layout_constraintTop_toBottomOf="@id/headerContent">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:padding="16dp">
-
-            <!-- Profile Card -->
+            <!--  Profile Card  -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/profileCardWrapper"
                 android:layout_width="match_parent"
@@ -79,12 +75,12 @@
                     <View
                         android:layout_width="140dp"
                         android:layout_height="140dp"
-                        android:background="@drawable/circle_white"
-                        android:alpha="0.08"
-                        app:layout_constraintTop_toTopOf="parent"
-                        app:layout_constraintEnd_toEndOf="parent"
                         android:layout_marginTop="-70dp"
-                        android:layout_marginEnd="-70dp" />
+                        android:layout_marginEnd="-70dp"
+                        android:alpha="0.08"
+                        android:background="@drawable/circle_white"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
 
                     <FrameLayout
                         android:id="@+id/avatarContainer"
@@ -92,8 +88,8 @@
                         android:layout_height="84dp"
                         android:background="@drawable/circle_white"
                         android:backgroundTint="#33FFFFFF"
-                        app:layout_constraintTop_toTopOf="parent"
-                        app:layout_constraintStart_toStartOf="parent">
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent">
 
                         <TextView
                             android:id="@+id/profileInitial"
@@ -109,9 +105,9 @@
                             android:id="@+id/profileImage"
                             android:layout_width="match_parent"
                             android:layout_height="match_parent"
+                            android:contentDescription="@string/profile_image"
                             android:scaleType="centerCrop"
-                            android:visibility="gone"
-                            android:contentDescription="@string/profile_image" />
+                            android:visibility="gone" />
                     </FrameLayout>
 
                     <ImageButton
@@ -120,12 +116,12 @@
                         android:layout_height="44dp"
                         android:background="@drawable/circle_white"
                         android:backgroundTint="#33FFFFFF"
-                        android:src="@drawable/ic_edit"
+                        android:contentDescription="@string/report"
                         android:padding="10dp"
                         android:scaleType="centerInside"
-                        android:contentDescription="@string/report"
-                        app:layout_constraintTop_toTopOf="parent"
-                        app:layout_constraintEnd_toEndOf="parent" />
+                        android:src="@drawable/ic_edit"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
 
                     <TextView
                         android:id="@+id/userName"
@@ -137,9 +133,9 @@
                         android:textColor="@color/white"
                         android:textSize="26sp"
                         android:textStyle="bold"
-                        app:layout_constraintTop_toBottomOf="@id/avatarContainer"
+                        app:layout_constraintEnd_toEndOf="parent"
                         app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintEnd_toEndOf="parent" />
+                        app:layout_constraintTop_toBottomOf="@id/avatarContainer" />
 
                     <TextView
                         android:id="@+id/userEmail"
@@ -149,8 +145,8 @@
                         android:text="@string/user_email"
                         android:textColor="#CCFFFFFF"
                         android:textSize="14sp"
-                        app:layout_constraintTop_toBottomOf="@id/userName"
-                        app:layout_constraintStart_toStartOf="parent" />
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/userName" />
 
                     <TextView
                         android:id="@+id/userRole"
@@ -161,43 +157,43 @@
                         android:textColor="#A6FFFFFF"
                         android:textSize="13sp"
                         android:textStyle="italic"
-                        app:layout_constraintTop_toBottomOf="@id/userEmail"
-                        app:layout_constraintStart_toStartOf="parent" />
-
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/userEmail" />
                 </androidx.constraintlayout.widget.ConstraintLayout>
             </com.google.android.material.card.MaterialCardView>
-
-            <!-- Stats Grid -->
+            <!--  Stats Grid  -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="20dp"
-                android:orientation="horizontal"
-                android:baselineAligned="false">
-
-                <!-- Total Birds -->
+                android:baselineAligned="false"
+                android:orientation="horizontal">
+                <!--  Total Birds  -->
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
                     android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
                     app:cardCornerRadius="16dp"
                     app:cardElevation="2dp"
                     app:strokeWidth="0dp">
+
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:gravity="center"
                         android:orientation="vertical"
                         android:padding="12dp">
+
                         <ImageView
                             android:layout_width="36dp"
                             android:layout_height="36dp"
                             android:background="@drawable/bg_stat_blue"
+                            android:contentDescription="@string/birds_icon"
                             android:padding="8dp"
                             android:src="@drawable/quailbird_icon"
-                            app:tint="@color/white"
-                            android:contentDescription="@string/birds_icon" />
+                            app:tint="@color/white" />
+
                         <TextView
                             android:id="@+id/totalBirdsValue"
                             android:layout_width="wrap_content"
@@ -207,40 +203,43 @@
                             android:textColor="@color/black"
                             android:textSize="18sp"
                             android:textStyle="bold" />
+
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:letterSpacing="0.05"
                             android:text="@string/total_birds"
-                            android:textColor="@color/gray"
-                            android:textSize="10sp"
                             android:textAllCaps="true"
-                            android:letterSpacing="0.05" />
+                            android:textColor="@color/gray"
+                            android:textSize="10sp" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
-
-                <!-- Active Cages -->
+                <!--  Active Cages  -->
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
                     android:layout_marginHorizontal="3dp"
+                    android:layout_weight="1"
                     app:cardCornerRadius="16dp"
                     app:cardElevation="2dp"
                     app:strokeWidth="0dp">
+
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:gravity="center"
                         android:orientation="vertical"
                         android:padding="12dp">
+
                         <ImageView
                             android:layout_width="36dp"
                             android:layout_height="36dp"
                             android:background="@drawable/bg_stat_green"
+                            android:contentDescription="@string/cages_icon"
                             android:padding="8dp"
                             android:src="@drawable/cageicon"
-                            app:tint="@color/white"
-                            android:contentDescription="@string/cages_icon" />
+                            app:tint="@color/white" />
+
                         <TextView
                             android:id="@+id/activeCagesValue"
                             android:layout_width="wrap_content"
@@ -250,40 +249,43 @@
                             android:textColor="@color/black"
                             android:textSize="18sp"
                             android:textStyle="bold" />
+
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:letterSpacing="0.05"
                             android:text="@string/active_cages"
-                            android:textColor="@color/gray"
-                            android:textSize="10sp"
                             android:textAllCaps="true"
-                            android:letterSpacing="0.05" />
+                            android:textColor="@color/gray"
+                            android:textSize="10sp" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
-
-                <!-- Days Running -->
+                <!--  Days Running  -->
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
                     android:layout_marginStart="6dp"
+                    android:layout_weight="1"
                     app:cardCornerRadius="16dp"
                     app:cardElevation="2dp"
                     app:strokeWidth="0dp">
+
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:gravity="center"
                         android:orientation="vertical"
                         android:padding="12dp">
+
                         <ImageView
                             android:layout_width="36dp"
                             android:layout_height="36dp"
                             android:background="@drawable/bg_stat_orange"
+                            android:contentDescription="@string/days_icon"
                             android:padding="8dp"
                             android:src="@drawable/day_icon"
-                            app:tint="@color/white"
-                            android:contentDescription="@string/days_icon" />
+                            app:tint="@color/white" />
+
                         <TextView
                             android:id="@+id/daysRunningValue"
                             android:layout_width="wrap_content"
@@ -293,31 +295,31 @@
                             android:textColor="@color/black"
                             android:textSize="18sp"
                             android:textStyle="bold" />
+
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:letterSpacing="0.05"
                             android:text="@string/days_running"
-                            android:textColor="@color/gray"
-                            android:textSize="10sp"
                             android:textAllCaps="true"
-                            android:letterSpacing="0.05" />
+                            android:textColor="@color/gray"
+                            android:textSize="10sp" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
             </LinearLayout>
-
-            <!-- Account Group -->
+            <!--  Account Group  -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="28dp"
                 android:layout_marginStart="4dp"
+                android:layout_marginTop="28dp"
                 android:layout_marginBottom="12dp"
+                android:letterSpacing="0.1"
                 android:text="@string/account_group"
+                android:textAllCaps="true"
                 android:textColor="@color/dark_gray"
                 android:textSize="14sp"
-                android:textStyle="bold"
-                android:textAllCaps="true"
-                android:letterSpacing="0.1" />
+                android:textStyle="bold" />
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
@@ -331,8 +333,7 @@
                     android:layout_height="wrap_content"
                     android:background="@android:color/white"
                     android:orientation="vertical">
-
-                    <!-- Account Settings -->
+                    <!--  Account Settings  -->
                     <LinearLayout
                         android:id="@+id/accountSettingsButton"
                         android:layout_width="match_parent"
@@ -355,68 +356,25 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="16dp"
                             android:layout_weight="1"
+                            android:fontFamily="sans-serif-medium"
                             android:text="@string/account_settings"
                             android:textColor="@color/black"
-                            android:textSize="16sp"
-                            android:fontFamily="sans-serif-medium" />
+                            android:textSize="16sp" />
 
                         <ImageView
                             android:layout_width="20dp"
                             android:layout_height="20dp"
+                            android:contentDescription="@string/chevron_icon"
                             android:src="@drawable/ic_chevron_right"
-                            app:tint="#D1D5DB"
-                            android:contentDescription="@string/chevron_icon" />
+                            app:tint="#D1D5DB" />
                     </LinearLayout>
 
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
-                        android:background="#F3F4F6"
-                        android:layout_marginHorizontal="16dp" />
-
-                    <!-- Notification Preferences -->
-                    <LinearLayout
-                        android:id="@+id/notificationPreferencesButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="64dp"
-                        android:background="?attr/selectableItemBackground"
-                        android:gravity="center_vertical"
-                        android:paddingHorizontal="16dp">
-
-                        <View
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:background="@drawable/rounded_corner"
-                            android:backgroundTint="@color/bg_purple_100"
-                            android:foreground="@drawable/ic_notifications"
-                            android:foregroundGravity="center"
-                            android:foregroundTint="@color/text_purple_600" />
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="16dp"
-                            android:layout_weight="1"
-                            android:text="@string/notification_preferences"
-                            android:textColor="@color/black"
-                            android:textSize="16sp"
-                            android:fontFamily="sans-serif-medium" />
-
-                        <ImageView
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:src="@drawable/ic_chevron_right"
-                            app:tint="#D1D5DB"
-                            android:contentDescription="@string/chevron_icon" />
-                    </LinearLayout>
-
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:background="#F3F4F6"
-                        android:layout_marginHorizontal="16dp" />
-
-                    <!-- Farm Recalibration -->
+                        android:layout_marginHorizontal="16dp"
+                        android:background="#F3F4F6" />
+                    <!--  Farm Recalibration  -->
                     <LinearLayout
                         android:id="@+id/farmRecalibrationButton"
                         android:layout_width="match_parent"
@@ -439,35 +397,34 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="16dp"
                             android:layout_weight="1"
+                            android:fontFamily="sans-serif-medium"
                             android:text="@string/farm_recalibration"
                             android:textColor="@color/black"
-                            android:textSize="16sp"
-                            android:fontFamily="sans-serif-medium" />
+                            android:textSize="16sp" />
 
                         <ImageView
                             android:layout_width="20dp"
                             android:layout_height="20dp"
+                            android:contentDescription="@string/chevron_icon"
                             android:src="@drawable/ic_chevron_right"
-                            app:tint="#D1D5DB"
-                            android:contentDescription="@string/chevron_icon" />
+                            app:tint="#D1D5DB" />
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
-
-            <!-- Admin Group (only for owners) -->
+            <!--  Admin Group (only for owners)  -->
             <TextView
                 android:id="@+id/adminGroupLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="28dp"
                 android:layout_marginStart="4dp"
+                android:layout_marginTop="28dp"
                 android:layout_marginBottom="12dp"
+                android:letterSpacing="0.1"
                 android:text="@string/admin_group_label"
+                android:textAllCaps="true"
                 android:textColor="@color/dark_gray"
                 android:textSize="14sp"
                 android:textStyle="bold"
-                android:textAllCaps="true"
-                android:letterSpacing="0.1"
                 android:visibility="gone" />
 
             <com.google.android.material.card.MaterialCardView
@@ -484,8 +441,7 @@
                     android:layout_height="wrap_content"
                     android:background="@android:color/white"
                     android:orientation="vertical">
-
-                    <!-- User List -->
+                    <!--  User List  -->
                     <LinearLayout
                         android:id="@+id/userListButton"
                         android:layout_width="match_parent"
@@ -508,68 +464,25 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="16dp"
                             android:layout_weight="1"
+                            android:fontFamily="sans-serif-medium"
                             android:text="@string/user_access_list"
                             android:textColor="@color/black"
-                            android:textSize="16sp"
-                            android:fontFamily="sans-serif-medium" />
+                            android:textSize="16sp" />
 
                         <ImageView
                             android:layout_width="20dp"
                             android:layout_height="20dp"
+                            android:contentDescription="@string/chevron_icon"
                             android:src="@drawable/ic_chevron_right"
-                            app:tint="#D1D5DB"
-                            android:contentDescription="@string/chevron_icon" />
+                            app:tint="#D1D5DB" />
                     </LinearLayout>
 
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
-                        android:background="#F3F4F6"
-                        android:layout_marginHorizontal="16dp" />
-
-                    <!-- Database Management -->
-                    <LinearLayout
-                        android:id="@+id/databaseManagementButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="64dp"
-                        android:background="?attr/selectableItemBackground"
-                        android:gravity="center_vertical"
-                        android:paddingHorizontal="16dp">
-
-                        <View
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:background="@drawable/rounded_corner"
-                            android:backgroundTint="@color/bg_orange_100"
-                            android:foreground="@drawable/ic_lock"
-                            android:foregroundGravity="center"
-                            android:foregroundTint="@color/text_orange_600" />
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="16dp"
-                            android:layout_weight="1"
-                            android:text="@string/database_management"
-                            android:textColor="@color/black"
-                            android:textSize="16sp"
-                            android:fontFamily="sans-serif-medium" />
-
-                        <ImageView
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:src="@drawable/ic_chevron_right"
-                            app:tint="#D1D5DB"
-                            android:contentDescription="@string/chevron_icon" />
-                    </LinearLayout>
-
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:background="#F3F4F6"
-                        android:layout_marginHorizontal="16dp" />
-
-                    <!-- Generate Invite Code -->
+                        android:layout_marginHorizontal="16dp"
+                        android:background="#F3F4F6" />
+                    <!--  Generate Invite Code  -->
                     <LinearLayout
                         android:id="@+id/generateInviteButton"
                         android:layout_width="match_parent"
@@ -592,26 +505,25 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="16dp"
                             android:layout_weight="1"
+                            android:fontFamily="sans-serif-medium"
                             android:text="@string/generate_invite_code"
                             android:textColor="@color/black"
-                            android:textSize="16sp"
-                            android:fontFamily="sans-serif-medium" />
+                            android:textSize="16sp" />
 
                         <ImageView
                             android:layout_width="20dp"
                             android:layout_height="20dp"
+                            android:contentDescription="@string/chevron_icon"
                             android:src="@drawable/ic_chevron_right"
-                            app:tint="#D1D5DB"
-                            android:contentDescription="@string/chevron_icon" />
+                            app:tint="#D1D5DB" />
                     </LinearLayout>
 
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
-                        android:background="#F3F4F6"
-                        android:layout_marginHorizontal="16dp" />
-
-                    <!-- Manage Users -->
+                        android:layout_marginHorizontal="16dp"
+                        android:background="#F3F4F6" />
+                    <!--  Manage Users  -->
                     <LinearLayout
                         android:id="@+id/manageUsersButton"
                         android:layout_width="match_parent"
@@ -634,34 +546,33 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="16dp"
                             android:layout_weight="1"
+                            android:fontFamily="sans-serif-medium"
                             android:text="@string/manage_users"
                             android:textColor="@color/black"
-                            android:textSize="16sp"
-                            android:fontFamily="sans-serif-medium" />
+                            android:textSize="16sp" />
 
                         <ImageView
                             android:layout_width="20dp"
                             android:layout_height="20dp"
+                            android:contentDescription="@string/chevron_icon"
                             android:src="@drawable/ic_chevron_right"
-                            app:tint="#D1D5DB"
-                            android:contentDescription="@string/chevron_icon" />
+                            app:tint="#D1D5DB" />
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
-
-            <!-- General Group -->
+            <!--  General Group  -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="28dp"
                 android:layout_marginStart="4dp"
+                android:layout_marginTop="28dp"
                 android:layout_marginBottom="12dp"
+                android:letterSpacing="0.1"
                 android:text="@string/general_group"
+                android:textAllCaps="true"
                 android:textColor="@color/dark_gray"
                 android:textSize="14sp"
-                android:textStyle="bold"
-                android:textAllCaps="true"
-                android:letterSpacing="0.1" />
+                android:textStyle="bold" />
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
@@ -675,8 +586,7 @@
                     android:layout_height="wrap_content"
                     android:background="@android:color/white"
                     android:orientation="vertical">
-
-                    <!-- Language & Region -->
+                    <!--  Language & Region  -->
                     <LinearLayout
                         android:id="@+id/languageRegionButton"
                         android:layout_width="match_parent"
@@ -698,26 +608,25 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="16dp"
                             android:layout_weight="1"
+                            android:fontFamily="sans-serif-medium"
                             android:text="@string/language_region"
                             android:textColor="@color/black"
-                            android:textSize="16sp"
-                            android:fontFamily="sans-serif-medium" />
+                            android:textSize="16sp" />
 
                         <ImageView
                             android:layout_width="20dp"
                             android:layout_height="20dp"
+                            android:contentDescription="@string/chevron_icon"
                             android:src="@drawable/ic_chevron_right"
-                            app:tint="#D1D5DB"
-                            android:contentDescription="@string/chevron_icon" />
+                            app:tint="#D1D5DB" />
                     </LinearLayout>
 
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
-                        android:background="#F3F4F6"
-                        android:layout_marginHorizontal="16dp" />
-
-                    <!-- Privacy & Security -->
+                        android:layout_marginHorizontal="16dp"
+                        android:background="#F3F4F6" />
+                    <!--  Privacy & Security  -->
                     <LinearLayout
                         android:id="@+id/privacySecurityButton"
                         android:layout_width="match_parent"
@@ -739,26 +648,25 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="16dp"
                             android:layout_weight="1"
+                            android:fontFamily="sans-serif-medium"
                             android:text="@string/privacy_security"
                             android:textColor="@color/black"
-                            android:textSize="16sp"
-                            android:fontFamily="sans-serif-medium" />
+                            android:textSize="16sp" />
 
                         <ImageView
                             android:layout_width="20dp"
                             android:layout_height="20dp"
+                            android:contentDescription="@string/chevron_icon"
                             android:src="@drawable/ic_chevron_right"
-                            app:tint="#D1D5DB"
-                            android:contentDescription="@string/chevron_icon" />
+                            app:tint="#D1D5DB" />
                     </LinearLayout>
 
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
-                        android:background="#F3F4F6"
-                        android:layout_marginHorizontal="16dp" />
-
-                    <!-- Help & Support -->
+                        android:layout_marginHorizontal="16dp"
+                        android:background="#F3F4F6" />
+                    <!--  Help & Support  -->
                     <LinearLayout
                         android:id="@+id/helpSupportButton"
                         android:layout_width="match_parent"
@@ -781,42 +689,40 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="16dp"
                             android:layout_weight="1"
+                            android:fontFamily="sans-serif-medium"
                             android:text="@string/help_support"
                             android:textColor="@color/black"
-                            android:textSize="16sp"
-                            android:fontFamily="sans-serif-medium" />
+                            android:textSize="16sp" />
 
                         <ImageView
                             android:layout_width="20dp"
                             android:layout_height="20dp"
+                            android:contentDescription="@string/chevron_icon"
                             android:src="@drawable/ic_chevron_right"
-                            app:tint="#D1D5DB"
-                            android:contentDescription="@string/chevron_icon" />
+                            app:tint="#D1D5DB" />
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
-
-            <!-- Logout Button -->
+            <!--  Logout Button  -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/logoutButton"
                 android:layout_width="match_parent"
                 android:layout_height="60dp"
                 android:layout_marginTop="32dp"
                 android:backgroundTint="@color/logout_red_bg"
-                app:icon="@drawable/lc_logout"
-                app:iconPadding="12dp"
-                app:iconTint="@color/logout_red"
-                app:cornerRadius="16dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
                 android:text="@string/log_out"
                 android:textAllCaps="false"
                 android:textColor="@color/logout_red"
                 android:textSize="16sp"
                 android:textStyle="bold"
+                app:cornerRadius="16dp"
                 app:elevation="2dp"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"/>
-
-            <!-- Version Info -->
+                app:icon="@drawable/lc_logout"
+                app:iconPadding="12dp"
+                app:iconTint="@color/logout_red" />
+            <!--  Version Info  -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -840,124 +746,117 @@
                     android:textColor="#9CA3AF"
                     android:textSize="12sp" />
             </LinearLayout>
-
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
-
-    <!-- Footer / Bottom Nav -->
+    <!--  Footer / Bottom Nav  -->
     <LinearLayout
         android:id="@+id/bottomNavContainer"
         android:layout_width="match_parent"
         android:layout_height="64dp"
         android:background="@color/dark_green"
-        android:orientation="horizontal"
-        android:gravity="center"
         android:baselineAligned="false"
+        android:gravity="center"
+        android:orientation="horizontal"
         app:layout_constraintBottom_toBottomOf="parent">
-
-        <!-- Home Button -->
+        <!--  Home Button  -->
         <LinearLayout
             android:id="@+id/homeButton"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:orientation="vertical"
+            android:background="?attr/selectableItemBackground"
             android:gravity="center"
-            android:background="?attr/selectableItemBackground">
+            android:orientation="vertical">
 
             <ImageView
                 android:layout_width="24dp"
                 android:layout_height="24dp"
-                android:src="@drawable/ic_home"
                 android:contentDescription="@string/home"
+                android:src="@drawable/ic_home"
                 app:tint="@color/white" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
                 android:text="@string/home"
                 android:textColor="@color/white"
-                android:textSize="11sp"
-                android:layout_marginTop="4dp" />
+                android:textSize="11sp" />
         </LinearLayout>
-
-        <!-- Analytics Button -->
+        <!--  Analytics Button  -->
         <LinearLayout
             android:id="@+id/analyticsButton"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:orientation="vertical"
+            android:background="?attr/selectableItemBackground"
             android:gravity="center"
-            android:background="?attr/selectableItemBackground">
+            android:orientation="vertical">
 
             <ImageView
                 android:layout_width="24dp"
                 android:layout_height="24dp"
-                android:src="@drawable/ic_chart"
                 android:contentDescription="@string/analytics"
+                android:src="@drawable/ic_chart"
                 app:tint="@color/white" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
                 android:text="@string/analytics"
                 android:textColor="@color/white"
-                android:textSize="11sp"
-                android:layout_marginTop="4dp" />
+                android:textSize="11sp" />
         </LinearLayout>
-
-        <!-- Schedule Button -->
+        <!--  Schedule Button  -->
         <LinearLayout
             android:id="@+id/scheduleButton"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:orientation="vertical"
+            android:background="?attr/selectableItemBackground"
             android:gravity="center"
-            android:background="?attr/selectableItemBackground">
+            android:orientation="vertical">
 
             <ImageView
                 android:layout_width="24dp"
                 android:layout_height="24dp"
-                android:src="@drawable/ic_schedule"
                 android:contentDescription="@string/schedule"
+                android:src="@drawable/ic_schedule"
                 app:tint="@color/white" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
                 android:text="@string/schedule"
                 android:textColor="@color/white"
-                android:textSize="11sp"
-                android:layout_marginTop="4dp" />
+                android:textSize="11sp" />
         </LinearLayout>
-
-        <!-- Profile Button -->
+        <!--  Profile Button  -->
         <LinearLayout
             android:id="@+id/profileButton"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:orientation="vertical"
+            android:background="?attr/selectableItemBackground"
             android:gravity="center"
-            android:background="?attr/selectableItemBackground">
+            android:orientation="vertical">
 
             <ImageView
                 android:layout_width="24dp"
                 android:layout_height="24dp"
-                android:src="@drawable/ic_profile"
                 android:contentDescription="@string/profile"
+                android:src="@drawable/ic_profile"
                 app:tint="@color/white" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
                 android:text="@string/profile"
                 android:textColor="@color/white"
-                android:textSize="11sp"
-                android:layout_marginTop="4dp" />
+                android:textSize="11sp" />
         </LinearLayout>
     </LinearLayout>
-
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -493,23 +493,23 @@ public class AnalyticsActivity extends AppCompatActivity {
         String ts        = new SimpleDateFormat("MM/dd/yyyy hh:mm a", Locale.getDefault()).format(new Date());
 
         String summary =
-                "📋  FARM ANALYTICS REPORT\n" +
+                "     FARM ANALYTICS REPORT\n" +
                         "Generated: " + ts + "\n\n" +
-                        "🥚  EGG PRODUCTION\n" +
-                        "   Total Month Eggs Collected : " + totalEggs + " eggs\n\n" +
-                        "💰  REVENUE\n" +
-                        "   Price per Egg        : " + currencyFormat.format(pricePerEgg) + "\n" +
-                        "   Egg Sales Revenue    : " + currencyFormat.format(revenue) + "\n\n" +
-                        "📦  INVENTORY VALUE\n" +
-                        "   Total Inventory Value: " + currencyFormat.format(totalInventoryValue) + "\n\n" +
-                        "📈  NET PROFIT\n" +
-                        "   Net Profit           : " + currencyFormat.format(profit) +
-                        (profit < 0 ? "  ⚠ Loss" : "  ✔ Profit") + "\n\n" +
-                        "🏆  PERFORMANCE\n" +
-                        "   " + perfTitle + "\n" +
-                        "   " + perfDesc + "\n\n" +
-                        "💡  AI RECOMMENDATION\n" +
-                        "   " + tip;
+                        " EGG PRODUCTION\n" +
+                        "Total Month Eggs Collected : " + totalEggs + " eggs\n\n" +
+                        " REVENUE\n" +
+                        "Price per Egg        : " + currencyFormat.format(pricePerEgg) + "\n" +
+                        "Egg Sales Revenue    : " + currencyFormat.format(revenue) + "\n\n" +
+                        " INVENTORY VALUE\n" +
+                        "Total Inventory Value: " + currencyFormat.format(totalInventoryValue) + "\n\n" +
+                        " NET PROFIT\n" +
+                        "Net Profit           : " + currencyFormat.format(profit) +
+                        (profit < 0 ? "  Loss" : "  Profit") + "\n\n" +
+                        " PERFORMANCE\n" +
+                        "" + perfTitle + "\n" +
+                        "" + perfDesc + "\n\n" +
+                        " AI RECOMMENDATION\n" +
+                        "" + tip;
 
         new AlertDialog.Builder(this)
                 .setTitle("Farm Analytics Report")
@@ -600,7 +600,7 @@ public class AnalyticsActivity extends AppCompatActivity {
             intent.setDataAndType(uri, "application/pdf");
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             startActivity(Intent.createChooser(intent, "Open PDF Report"));
-            Toast.makeText(this, "✅ PDF saved: " + filename, Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "PDF saved: " + filename, Toast.LENGTH_LONG).show();
 
         } catch (Exception e) {
             Toast.makeText(this, "PDF generation failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
