@@ -148,7 +148,7 @@ class DashboardActivity : AppCompatActivity() {
             for (alert in alerts) {
                 val message = alert["message"] as? String ?: continue
                 val type = alert["type"] as? String ?: "Inventory"
-                
+
                 val firestoreTs = alert["timestamp"]
                 val timestampStr = when (firestoreTs) {
                     is com.google.firebase.Timestamp -> sdf.format(firestoreTs.toDate())
@@ -156,7 +156,9 @@ class DashboardActivity : AppCompatActivity() {
                     else -> "Just now"
                 }
 
-                val existing = GlobalData.getAlerts().find { it.message == message && it.timestamp == timestampStr }
+                // Dedup by message only — timestamp strings can differ by seconds
+                // between devices and should not be used as part of the identity check.
+                val existing = GlobalData.getAlerts().find { it.message == message }
                 if (existing == null) {
                     GlobalData.addAlert(message, timestampStr, type)
                     newAlertAdded = true

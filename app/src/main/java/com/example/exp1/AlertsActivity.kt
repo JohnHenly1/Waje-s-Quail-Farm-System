@@ -31,8 +31,16 @@ class AlertsActivity : AppCompatActivity() {
     private lateinit var accountManager: AccountManager
     private lateinit var roleManager: RoleManager
     private var farmAlertsListener: com.google.firebase.firestore.ListenerRegistration? = null
-    
+
     private var activeFilter = "All"
+
+    companion object {
+        // Time-gate: integrity checks run at most once per hour across the whole process.
+        // FarmRepository.addAlert() uses deterministic doc IDs (idempotent .set()) as the
+        // real authoritative dedup — this gate just avoids unnecessary Firestore reads.
+        private var lastIntegrityCheckMs = 0L
+        private const val CHECK_INTERVAL_MS = 60 * 60 * 1000L // 1 hour
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -91,20 +99,28 @@ class AlertsActivity : AppCompatActivity() {
         setupFilters()
         updateAlertsList()
         NavigationHelper.setupBottomNavigation(this)
-        
-        // Data integrity checks - saving to Firestore for team visibility
-        checkMissedTasks()
-        checkInventoryStock()
-        checkEggCountLogs()
+
+        // Data integrity checks — run at most once per hour.
+        // FarmRepository.addAlert() uses deterministic doc IDs so even if this runs
+        // multiple times, the same alert just overwrites the same Firestore document.
+        val now = System.currentTimeMillis()
+        if (now - lastIntegrityCheckMs > CHECK_INTERVAL_MS) {
+            lastIntegrityCheckMs = now
+            checkMissedTasks()
+            checkInventoryStock()
+            // checkEggCountLogs() — Egg Count category removed
+        }
     }
 
     private fun setupFilters() {
         val filters = mapOf(
             "All" to findViewById<TextView>(R.id.filterAll),
             "Inventory" to findViewById<TextView>(R.id.filterInventory),
-            "Schedule" to findViewById<TextView>(R.id.filterSchedule),
-            "Egg Count" to findViewById<TextView>(R.id.filterEggCount)
+            "Schedule" to findViewById<TextView>(R.id.filterSchedule)
         )
+
+        // Hide the Egg Count filter tab
+        findViewById<TextView>(R.id.filterEggCount)?.visibility = View.GONE
 
         filters.forEach { (name, view) ->
             view?.setOnClickListener {
@@ -127,6 +143,8 @@ class AlertsActivity : AppCompatActivity() {
                 view?.setTypeface(null, android.graphics.Typeface.NORMAL)
             }
         }
+        // Keep Egg Count tab hidden regardless of selection
+        findViewById<TextView>(R.id.filterEggCount)?.visibility = View.GONE
     }
 
     // Tracker to prevent auto-alerts from reappearing on the same day once cleared
@@ -144,31 +162,30 @@ class AlertsActivity : AppCompatActivity() {
 
     private fun checkMissedTasks() {
         if (!accountManager.isScheduleEnabled()) return
-        
+
         val now = Calendar.getInstance()
-        val dayStamp = SimpleDateFormat("yyyy/MM/dd", Locale.getDefault()).format(now.time)
 
         FirebaseFirestore.getInstance().collection("farm_data")
             .document("shared").collection("tasks")
             .whereEqualTo("status", "Pending")
             .get()
             .addOnSuccessListener { snapshots ->
-                val existingAlerts = GlobalData.getAlerts()
                 for (doc in snapshots) {
-                    val year = doc.getLong("year")?.toInt() ?: 0
+                    val year  = doc.getLong("year")?.toInt()  ?: 0
                     val month = doc.getLong("month")?.toInt() ?: 0
-                    val day = doc.getLong("day")?.toInt() ?: 0
+                    val day   = doc.getLong("day")?.toInt()   ?: 0
                     val title = doc.getString("title") ?: "Task"
-                    
+
                     val taskDate = Calendar.getInstance()
                     taskDate.set(year, month, day, 23, 59)
-                    
+
                     if (taskDate.before(now)) {
                         val message = "Missed Task: $title was scheduled for ${day}/${month + 1}/${year}"
-                        val alreadyNotified = existingAlerts.any { it.message == message }
-                        
-                        if (!alreadyNotified && !wasAlreadyAlertedToday(message)) {
-                            // Save to Firestore so other users can see it
+                        // wasAlreadyAlertedToday uses a local SharedPrefs key per device
+                        // to prevent re-adding the same alert every time the screen opens.
+                        // This is the primary dedup gate; GlobalData.addAlert has a secondary
+                        // same-day dedup as a safety net.
+                        if (!wasAlreadyAlertedToday(message)) {
                             FarmRepository.addAlert(message, "Critical")
                             markAsAlertedToday(message)
                         }
@@ -179,21 +196,18 @@ class AlertsActivity : AppCompatActivity() {
 
     private fun checkInventoryStock() {
         if (!accountManager.isAlertsEnabled()) return
-        
+
         FirebaseFirestore.getInstance().collection("farm_data")
             .document("shared").collection("feed")
             .get()
             .addOnSuccessListener { snapshots ->
-                val dayStamp = SimpleDateFormat("yyyy/MM/dd", Locale.getDefault()).format(Date())
-                val existingAlerts = GlobalData.getAlerts()
-                
                 for (doc in snapshots) {
-                    val qty = doc.getLong("quantity") ?: 0L
+                    val qty  = doc.getLong("quantity") ?: 0L
                     val name = doc.getString("name") ?: "Item"
-                    
+
                     if (qty == 0L) {
                         val message = "Inventory Alert: $name is STOCK DEPLETED"
-                        if (existingAlerts.none { it.message == message && it.timestamp.startsWith(dayStamp) } && !wasAlreadyAlertedToday(message)) {
+                        if (!wasAlreadyAlertedToday(message)) {
                             FarmRepository.addAlert(message, "Critical")
                             markAsAlertedToday(message)
                         }
@@ -201,7 +215,7 @@ class AlertsActivity : AppCompatActivity() {
                         val status = doc.getString("status") ?: ""
                         if (status == "Low Stock" || status == "Medium") {
                             val message = "Inventory Alert: $name is currently $status"
-                            if (existingAlerts.none { it.message == message && it.timestamp.startsWith(dayStamp) } && !wasAlreadyAlertedToday(message)) {
+                            if (!wasAlreadyAlertedToday(message)) {
                                 FarmRepository.addAlert(message, "Inventory")
                                 markAsAlertedToday(message)
                             }
@@ -213,7 +227,7 @@ class AlertsActivity : AppCompatActivity() {
 
     private fun checkEggCountLogs() {
         if (!accountManager.isEggCountEnabled()) return
-        
+
         val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         FirebaseDatabase.getInstance().getReference("egg_collections").child(todayStr).get()
             .addOnSuccessListener { snapshot ->
@@ -221,7 +235,7 @@ class AlertsActivity : AppCompatActivity() {
                     val dayStamp = SimpleDateFormat("yyyy/MM/dd", Locale.getDefault()).format(Date())
                     val message = "Log Missing: No egg collection recorded for today yet."
                     val existingAlerts = GlobalData.getAlerts()
-                    
+
                     if (existingAlerts.none { it.message == message && it.timestamp.startsWith(dayStamp) } && !wasAlreadyAlertedToday(message)) {
                         FarmRepository.addAlert(message, "Egg Count")
                         markAsAlertedToday(message)
@@ -283,7 +297,7 @@ class AlertsActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        
+
         farmAlertsListener = FarmRepository.listenToAlerts { alerts ->
             val sdf = SimpleDateFormat("yyyy/MM/dd hh:mm a", Locale.getDefault())
             val mappedAlerts = alerts.map { alert ->
@@ -313,21 +327,20 @@ class AlertsActivity : AppCompatActivity() {
 
     private fun updateAlertsList() {
         val container = findViewById<LinearLayout>(R.id.alertsContainer) ?: return
-        
+
         container.removeAllViews()
         val inflater = LayoutInflater.from(this)
 
         val allAlerts = GlobalData.getAlerts()
-        
+
         // Filter logic updated to correctly handle category separation
         val alerts = if (activeFilter == "All") {
             allAlerts
         } else {
-            allAlerts.filter { 
+            allAlerts.filter {
                 when(activeFilter) {
                     "Inventory" -> it.type == "Inventory" || (it.type == "Critical" && it.message.contains("Inventory", true))
                     "Schedule" -> it.type == "Schedule" || (it.type == "Critical" && it.message.contains("Missed", true))
-                    "Egg Count" -> it.type == "System" || it.type == "Egg Count" || it.message.contains("Egg", true)
                     else -> true
                 }
             }
@@ -335,14 +348,14 @@ class AlertsActivity : AppCompatActivity() {
 
         // Proper date-based alignment/sorting for the alert list
         val sdf = SimpleDateFormat("yyyy/MM/dd hh:mm a", Locale.getDefault())
-        val sortedAlerts = alerts.sortedByDescending { 
+        val sortedAlerts = alerts.sortedByDescending {
             try { sdf.parse(it.timestamp) } catch (e: Exception) { Date(0) }
         }
 
         // Summary Cards - Count based on current filtered view and priority
         val urgentCount = sortedAlerts.count { it.type == "Critical" || it.message.contains("EMPTY", true) || it.message.contains("DEPLETED", true) }
         val generalCount = sortedAlerts.count { it.type != "Critical" && !it.message.contains("EMPTY", true) && !it.message.contains("DEPLETED", true) }
-        
+
         findViewById<TextView>(R.id.criticalCount)?.text = urgentCount.toString()
         findViewById<TextView>(R.id.warningCount)?.text = generalCount.toString()
         findViewById<TextView>(R.id.totalCount)?.text = sortedAlerts.size.toString()
@@ -359,7 +372,7 @@ class AlertsActivity : AppCompatActivity() {
             val slideUp = AnimationUtils.loadAnimation(this, R.anim.slide_up)
             for ((index, alert) in sortedAlerts.withIndex()) {
                 val itemView = inflater.inflate(R.layout.item_alert, container, false)
-                
+
                 val icon = itemView.findViewById<ImageView>(R.id.alertIcon)
                 val stripe = itemView.findViewById<View>(R.id.alertAccentStripe)
                 val categoryTv = itemView.findViewById<TextView>(R.id.alertCategory)
@@ -370,7 +383,7 @@ class AlertsActivity : AppCompatActivity() {
 
                 msgTv.text = alert.message
                 timeTv.text = getRelativeTime(alert.timestamp)
-                
+
                 // Enhanced descriptive UI configuration
                 when {
                     alert.type == "Egg Count" || alert.type == "System" || alert.message.contains("Egg", true) -> {
@@ -422,11 +435,6 @@ class AlertsActivity : AppCompatActivity() {
                 criticalLabel.text = "Overdue Tasks"
                 warningLabel.text = "Pending Today"
                 totalLabel.text = "Scheduled Duty"
-            }
-            "Egg Count" -> {
-                criticalLabel.text = "Missing Logs"
-                warningLabel.text = "Daily Logs"
-                totalLabel.text = "Prod. Updates"
             }
             else -> {
                 criticalLabel.text = "Urgent Issues"

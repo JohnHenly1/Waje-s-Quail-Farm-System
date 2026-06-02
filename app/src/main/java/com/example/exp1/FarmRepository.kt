@@ -95,9 +95,9 @@ object FarmRepository {
             "statusUpdatedAt" to FieldValue.serverTimestamp()
         )
         tasksCol.document(firestoreId).update(update)
-            .addOnSuccessListener { 
+            .addOnSuccessListener {
                 // Status updated in Firestore, Alerts will be handled by the listener in the apps
-                onDone?.invoke(null) 
+                onDone?.invoke(null)
             }
             .addOnFailureListener { e -> onDone?.invoke(e) }
     }
@@ -186,12 +186,24 @@ object FarmRepository {
     // -- Shared Alerts ----------------------------------------------------------------------------
 
     fun addAlert(message: String, type: String, onDone: ((Exception?) -> Unit)? = null) {
-        alertsCol.add(mapOf(
+        // DEDUP STRATEGY: Use a deterministic document ID derived from message + date.
+        // .set() with the same ID is idempotent — writing the same alert twice just
+        // overwrites the same Firestore document instead of creating a new one.
+        // This eliminates duplicates across all devices with no composite index needed
+        // and no race conditions from read-then-write (check-then-insert) patterns.
+        val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+            .format(java.util.Date())
+        // Build a stable doc ID: sanitize message to allowed Firestore ID chars
+        val safeMsg = message.replace(Regex("[^a-zA-Z0-9_-]"), "_").take(80)
+        val docId = "${today}_${safeMsg}"
+        alertsCol.document(docId).set(mapOf(
             "message"   to message,
             "type"      to type,
             "timestamp" to FieldValue.serverTimestamp(),
+            "dayKey"    to today,
             "isRead"    to false
-        )).addOnSuccessListener { onDone?.invoke(null) }
+        ), SetOptions.merge())
+            .addOnSuccessListener { onDone?.invoke(null) }
             .addOnFailureListener { e -> onDone?.invoke(e) }
     }
 

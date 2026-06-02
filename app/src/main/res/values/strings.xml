@@ -367,7 +367,7 @@
     <string name="days_icon">Days Icon</string>
     <string name="placeholder_dashes">--</string>
     <string name="chevron_icon">Chevron Icon</string>
-    <string name="admin_group_label">FARM USERS &amp; DATABASE MANAGEMENT</string>
+    <string name="admin_group_label">FARM ADMIN</string>
     <string name="user_access_list">User Access List</string>
     <string name="generate_invite_code">Generate Invite Code</string>
     <string name="manage_users">Manage Users</string>

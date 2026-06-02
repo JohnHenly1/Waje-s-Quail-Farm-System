@@ -28,27 +28,30 @@ object GlobalData {
     @Synchronized
     fun addAlert(message: String, timestamp: String, type: String = "Inventory") {
         val list = loadAlerts().toMutableList()
-        
-        // Prevent duplicates: same message on the same day (assuming YYYY/MM/DD prefix)
-        val dayStamp = if (timestamp.contains("/")) timestamp.substringBefore(" ") else ""
-        val isDuplicate = list.any { 
-            it.message == message && (if (dayStamp.isNotEmpty()) it.timestamp.startsWith(dayStamp) else it.timestamp == timestamp)
-        }
+
+        // Prevent duplicates: same message text is always a duplicate regardless of timestamp.
+        // Firestore is the source of truth; this local cache should never hold two entries
+        // with the same message.
+        val isDuplicate = list.any { it.message == message }
         if (isDuplicate) return
 
         list.add(0, AlertItem(message, timestamp, type))
-        
+
         // Keep last 100 alerts
         val trimmedList = if (list.size > 100) list.take(100) else list
         saveAlerts(trimmedList)
     }
 
     /**
-     * Replaces the current local alerts with a new list (useful for syncing with cloud)
+     * Replaces the current local alerts with a new list (useful for syncing with cloud).
+     * Deduplicates by message before saving so old Firestore duplicates (written before
+     * the deterministic-ID fix) do not appear multiple times in the UI.
      */
     @Synchronized
     fun syncWithCloud(cloudAlerts: List<AlertItem>) {
-        saveAlerts(cloudAlerts)
+        // Keep only the first occurrence of each unique message (list is newest-first)
+        val deduped = cloudAlerts.distinctBy { it.message }
+        saveAlerts(deduped)
     }
 
     @Synchronized

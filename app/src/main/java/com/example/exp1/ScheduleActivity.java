@@ -44,6 +44,8 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import com.example.exp1.FarmRepository;
+import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
@@ -289,44 +291,92 @@ public class ScheduleActivity extends AppCompatActivity {
                         Toast.makeText(this, getString(R.string.error_updating_status, e.getMessage()), Toast.LENGTH_SHORT).show());
     }
 
+    // ── Auth guard ──────────────────────────────────────────────────────────
+    // signInAnonymously() in WajeApplication is async. If the Activity opens
+    // before it completes, currentUser is still null and every Firestore write
+    // fails with PERMISSION_DENIED. This helper re-triggers sign-in right
+    // before any write and only runs the action once auth is confirmed.
+    private void ensureAuthThenRun(Runnable action) {
+        com.google.firebase.auth.FirebaseAuth auth = com.google.firebase.auth.FirebaseAuth.getInstance();
+        if (auth.getCurrentUser() != null) {
+            action.run();
+        } else {
+            auth.signInAnonymously()
+                    .addOnSuccessListener(result -> action.run())
+                    .addOnFailureListener(e ->
+                            Toast.makeText(this,
+                                    "Auth error – please check your connection and try again.",
+                                    Toast.LENGTH_LONG).show());
+        }
+    }
+    // ───────────────────────────────────────────────────────────────────────
+
     private void deleteTaskFromFirestore(Task task) {
         if (task.firestoreId == null) return;
-        db.collection("farm_data").document("shared")
-                .collection("tasks").document(task.firestoreId)
-                .delete()
-                .addOnFailureListener(e ->
-                        Toast.makeText(this, getString(R.string.error_deleting, e.getMessage()), Toast.LENGTH_SHORT).show());
+        cancelNotification(task); // cancel alarm & dismiss any live notification
+        ensureAuthThenRun(() ->
+                db.collection("farm_data").document("shared")
+                        .collection("tasks").document(task.firestoreId)
+                        .delete()
+                        .addOnFailureListener(e ->
+                                Toast.makeText(this, getString(R.string.error_deleting, e.getMessage()), Toast.LENGTH_SHORT).show())
+        );
     }
 
     private void deleteRecurringSeriesFromFirestore(Task task) {
         if (task.recurrenceGroupId == null) { deleteTaskFromFirestore(task); return; }
-        db.collection("farm_data").document("shared").collection("tasks")
-                .whereEqualTo("recurrenceGroupId", task.recurrenceGroupId)
-                .get()
-                .addOnSuccessListener(querySnapshot -> {
-                    com.google.firebase.firestore.WriteBatch batch = db.batch();
-                    for (QueryDocumentSnapshot doc : querySnapshot) batch.delete(doc.getReference());
-                    batch.commit()
-                            .addOnSuccessListener(unused ->
-                                    Toast.makeText(this, getString(R.string.all_recurring_deleted), Toast.LENGTH_SHORT).show())
-                            .addOnFailureListener(e ->
-                                    Toast.makeText(this, getString(R.string.error_deleting, e.getMessage()), Toast.LENGTH_SHORT).show());
-                });
+        ensureAuthThenRun(() ->
+                db.collection("farm_data").document("shared").collection("tasks")
+                        .whereEqualTo("recurrenceGroupId", task.recurrenceGroupId)
+                        .get()
+                        .addOnSuccessListener(querySnapshot -> {
+                            com.google.firebase.firestore.WriteBatch batch = db.batch();
+                            for (QueryDocumentSnapshot doc : querySnapshot) {
+                                // Reconstruct a minimal Task so we can cancel each alarm.
+                                try {
+                                    Task t = new Task(
+                                            doc.getId(),
+                                            doc.getString("title"),
+                                            doc.getString("category"),
+                                            doc.getString("time"),
+                                            doc.getString("status"),
+                                            doc.getLong("year") != null  ? doc.getLong("year").intValue()  : 0,
+                                            doc.getLong("month") != null ? doc.getLong("month").intValue() : 0,
+                                            doc.getLong("day") != null   ? doc.getLong("day").intValue()   : 0,
+                                            doc.getString("recurrence"),
+                                            doc.getString("recurrenceGroupId")
+                                    );
+                                    cancelNotification(t);
+                                } catch (Exception ignored) { }
+                                batch.delete(doc.getReference());
+                            }
+                            batch.commit()
+                                    .addOnSuccessListener(unused ->
+                                            Toast.makeText(this, getString(R.string.all_recurring_deleted), Toast.LENGTH_SHORT).show())
+                                    .addOnFailureListener(e ->
+                                            Toast.makeText(this, getString(R.string.error_deleting, e.getMessage()), Toast.LENGTH_SHORT).show());
+                        })
+        );
     }
 
     private void bulkDeleteFromFirestore(List<Task> tasksToDelete) {
-        com.google.firebase.firestore.WriteBatch batch = db.batch();
         for (Task task : tasksToDelete) {
-            if (task.firestoreId != null) {
-                batch.delete(db.collection("farm_data").document("shared")
-                        .collection("tasks").document(task.firestoreId));
-            }
+            cancelNotification(task); // cancel alarm & dismiss any live notification
         }
-        batch.commit()
-                .addOnSuccessListener(unused ->
-                        Toast.makeText(this, getString(R.string.selected_schedules_deleted), Toast.LENGTH_SHORT).show())
-                .addOnFailureListener(e ->
-                        Toast.makeText(this, getString(R.string.error_deleting_tasks, e.getMessage()), Toast.LENGTH_SHORT).show());
+        ensureAuthThenRun(() -> {
+            com.google.firebase.firestore.WriteBatch batch = db.batch();
+            for (Task task : tasksToDelete) {
+                if (task.firestoreId != null) {
+                    batch.delete(db.collection("farm_data").document("shared")
+                            .collection("tasks").document(task.firestoreId));
+                }
+            }
+            batch.commit()
+                    .addOnSuccessListener(unused ->
+                            Toast.makeText(this, getString(R.string.selected_schedules_deleted), Toast.LENGTH_SHORT).show())
+                    .addOnFailureListener(e ->
+                            Toast.makeText(this, getString(R.string.error_deleting_tasks, e.getMessage()), Toast.LENGTH_SHORT).show());
+        });
     }
 
     private void showAddScheduleDialog() {
@@ -397,13 +447,13 @@ public class ScheduleActivity extends AppCompatActivity {
                 } else txtPatternSuggestion.setVisibility(View.GONE);
 
                 String[] daysHeaders = {
-                    getString(R.string.Sunday).substring(0, 1),
-                    getString(R.string.Monday).substring(0, 1),
-                    getString(R.string.Tuesday).substring(0, 1),
-                    getString(R.string.Wednesday).substring(0, 1),
-                    getString(R.string.Thursday).substring(0, 2),
-                    getString(R.string.Friday).substring(0, 1),
-                    getString(R.string.Saturday).substring(0, 1)
+                        getString(R.string.Sunday).substring(0, 1),
+                        getString(R.string.Monday).substring(0, 1),
+                        getString(R.string.Tuesday).substring(0, 1),
+                        getString(R.string.Wednesday).substring(0, 1),
+                        getString(R.string.Thursday).substring(0, 2),
+                        getString(R.string.Friday).substring(0, 1),
+                        getString(R.string.Saturday).substring(0, 1)
                 };
                 for (String d : daysHeaders)
                     calendarGrid.addView(makeHeaderCell(d));
@@ -503,23 +553,23 @@ public class ScheduleActivity extends AppCompatActivity {
             TextView textStartDate = yearDialogView.findViewById(R.id.textStartDate);
             TextView textEndDate = yearDialogView.findViewById(R.id.textEndDate);
             RadioGroup rgFilter = yearDialogView.findViewById(R.id.rgYearFilter);
-            
+
             final Calendar startCal = Calendar.getInstance();
             final Calendar endCal = Calendar.getInstance();
             endCal.set(Calendar.MONTH, Calendar.DECEMBER);
             endCal.set(Calendar.DAY_OF_MONTH, 31);
-            
+
             SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
             textStartDate.setText(df.format(startCal.getTime()));
             textEndDate.setText(df.format(endCal.getTime()));
-            
+
             textStartDate.setOnClickListener(vStart -> {
                 new DatePickerDialog(this, (view, year, month, day) -> {
                     startCal.set(year, month, day);
                     textStartDate.setText(df.format(startCal.getTime()));
                 }, startCal.get(Calendar.YEAR), startCal.get(Calendar.MONTH), startCal.get(Calendar.DAY_OF_MONTH)).show();
             });
-            
+
             textEndDate.setOnClickListener(vEnd -> {
                 new DatePickerDialog(this, (view, year, month, day) -> {
                     endCal.set(year, month, day);
@@ -541,7 +591,7 @@ public class ScheduleActivity extends AppCompatActivity {
 
                             Calendar cal = (Calendar) startCal.clone();
                             cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0);
-                            
+
                             while (!cal.after(endCal)) {
                                 int dow = cal.get(Calendar.DAY_OF_WEEK);
                                 boolean match = true;
@@ -625,46 +675,41 @@ public class ScheduleActivity extends AppCompatActivity {
                         final int[] completedBatches = {0};
                         int numBatches = (totalTasks + batchSize - 1) / batchSize;
 
-                        int notificationLimit = 50;
-                        int notificationsCreated = 0;
+                        ensureAuthThenRun(() -> {
+                            for (int i = 0; i < totalTasks; i += batchSize) {
+                                com.google.firebase.firestore.WriteBatch batch = db.batch();
+                                int end = Math.min(i + batchSize, totalTasks);
 
-                        for (int i = 0; i < totalTasks; i += batchSize) {
-                            com.google.firebase.firestore.WriteBatch batch = db.batch();
-                            int end = Math.min(i + batchSize, totalTasks);
+                                for (int j = i; j < end; j++) {
+                                    Long time = selectedDates.get(j);
+                                    Calendar cal = Calendar.getInstance();
+                                    cal.setTimeInMillis(time);
 
-                            for (int j = i; j < end; j++) {
-                                Long time = selectedDates.get(j);
-                                Calendar cal = Calendar.getInstance();
-                                cal.setTimeInMillis(time);
-                                
-                                DocumentReference ref = db.collection("farm_data").document("shared")
-                                        .collection("tasks").document();
-                                        
-                                Task t = new Task(ref.getId(), title, category, selectedTime[0], "Pending",
-                                        cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH),
-                                        selectedRecurrence[0], groupId);
-                                t.workWindowMinutes = window;
+                                    DocumentReference ref = db.collection("farm_data").document("shared")
+                                            .collection("tasks").document();
 
-                                batch.set(ref, buildTaskMap(t));
+                                    Task t = new Task(ref.getId(), title, category, selectedTime[0], "Pending",
+                                            cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH),
+                                            selectedRecurrence[0], groupId);
+                                    t.workWindowMinutes = window;
 
-                                if (notificationsCreated < notificationLimit) {
+                                    batch.set(ref, buildTaskMap(t));
                                     scheduleNotification(t, selHour[0], selMinute[0]);
-                                    notificationsCreated++;
                                 }
-                            }
 
-                            batch.commit().addOnCompleteListener(taskResult -> {
-                                completedBatches[0]++;
-                                if (completedBatches[0] >= numBatches) {
+                                batch.commit().addOnCompleteListener(taskResult -> {
+                                    completedBatches[0]++;
+                                    if (completedBatches[0] >= numBatches) {
+                                        progress.dismiss();
+                                        Toast.makeText(this, getString(R.string.tasks_scheduled, totalTasks), Toast.LENGTH_SHORT).show();
+                                        dialog.dismiss();
+                                    }
+                                }).addOnFailureListener(e -> {
                                     progress.dismiss();
-                                    Toast.makeText(this, getString(R.string.tasks_scheduled, totalTasks), Toast.LENGTH_SHORT).show();
-                                    dialog.dismiss();
-                                }
-                            }).addOnFailureListener(e -> {
-                                progress.dismiss();
-                                Toast.makeText(this, getString(R.string.save_failed, e.getMessage()), Toast.LENGTH_LONG).show();
-                            });
-                        }
+                                    Toast.makeText(this, getString(R.string.save_failed, e.getMessage()), Toast.LENGTH_LONG).show();
+                                });
+                            }
+                        });
                     })
                     .setNegativeButton(getString(R.string.back), null)
                     .show();
@@ -984,7 +1029,7 @@ public class ScheduleActivity extends AppCompatActivity {
             timePart.setTime(date);
             taskCal.set(task.year, task.month, task.day, timePart.get(Calendar.HOUR_OF_DAY), timePart.get(Calendar.MINUTE), 0);
             taskCal.set(Calendar.MILLISECOND, 0);
-            
+
             taskCal.add(Calendar.MINUTE, task.workWindowMinutes + task.extensionMinutes);
             return new SimpleDateFormat("hh:mm a", Locale.getDefault()).format(taskCal.getTime());
         } catch (ParseException e) {
@@ -1018,11 +1063,12 @@ public class ScheduleActivity extends AppCompatActivity {
     private void showStatusUpdateDialog(Task task) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Update Task Status");
-        
+
         String[] options = {"Mark as Done", "Request 30min Extension"};
         builder.setItems(options, (dialog, which) -> {
             if (which == 0) {
                 task.status = getString(R.string.status_done);
+                cancelNotification(task); // alarm no longer needed once task is done
                 updateTaskStatus(task);
                 Toast.makeText(this, "Task completed!", Toast.LENGTH_SHORT).show();
             } else {
@@ -1168,20 +1214,67 @@ public class ScheduleActivity extends AppCompatActivity {
         calendar.set(Calendar.SECOND, 0);
         calendar.set(Calendar.MILLISECOND, 0);
         if (calendar.before(Calendar.getInstance())) return;
-        
+
         Intent intent = new Intent(this, TaskAlarmReceiver.class);
         intent.putExtra("taskTitle", task.title);
         intent.putExtra("taskCategory", task.category);
         intent.putExtra("taskId", task.firestoreId);
-        
+
         int rc = (task.title + task.year + task.month + task.day + hour + minute).hashCode();
         PendingIntent pi = PendingIntent.getBroadcast(this, rc, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (am.canScheduleExactAlarms()) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, calendar.getTimeInMillis(), pi);
             else am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, calendar.getTimeInMillis(), pi);
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, calendar.getTimeInMillis(), pi);
         else am.setExact(AlarmManager.RTC_WAKEUP, calendar.getTimeInMillis(), pi);
+    }
+
+    /**
+     * Cancel the AlarmManager alarm and dismiss any posted notification for a task.
+     * Must be called whenever a task is deleted or marked Done so the user never
+     * receives a reminder for a task that no longer needs action.
+     */
+    private void cancelNotification(Task task) {
+        AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+        if (am == null) return;
+
+        // Re-derive the hour/minute from the stored time string so the request
+        // code matches exactly what was used in scheduleNotification().
+        int hour = 0, minute = 0;
+        try {
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault());
+            java.util.Date d = sdf.parse(task.time.trim());
+            if (d != null) {
+                Calendar tmp = Calendar.getInstance();
+                tmp.setTime(d);
+                hour   = tmp.get(Calendar.HOUR_OF_DAY);
+                minute = tmp.get(Calendar.MINUTE);
+            }
+        } catch (Exception ignored) { }
+
+        int rc = (task.title + task.year + task.month + task.day + hour + minute).hashCode();
+        Intent intent = new Intent(this, TaskAlarmReceiver.class);
+        PendingIntent pi = PendingIntent.getBroadcast(this, rc, intent,
+                PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE);
+        if (pi != null) {
+            am.cancel(pi);
+            pi.cancel();
+        }
+
+        // Also dismiss the notification if it is already showing.
+        // IMPORTANT: notifId must match what TaskAlarmReceiver.showNotification() used.
+        // TaskAlarmReceiver uses taskId.hashCode() when firestoreId is available,
+        // and falls back to (title+category).hashCode() only for legacy alarms.
+        // We cancel both IDs to cover both cases.
+        android.app.NotificationManager nm =
+                (android.app.NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (nm != null) {
+            if (task.firestoreId != null && !task.firestoreId.isEmpty()) {
+                nm.cancel(task.firestoreId.hashCode()); // matches TaskAlarmReceiver primary ID
+            }
+            nm.cancel((task.title + task.category).hashCode()); // legacy fallback
+        }
     }
 
     private TextView makeHeaderCell(String label) {
@@ -1258,63 +1351,74 @@ public class ScheduleActivity extends AppCompatActivity {
             final PendingResult result = goAsync();
             // Check if task still exists and is not done before notifying
             FirebaseFirestore.getInstance().collection("farm_data")
-                .document("shared").collection("tasks").document(taskId)
-                .get()
-                .addOnCompleteListener(task -> {
-                    try {
-                        if (task.isSuccessful() && task.getResult() != null && task.getResult().exists()) {
-                            String status = task.getResult().getString("status");
-                            if (!"Done".equals(status)) {
-                                showNotification(context, intent);
+                    .document("shared").collection("tasks").document(taskId)
+                    .get()
+                    .addOnCompleteListener(task -> {
+                        try {
+                            if (task.isSuccessful() && task.getResult() != null && task.getResult().exists()) {
+                                String status = task.getResult().getString("status");
+                                if (!"Done".equals(status)) {
+                                    showNotification(context, intent);
+                                }
                             }
+                        } finally {
+                            result.finish();
                         }
-                    } finally {
-                        result.finish();
-                    }
-                });
+                    });
         }
-        
+
         private void showNotification(Context context, Intent intent) {
             String title = intent.getStringExtra("taskTitle");
             String category = intent.getStringExtra("taskCategory");
+            String taskId  = intent.getStringExtra("taskId");
             createChannel(context);
-            
+
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd hh:mm a", Locale.getDefault());
             String timestamp = sdf.format(new Date());
             try {
                 AccountManager accountManager = new AccountManager(context);
                 if (!accountManager.isScheduleEnabled()) return;
+                String alertMsg = context.getString(R.string.task_reminder_title, title) + " (" + category + ")";
                 if (accountManager.isGlobalDataEnabled()) {
-                    GlobalData.addAlert(context.getString(R.string.task_reminder_title, title) + " (" + category + ")", timestamp, "System");
+                    // Write to Firestore via FarmRepository so the alert is shared across
+                    // all devices and deduplicated by deterministic document ID.
+                    // Also update local GlobalData for immediate UI refresh.
+                    FarmRepository.INSTANCE.addAlert(alertMsg, "Schedule", null);
+                    GlobalData.addAlert(alertMsg, timestamp, "Schedule");
                 }
             } catch (Exception e) { e.printStackTrace(); }
-            
+
             Intent alertIntent = new Intent(context, MainActivity.class);
             alertIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             PendingIntent pi = PendingIntent.getActivity(context, 0, alertIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-            
+
             NotificationCompat.Builder builder = new NotificationCompat.Builder(context, "task_reminder_channel")
-                .setSmallIcon(R.drawable.ic_notifications)
-                .setContentTitle(context.getString(R.string.task_reminder_title, title))
-                .setContentText(context.getString(R.string.task_reminder_msg, category))
-                .setPriority(NotificationCompat.PRIORITY_MAX)
-                .setDefaults(NotificationCompat.DEFAULT_ALL)
-                .setContentIntent(pi)
-                .setAutoCancel(true)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
-                
+                    .setSmallIcon(R.drawable.ic_notifications)
+                    .setContentTitle(context.getString(R.string.task_reminder_title, title))
+                    .setContentText(context.getString(R.string.task_reminder_msg, category))
+                    .setPriority(NotificationCompat.PRIORITY_MAX)
+                    .setDefaults(NotificationCompat.DEFAULT_ALL)
+                    .setContentIntent(pi)
+                    .setAutoCancel(true)
+                    .setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
+
             try {
                 NotificationManagerCompat nm = NotificationManagerCompat.from(context);
-                int notificationId = (title + category).hashCode();
+                // Use taskId when available so each task gets its own notification slot.
+                // Fall back to title+category hash only for legacy alarms that carry no ID.
+                taskId = intent.getStringExtra("taskId");
+                int notificationId = (taskId != null && !taskId.isEmpty())
+                        ? taskId.hashCode()
+                        : (title + category).hashCode();
                 nm.notify(notificationId, builder.build());
             } catch (SecurityException e) { e.printStackTrace(); }
         }
-        
+
         private static void createChannel(Context context) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 NotificationChannel channel = new NotificationChannel("task_reminder_channel", "Task Reminders", NotificationManager.IMPORTANCE_HIGH);
                 channel.setDescription("Notifications for farm tasks");
-                channel.enableLights(true); 
+                channel.enableLights(true);
                 channel.enableVibration(true);
                 channel.setLockscreenVisibility(NotificationCompat.VISIBILITY_PUBLIC);
                 NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
