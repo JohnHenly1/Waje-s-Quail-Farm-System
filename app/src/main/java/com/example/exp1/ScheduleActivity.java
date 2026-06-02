@@ -49,7 +49,6 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
-import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.text.ParseException;
@@ -225,7 +224,6 @@ public class ScheduleActivity extends AppCompatActivity {
         tasksListener = db.collection("farm_data")
                 .document("shared")
                 .collection("tasks")
-                .orderBy("createdAt", Query.Direction.DESCENDING)
                 .addSnapshotListener((snapshots, e) -> {
                     if (e != null) {
                         Toast.makeText(this, getString(R.string.failed_to_load_tasks, e.getMessage()), Toast.LENGTH_SHORT).show();
@@ -1068,7 +1066,15 @@ public class ScheduleActivity extends AppCompatActivity {
         builder.setItems(options, (dialog, which) -> {
             if (which == 0) {
                 task.status = getString(R.string.status_done);
-                cancelNotification(task); // alarm no longer needed once task is done
+                cancelNotification(task); // cancel alarm & dismiss live notification
+
+                // Remove all related alerts from notification history (Firestore + local cache).
+                // This covers:
+                //   "Task Reminder: <title> (<category>)" — from TaskAlarmReceiver
+                //   "Missed Task: <title> was scheduled for..." — from checkMissedTasks
+                FarmRepository.INSTANCE.deleteAlertByMessage(task.title, null);
+                GlobalData.removeAlertsContaining(task.title);
+
                 updateTaskStatus(task);
                 Toast.makeText(this, "Task completed!", Toast.LENGTH_SHORT).show();
             } else {
@@ -1349,22 +1355,41 @@ public class ScheduleActivity extends AppCompatActivity {
             }
 
             final PendingResult result = goAsync();
-            // Check if task still exists and is not done before notifying
-            FirebaseFirestore.getInstance().collection("farm_data")
-                    .document("shared").collection("tasks").document(taskId)
-                    .get()
-                    .addOnCompleteListener(task -> {
-                        try {
-                            if (task.isSuccessful() && task.getResult() != null && task.getResult().exists()) {
-                                String status = task.getResult().getString("status");
-                                if (!"Done".equals(status)) {
-                                    showNotification(context, intent);
+            // Ensure anonymous auth before Firestore read — the auth may not be ready
+            // at alarm fire time (especially after device reboot).
+            com.google.firebase.auth.FirebaseAuth auth =
+                    com.google.firebase.auth.FirebaseAuth.getInstance();
+            Runnable checkAndNotify = () ->
+                    FirebaseFirestore.getInstance().collection("farm_data")
+                            .document("shared").collection("tasks").document(taskId)
+                            .get()
+                            .addOnCompleteListener(task -> {
+                                try {
+                                    if (task.isSuccessful() && task.getResult() != null && task.getResult().exists()) {
+                                        String status = task.getResult().getString("status");
+                                        if (!"Done".equals(status)) {
+                                            showNotification(context, intent);
+                                        }
+                                    } else {
+                                        // Task deleted or read failed — still show notification
+                                        // so the user isn't silently skipped
+                                        showNotification(context, intent);
+                                    }
+                                } finally {
+                                    result.finish();
                                 }
-                            }
-                        } finally {
+                            });
+            if (auth.getCurrentUser() != null) {
+                checkAndNotify.run();
+            } else {
+                auth.signInAnonymously()
+                        .addOnSuccessListener(r -> checkAndNotify.run())
+                        .addOnFailureListener(e -> {
+                            // Auth failed — still show notification as fallback
+                            showNotification(context, intent);
                             result.finish();
-                        }
-                    });
+                        });
+            }
         }
 
         private void showNotification(Context context, Intent intent) {
@@ -1404,9 +1429,7 @@ public class ScheduleActivity extends AppCompatActivity {
 
             try {
                 NotificationManagerCompat nm = NotificationManagerCompat.from(context);
-                // Use taskId when available so each task gets its own notification slot.
-                // Fall back to title+category hash only for legacy alarms that carry no ID.
-                taskId = intent.getStringExtra("taskId");
+                // taskId already extracted at top of showNotification()
                 int notificationId = (taskId != null && !taskId.isEmpty())
                         ? taskId.hashCode()
                         : (title + category).hashCode();

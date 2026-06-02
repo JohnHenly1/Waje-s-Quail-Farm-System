@@ -35,11 +35,10 @@ class AlertsActivity : AppCompatActivity() {
     private var activeFilter = "All"
 
     companion object {
-        // Time-gate: integrity checks run at most once per hour across the whole process.
-        // FarmRepository.addAlert() uses deterministic doc IDs (idempotent .set()) as the
-        // real authoritative dedup — this gate just avoids unnecessary Firestore reads.
-        private var lastIntegrityCheckMs = 0L
-        private const val CHECK_INTERVAL_MS = 60 * 60 * 1000L // 1 hour
+        // Per-session flag: run integrity checks only once per app launch, not on every
+        // screen open. Firestore-side dedup in FarmRepository.addAlert() is the real
+        // guard; this just avoids unnecessary network queries on repeated visits.
+        private var integrityChecksRanThisSession = false
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -100,12 +99,11 @@ class AlertsActivity : AppCompatActivity() {
         updateAlertsList()
         NavigationHelper.setupBottomNavigation(this)
 
-        // Data integrity checks — run at most once per hour.
-        // FarmRepository.addAlert() uses deterministic doc IDs so even if this runs
-        // multiple times, the same alert just overwrites the same Firestore document.
-        val now = System.currentTimeMillis()
-        if (now - lastIntegrityCheckMs > CHECK_INTERVAL_MS) {
-            lastIntegrityCheckMs = now
+        // Data integrity checks — guarded by session flag so they only run once
+        // per app launch. FarmRepository.addAlert() also does Firestore-side dedup
+        // as the authoritative guard against cross-device duplicates.
+        if (!integrityChecksRanThisSession) {
+            integrityChecksRanThisSession = true
             checkMissedTasks()
             checkInventoryStock()
             // checkEggCountLogs() — Egg Count category removed
@@ -438,7 +436,7 @@ class AlertsActivity : AppCompatActivity() {
             }
             else -> {
                 criticalLabel.text = "Urgent Issues"
-                warningLabel.text = "General Alerts"
+                warningLabel.text = "Alerts"
                 totalLabel.text = "All Notifications"
             }
         }

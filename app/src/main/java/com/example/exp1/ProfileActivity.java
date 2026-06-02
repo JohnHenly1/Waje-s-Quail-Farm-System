@@ -1,21 +1,12 @@
 package com.example.exp1;
 
-import android.Manifest;
 import android.content.Intent;
 import android.app.DatePickerDialog;
-import android.content.pm.PackageManager;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.provider.MediaStore;
 
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.PickVisualMediaRequest;
-import androidx.activity.result.contract.ActivityResultContracts;
-import androidx.core.content.ContextCompat;
-import androidx.core.content.FileProvider;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.TypedValue;
@@ -39,6 +30,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.appcompat.widget.SwitchCompat;
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.os.LocaleListCompat;
 import androidx.core.view.ViewCompat;
@@ -46,15 +38,11 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.bumptech.glide.Glide;
 import com.google.android.material.textfield.TextInputLayout;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Source;
-import com.google.firebase.storage.FirebaseStorage;
-import com.google.firebase.storage.StorageReference;
-import com.google.firebase.storage.UploadTask;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -66,7 +54,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
 import java.text.SimpleDateFormat;
-import java.io.File;
 
 public class ProfileActivity extends AppCompatActivity {
     private CameraHelper cameraHelper;
@@ -80,78 +67,18 @@ public class ProfileActivity extends AppCompatActivity {
     private TextView userEmailTv;
     private TextView userRoleTv;
     private TextView profileInitialTv;
-    private ImageView profileImageView;
+
 
     private String userRole = "staff";
     private String currentEmail = "";
     private final Handler handler = new Handler(Looper.getMainLooper());
 
-    // Profile picture editing
-    private AlertDialog profilePicDialog;
-    private Uri cameraImageUri;
-    private ActivityResultLauncher<Intent> galleryLauncher;
-    private ActivityResultLauncher<Uri> cameraLauncher;
-    // Modern photo picker (API 33+)
-    private ActivityResultLauncher<PickVisualMediaRequest> photoPickerLauncher;
-    // Permission launcher
-    private ActivityResultLauncher<String> mediaPermissionLauncher;
 
-    // Firebase Storage bucket URL (explicit to avoid "object does not exist" errors)
-    private static final String STORAGE_BUCKET = "gs://exp1-cff54.firebasestorage.app";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
-
-        // ── Modern Photo Picker (Android 13+ / API 33+) ────────────────────
-        photoPickerLauncher = registerForActivityResult(
-                new ActivityResultContracts.PickVisualMedia(),
-                uri -> {
-                    if (uri != null) {
-                        uploadProfilePicture(uri);
-                    }
-                }
-        );
-
-        // ── Legacy gallery launcher (Android 12 and below) ─────────────────
-        galleryLauncher = registerForActivityResult(
-                new ActivityResultContracts.StartActivityForResult(),
-                result -> {
-                    if (result.getResultCode() == RESULT_OK && result.getData() != null) {
-                        Uri imageUri = result.getData().getData();
-                        if (imageUri != null) {
-                            uploadProfilePicture(imageUri);
-                        }
-                    }
-                }
-        );
-
-        // ── Camera launcher ────────────────────────────────────────────────
-        cameraLauncher = registerForActivityResult(
-                new ActivityResultContracts.TakePicture(),
-                success -> {
-                    if (success && cameraImageUri != null) {
-                        uploadProfilePicture(cameraImageUri);
-                    } else if (!success) {
-                        Toast.makeText(this, "Camera capture cancelled.", Toast.LENGTH_SHORT).show();
-                    }
-                }
-        );
-
-        // ── Runtime media-permission launcher ──────────────────────────────
-        mediaPermissionLauncher = registerForActivityResult(
-                new ActivityResultContracts.RequestPermission(),
-                granted -> {
-                    if (granted) {
-                        openGallery();
-                    } else {
-                        Toast.makeText(this,
-                                "Storage permission is required to select a photo.",
-                                Toast.LENGTH_LONG).show();
-                    }
-                }
-        );
 
         cameraHelper = new CameraHelper(this, (uri, results) -> {
             int gradeA = 0, gradeB = 0, gradeC = 0;
@@ -184,7 +111,6 @@ public class ProfileActivity extends AppCompatActivity {
         userEmailTv      = findViewById(R.id.userEmail);
         userRoleTv       = findViewById(R.id.userRole);
         profileInitialTv = findViewById(R.id.profileInitial);
-        profileImageView = findViewById(R.id.profileImage);
 
         if (userRoleTv != null) {
             String roleDisplayName = RoleManager.Companion.displayName(userRole != null ? userRole : "staff");
@@ -203,11 +129,6 @@ public class ProfileActivity extends AppCompatActivity {
             fetchUserData();
             loadFirestoreData();
         });
-
-        View editProfileButton = findViewById(R.id.editProfileButton);
-        if (editProfileButton != null) {
-            editProfileButton.setOnClickListener(v -> showEditNameDialog());
-        }
 
         View accountSettingsButton = findViewById(R.id.accountSettingsButton);
         if (accountSettingsButton != null) {
@@ -330,7 +251,6 @@ public class ProfileActivity extends AppCompatActivity {
                 .addOnSuccessListener(doc -> {
                     if (doc.exists()) {
                         String name = doc.getString("name");
-                        String photoUrl = doc.getString("profilePic");
                         String role = doc.getString("role");
 
                         if (name != null) {
@@ -343,14 +263,7 @@ public class ProfileActivity extends AppCompatActivity {
                             userRoleTv.setText(getString(R.string.role_label, RoleManager.Companion.displayName(role)));
                         }
 
-                        if (photoUrl != null && !photoUrl.isEmpty()) {
-                            profileInitialTv.setVisibility(View.GONE);
-                            profileImageView.setVisibility(View.VISIBLE);
-                            Glide.with(this).load(photoUrl).circleCrop().into(profileImageView);
-                        } else {
-                            profileImageView.setVisibility(View.GONE);
-                            profileInitialTv.setVisibility(View.VISIBLE);
-                        }
+
                     }
                 })
                 .addOnFailureListener(e ->
@@ -379,43 +292,6 @@ public class ProfileActivity extends AppCompatActivity {
                         getString(R.string.error_loading_farm_data), Toast.LENGTH_SHORT).show());
             }
         });
-    }
-
-    // ── Edit Name ──────────────────────────────────────────────────────────────
-
-    private void showEditNameDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle(getString(R.string.edit_name));
-
-        final EditText input = new EditText(this);
-        input.setText(userNameTv.getText().toString());
-        input.setPadding(48, 24, 48, 24);
-        builder.setView(input);
-
-        builder.setPositiveButton(getString(R.string.save), (dialog, which) -> {
-            String newName = input.getText().toString().trim();
-            if (newName.isEmpty()) {
-                Toast.makeText(this, getString(R.string.name_empty), Toast.LENGTH_SHORT).show();
-                return;
-            }
-            firestoreManager.saveName(newName, new FirestoreManager.OnSaveListener() {
-                @Override
-                public void onSuccess() {
-                    runOnUiThread(() -> {
-                        userNameTv.setText(newName);
-                        profileInitialTv.setText(String.valueOf(newName.charAt(0)).toUpperCase());
-                        Toast.makeText(ProfileActivity.this, getString(R.string.name_updated), Toast.LENGTH_SHORT).show();
-                    });
-                }
-
-                @Override
-                public void onError(Exception e) {
-                    runOnUiThread(() -> Toast.makeText(ProfileActivity.this, getString(R.string.failed_to_update), Toast.LENGTH_SHORT).show());
-                }
-            });
-        });
-        builder.setNegativeButton(getString(R.string.cancel), null);
-        builder.show();
     }
 
     // ── Farm Recalibration ─────────────────────────────────────────────────────
@@ -571,11 +447,9 @@ public class ProfileActivity extends AppCompatActivity {
         builder.setView(view);
 
         View changePasswordBtn = view.findViewById(R.id.changePasswordBtn);
-        View editProfilePicBtn = view.findViewById(R.id.editProfilePicBtn);
         View editBirthdayBtn   = view.findViewById(R.id.editBirthdayBtn);
 
         changePasswordBtn.setOnClickListener(v -> showChangePasswordDialog());
-        editProfilePicBtn.setOnClickListener(v -> showEditProfilePictureDialog());
         editBirthdayBtn.setOnClickListener(v -> showEditBirthdayDialog());
 
         builder.setPositiveButton("Close", null);
@@ -792,275 +666,6 @@ public class ProfileActivity extends AppCompatActivity {
                 })
                 .setNegativeButton(getString(R.string.cancel), null)
                 .show();
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  FIX 2 — Edit Profile Picture
-    //  • Uses ActivityResultContracts.PickVisualMedia on API 33+ (no permission needed)
-    //  • Falls back to legacy gallery intent with READ_EXTERNAL_STORAGE check on API ≤ 32
-    //  • Uses explicit Firebase Storage bucket URL to avoid "Object does not exist"
-    //  • Adds full progress reporting, error handling, and UI state restoration
-    //  • Refreshes profile image across the screen after upload
-    // ══════════════════════════════════════════════════════════════════════════
-    private void showEditProfilePictureDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        View view = getLayoutInflater().inflate(R.layout.dialog_edit_profile_picture, null);
-        builder.setView(view);
-        builder.setNegativeButton(getString(R.string.cancel), null);
-
-        profilePicDialog = builder.create();
-
-        ImageView previewImage   = view.findViewById(R.id.previewImage);
-        TextView  previewInitial = view.findViewById(R.id.previewInitial);
-        View      galleryBtn     = view.findViewById(R.id.btnChooseGallery);
-        View      cameraBtn      = view.findViewById(R.id.btnTakePhoto);
-        View      removeBtn      = view.findViewById(R.id.btnRemovePhoto);
-        com.google.android.material.progressindicator.LinearProgressIndicator progressBar =
-                view.findViewById(R.id.uploadProgressBar);
-        TextView statusText = view.findViewById(R.id.uploadStatusText);
-
-        // Pre-fill preview
-        FirebaseFirestore.getInstance()
-                .collection("user_access").document(currentEmail).get()
-                .addOnSuccessListener(doc -> {
-                    if (doc.exists()) {
-                        String photoUrl = doc.getString("profilePic");
-                        String name     = doc.getString("name");
-                        if (photoUrl != null && !photoUrl.isEmpty()) {
-                            previewInitial.setVisibility(View.GONE);
-                            previewImage.setVisibility(View.VISIBLE);
-                            Glide.with(this).load(photoUrl).circleCrop().into(previewImage);
-                            removeBtn.setVisibility(View.VISIBLE);
-                        } else {
-                            previewImage.setVisibility(View.GONE);
-                            previewInitial.setVisibility(View.VISIBLE);
-                            if (name != null && !name.isEmpty()) {
-                                previewInitial.setText(String.valueOf(name.charAt(0)).toUpperCase());
-                            }
-                            removeBtn.setVisibility(View.GONE);
-                        }
-                    }
-                });
-
-        // ── Gallery ────────────────────────────────────────────────────────
-        galleryBtn.setOnClickListener(v -> {
-            profilePicDialog.dismiss();
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                // Android 13+: use the new Photo Picker — no permission required
-                photoPickerLauncher.launch(
-                        new PickVisualMediaRequest.Builder()
-                                .setMediaType(ActivityResultContracts.PickVisualMedia.ImageOnly.INSTANCE)
-                                .build());
-            } else {
-                // Android 12 and below: need READ_EXTERNAL_STORAGE
-                requestGalleryPermissionThenOpen();
-            }
-        });
-
-        // ── Camera ─────────────────────────────────────────────────────────
-        cameraBtn.setOnClickListener(v -> {
-            try {
-                File photoFile = File.createTempFile("profile_", ".jpg", getCacheDir());
-                cameraImageUri = FileProvider.getUriForFile(
-                        this,
-                        getPackageName() + ".fileprovider",
-                        photoFile);
-                cameraLauncher.launch(cameraImageUri);
-                profilePicDialog.dismiss();
-            } catch (Exception e) {
-                Toast.makeText(this, "Could not open camera: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-            }
-        });
-
-        // ── Remove photo ───────────────────────────────────────────────────
-        removeBtn.setOnClickListener(v ->
-                new AlertDialog.Builder(this)
-                        .setTitle("Remove Profile Picture")
-                        .setMessage("Are you sure you want to remove your profile picture?")
-                        .setPositiveButton("Remove", (d, w) -> {
-                            if (progressBar != null) progressBar.setVisibility(View.VISIBLE);
-                            if (statusText != null) {
-                                statusText.setText("Removing photo...");
-                                statusText.setVisibility(View.VISIBLE);
-                            }
-                            galleryBtn.setEnabled(false);
-                            cameraBtn.setEnabled(false);
-                            removeBtn.setEnabled(false);
-
-                            FirebaseFirestore.getInstance()
-                                    .collection("user_access").document(currentEmail)
-                                    .update("profilePic", "")
-                                    .addOnSuccessListener(aVoid -> runOnUiThread(() -> {
-                                        profileImageView.setVisibility(View.GONE);
-                                        profileInitialTv.setVisibility(View.VISIBLE);
-                                        Toast.makeText(ProfileActivity.this,
-                                                "Profile picture removed", Toast.LENGTH_SHORT).show();
-                                        profilePicDialog.dismiss();
-                                    }))
-                                    .addOnFailureListener(e -> runOnUiThread(() -> {
-                                        if (progressBar != null) progressBar.setVisibility(View.GONE);
-                                        if (statusText != null) statusText.setVisibility(View.GONE);
-                                        galleryBtn.setEnabled(true);
-                                        cameraBtn.setEnabled(true);
-                                        removeBtn.setEnabled(true);
-                                        Toast.makeText(ProfileActivity.this,
-                                                "Failed to remove: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                                    }));
-                        })
-                        .setNegativeButton(getString(R.string.cancel), null)
-                        .show());
-
-        profilePicDialog.show();
-    }
-
-    /** Check / request READ_EXTERNAL_STORAGE (API ≤ 32) then open the gallery. */
-    private void requestGalleryPermissionThenOpen() {
-        String permission = Manifest.permission.READ_EXTERNAL_STORAGE;
-        if (ContextCompat.checkSelfPermission(this, permission)
-                == PackageManager.PERMISSION_GRANTED) {
-            openGallery();
-        } else {
-            mediaPermissionLauncher.launch(permission);
-        }
-    }
-
-    /** Launch the legacy ACTION_PICK gallery intent (used for API ≤ 32). */
-    private void openGallery() {
-        Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
-        intent.setType("image/*");
-        galleryLauncher.launch(intent);
-    }
-
-    /**
-     * Uploads the given image URI to Firebase Storage under
-     * profile_pics/{sanitisedEmail}.jpg, then saves the download URL to
-     * Firestore user_access/{email}.profilePic and refreshes the UI.
-     *
-     * Uses an explicit bucket URL (STORAGE_BUCKET constant) to avoid the
-     * "Object does not exist at location" error that occurs when the default
-     * FirebaseStorage instance resolves to the wrong bucket.
-     *
-     * FIX: Ensures Firebase anonymous Auth is active before uploading so that
-     * Storage security rules (which require request.auth != null) are satisfied.
-     */
-    private void uploadProfilePicture(Uri imageUri) {
-        if (currentEmail == null || currentEmail.isEmpty()) {
-            Toast.makeText(this, "Cannot upload: account email unknown.", Toast.LENGTH_LONG).show();
-            return;
-        }
-
-        if (imageUri == null) {
-            Toast.makeText(this, "No image selected.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        // ── FIX: Ensure we have an active Firebase Auth session before uploading.
-        // WajeApplication signs in anonymously at startup, but if for any reason
-        // the session was lost, we re-sign in before touching Storage.
-        FirebaseAuth auth = FirebaseAuth.getInstance();
-        if (auth.getCurrentUser() != null) {
-            // Already authenticated — proceed directly.
-            performStorageUpload(imageUri);
-        } else {
-            // Show upload progress dialog during sign-in
-            AlertDialog signingInDialog = new AlertDialog.Builder(this)
-                    .setTitle("Preparing upload…")
-                    .setMessage("Initialising secure connection.")
-                    .setCancelable(false)
-                    .create();
-            signingInDialog.show();
-
-            auth.signInAnonymously()
-                    .addOnSuccessListener(result -> {
-                        signingInDialog.dismiss();
-                        performStorageUpload(imageUri);
-                    })
-                    .addOnFailureListener(e -> {
-                        signingInDialog.dismiss();
-                        Toast.makeText(this,
-                                "Authentication required to upload photos. Please check your internet connection and try again.",
-                                Toast.LENGTH_LONG).show();
-                    });
-        }
-    }
-
-    /** Internal method that performs the actual Firebase Storage upload. */
-    private void performStorageUpload(Uri imageUri) {
-        AlertDialog uploadDialog = new AlertDialog.Builder(this)
-                .setTitle("Uploading Photo")
-                .setMessage("Please wait…")
-                .setCancelable(false)
-                .create();
-        uploadDialog.show();
-
-        // Build a safe storage path: profile_pics/<sanitised_email>.jpg
-        // Replacing @ and . avoids forward-slash issues in Storage paths.
-        String sanitisedEmail = currentEmail
-                .replace("@", "_at_")
-                .replace(".", "_dot_");
-        String storagePath = "profile_pics/" + sanitisedEmail + ".jpg";
-
-        // Use the explicit bucket URL to prevent "Object does not exist" errors
-        StorageReference storageRef = FirebaseStorage.getInstance(STORAGE_BUCKET)
-                .getReference()
-                .child(storagePath);
-
-        UploadTask uploadTask = storageRef.putFile(imageUri);
-
-        uploadTask
-                .addOnProgressListener(taskSnapshot -> {
-                    long total = taskSnapshot.getTotalByteCount();
-                    long transferred = taskSnapshot.getBytesTransferred();
-                    double progress = (total > 0) ? (100.0 * transferred / total) : 0;
-                    runOnUiThread(() ->
-                            uploadDialog.setMessage(
-                                    String.format(Locale.getDefault(), "Uploading… %.0f%%", progress)));
-                })
-                .addOnSuccessListener(taskSnapshot -> {
-                    // Retrieve the public download URL
-                    storageRef.getDownloadUrl()
-                            .addOnSuccessListener(downloadUri -> {
-                                String photoUrl = downloadUri.toString();
-                                // Persist URL in Firestore
-                                FirebaseFirestore.getInstance()
-                                        .collection("user_access").document(currentEmail)
-                                        .update("profilePic", photoUrl)
-                                        .addOnSuccessListener(aVoid -> runOnUiThread(() -> {
-                                            uploadDialog.dismiss();
-                                            // Refresh avatar on the profile screen
-                                            profileInitialTv.setVisibility(View.GONE);
-                                            profileImageView.setVisibility(View.VISIBLE);
-                                            Glide.with(ProfileActivity.this)
-                                                    .load(photoUrl)
-                                                    .circleCrop()
-                                                    .into(profileImageView);
-                                            Toast.makeText(ProfileActivity.this,
-                                                    "Profile picture updated!", Toast.LENGTH_SHORT).show();
-                                        }))
-                                        .addOnFailureListener(e -> runOnUiThread(() -> {
-                                            uploadDialog.dismiss();
-                                            Toast.makeText(ProfileActivity.this,
-                                                    "Photo uploaded but URL could not be saved: " + e.getMessage(),
-                                                    Toast.LENGTH_LONG).show();
-                                        }));
-                            })
-                            .addOnFailureListener(e -> runOnUiThread(() -> {
-                                uploadDialog.dismiss();
-                                Toast.makeText(ProfileActivity.this,
-                                        "Upload succeeded but download URL is unavailable: " + e.getMessage(),
-                                        Toast.LENGTH_LONG).show();
-                            }));
-                })
-                .addOnFailureListener(e -> runOnUiThread(() -> {
-                    uploadDialog.dismiss();
-                    // Provide a specific hint for the "object does not exist" Storage error
-                    String msg = e.getMessage() != null ? e.getMessage() : "Unknown error";
-                    if (msg.contains("Object does not exist") || msg.contains("does not exist")) {
-                        msg = "Storage path not found. Please check Firebase Storage rules and bucket configuration.";
-                    }
-                    Toast.makeText(ProfileActivity.this,
-                            "Upload failed: " + msg, Toast.LENGTH_LONG).show();
-                }));
     }
 
 

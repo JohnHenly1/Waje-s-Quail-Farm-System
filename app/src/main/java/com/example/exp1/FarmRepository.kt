@@ -243,4 +243,37 @@ object FarmRepository {
             }
             .addOnFailureListener { e -> onDone?.invoke(e) }
     }
+
+    /**
+     * Delete a specific alert by its message. The doc ID is deterministic
+     * (same formula used in addAlert) so no query is needed.
+     * Also deletes any alert whose message CONTAINS the given substring,
+     * to catch both "Task Reminder: X (category)" and "Missed Task: X" variants.
+     */
+    fun deleteAlertByMessage(message: String, onDone: ((Exception?) -> Unit)? = null) {
+        val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+            .format(java.util.Date())
+        val safeMsg = message.replace(Regex("[^a-zA-Z0-9_-]"), "_").take(80)
+        val docId = "${today}_${safeMsg}"
+
+        // Delete the exact doc by deterministic ID
+        alertsCol.document(docId).delete()
+            .addOnSuccessListener { onDone?.invoke(null) }
+            .addOnFailureListener { onDone?.invoke(null) } // ignore if not found
+
+        // Also do a full scan to catch any older docs (pre-deterministic-ID) or
+        // "Missed Task" variants that contain the task title
+        alertsCol.get().addOnSuccessListener { snap ->
+            val batch = db.batch()
+            var found = false
+            for (doc in snap.documents) {
+                val msg = doc.getString("message") ?: ""
+                if (msg.contains(message, ignoreCase = true)) {
+                    batch.delete(doc.reference)
+                    found = true
+                }
+            }
+            if (found) batch.commit()
+        }
+    }
 }

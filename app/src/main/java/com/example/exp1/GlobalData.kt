@@ -65,6 +65,19 @@ object GlobalData {
     @Synchronized
     fun clearAlerts() = saveAlerts(emptyList())
 
+    /**
+     * Remove all local alerts whose message contains the given string.
+     * Used when a task is marked Done so its reminder disappears from the list.
+     */
+    @JvmStatic
+    @Synchronized
+    fun removeAlertsContaining(substring: String) {
+        val filtered = loadAlerts().filterNot {
+            it.message.contains(substring, ignoreCase = true)
+        }
+        saveAlerts(filtered)
+    }
+
     @Synchronized
     fun getUnreadCount(): Int = loadAlerts().count { !it.isRead }
 
