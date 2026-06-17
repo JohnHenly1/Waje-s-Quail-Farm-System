@@ -73,12 +73,6 @@
             android:text="Staff"
             android:checked="true"
             android:buttonTint="@color/dark_green"/>
-        <RadioButton
-            android:id="@+id/radioInviteBackup"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Backup Owner"
-            android:buttonTint="@color/dark_green"/>
     </RadioGroup>
 
 </LinearLayout>
