@@ -212,7 +212,7 @@ class DashboardActivity : AppCompatActivity() {
     }
 
     private fun isAdmin(): Boolean {
-        return userRole == "owner" || userRole == "backup_owner"
+        return RoleManager(userRole).canViewAdminPanel()
     }
 
     override fun onDestroy() {

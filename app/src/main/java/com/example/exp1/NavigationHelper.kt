@@ -105,7 +105,7 @@ object NavigationHelper {
             showNoInternetOverlay(currentActivity)
             return
         }
-        
+
         showGlobalLoading(currentActivity, label) {
             val intent = Intent(currentActivity, targetClass)
             intent.putExtra("username", email)
@@ -119,7 +119,7 @@ object NavigationHelper {
         val network = cm.activeNetwork ?: return false
         val caps = cm.getNetworkCapabilities(network) ?: return false
         return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-               caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 
     fun showNoInternetOverlay(activity: Activity) {
@@ -136,7 +136,7 @@ object NavigationHelper {
             percentageText?.visibility = View.GONE
             noInternetSection.visibility = View.VISIBLE
             loadingLayout.visibility = View.VISIBLE
-            
+
             btnRetry?.setOnClickListener {
                 if (isInternetActuallyWorking(activity)) {
                     loadingLayout.visibility = View.GONE
@@ -185,7 +185,7 @@ object NavigationHelper {
 
     fun setupSideMenu(activity: Activity, drawerLayout: DrawerLayout) {
         val navigationView = activity.findViewById<NavigationView>(R.id.sideMenu)
-        
+
         val accountManager = AccountManager(activity)
         val currentEmail = accountManager.getCurrentUsername()
         val currentRole = accountManager.getRole(currentEmail ?: "")
@@ -193,12 +193,8 @@ object NavigationHelper {
         // Hide Invite User if role is staff
         val navMenu = navigationView.menu
         val inviteItem = navMenu.findItem(R.id.nav_invite_user)
-        if (currentRole == "staff") {
-            inviteItem?.isVisible = false
-        } else {
-            inviteItem?.isVisible = true
-        }
-        
+        inviteItem?.isVisible = RoleManager(currentRole).canGenerateInviteCodes()
+
         if (currentEmail != null) {
             FirebaseFirestore.getInstance().collection("user_access").document(currentEmail).get()
                 .addOnSuccessListener { doc ->
@@ -209,7 +205,7 @@ object NavigationHelper {
                     }
                 }
         }
-        
+
         navigationView?.setNavigationItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
                 R.id.nav_invite_user -> {
@@ -255,7 +251,7 @@ object NavigationHelper {
         val userImageView = headerView?.findViewById<ImageView>(R.id.userPhoto)
 
         userNameTextView?.text = name
-        
+
         if (photoUrl.isNotEmpty()) {
             userInitialTextView?.visibility = View.GONE
             userImageView?.let {
@@ -293,10 +289,12 @@ object NavigationHelper {
     fun showGenerateInviteCodeDialog(activity: Activity, ownerEmail: String) {
         val dialogView = LayoutInflater.from(activity).inflate(R.layout.dialog_invite_user, null)
         val editEmail = dialogView.findViewById<EditText>(R.id.inviteEmail)
-        val roleGroup = dialogView.findViewById<android.widget.RadioGroup>(R.id.inviteRoleGroup)
-        
+
+        // Only staff role is assignable via the invite flow.
+        // The radioInviteBackup button in the layout should be hidden or removed.
         val rbStaff = dialogView.findViewById<android.widget.RadioButton>(R.id.radioInviteStaff)
-        val rbBackup = dialogView.findViewById<android.widget.RadioButton>(R.id.radioInviteBackup)
+        val rbBackup = dialogView.findViewById<android.widget.RadioButton?>(R.id.radioInviteBackup)
+        rbBackup?.visibility = android.view.View.GONE // Co-owner role removed; only staff is assignable
 
         editEmail.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -311,15 +309,13 @@ object NavigationHelper {
             }
         })
 
-        // Update availability
+        // Show how many staff slots remain
         val db = FirebaseFirestore.getInstance()
         db.collection("system_settings").document("role_limits").get()
             .addOnSuccessListener { limitDoc ->
                 val staffLimit = limitDoc.getLong("staff_limit") ?: 5L
-                val backupLimit = limitDoc.getLong("backup_owner_limit") ?: 2L
-
                 db.collection("user_access")
-                    .whereEqualTo("role", "staff")
+                    .whereEqualTo("role", RoleManager.STAFF)
                     .whereEqualTo("status", "approved")
                     .get()
                     .addOnSuccessListener { docs ->
@@ -328,19 +324,6 @@ object NavigationHelper {
                         if (available <= 0) {
                             rbStaff.isEnabled = false
                             rbStaff.text = "Farm Staff (Full)"
-                        }
-                    }
-
-                db.collection("user_access")
-                    .whereEqualTo("role", "backup_owner")
-                    .whereEqualTo("status", "approved")
-                    .get()
-                    .addOnSuccessListener { docs ->
-                        val available = (backupLimit - docs.size()).coerceAtLeast(0)
-                        rbBackup.text = "Co Farm Owner ($available spots left)"
-                        if (available <= 0) {
-                            rbBackup.isEnabled = false
-                            rbBackup.text = "Co Farm Owner (Full)"
                         }
                     }
             }
@@ -365,15 +348,15 @@ object NavigationHelper {
                 return@setOnClickListener
             }
 
-            val selectedRoleId = roleGroup.checkedRadioButtonId
-            val selectedRole = if (selectedRoleId == R.id.radioInviteBackup) "backup_owner" else "staff"
+            // Only staff is an assignable role — no privilege escalation possible here
+            val selectedRole = RoleManager.STAFF
 
-            // Check role availability
+            // Check role availability against the staff limit
             db.collection("system_settings").document("role_limits").get()
                 .addOnSuccessListener { limitDoc ->
-                    val limit = limitDoc.getLong("${selectedRole}_limit") ?: 5L
+                    val limit = limitDoc.getLong("staff_limit") ?: 5L
                     db.collection("user_access")
-                        .whereEqualTo("role", selectedRole)
+                        .whereEqualTo("role", RoleManager.STAFF)
                         .whereEqualTo("status", "approved")
                         .get()
                         .addOnSuccessListener { users ->
@@ -394,11 +377,11 @@ object NavigationHelper {
                                             db.collection("invite_codes")
                                                 .document(code)
                                                 .set(mapOf(
-                                                    "role"      to selectedRole,
+                                                    "role"         to selectedRole,
                                                     "invitedEmail" to invitedEmail,
-                                                    "createdBy" to ownerEmail,
-                                                    "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp(),
-                                                    "expiresAt" to expirationTime 
+                                                    "createdBy"    to ownerEmail,
+                                                    "createdAt"    to com.google.firebase.firestore.FieldValue.serverTimestamp(),
+                                                    "expiresAt"    to expirationTime
                                                 ))
                                                 .addOnSuccessListener {
                                                     showCodeResultDialog(activity, code, invitedEmail, ownerEmail, selectedRole)
@@ -414,11 +397,11 @@ object NavigationHelper {
                                     }
                             }
                         }
-                        .addOnFailureListener { 
+                        .addOnFailureListener {
                             Toast.makeText(activity, "Error checking role availability", Toast.LENGTH_SHORT).show()
                         }
                 }
-                .addOnFailureListener { 
+                .addOnFailureListener {
                     Toast.makeText(activity, "Error fetching role limits", Toast.LENGTH_SHORT).show()
                 }
         }

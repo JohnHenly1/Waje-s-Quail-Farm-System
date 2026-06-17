@@ -12,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -26,7 +27,7 @@ class FeedInventoryActivity : AppCompatActivity() {
     //   name        : String
     //   invNumber   : String   e.g. "#INV0001"
     //   description : String
-    //   category    : String   "Starter Feed" | "Grower Feed" | "Layer Feed" | "Supplements" | "Specialty Feed"
+    //   category    : String   "Feed" | "Supplements"
     //   location    : String   e.g. "Shop 1"
     //   quantity    : Long
     //   initialQuantity : Long (Baseline for auto-status)
@@ -62,9 +63,12 @@ class FeedInventoryActivity : AppCompatActivity() {
     private lateinit var roleManager: RoleManager
     private var feedListener: ListenerRegistration? = null
 
-    private val db       = FirebaseFirestore.getInstance()
-    private val feedCol  get() = db.collection("farm_data").document("shared").collection("feed")
-    private val historyCol get() = db.collection("farm_data").document("shared").collection("feed_history")
+    private val db            = FirebaseFirestore.getInstance()
+    private val auth          = FirebaseAuth.getInstance()
+    private val feedCol       get() = db.collection("farm_data").document("shared").collection("feed")
+    private val historyCol    get() = db.collection("farm_data").document("shared").collection("feed_history")
+    // inventory_history is the new structured audit trail (Feature 2)
+    private val auditCol      get() = db.collection("inventory_history")
     val currency = NumberFormat.getCurrencyInstance(Locale("en", "PH"))
 
     // View references
@@ -138,10 +142,10 @@ class FeedInventoryActivity : AppCompatActivity() {
         }
 
         findViewById<View>(R.id.searchButton).setOnClickListener { showSearchDialog() }
-        
-        // History button
+
+        // History button — opens the inventory audit trail screen
         findViewById<View>(R.id.historyButton).setOnClickListener {
-            startActivity(Intent(this, FeedHistoryActivity::class.java))
+            startActivity(Intent(this, InventoryHistoryActivity::class.java))
         }
 
         val addBtn = findViewById<View>(R.id.addButton)
@@ -155,8 +159,6 @@ class FeedInventoryActivity : AppCompatActivity() {
 
     // ──────────────────────────────────────────────────────────────────────────
     // Filter tabs
-    // FIX #1: added space before "to" in "Specialty Feed" entry — was causing
-    //         "Literals must be surrounded by whitespace" at that line
     // ──────────────────────────────────────────────────────────────────────────
     private val tabMap by lazy {
         mapOf(
@@ -227,13 +229,13 @@ class FeedInventoryActivity : AppCompatActivity() {
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // Summary Stats - Updated to reflect active filters
+    // Summary Stats
     // ──────────────────────────────────────────────────────────────────────────
     private fun updateSummaryStats() {
         val filteredForStats = allItems.filter { item ->
             activeTab == "All Items" || item.category == activeTab
         }
-        
+
         val totalValue  = filteredForStats.sumOf { it.totalValue }
         val lowCount    = filteredForStats.count { it.status == "Low Stock" }
         val locationSet = filteredForStats.map { it.location }.toSet()
@@ -278,8 +280,7 @@ class FeedInventoryActivity : AppCompatActivity() {
                 inventoryList.addView(card)
             }
         }
-        
-        // Also update summary whenever list renders (to keep stats in sync with tabs)
+
         updateSummaryStats()
     }
 
@@ -312,17 +313,27 @@ class FeedInventoryActivity : AppCompatActivity() {
             else        -> applyBadgeStyle(badge, "#E8F5E9", "#2E7D32")
         }
 
-        // Tapping the supply card
+        // Card tap — staff can update quantity; owner opens full edit dialog
         card.setOnClickListener {
             if (item.quantity <= 0L) {
                 showZeroQuantityPopup(item)
-            } else {
+            } else if (roleManager.canEditFarm()) {
                 showAddEditDialog(item)
+            } else if (roleManager.canUpdateInventoryQuantity()) {
+                showQuantityUpdateDialog(item)
             }
         }
 
-        card.findViewById<View>(R.id.editButton).setOnClickListener {
-            showAddEditDialog(item)
+        val editBtn = card.findViewById<View>(R.id.editButton)
+        if (roleManager.canEditFarm()) {
+            editBtn.visibility = View.VISIBLE
+            editBtn.setOnClickListener { showAddEditDialog(item) }
+        } else if (roleManager.canUpdateInventoryQuantity()) {
+            // Staff see the edit button but it opens the quantity-only dialog
+            editBtn.visibility = View.VISIBLE
+            editBtn.setOnClickListener { showQuantityUpdateDialog(item) }
+        } else {
+            editBtn.visibility = View.GONE
         }
 
         val deleteBtn = card.findViewById<View>(R.id.deleteButton)
@@ -345,11 +356,159 @@ class FeedInventoryActivity : AppCompatActivity() {
     }
 
     // ──────────────────────────────────────────────────────────────────────────
+    // Staff-only: quantity update dialog
+    // Allows staff to change ONLY the stock quantity.  All other fields are
+    // read-only and displayed for context.  The write is performed via a
+    // Firestore transaction so the stock update and audit log are atomic.
+    // ──────────────────────────────────────────────────────────────────────────
+    private fun showQuantityUpdateDialog(item: FeedItem) {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_add_food, null)
+
+        val nameInput     = dialogView.findViewById<EditText>(R.id.foodNameInput)
+        val descInput     = dialogView.findViewById<EditText>(R.id.foodDescInput)
+        val invInput      = dialogView.findViewById<EditText>(R.id.foodInvInput)
+        val locationInput = dialogView.findViewById<EditText>(R.id.foodLocationInput)
+        val qtyInput      = dialogView.findViewById<EditText>(R.id.foodQtyInput)
+        val qtyLabel      = dialogView.findViewById<TextView>(R.id.foodQtyLabel)
+        val priceInput    = dialogView.findViewById<EditText>(R.id.foodPriceInput)
+        val catSpinner    = dialogView.findViewById<Spinner>(R.id.categorySpinner)
+        val statusSpinner = dialogView.findViewById<Spinner>(R.id.statusSpinner)
+        val existSpinner  = dialogView.findViewById<Spinner>(R.id.existingItemsSpinner)
+
+        // Hide fields and selectors that staff must not interact with
+        statusSpinner.visibility = View.GONE
+        dialogView.findViewById<TextView>(R.id.statusLabel)?.visibility = View.GONE
+        dialogView.findViewById<View>(R.id.selectItemLabel)?.visibility = View.GONE
+        dialogView.findViewById<View>(R.id.selectItemContainer)?.visibility = View.GONE
+
+        // Pre-fill all fields
+        nameInput.setText(item.name)
+        descInput.setText(item.description)
+        invInput.setText(item.invNumber)
+        locationInput.setText(item.location)
+        qtyInput.setText(item.quantity.toString())
+        priceInput.setText(item.unitPrice.toString())
+
+        val catAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, categoryOptions)
+        catAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        catSpinner.adapter = catAdapter
+        catSpinner.setSelection(categoryOptions.indexOf(item.category).coerceAtLeast(0))
+
+        qtyLabel.text = when (item.category) {
+            "Feed" -> "Quantity (Sack)"
+            "Supplements" -> "Quantity (Bottle)"
+            else -> "Quantity"
+        }
+
+        // Lock every field except quantity
+        nameInput.isEnabled     = false
+        descInput.isEnabled     = false
+        invInput.isEnabled      = false
+        locationInput.isEnabled = false
+        priceInput.isEnabled    = false
+        catSpinner.isEnabled    = false
+        existSpinner.isEnabled  = false
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Update Stock Quantity")
+            .setView(dialogView)
+            .setPositiveButton("Update", null)
+            .setNegativeButton("Cancel", null)
+            .create()
+
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val newQty = qtyInput.text.toString().toLongOrNull()
+                if (newQty == null) {
+                    qtyInput.error = "Enter a valid quantity"
+                    return@setOnClickListener
+                }
+                if (newQty < 0) {
+                    qtyInput.error = "Quantity cannot be negative"
+                    return@setOnClickListener
+                }
+                if (newQty == item.quantity) {
+                    // No change — nothing to write
+                    dialog.dismiss()
+                    return@setOnClickListener
+                }
+                commitQuantityUpdate(item, newQty, "Stock updated") {
+                    dialog.dismiss()
+                }
+            }
+        }
+        dialog.show()
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Atomic quantity update + audit log
+    // Uses a Firestore transaction so both writes succeed or both fail.
+    // ──────────────────────────────────────────────────────────────────────────
+    private fun commitQuantityUpdate(
+        item: FeedItem,
+        newQty: Long,
+        notes: String,
+        onSuccess: () -> Unit
+    ) {
+        val uid          = auth.currentUser?.uid ?: "unknown"
+        val editorName   = accountManager.getCurrentUsername() ?: "User"
+        val editorRole   = roleManager.role
+        val quantityDiff = newQty - item.quantity
+        val action       = if (quantityDiff >= 0) "add" else "deduct"
+
+        val feedDocRef  = feedCol.document(item.firestoreId)
+        val auditDocRef = auditCol.document()   // auto-id
+
+        val newInitialQty = if (newQty > item.initialQuantity) newQty else item.initialQuantity
+        val newStatus     = calculateStatus(newQty, newInitialQty)
+
+        db.runTransaction { transaction ->
+            // Read the current document to guard against concurrent edits
+            val snapshot = transaction.get(feedDocRef)
+            val currentQty = snapshot.getLong("quantity") ?: item.quantity
+            if (currentQty != item.quantity) {
+                // Another write occurred between load and save; abort to prevent
+                // a silent overwrite — the Firestore listener will refresh the UI.
+                throw Exception("Quantity was modified concurrently. Please try again.")
+            }
+
+            // Write 1: update stock quantity and status
+            val stockUpdate = mapOf(
+                "quantity"        to newQty,
+                "initialQuantity" to newInitialQty,
+                "status"          to newStatus,
+                "updatedAt"       to FieldValue.serverTimestamp()
+            )
+            transaction.update(feedDocRef, stockUpdate)
+
+            // Write 2: create audit log entry
+            val auditEntry = mapOf(
+                "productId"       to item.firestoreId,
+                "productName"     to item.name,
+                "category"        to item.category,
+                "action"          to action,
+                "quantityBefore"  to item.quantity,
+                "quantityChanged" to quantityDiff,
+                "quantityAfter"   to newQty,
+                "editedByUid"     to uid,
+                "editedByName"    to editorName,
+                "editedByRole"    to editorRole,
+                "timestamp"       to FieldValue.serverTimestamp(),
+                "notes"           to notes
+            )
+            transaction.set(auditDocRef, auditEntry)
+        }.addOnSuccessListener {
+            onSuccess()
+        }.addOnFailureListener { e ->
+            Toast.makeText(this, "Update failed: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
     // Zero Quantity Popup
     // ──────────────────────────────────────────────────────────────────────────
     private fun showZeroQuantityPopup(item: FeedItem) {
         if (roleManager.canEditFarm()) {
-            // Owner/Backup Owner role
             AlertDialog.Builder(this)
                 .setTitle("Out of Stock: ${item.name}")
                 .setMessage("This supply is currently at 0 quantity. Would you like to restock it or delete the entry?")
@@ -357,8 +516,14 @@ class FeedInventoryActivity : AppCompatActivity() {
                 .setNegativeButton("Delete") { _, _ -> showDeleteConfirmation(item) }
                 .setNeutralButton("Cancel", null)
                 .show()
+        } else if (roleManager.canUpdateInventoryQuantity()) {
+            AlertDialog.Builder(this)
+                .setTitle("Out of Stock: ${item.name}")
+                .setMessage("This supply is currently at 0 quantity. You can update the stock quantity if stock has been replenished.")
+                .setPositiveButton("Update Quantity") { _, _ -> showQuantityUpdateDialog(item) }
+                .setNegativeButton("Cancel", null)
+                .show()
         } else {
-            // Staff role
             AlertDialog.Builder(this)
                 .setTitle("Out of Stock")
                 .setMessage("\"${item.name}\" has run out of stock. Please notify the owner for replenishment.")
@@ -369,14 +534,12 @@ class FeedInventoryActivity : AppCompatActivity() {
 
     // ──────────────────────────────────────────────────────────────────────────
     // Search dialog
-    // FIX #3: explicit DialogInterface parameter types to resolve lambda overload
     // ──────────────────────────────────────────────────────────────────────────
     private fun showSearchDialog() {
         val editText = EditText(this).apply {
             hint = "Search by name, INV number, or category…"
             setText(searchQuery)
             setPadding(48, 24, 48, 24)
-            // Trigger live search as user types
             addTextChangedListener(object : android.text.TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {}
                 override fun onTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {
@@ -401,7 +564,7 @@ class FeedInventoryActivity : AppCompatActivity() {
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // Add / Edit dialog
+    // Add / Edit dialog  (owner only)
     // ──────────────────────────────────────────────────────────────────────────
     private fun showAddEditDialog(item: FeedItem?) {
         val isEdit     = item != null
@@ -418,7 +581,6 @@ class FeedInventoryActivity : AppCompatActivity() {
         val statusSpinner = dialogView.findViewById<Spinner>(R.id.statusSpinner)
         val existSpinner  = dialogView.findViewById<Spinner>(R.id.existingItemsSpinner)
 
-        // Auto-status logic: hide the manual status spinner
         statusSpinner.visibility = View.GONE
         dialogView.findViewById<TextView>(R.id.statusLabel)?.let { it.visibility = View.GONE }
 
@@ -426,7 +588,6 @@ class FeedInventoryActivity : AppCompatActivity() {
         catAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         catSpinner.adapter = catAdapter
 
-        // Populate Existing Items Selector
         val spinnerData = mutableListOf("--- Create New Item ---")
         spinnerData.addAll(allItems.map { "${it.name} (${it.location})" })
         val existAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, spinnerData)
@@ -434,7 +595,6 @@ class FeedInventoryActivity : AppCompatActivity() {
         existSpinner.adapter = existAdapter
 
         if (isEdit) {
-            // Hide selector when explicitly editing a specific item
             dialogView.findViewById<View>(R.id.selectItemLabel)?.visibility = View.GONE
             dialogView.findViewById<View>(R.id.selectItemContainer)?.visibility = View.GONE
         }
@@ -474,17 +634,6 @@ class FeedInventoryActivity : AppCompatActivity() {
             qtyInput.setText(item.quantity.toString())
             priceInput.setText(item.unitPrice.toString())
             catSpinner.setSelection(categoryOptions.indexOf(item.category).coerceAtLeast(0))
-            
-            // ROLE BASED RESTRICTIONS: Staff can only change Quantity
-            if (!roleManager.canEditFarm()) {
-                nameInput.isEnabled     = false
-                descInput.isEnabled     = false
-                invInput.isEnabled      = false
-                locationInput.isEnabled = false
-                priceInput.isEnabled    = false
-                catSpinner.isEnabled    = false
-                existSpinner.isEnabled  = false
-            }
         }
 
         val dialog = AlertDialog.Builder(this)
@@ -509,14 +658,12 @@ class FeedInventoryActivity : AppCompatActivity() {
                 var desc     = descInput.text.toString().trim()
                 val inv      = invInput.text.toString().trim().ifEmpty { generateInvNumber() }
 
-                // Check for duplicate Name + Location + Price
                 val matchingItem = allItems.find {
                     it.name.equals(name, true) &&
-                    it.location.equals(location, true) &&
-                    it.unitPrice == price
+                            it.location.equals(location, true) &&
+                            it.unitPrice == price
                 }
 
-                // If Name exists but Location/Price is different, auto-adjust description to differentiate
                 val nameExists = allItems.any { it.name.equals(name, true) }
                 if (nameExists && matchingItem == null) {
                     if (!desc.contains(location, true)) {
@@ -525,29 +672,39 @@ class FeedInventoryActivity : AppCompatActivity() {
                 }
 
                 if (matchingItem != null) {
-                    // MERGE LOGIC
+                    val previousQty = matchingItem.quantity
                     val finalQty = if (isEdit && item?.firestoreId == matchingItem.firestoreId) {
-                        qtyIn // Just standard update if editing the same doc
+                        qtyIn
                     } else {
-                        matchingItem.quantity + qtyIn // Add to existing quantity
+                        matchingItem.quantity + qtyIn
                     }
 
                     val finalInit = if (finalQty > matchingItem.initialQuantity) finalQty else matchingItem.initialQuantity
                     val status = calculateStatus(finalQty, finalInit)
 
                     val updateData = hashMapOf<String, Any>(
-                        "name"        to name,
-                        "description" to desc,
-                        "quantity"    to finalQty,
+                        "name"            to name,
+                        "description"     to desc,
+                        "quantity"        to finalQty,
                         "initialQuantity" to finalInit,
-                        "status"      to status,
-                        "updatedAt"   to FieldValue.serverTimestamp()
+                        "status"          to status,
+                        "updatedAt"       to FieldValue.serverTimestamp()
                     )
 
                     feedCol.document(matchingItem.firestoreId).update(updateData)
                         .addOnSuccessListener {
                             logHistory(if (isEdit) "UPDATE" else "RESTOCK", matchingItem.name, qtyIn, price, matchingItem.category)
-                            // If we were editing A and it merged into B, delete A
+                            // Write audit trail only if quantity actually changed
+                            if (finalQty != previousQty) {
+                                writeAuditLog(
+                                    productId     = matchingItem.firestoreId,
+                                    productName   = matchingItem.name,
+                                    category      = matchingItem.category,
+                                    quantityBefore = previousQty,
+                                    quantityAfter  = finalQty,
+                                    notes          = if (isEdit) "Stock updated" else "Stock restocked"
+                                )
+                            }
                             if (isEdit && item != null && item.firestoreId != matchingItem.firestoreId) {
                                 feedCol.document(item.firestoreId).delete()
                             }
@@ -557,32 +714,50 @@ class FeedInventoryActivity : AppCompatActivity() {
                             Toast.makeText(this, "Operation failed: ${e.message}", Toast.LENGTH_SHORT).show()
                         }
                 } else {
-                    // NEW ITEM OR STANDARD UPDATE (No collision)
                     val status = calculateStatus(qtyIn, qtyIn)
                     val data = hashMapOf<String, Any>(
-                        "name"        to name,
-                        "description" to desc,
-                        "invNumber"   to inv,
-                        "location"    to location,
-                        "quantity"    to qtyIn,
+                        "name"            to name,
+                        "description"     to desc,
+                        "invNumber"       to inv,
+                        "location"        to location,
+                        "quantity"        to qtyIn,
                         "initialQuantity" to qtyIn,
-                        "unitPrice"   to price,
-                        "category"    to cat,
-                        "status"      to status,
-                        "updatedAt"   to FieldValue.serverTimestamp()
+                        "unitPrice"       to price,
+                        "category"        to cat,
+                        "status"          to status,
+                        "updatedAt"       to FieldValue.serverTimestamp()
                     )
 
                     if (isEdit && item != null) {
+                        val previousQty = item.quantity
                         feedCol.document(item.firestoreId).set(data)
-                            .addOnSuccessListener { 
+                            .addOnSuccessListener {
                                 logHistory("UPDATE", name, qtyIn, price, cat)
-                                dialog.dismiss() 
+                                if (qtyIn != previousQty) {
+                                    writeAuditLog(
+                                        productId      = item.firestoreId,
+                                        productName    = name,
+                                        category       = cat,
+                                        quantityBefore = previousQty,
+                                        quantityAfter  = qtyIn,
+                                        notes          = "Stock updated"
+                                    )
+                                }
+                                dialog.dismiss()
                             }
                     } else {
                         feedCol.add(data)
-                            .addOnSuccessListener { 
+                            .addOnSuccessListener { newDocRef ->
                                 logHistory("ADDED", name, qtyIn, price, cat)
-                                dialog.dismiss() 
+                                writeAuditLog(
+                                    productId      = newDocRef.id,
+                                    productName    = name,
+                                    category       = cat,
+                                    quantityBefore = 0L,
+                                    quantityAfter  = qtyIn,
+                                    notes          = "Initial stock added"
+                                )
+                                dialog.dismiss()
                             }
                     }
                 }
@@ -592,7 +767,7 @@ class FeedInventoryActivity : AppCompatActivity() {
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // Delete confirmation
+    // Delete confirmation  (owner only)
     // ──────────────────────────────────────────────────────────────────────────
     private fun showDeleteConfirmation(item: FeedItem) {
         AlertDialog.Builder(this)
@@ -600,6 +775,14 @@ class FeedInventoryActivity : AppCompatActivity() {
             .setMessage("Are you sure you want to delete \"${item.name}\"?")
             .setPositiveButton("Delete") { _: DialogInterface, _: Int ->
                 logHistory("DELETED", item.name, item.quantity, item.unitPrice, item.category)
+                writeAuditLog(
+                    productId      = item.firestoreId,
+                    productName    = item.name,
+                    category       = item.category,
+                    quantityBefore = item.quantity,
+                    quantityAfter  = 0L,
+                    notes          = "Item deleted"
+                )
                 feedCol.document(item.firestoreId).delete()
                     .addOnFailureListener { e ->
                         Toast.makeText(this, "Delete failed: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -612,16 +795,60 @@ class FeedInventoryActivity : AppCompatActivity() {
     // ──────────────────────────────────────────────────────────────────────────
     // Helpers
     // ──────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Legacy feed_history log entry — preserved for backward compatibility with
+     * [FeedHistoryActivity] which reads from farm_data/shared/feed_history.
+     */
     private fun logHistory(type: String, name: String, qty: Long, price: Double, category: String) {
         val entry = hashMapOf(
-            "type" to type,
-            "name" to name,
-            "quantity" to qty,
+            "type"      to type,
+            "name"      to name,
+            "quantity"  to qty,
             "unitPrice" to price,
-            "category" to category,
+            "category"  to category,
             "timestamp" to FieldValue.serverTimestamp()
         )
         historyCol.add(entry)
+    }
+
+    /**
+     * Writes a structured audit entry to inventory_history/{autoId}.
+     * Called whenever a quantity change occurs (add, deduct, delete).
+     * When [quantityBefore] == [quantityAfter] this method is a no-op so
+     * callers do not need to guard the call site.
+     */
+    private fun writeAuditLog(
+        productId: String,
+        productName: String,
+        category: String,
+        quantityBefore: Long,
+        quantityAfter: Long,
+        notes: String
+    ) {
+        val diff = quantityAfter - quantityBefore
+        if (diff == 0L) return
+
+        val uid        = auth.currentUser?.uid ?: "unknown"
+        val editorName = accountManager.getCurrentUsername() ?: "User"
+        val editorRole = roleManager.role
+        val action     = if (diff > 0) "add" else "deduct"
+
+        val entry = hashMapOf(
+            "productId"       to productId,
+            "productName"     to productName,
+            "category"        to category,
+            "action"          to action,
+            "quantityBefore"  to quantityBefore,
+            "quantityChanged" to diff,
+            "quantityAfter"   to quantityAfter,
+            "editedByUid"     to uid,
+            "editedByName"    to editorName,
+            "editedByRole"    to editorRole,
+            "timestamp"       to FieldValue.serverTimestamp(),
+            "notes"           to notes
+        )
+        auditCol.add(entry)
     }
 
     private fun calculateStatus(qty: Long, initialQty: Long): String {

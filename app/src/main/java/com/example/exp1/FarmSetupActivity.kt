@@ -46,7 +46,7 @@ class FarmSetupActivity : AppCompatActivity() {
     private lateinit var setupPassword: EditText
     private lateinit var setupPasswordLayout: TextInputLayout
     private lateinit var ownerProfilePic: ImageView
-    
+
     private val calendar = Calendar.getInstance()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -119,8 +119,8 @@ class FarmSetupActivity : AppCompatActivity() {
             val postal = setupAddressPostal.text.toString().trim()
             val pass = setupPassword.text.toString().trim()
 
-            if (birds.isEmpty() || cages.isEmpty() || farmLocStreet.isEmpty() || farmLocCity.isEmpty() || 
-                farmLocState.isEmpty() || farmLocPostal.isEmpty() || bday.isEmpty() || street.isEmpty() || 
+            if (birds.isEmpty() || cages.isEmpty() || farmLocStreet.isEmpty() || farmLocCity.isEmpty() ||
+                farmLocState.isEmpty() || farmLocPostal.isEmpty() || bday.isEmpty() || street.isEmpty() ||
                 city.isEmpty() || state.isEmpty() || postal.isEmpty() || pass.isEmpty()) {
                 Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
@@ -179,14 +179,14 @@ class FarmSetupActivity : AppCompatActivity() {
         if (city.length < 2) return "City must be at least 2 characters"
         if (state.length < 2) return "State/Province must be at least 2 characters"
         if (postal.length < 3) return "Postal code must be at least 3 characters"
-        
+
         // Check for suspicious characters
         val invalidChars = "!@#$%^&*()=[]{}|;':\",<>?"
-        if (street.any { it in invalidChars } || city.any { it in invalidChars } || 
+        if (street.any { it in invalidChars } || city.any { it in invalidChars } ||
             state.any { it in invalidChars } || postal.any { it in invalidChars }) {
             return "Address contains invalid characters"
         }
-        
+
         return null
     }
 
@@ -210,7 +210,7 @@ class FarmSetupActivity : AppCompatActivity() {
             val email = account.email?.trim()?.lowercase() ?: ""
             val displayName = account.displayName ?: "Owner"
             val photoUrl = account.photoUrl?.toString() ?: ""
-            
+
             val birdsCount = setupTotalBirds.text.toString().toInt()
             val cagesCount = setupActiveCages.text.toString().toInt()
             val farmLocStreet = setupFarmLocationStreet.text.toString().trim()
@@ -271,11 +271,11 @@ class FarmSetupActivity : AppCompatActivity() {
                             ),
                             "farmStartDate" to com.google.firebase.Timestamp.now()
                         )
-                        
+
                         db.collection("farm_data").document("stats").set(farmStats)
                             .addOnSuccessListener {
-                                accountManager.registerAccount(displayName, email, pass, "owner")
-                                accountManager.updateCachedRole(displayName, "owner")
+                                accountManager.registerAccount(email, email, pass, "owner")
+                                accountManager.updateCachedRole(email, "owner")
                                 accountManager.saveCurrentSession(email)
 
                                 Toast.makeText(this, "Farm Setup Complete!", Toast.LENGTH_SHORT).show()

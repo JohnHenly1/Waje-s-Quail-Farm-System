@@ -19,7 +19,7 @@ class RegisterActivity : AppCompatActivity() {
     private lateinit var btnEnterCode: Button
     private lateinit var btnFarmSetup: Button
     private lateinit var accountManager: AccountManager
-    
+
     private lateinit var registrationUI: View
     private lateinit var pendingLayout: View
     private lateinit var pendingEmailTv: TextView
@@ -78,7 +78,7 @@ class RegisterActivity : AppCompatActivity() {
         val editEmail = dialogView.findViewById<EditText>(R.id.requestEmail)
         val editName = dialogView.findViewById<EditText>(R.id.requestName)
         val roleGroup = dialogView.findViewById<RadioGroup>(R.id.requestRoleGroup)
-        
+
         val rbStaff = dialogView.findViewById<RadioButton>(R.id.radioRequestStaff)
         val rbBackup = dialogView.findViewById<RadioButton>(R.id.radioRequestBackup)
 
@@ -108,9 +108,9 @@ class RegisterActivity : AppCompatActivity() {
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             val email = editEmail.text.toString().trim().lowercase()
             val name = editName.text.toString().trim()
-            
+
             val selectedRoleId = roleGroup.checkedRadioButtonId
-            val role = if (selectedRoleId == R.id.radioRequestBackup) "backup_owner" else "staff"
+            val role = RoleManager.STAFF // Only staff role can be requested by users
 
             if (email.isEmpty() || name.isEmpty()) {
                 Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show()
@@ -165,7 +165,7 @@ class RegisterActivity : AppCompatActivity() {
         registrationUI.visibility = View.GONE
         pendingLayout.visibility = View.VISIBLE
         pendingEmailTv.text = email
-        
+
         val jump = AnimationUtils.loadAnimation(this, R.anim.quail_jump)
         pendingQuail.startAnimation(jump)
 
@@ -174,14 +174,14 @@ class RegisterActivity : AppCompatActivity() {
             .document(email)
             .addSnapshotListener { snapshot, e ->
                 if (e != null) return@addSnapshotListener
-                
+
                 if (snapshot != null && snapshot.exists()) {
                     val status = snapshot.getString("status") ?: ""
                     if (status == "approved") {
                         stopPendingListener()
                         // Proceed to Verification Code screen automatically
                         val intent = Intent(this, EnterCodeActivity::class.java)
-                        intent.putExtra("email", email) 
+                        intent.putExtra("email", email)
                         startActivity(intent)
                         finish()
                     }
@@ -211,7 +211,7 @@ class RegisterActivity : AppCompatActivity() {
         db.collection("system_settings").document("role_limits").get()
             .addOnSuccessListener { limitDoc ->
                 val staffLimit = limitDoc.getLong("staff_limit") ?: 5L
-                val backupLimit = limitDoc.getLong("backup_owner_limit") ?: 2L
+                val staffLimit2 = limitDoc.getLong("staff_limit") ?: 5L
 
                 db.collection("user_access")
                     .whereEqualTo("role", "staff")
@@ -223,19 +223,6 @@ class RegisterActivity : AppCompatActivity() {
                         if (available <= 0) {
                             rbStaff.isEnabled = false
                             rbStaff.text = "Farm Staff (Full)"
-                        }
-                    }
-
-                db.collection("user_access")
-                    .whereEqualTo("role", "backup_owner")
-                    .whereEqualTo("status", "approved")
-                    .get()
-                    .addOnSuccessListener { docs ->
-                        val available = (backupLimit - docs.size()).coerceAtLeast(0)
-                        rbBackup.text = "Co Farm Owner ($available spots left)"
-                        if (available <= 0) {
-                            rbBackup.isEnabled = false
-                            rbBackup.text = "Co Farm Owner (Full)"
                         }
                     }
             }

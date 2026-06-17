@@ -115,6 +115,11 @@
         <activity
             android:name=".SetupAccountActivity"
             android:exported="true"/>
+        <activity
+            android:name=".InventoryHistoryActivity"
+            android:exported="false"
+            android:label="Inventory History"
+            android:parentActivityName=".FeedInventoryActivity" />
     </application>
 
 </manifest>

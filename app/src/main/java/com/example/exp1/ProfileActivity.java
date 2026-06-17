@@ -271,7 +271,7 @@ public class ProfileActivity extends AppCompatActivity {
     }
 
     private boolean isAdmin() {
-        return "owner".equals(userRole) || "backup_owner".equals(userRole);
+        return new RoleManager(userRole).canViewAdminPanel();
     }
 
     private void loadFirestoreData() {
@@ -971,7 +971,7 @@ public class ProfileActivity extends AppCompatActivity {
         layout.setPadding(40, 40, 40, 40);
 
         EditText editBackupLimit = new EditText(this);
-        editBackupLimit.setHint(R.string.max_backup_owners_hint);
+        // Role limits: staff_limit field in system_settings/role_limits
         layout.addView(editBackupLimit);
 
         EditText editStaffLimit = new EditText(this);
@@ -981,7 +981,7 @@ public class ProfileActivity extends AppCompatActivity {
         FirebaseFirestore.getInstance().collection("system_settings").document("role_limits").get()
                 .addOnSuccessListener(doc -> {
                     if (doc.exists()) {
-                        editBackupLimit.setText(String.valueOf(doc.getLong("backup_owner_limit")));
+                        // staff limit loaded below
                         editStaffLimit.setText(String.valueOf(doc.getLong("staff_limit")));
                     }
                 });
@@ -989,7 +989,7 @@ public class ProfileActivity extends AppCompatActivity {
         builder.setView(layout);
         builder.setPositiveButton(getString(R.string.save), (d, w) -> {
             Map<String, Object> limits = new HashMap<>();
-            limits.put("backup_owner_limit", Long.parseLong(editBackupLimit.getText().toString()));
+            // consolidated into single staff_limit below
             limits.put("staff_limit", Long.parseLong(editStaffLimit.getText().toString()));
             FirebaseFirestore.getInstance().collection("system_settings").document("role_limits").set(limits)
                     .addOnSuccessListener(a ->
