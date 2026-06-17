@@ -380,29 +380,10 @@ object NavigationHelper {
                                         if (doc.exists()) {
                                             Toast.makeText(activity, "This email is already registered.", Toast.LENGTH_SHORT).show()
                                         } else {
-                                            // Proceed to generate code
-                                            val expirationTime = System.currentTimeMillis() + (24 * 60 * 60 * 1000)
-                                            val code = "%06d".format(Random.nextInt(1000000))
-
-                                            db.collection("invite_codes")
-                                                .document(code)
-                                                .set(mapOf(
-                                                    "role"      to selectedRole,
-                                                    "invitedEmail" to invitedEmail,
-                                                    "createdBy" to ownerEmail,
-                                                    "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp(),
-                                                    "expiresAt" to expirationTime
-                                                ))
-                                                .addOnSuccessListener {
-                                                    // Fire-and-forget call to the Apps Script web app,
-                                                    // which sends the invite email via Gmail (MailApp).
-                                                    sendInviteEmailViaAppsScript(activity, invitedEmail, code, selectedRole)
-                                                    showCodeResultDialog(activity, code, invitedEmail, selectedRole)
-                                                    dialog.dismiss()
-                                                }
-                                                .addOnFailureListener { e ->
-                                                    Toast.makeText(activity, "Failed to generate: ${e.message}", Toast.LENGTH_LONG).show()
-                                                }
+                                            // Confirm before actually creating the code and sending the email
+                                            showInviteConfirmationDialog(activity, invitedEmail, selectedRole) {
+                                                generateAndSendInvite(activity, db, ownerEmail, invitedEmail, selectedRole, dialog)
+                                            }
                                         }
                                     }
                                     .addOnFailureListener { e ->
@@ -421,12 +402,62 @@ object NavigationHelper {
     }
 
     /**
+     * Asks the owner to confirm before the invite is generated and the email
+     * is sent, since both actions happen immediately and aren't easily undone.
+     */
+    private fun showInviteConfirmationDialog(activity: Activity, email: String, role: String, onConfirm: () -> Unit) {
+        val roleDisplayName = RoleManager.displayName(role)
+        AlertDialog.Builder(activity)
+            .setTitle("Confirm Invite")
+            .setMessage("Generate an invite code for $email as $roleDisplayName?\n\nAn email will be sent to them automatically.")
+            .setPositiveButton("Proceed") { _, _ -> onConfirm() }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    /**
+     * Performs the actual Firestore write and email send for a new invite.
+     * Only called after the owner has confirmed via showInviteConfirmationDialog.
+     */
+    private fun generateAndSendInvite(
+        activity: Activity,
+        db: FirebaseFirestore,
+        ownerEmail: String,
+        invitedEmail: String,
+        selectedRole: String,
+        parentDialog: AlertDialog
+    ) {
+        val expirationTime = System.currentTimeMillis() + (24 * 60 * 60 * 1000)
+        val code = "%06d".format(Random.nextInt(1000000))
+
+        db.collection("invite_codes")
+            .document(code)
+            .set(mapOf(
+                "role"      to selectedRole,
+                "invitedEmail" to invitedEmail,
+                "createdBy" to ownerEmail,
+                "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp(),
+                "expiresAt" to expirationTime
+            ))
+            .addOnSuccessListener {
+                // Fire-and-forget call to the Apps Script web app,
+                // which sends the invite email via Gmail (MailApp).
+                sendInviteEmailViaAppsScript(activity, invitedEmail, code, selectedRole)
+                showCodeResultDialog(activity, code, invitedEmail, selectedRole)
+                parentDialog.dismiss()
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(activity, "Failed to generate: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+    }
+
+    /**
      * Sends the invite email by calling a Google Apps Script web app, which uses
      * Gmail's MailApp to send the message under the "Waje Quail Farm" display name.
      * This runs on a background thread since it's a blocking network call.
      */
     private fun sendInviteEmailViaAppsScript(activity: Activity, email: String, code: String, role: String) {
-        val scriptUrl = "https://script.google.com/macros/s/AKfycbwr6X0iiy56L1v3RgPDaaD58s4KU9U16vhPBlitwfVy_THqz83dUSFSViJQ54irxgiS/exec"
+        val scriptUrl = "https://script.google.com/macros/s/AKfycbxd3Jv_ysFbqaH0Rf5Qw8_Zxv6g2Sy2muDSkISnmPjxk2KMENJF7RA8ybXdQ5GYyMHF/exec"
         val secret = "Red0455"
 
         Thread {

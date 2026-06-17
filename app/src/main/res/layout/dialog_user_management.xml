@@ -23,7 +23,8 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center"
-        android:layout_marginBottom="28dp">
+        android:layout_marginBottom="28dp"
+        android:spacing="8dp">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnRoleLimits"
@@ -32,32 +33,16 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Limits"
-            android:textSize="11sp"
-            app:cornerRadius="12dp"
+            android:textSize="12sp"
+            app:cornerRadius="8dp"
             app:strokeColor="@color/dark_green"
             android:textColor="@color/dark_green"
-            android:layout_marginEnd="4dp"
-            android:paddingVertical="8dp"
+            android:layout_marginEnd="6dp"
+            android:paddingVertical="10dp"
             android:insetTop="0dp"
             android:insetBottom="0dp"
-            android:textAllCaps="false"/>
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnPendingReq"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Pending"
-            android:textSize="11sp"
-            app:cornerRadius="12dp"
-            app:strokeColor="@color/dark_green"
-            android:textColor="@color/dark_green"
-            android:layout_marginHorizontal="2dp"
-            android:paddingVertical="8dp"
-            android:insetTop="0dp"
-            android:insetBottom="0dp"
-            android:textAllCaps="false"/>
+            android:textAllCaps="false"
+            app:strokeWidth="1.5dp"/>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnViewCodes"
@@ -66,15 +51,16 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Codes"
-            android:textSize="11sp"
-            app:cornerRadius="12dp"
+            android:textSize="12sp"
+            app:cornerRadius="8dp"
             app:strokeColor="@color/dark_green"
             android:textColor="@color/dark_green"
-            android:layout_marginHorizontal="2dp"
-            android:paddingVertical="8dp"
+            android:layout_marginHorizontal="6dp"
+            android:paddingVertical="10dp"
             android:insetTop="0dp"
             android:insetBottom="0dp"
-            android:textAllCaps="false"/>
+            android:textAllCaps="false"
+            app:strokeWidth="1.5dp"/>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnInviteNew"
@@ -82,12 +68,12 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Invite"
-            android:textSize="11sp"
-            app:cornerRadius="12dp"
+            android:text="Invite New"
+            android:textSize="12sp"
+            app:cornerRadius="8dp"
             app:backgroundTint="@color/dark_green"
-            android:layout_marginStart="4dp"
-            android:paddingVertical="8dp"
+            android:layout_marginStart="6dp"
+            android:paddingVertical="10dp"
             android:insetTop="0dp"
             android:insetBottom="0dp"
             android:textAllCaps="false"/>
