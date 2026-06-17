@@ -36,7 +36,6 @@ class RegisterActivity : AppCompatActivity() {
         pendingEmailTv = findViewById(R.id.pendingEmailTv)
         pendingQuail = findViewById(R.id.pendingQuail)
 
-        btnRequestCode = findViewById(R.id.btnRequestCode)
         btnEnterCode = findViewById(R.id.btnEnterCode)
         btnFarmSetup = findViewById(R.id.btnFarmSetup)
 
@@ -48,9 +47,6 @@ class RegisterActivity : AppCompatActivity() {
             startPendingVerification(pendingEmail)
         }
 
-        btnRequestCode.setOnClickListener {
-            showRequestCodeDialog(db)
-        }
 
         btnEnterCode.setOnClickListener {
             val intent = Intent(this, EnterCodeActivity::class.java)
@@ -70,94 +66,6 @@ class RegisterActivity : AppCompatActivity() {
 
         findViewById<Button>(R.id.btnCancelPending)?.setOnClickListener {
             stopPendingListener()
-        }
-    }
-
-    private fun showRequestCodeDialog(db: FirebaseFirestore) {
-        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_request_access, null)
-        val editEmail = dialogView.findViewById<EditText>(R.id.requestEmail)
-        val editName = dialogView.findViewById<EditText>(R.id.requestName)
-        val roleGroup = dialogView.findViewById<RadioGroup>(R.id.requestRoleGroup)
-
-        val rbStaff = dialogView.findViewById<RadioButton>(R.id.radioRequestStaff)
-        val rbBackup = dialogView.findViewById<RadioButton>(R.id.radioRequestBackup)
-
-        editEmail.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            override fun afterTextChanged(s: android.text.Editable?) {
-                val email = s.toString().trim()
-                if (email.isNotEmpty() && !Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-                    editEmail.error = "Invalid email format"
-                } else {
-                    editEmail.error = null
-                }
-            }
-        })
-
-        updateAvailabilityInButtons(db, rbStaff, rbBackup)
-
-        val builder = AlertDialog.Builder(this)
-            .setView(dialogView)
-            .setPositiveButton("Submit Request", null)
-            .setNegativeButton("Cancel", null)
-
-        val dialog = builder.create()
-        dialog.show()
-
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-            val email = editEmail.text.toString().trim().lowercase()
-            val name = editName.text.toString().trim()
-
-            val selectedRoleId = roleGroup.checkedRadioButtonId
-            val role = RoleManager.STAFF // Only staff role can be requested by users
-
-            if (email.isEmpty() || name.isEmpty()) {
-                Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-
-            if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-                Toast.makeText(this, "Please enter a valid email address", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-
-            // Prevent duplicate email requests
-            db.collection("user_access").document(email).get()
-                .addOnSuccessListener { doc ->
-                    if (doc.exists()) {
-                        Toast.makeText(this, "This email is already registered or has a pending request.", Toast.LENGTH_LONG).show()
-                    } else {
-                        checkRoleAvailability(db, role) { available ->
-                            if (!available) {
-                                val roleDisplayName = RoleManager.displayName(role)
-                                Toast.makeText(this, "The limit for $roleDisplayName has been reached.", Toast.LENGTH_LONG).show()
-                            } else {
-                                val requestMap = hashMapOf(
-                                    "name" to name,
-                                    "email" to email,
-                                    "status" to "pending",
-                                    "role" to role,
-                                    "requestedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
-                                )
-
-                                db.collection("user_access")
-                                    .document(email)
-                                    .set(requestMap)
-                                    .addOnSuccessListener {
-                                        dialog.dismiss()
-                                        startPendingVerification(email)
-                                    }
-                                    .addOnFailureListener { e ->
-                                        Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                                    }
-                            }
-                        }
-                    }
-                }
-                .addOnFailureListener { e ->
-                    Toast.makeText(this, "Error checking email: ${e.message}", Toast.LENGTH_SHORT).show()
-                }
         }
     }
 

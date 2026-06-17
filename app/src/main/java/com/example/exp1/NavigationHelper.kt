@@ -193,7 +193,11 @@ object NavigationHelper {
         // Hide Invite User if role is staff
         val navMenu = navigationView.menu
         val inviteItem = navMenu.findItem(R.id.nav_invite_user)
-        inviteItem?.isVisible = RoleManager(currentRole).canGenerateInviteCodes()
+        if (currentRole == "staff") {
+            inviteItem?.isVisible = false
+        } else {
+            inviteItem?.isVisible = true
+        }
 
         if (currentEmail != null) {
             FirebaseFirestore.getInstance().collection("user_access").document(currentEmail).get()
@@ -289,12 +293,7 @@ object NavigationHelper {
     fun showGenerateInviteCodeDialog(activity: Activity, ownerEmail: String) {
         val dialogView = LayoutInflater.from(activity).inflate(R.layout.dialog_invite_user, null)
         val editEmail = dialogView.findViewById<EditText>(R.id.inviteEmail)
-
-        // Only staff role is assignable via the invite flow.
-        // The radioInviteBackup button in the layout should be hidden or removed.
         val rbStaff = dialogView.findViewById<android.widget.RadioButton>(R.id.radioInviteStaff)
-        val rbBackup = dialogView.findViewById<android.widget.RadioButton?>(R.id.radioInviteBackup)
-        rbBackup?.visibility = android.view.View.GONE // Co-owner role removed; only staff is assignable
 
         editEmail.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -309,13 +308,14 @@ object NavigationHelper {
             }
         })
 
-        // Show how many staff slots remain
+        // Update availability
         val db = FirebaseFirestore.getInstance()
         db.collection("system_settings").document("role_limits").get()
             .addOnSuccessListener { limitDoc ->
                 val staffLimit = limitDoc.getLong("staff_limit") ?: 5L
+
                 db.collection("user_access")
-                    .whereEqualTo("role", RoleManager.STAFF)
+                    .whereEqualTo("role", "staff")
                     .whereEqualTo("status", "approved")
                     .get()
                     .addOnSuccessListener { docs ->
@@ -326,6 +326,7 @@ object NavigationHelper {
                             rbStaff.text = "Farm Staff (Full)"
                         }
                     }
+
             }
 
         val builder = AlertDialog.Builder(activity)
@@ -348,15 +349,14 @@ object NavigationHelper {
                 return@setOnClickListener
             }
 
-            // Only staff is an assignable role — no privilege escalation possible here
-            val selectedRole = RoleManager.STAFF
+            val selectedRole = "staff"
 
-            // Check role availability against the staff limit
+            // Check role availability
             db.collection("system_settings").document("role_limits").get()
                 .addOnSuccessListener { limitDoc ->
-                    val limit = limitDoc.getLong("staff_limit") ?: 5L
+                    val limit = limitDoc.getLong("${selectedRole}_limit") ?: 5L
                     db.collection("user_access")
-                        .whereEqualTo("role", RoleManager.STAFF)
+                        .whereEqualTo("role", selectedRole)
                         .whereEqualTo("status", "approved")
                         .get()
                         .addOnSuccessListener { users ->
@@ -377,11 +377,11 @@ object NavigationHelper {
                                             db.collection("invite_codes")
                                                 .document(code)
                                                 .set(mapOf(
-                                                    "role"         to selectedRole,
+                                                    "role"      to selectedRole,
                                                     "invitedEmail" to invitedEmail,
-                                                    "createdBy"    to ownerEmail,
-                                                    "createdAt"    to com.google.firebase.firestore.FieldValue.serverTimestamp(),
-                                                    "expiresAt"    to expirationTime
+                                                    "createdBy" to ownerEmail,
+                                                    "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp(),
+                                                    "expiresAt" to expirationTime
                                                 ))
                                                 .addOnSuccessListener {
                                                     showCodeResultDialog(activity, code, invitedEmail, ownerEmail, selectedRole)

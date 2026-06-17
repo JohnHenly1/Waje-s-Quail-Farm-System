@@ -882,7 +882,6 @@ public class ProfileActivity extends AppCompatActivity {
         rvUserList.setLayoutManager(new LinearLayoutManager(this));
 
         view.findViewById(R.id.btnRoleLimits).setOnClickListener(v -> showRoleLimitsDialog());
-        view.findViewById(R.id.btnPendingReq).setOnClickListener(v -> showPendingRequestsDialog());
         view.findViewById(R.id.btnInviteNew).setOnClickListener(v -> NavigationHelper.INSTANCE.showGenerateInviteCodeDialog(this, currentEmail));
         view.findViewById(R.id.btnViewCodes).setOnClickListener(v -> showInviteCodesManagementDialog());
 
