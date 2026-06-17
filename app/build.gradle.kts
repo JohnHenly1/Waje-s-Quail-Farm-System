@@ -8,6 +8,10 @@ android {
     namespace = "com.example.exp1"
     compileSdk = 36
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     packaging {
         jniLibs { useLegacyPackaging = true }
         resources { excludes += "META-INF/DEPENDENCIES" }
@@ -20,6 +24,7 @@ android {
         versionCode = 1
         versionName = "beta"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // No Apps Script integration configured in BuildConfig
     }
 
     buildTypes {

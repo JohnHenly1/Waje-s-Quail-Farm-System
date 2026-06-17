@@ -27,6 +27,9 @@ import androidx.drawerlayout.widget.DrawerLayout
 import com.bumptech.glide.Glide
 import com.google.android.material.navigation.NavigationView
 import com.google.firebase.firestore.FirebaseFirestore
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.UUID
 import kotlin.random.Random
 
@@ -105,7 +108,7 @@ object NavigationHelper {
             showNoInternetOverlay(currentActivity)
             return
         }
-        
+
         showGlobalLoading(currentActivity, label) {
             val intent = Intent(currentActivity, targetClass)
             intent.putExtra("username", email)
@@ -119,7 +122,7 @@ object NavigationHelper {
         val network = cm.activeNetwork ?: return false
         val caps = cm.getNetworkCapabilities(network) ?: return false
         return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-               caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 
     fun showNoInternetOverlay(activity: Activity) {
@@ -136,7 +139,7 @@ object NavigationHelper {
             percentageText?.visibility = View.GONE
             noInternetSection.visibility = View.VISIBLE
             loadingLayout.visibility = View.VISIBLE
-            
+
             btnRetry?.setOnClickListener {
                 if (isInternetActuallyWorking(activity)) {
                     loadingLayout.visibility = View.GONE
@@ -185,7 +188,7 @@ object NavigationHelper {
 
     fun setupSideMenu(activity: Activity, drawerLayout: DrawerLayout) {
         val navigationView = activity.findViewById<NavigationView>(R.id.sideMenu)
-        
+
         val accountManager = AccountManager(activity)
         val currentEmail = accountManager.getCurrentUsername()
         val currentRole = accountManager.getRole(currentEmail ?: "")
@@ -198,7 +201,7 @@ object NavigationHelper {
         } else {
             inviteItem?.isVisible = true
         }
-        
+
         if (currentEmail != null) {
             FirebaseFirestore.getInstance().collection("user_access").document(currentEmail).get()
                 .addOnSuccessListener { doc ->
@@ -209,7 +212,7 @@ object NavigationHelper {
                     }
                 }
         }
-        
+
         navigationView?.setNavigationItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
                 R.id.nav_invite_user -> {
@@ -255,7 +258,7 @@ object NavigationHelper {
         val userImageView = headerView?.findViewById<ImageView>(R.id.userPhoto)
 
         userNameTextView?.text = name
-        
+
         if (photoUrl.isNotEmpty()) {
             userInitialTextView?.visibility = View.GONE
             userImageView?.let {
@@ -294,9 +297,8 @@ object NavigationHelper {
         val dialogView = LayoutInflater.from(activity).inflate(R.layout.dialog_invite_user, null)
         val editEmail = dialogView.findViewById<EditText>(R.id.inviteEmail)
         val roleGroup = dialogView.findViewById<android.widget.RadioGroup>(R.id.inviteRoleGroup)
-        
+
         val rbStaff = dialogView.findViewById<android.widget.RadioButton>(R.id.radioInviteStaff)
-        val rbBackup = dialogView.findViewById<android.widget.RadioButton>(R.id.radioInviteBackup)
 
         editEmail.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -316,8 +318,6 @@ object NavigationHelper {
         db.collection("system_settings").document("role_limits").get()
             .addOnSuccessListener { limitDoc ->
                 val staffLimit = limitDoc.getLong("staff_limit") ?: 5L
-                val backupLimit = limitDoc.getLong("backup_owner_limit") ?: 2L
-
                 db.collection("user_access")
                     .whereEqualTo("role", "staff")
                     .whereEqualTo("status", "approved")
@@ -330,19 +330,12 @@ object NavigationHelper {
                             rbStaff.text = "Farm Staff (Full)"
                         }
                     }
-
-                db.collection("user_access")
-                    .whereEqualTo("role", "backup_owner")
-                    .whereEqualTo("status", "approved")
-                    .get()
-                    .addOnSuccessListener { docs ->
-                        val available = (backupLimit - docs.size()).coerceAtLeast(0)
-                        rbBackup.text = "Co Farm Owner ($available spots left)"
-                        if (available <= 0) {
-                            rbBackup.isEnabled = false
-                            rbBackup.text = "Co Farm Owner (Full)"
-                        }
+                    .addOnFailureListener { e ->
+                        Toast.makeText(activity, "Error checking role availability: ${e.message}", Toast.LENGTH_SHORT).show()
                     }
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(activity, "Error fetching role limits: ${e.message}", Toast.LENGTH_SHORT).show()
             }
 
         val builder = AlertDialog.Builder(activity)
@@ -365,8 +358,8 @@ object NavigationHelper {
                 return@setOnClickListener
             }
 
-            val selectedRoleId = roleGroup.checkedRadioButtonId
-            val selectedRole = if (selectedRoleId == R.id.radioInviteBackup) "backup_owner" else "staff"
+            // Only staff invites are supported now
+            val selectedRole = "staff"
 
             // Check role availability
             db.collection("system_settings").document("role_limits").get()
@@ -398,10 +391,13 @@ object NavigationHelper {
                                                     "invitedEmail" to invitedEmail,
                                                     "createdBy" to ownerEmail,
                                                     "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp(),
-                                                    "expiresAt" to expirationTime 
+                                                    "expiresAt" to expirationTime
                                                 ))
                                                 .addOnSuccessListener {
-                                                    showCodeResultDialog(activity, code, invitedEmail, ownerEmail, selectedRole)
+                                                    // Fire-and-forget call to the Apps Script web app,
+                                                    // which sends the invite email via Gmail (MailApp).
+                                                    sendInviteEmailViaAppsScript(activity, invitedEmail, code, selectedRole)
+                                                    showCodeResultDialog(activity, code, invitedEmail, selectedRole)
                                                     dialog.dismiss()
                                                 }
                                                 .addOnFailureListener { e ->
@@ -414,75 +410,83 @@ object NavigationHelper {
                                     }
                             }
                         }
-                        .addOnFailureListener { 
-                            Toast.makeText(activity, "Error checking role availability", Toast.LENGTH_SHORT).show()
+                        .addOnFailureListener { e ->
+                            Toast.makeText(activity, "Error checking role availability: ${e.message}", Toast.LENGTH_SHORT).show()
                         }
                 }
-                .addOnFailureListener { 
-                    Toast.makeText(activity, "Error fetching role limits", Toast.LENGTH_SHORT).show()
+                .addOnFailureListener { e ->
+                    Toast.makeText(activity, "Error fetching role limits: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
         }
     }
 
-    private fun showCodeResultDialog(activity: Activity, code: String, email: String, ownerEmail: String, role: String) {
-        val roleDisplayName = RoleManager.displayName(role)
-        val message = "Share this code with $email:\n\nCode: $code\nRole: $roleDisplayName\n\nIt will expire in 24 hours."
-        AlertDialog.Builder(activity)
-            .setTitle("Invite Code Ready")
-            .setMessage(message)
-            .setPositiveButton("Open Gmail") { _, _ -> sendCodeByEmail(activity, code, email, ownerEmail, role) }
-            .setNeutralButton("Copy Code") { _, _ ->
-                val clipboard = activity.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Invite Code", code))
-                Toast.makeText(activity, "Code copied", Toast.LENGTH_SHORT).show()
+    /**
+     * Sends the invite email by calling a Google Apps Script web app, which uses
+     * Gmail's MailApp to send the message under the "Waje Quail Farm" display name.
+     * This runs on a background thread since it's a blocking network call.
+     */
+    private fun sendInviteEmailViaAppsScript(activity: Activity, email: String, code: String, role: String) {
+        val scriptUrl = "https://script.google.com/macros/s/AKfycbwr6X0iiy56L1v3RgPDaaD58s4KU9U16vhPBlitwfVy_THqz83dUSFSViJQ54irxgiS/exec"
+        val secret = "Red0455"
+
+        Thread {
+            try {
+                val url = URL(scriptUrl)
+                val conn = url.openConnection() as HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                conn.doOutput = true
+                conn.connectTimeout = 10000
+                conn.readTimeout = 10000
+
+                val payload = JSONObject().apply {
+                    put("secret", secret)
+                    put("email", email)
+                    put("code", code)
+                    put("role", role)
+                    put("expiresHours", 24)
+                }
+
+                conn.outputStream.use { os ->
+                    os.write(payload.toString().toByteArray(Charsets.UTF_8))
+                }
+
+                val responseCode = conn.responseCode
+                val responseText = try {
+                    conn.inputStream.bufferedReader().use { it.readText() }
+                } catch (_: Exception) {
+                    conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+                }
+
+                Handler(Looper.getMainLooper()).post {
+                    if (responseCode != 200) {
+                        Toast.makeText(
+                            activity,
+                            "Invite saved, but the email failed to send (code $responseCode).",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            } catch (e: Exception) {
+                Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(
+                        activity,
+                        "Invite saved, but the email failed to send: ${e.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
             }
-            .show()
+        }.start()
     }
 
-    private fun sendCodeByEmail(activity: Activity, code: String, email: String, ownerEmail: String, role: String) {
+    private fun showCodeResultDialog(activity: Activity, code: String, email: String, role: String) {
         val roleDisplayName = RoleManager.displayName(role)
-        val emailBody = """
-Hello,
-
-You have been invited to join the Quail Farm Management System by $ownerEmail.
-
-Your 6-digit access code is: $code
-Your role: $roleDisplayName
-
-This code is linked to your email ($email) and will expire in 24 hours.
-
-Steps to get started:
-1. Download the Quail Farm Management System app from the Play Store
-2. Select "Enter Code" during registration
-3. Enter your 6-digit code: $code
-4. Complete your profile setup
-
-The owner of the farm is: $ownerEmail
-If you have any questions, please contact them directly.
-
-Best regards,
-Waje's Quail Farm System
-        """.trimIndent()
-
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "message/rfc822"
-            putExtra(Intent.EXTRA_EMAIL, arrayOf(email))
-            putExtra(Intent.EXTRA_CC, arrayOf(ownerEmail))
-            putExtra(Intent.EXTRA_SUBJECT, "Quail Farm Invitation Code - $code")
-            putExtra(Intent.EXTRA_TEXT, emailBody)
-            setPackage("com.google.android.gm") // Force Gmail
-        }
-        try {
-            activity.startActivity(intent)
-        } catch (e: Exception) {
-            // Fallback to chooser without package
-            intent.setPackage(null)
-            try {
-                activity.startActivity(Intent.createChooser(intent, "Send Email..."))
-            } catch (e2: Exception) {
-                Toast.makeText(activity, "No email app found", Toast.LENGTH_SHORT).show()
-            }
-        }
+        val message = "An invite email has been automatically sent to $email.\n\nCode: $code\nRole: $roleDisplayName\n\nIt will expire in 24 hours."
+        AlertDialog.Builder(activity)
+            .setTitle("Invite Sent")
+            .setMessage(message)
+            .setPositiveButton("Close", null)
+            .show()
     }
 
     fun showHelpSupportDialog(activity: Activity) {

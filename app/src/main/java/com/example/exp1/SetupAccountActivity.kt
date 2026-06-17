@@ -26,7 +26,7 @@ class SetupAccountActivity : AppCompatActivity() {
     private lateinit var editPasswordLayout: TextInputLayout
     private lateinit var imgProfile: ImageView
     private lateinit var btnComplete: Button
-    
+
     private var email: String = ""
     private var role: String = ""
     private var photoUrl: String = ""
@@ -70,10 +70,19 @@ class SetupAccountActivity : AppCompatActivity() {
             showDatePicker()
         }
 
+        // Live validation: letters only, no numbers or stray symbols
+        editName.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                editName.error = getNameValidationError(s.toString())
+            }
+        })
+
         // Auto-detect password format
         editPassword.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun onTextChanged(s: CharSequence?, before: Int, start: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
                 val pass = s.toString()
                 if (pass.isNotEmpty()) {
@@ -99,6 +108,22 @@ class SetupAccountActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
+            // Full name must contain letters only (no digits or stray symbols)
+            val nameError = getNameValidationError(name)
+            if (nameError != null) {
+                editName.error = nameError
+                Toast.makeText(this, nameError, Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            // Safety net: enforce 18+ even if the birthday text was set some
+            // other way than the date picker (the picker itself already
+            // blocks selecting a date that fails this).
+            if (bday.isNotEmpty() && !isAtLeast18(bday)) {
+                Toast.makeText(this, "You must be at least 18 years old", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
             // Validate address if any component is provided
             if (street.isNotEmpty() || city.isNotEmpty() || state.isNotEmpty() || postal.isNotEmpty()) {
                 if (street.isEmpty() || city.isEmpty() || state.isEmpty() || postal.isEmpty()) {
@@ -121,7 +146,7 @@ class SetupAccountActivity : AppCompatActivity() {
             }
 
             val db = FirebaseFirestore.getInstance()
-            
+
             val addressMap = if (street.isNotEmpty()) {
                 mapOf(
                     "street" to street,
@@ -144,7 +169,7 @@ class SetupAccountActivity : AppCompatActivity() {
                 "setupCompleted" to true,
                 "verifiedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
             )
-            
+
             if (addressMap != null) {
                 userData["address"] = addressMap
             }
@@ -175,18 +200,33 @@ class SetupAccountActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Full names may contain letters, spaces, hyphens, and apostrophes
+     * (covers names like "Mary-Jane" or "O'Brien"), but no digits or
+     * other symbols. Returns null when the name is valid or empty.
+     */
+    private fun getNameValidationError(name: String): String? {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return null
+        val nameRegex = Regex("^[A-Za-z\\s'-]+$")
+        if (!nameRegex.matches(trimmed)) {
+            return "Name can only contain letters (no numbers or symbols)"
+        }
+        return null
+    }
+
     private fun validateAddress(street: String, city: String, state: String, postal: String): String? {
         if (street.length < 5) return "Street address must be at least 5 characters"
         if (city.length < 2) return "City must be at least 2 characters"
         if (state.length < 2) return "State/Province must be at least 2 characters"
         if (postal.length < 3) return "Postal code must be at least 3 characters"
-        
+
         val invalidChars = "!@#$%^&*()=[]{}|;':\",<>?"
-        if (street.any { it in invalidChars } || city.any { it in invalidChars } || 
+        if (street.any { it in invalidChars } || city.any { it in invalidChars } ||
             state.any { it in invalidChars } || postal.any { it in invalidChars }) {
             return "Address contains invalid characters"
         }
-        
+
         return null
     }
 
@@ -210,12 +250,43 @@ class SetupAccountActivity : AppCompatActivity() {
             editBirthday.setText(sdf.format(calendar.time))
         }
 
-        DatePickerDialog(
+        // Birthday must yield an age of at least 18, so cap the picker at
+        // "today minus 18 years" and open it there by default — no later
+        // date can be selected.
+        val maxBirthday = Calendar.getInstance().apply { add(Calendar.YEAR, -18) }
+
+        val dialog = DatePickerDialog(
             this,
             dateSetListener,
-            calendar.get(Calendar.YEAR),
-            calendar.get(Calendar.MONTH),
-            calendar.get(Calendar.DAY_OF_MONTH)
-        ).show()
+            maxBirthday.get(Calendar.YEAR),
+            maxBirthday.get(Calendar.MONTH),
+            maxBirthday.get(Calendar.DAY_OF_MONTH)
+        )
+        dialog.datePicker.maxDate = maxBirthday.timeInMillis
+        dialog.show()
+    }
+
+    /**
+     * Safety net in case the birthday field is ever edited some other way
+     * than the date picker (e.g. direct text input). Returns true only
+     * when the parsed date makes the person 18 or older today.
+     */
+    private fun isAtLeast18(bday: String): Boolean {
+        return try {
+            val sdf = SimpleDateFormat("MM/dd/yyyy", Locale.US)
+            sdf.isLenient = false
+            val birthDate = sdf.parse(bday) ?: return false
+
+            val birthCal = Calendar.getInstance().apply { time = birthDate }
+            val today = Calendar.getInstance()
+
+            var age = today.get(Calendar.YEAR) - birthCal.get(Calendar.YEAR)
+            if (today.get(Calendar.DAY_OF_YEAR) < birthCal.get(Calendar.DAY_OF_YEAR)) {
+                age--
+            }
+            age >= 18
+        } catch (e: Exception) {
+            false
+        }
     }
 }

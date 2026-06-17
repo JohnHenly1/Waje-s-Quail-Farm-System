@@ -271,7 +271,7 @@ public class ProfileActivity extends AppCompatActivity {
     }
 
     private boolean isAdmin() {
-        return "owner".equals(userRole) || "backup_owner".equals(userRole);
+        return "owner".equals(userRole);
     }
 
     private void loadFirestoreData() {
@@ -969,11 +969,7 @@ public class ProfileActivity extends AppCompatActivity {
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(40, 40, 40, 40);
-
-        EditText editBackupLimit = new EditText(this);
-        editBackupLimit.setHint(R.string.max_backup_owners_hint);
-        layout.addView(editBackupLimit);
-
+        // Only staff limit is applicable now (backup_owner role removed)
         EditText editStaffLimit = new EditText(this);
         editStaffLimit.setHint(R.string.max_staff_hint);
         layout.addView(editStaffLimit);
@@ -981,7 +977,6 @@ public class ProfileActivity extends AppCompatActivity {
         FirebaseFirestore.getInstance().collection("system_settings").document("role_limits").get()
                 .addOnSuccessListener(doc -> {
                     if (doc.exists()) {
-                        editBackupLimit.setText(String.valueOf(doc.getLong("backup_owner_limit")));
                         editStaffLimit.setText(String.valueOf(doc.getLong("staff_limit")));
                     }
                 });
@@ -989,8 +984,13 @@ public class ProfileActivity extends AppCompatActivity {
         builder.setView(layout);
         builder.setPositiveButton(getString(R.string.save), (d, w) -> {
             Map<String, Object> limits = new HashMap<>();
-            limits.put("backup_owner_limit", Long.parseLong(editBackupLimit.getText().toString()));
-            limits.put("staff_limit", Long.parseLong(editStaffLimit.getText().toString()));
+            long staffLimitVal = 5L;
+            try {
+                staffLimitVal = Long.parseLong(editStaffLimit.getText().toString());
+            } catch (Exception ex) {
+                // fallback to default
+            }
+            limits.put("staff_limit", staffLimitVal);
             FirebaseFirestore.getInstance().collection("system_settings").document("role_limits").set(limits)
                     .addOnSuccessListener(a ->
                             Toast.makeText(this, getString(R.string.limits_updated), Toast.LENGTH_SHORT).show());

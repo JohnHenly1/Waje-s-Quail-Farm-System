@@ -53,31 +53,15 @@
             android:layout_marginTop="48dp">
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnRequestCode"
-                style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
-                android:layout_width="match_parent"
-                android:layout_height="64dp"
-                android:text="@string/request_code"
-                android:textColor="@color/white"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:textAllCaps="false"
-                app:backgroundTint="#466d1d"
-                app:cornerRadius="16dp"
-                app:icon="@drawable/ic_clipboard_list"
-                app:iconGravity="textStart" />
-
-            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnEnterCode"
                 style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
                 android:layout_width="match_parent"
-                android:layout_height="64dp"
-                android:layout_marginTop="16dp"
+                android:layout_height="wrap_content"
                 android:text="@string/i_have_a_code"
+                android:textAllCaps="false"
                 android:textColor="@color/white"
                 android:textSize="16sp"
                 android:textStyle="bold"
-                android:textAllCaps="false"
                 app:backgroundTint="#6B8E23"
                 app:cornerRadius="16dp"
                 app:icon="@drawable/ic_file_text"

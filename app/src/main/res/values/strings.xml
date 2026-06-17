@@ -140,9 +140,8 @@
     <string name="or_separator">— OR —</string>
     <string name="select_role">Select Desired Role:</string>
     <string name="role_staff">Farm Staff</string>
-    <string name="role_backup_owner">Co Farm Owner</string>
     <string name="request_code">Request Access Code</string>
-    <string name="i_have_a_code">I have an Invite Code</string>
+    <string name="i_have_a_code">Enter the Code and Crendentials To Fully Registered</string>
     <string name="initial_farm_setup">Initial Farm Setup (Farm Owner)</string>
     <string name="role_available">Available: %1$d/%2$d</string>
     <string name="role_full">Role Full</string>
@@ -316,7 +315,7 @@
     <string name="fill_all_address">Please fill all address fields</string>
     <string name="location_updated">Location updated successfully</string>
     <string name="location_update_failed">Failed to update location</string>
-    <string name="max_backup_owners_hint">Max Co Farm Owners</string>
+    <!-- backup owner role removed -->
     <string name="max_staff_hint">Max Farm Staff</string>
     <string name="verification_code_msg">Verification Code for %1$s: %2$s</string>
     <string name="send_approval_email">Send Approval &amp; Code via Gmail</string>

@@ -523,30 +523,114 @@
                     android:fontFamily="sans-serif-black"
                     android:text="Today's Tasks"
                     android:textColor="#111827"
-                    android:textSize="18sp" />
+                    android:textSize="18sp"
+                    android:visibility="gone" />
 
+                <!-- Make the container full width. Put filters in a left-weighted group and action icons to the right so delete icon is never clipped -->
                 <LinearLayout
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_alignParentEnd="true"
                     android:layout_centerVertical="true"
-                    android:orientation="horizontal">
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:paddingEnd="8dp">
+
+                    <!-- Filters: use a horizontal scrollable ChipGroup so chips look nicer and never get squeezed on small screens -->
+                    <HorizontalScrollView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:fillViewport="false"
+                        android:scrollbars="none"
+                        android:overScrollMode="never">
+
+                        <com.google.android.material.chip.ChipGroup
+                            android:id="@+id/filtersGroup"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            app:singleLine="true"
+                            app:chipSpacing="8dp"
+                            app:singleSelection="true"
+                            app:selectionRequired="true"
+                            android:paddingStart="4dp"
+                            android:paddingEnd="4dp"
+                            android:gravity="center_vertical">
+
+                            <com.google.android.material.chip.Chip
+                                android:id="@+id/filterAssignedBtn"
+                                style="@style/Widget.MaterialComponents.Chip.Choice"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Assigned"
+                                android:textAllCaps="false"
+                                android:minWidth="72dp"
+                                android:paddingLeft="12dp"
+                                android:paddingRight="12dp"
+                                android:checkable="true"
+                                android:checked="true"
+                                app:chipBackgroundColor="@color/chip_bg_green"
+                                app:chipStrokeColor="@color/dark_green"
+                                app:chipStrokeWidth="1dp"
+                                app:checkedIconVisible="false"
+                                android:textColor="@color/chip_text_green" />
+
+                            <com.google.android.material.chip.Chip
+                                android:id="@+id/filterMissingBtn"
+                                style="@style/Widget.MaterialComponents.Chip.Choice"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Missing"
+                                android:textAllCaps="false"
+                                android:minWidth="72dp"
+                                android:paddingLeft="12dp"
+                                android:paddingRight="12dp"
+                                android:checkable="true"
+                                app:chipBackgroundColor="@color/chip_bg_orange"
+                                app:chipStrokeColor="#EA580C"
+                                app:chipStrokeWidth="1dp"
+                                app:checkedIconVisible="false"
+                                android:textColor="@color/chip_text_orange" />
+
+                            <com.google.android.material.chip.Chip
+                                android:id="@+id/filterDoneBtn"
+                                style="@style/Widget.MaterialComponents.Chip.Choice"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Done"
+                                android:textAllCaps="false"
+                                android:minWidth="72dp"
+                                android:paddingLeft="12dp"
+                                android:paddingRight="12dp"
+                                android:checkable="true"
+                                app:chipBackgroundColor="@color/chip_bg_green"
+                                app:chipStrokeColor="@color/dark_green"
+                                app:chipStrokeWidth="1dp"
+                                app:checkedIconVisible="false"
+                                android:textColor="@color/card_green_light" />
+
+                        </com.google.android.material.chip.ChipGroup>
+                    </HorizontalScrollView>
 
                     <ImageButton
                         android:id="@+id/taskDetailsBtn"
-                        android:layout_width="32dp"
-                        android:layout_height="32dp"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
                         android:layout_marginEnd="8dp"
+                        android:layout_gravity="center_vertical"
                         android:background="?attr/selectableItemBackgroundBorderless"
+                        android:padding="6dp"
                         app:srcCompat="@drawable/ic_info"
                         app:tint="@color/dark_green"
                         android:contentDescription="All Task Details" />
 
                     <ImageButton
                         android:id="@+id/bulkDeleteBtn"
-                        android:layout_width="32dp"
-                        android:layout_height="32dp"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:layout_marginEnd="4dp"
+                        android:layout_gravity="center_vertical"
                         android:background="?attr/selectableItemBackgroundBorderless"
+                        android:padding="6dp"
                         app:srcCompat="@android:drawable/ic_menu_delete"
                         app:tint="#EF4444"
                         android:contentDescription="Bulk Delete" />

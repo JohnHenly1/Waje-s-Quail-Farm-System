@@ -140,7 +140,6 @@
     <string name="or_separator">— O —</string>
     <string name="select_role">Pumili ng Papel:</string>
     <string name="role_staff">Farm Staff</string>
-    <string name="role_backup_owner">Co Farm Owner</string>
     <string name="request_code">Humingi ng Access Code</string>
     <string name="i_have_a_code">May Invite Code Ako</string>
     <string name="initial_farm_setup">Initial na Setup ng Farm (Farm Owner)</string>
@@ -308,7 +307,7 @@
     <string name="fill_all_address">Pakisuyong punan ang lahat ng field ng address</string>
     <string name="location_updated">Matagumpay na na-update ang lokasyon</string>
     <string name="location_update_failed">Bigo sa pag-update ng lokasyon</string>
-    <string name="max_backup_owners_hint">Max Co Farm Owners</string>
+    <!-- backup owner role removed -->
     <string name="max_staff_hint">Max Farm Staff</string>
     <string name="verification_code_msg">Verification Code para kay %1$s: %2$s</string>
     <string name="send_approval_email">Ipadala ang Approval at Code sa pamamagitan ng Gmail</string>

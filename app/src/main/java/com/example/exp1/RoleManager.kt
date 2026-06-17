@@ -4,28 +4,26 @@ class RoleManager(val role: String) {
 
     companion object {
         const val OWNER         = "owner"
-        const val BACKUP_OWNER  = "backup_owner"
         const val STAFF         = "staff"
 
         fun displayName(role: String): String = when (role) {
             OWNER        -> "Farm Owner"
-            BACKUP_OWNER -> "Co Farm Owner"
             STAFF        -> "Farm Staff"
             else         -> "Farm Staff"
         }
     }
 
     /** Can add/edit/delete feed items, tasks, farm stats */
-    fun canEditFarm(): Boolean = role == OWNER || role == BACKUP_OWNER
+    fun canEditFarm(): Boolean = role == OWNER
 
     // Can delete feed items (staff can only update status)
-    fun canDeleteFeedItem(): Boolean = role == OWNER || role == BACKUP_OWNER
+    fun canDeleteFeedItem(): Boolean = role == OWNER
 
     // Can add new tasks
-    fun canAddTask(): Boolean = role == OWNER || role == BACKUP_OWNER
+    fun canAddTask(): Boolean = role == OWNER
 
     //Can delete tasks
-    fun canDeleteTask(): Boolean = role == OWNER || role == BACKUP_OWNER
+    fun canDeleteTask(): Boolean = role == OWNER
 
     // Can update task status (all roles)
     fun canUpdateTaskStatus(): Boolean = true
@@ -34,11 +32,11 @@ class RoleManager(val role: String) {
     fun canManageUsers(): Boolean = role == OWNER
 
     // Can generate invite codes
-    fun canGenerateInviteCodes(): Boolean = role == OWNER || role == BACKUP_OWNER
+    fun canGenerateInviteCodes(): Boolean = role == OWNER
 
     // Can clear global alerts
-    fun canClearAlerts(): Boolean = role == OWNER || role == BACKUP_OWNER
+    fun canClearAlerts(): Boolean = role == OWNER
 
     // Can change farm settings (birds, cages, start date)
-    fun canChangeFarmSettings(): Boolean = role == OWNER || role == BACKUP_OWNER
+    fun canChangeFarmSettings(): Boolean = role == OWNER
 }

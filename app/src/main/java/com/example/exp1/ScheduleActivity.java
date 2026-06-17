@@ -43,6 +43,7 @@ import androidx.core.app.NotificationManagerCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.core.content.ContextCompat;
 
 import com.example.exp1.FarmRepository;
 import com.google.firebase.auth.FirebaseAuth;
@@ -82,6 +83,12 @@ public class ScheduleActivity extends AppCompatActivity {
     private LinearLayout tasksContainer;
     private TextView doneCount, ongoingCount, pendingCount;
     private List<Task> taskList = new ArrayList<>();
+    // Filter buttons
+    private Button filterAssignedBtn, filterMissingBtn, filterDoneBtn;
+    private static final String FILTER_ASSIGNED = "ASSIGNED"; // pending
+    private static final String FILTER_MISSING = "MISSING";   // missed
+    private static final String FILTER_DONE = "DONE";         // done
+    private String activeFilter = FILTER_ASSIGNED;
 
     private FirebaseFirestore db;
     private String currentUserEmail;
@@ -187,6 +194,23 @@ public class ScheduleActivity extends AppCompatActivity {
         findViewById(R.id.seeCalendarBtn).setOnClickListener(v -> showFullCalendar());
         findViewById(R.id.bulkDeleteBtn).setOnClickListener(v -> showBulkDeleteDialog());
         findViewById(R.id.taskDetailsBtn).setOnClickListener(v -> showAllTaskDetails());
+
+        // Setup filter buttons (Assigned / Missing / Done)
+        filterAssignedBtn = findViewById(R.id.filterAssignedBtn);
+        filterMissingBtn = findViewById(R.id.filterMissingBtn);
+        filterDoneBtn = findViewById(R.id.filterDoneBtn);
+
+        View.OnClickListener filterClick = v -> {
+            if (v.getId() == R.id.filterAssignedBtn) activeFilter = FILTER_ASSIGNED;
+            else if (v.getId() == R.id.filterMissingBtn) activeFilter = FILTER_MISSING;
+            else if (v.getId() == R.id.filterDoneBtn) activeFilter = FILTER_DONE;
+            updateFilterButtonsUI();
+            updateTasksUI();
+        };
+        if (filterAssignedBtn != null) filterAssignedBtn.setOnClickListener(filterClick);
+        if (filterMissingBtn != null) filterMissingBtn.setOnClickListener(filterClick);
+        if (filterDoneBtn != null) filterDoneBtn.setOnClickListener(filterClick);
+        updateFilterButtonsUI();
 
         NavigationHelper.INSTANCE.setupBottomNavigation(this);
 
@@ -383,7 +407,8 @@ public class ScheduleActivity extends AppCompatActivity {
         EditText    editTaskTitle        = dialogView.findViewById(R.id.editTaskTitle);
         Spinner     spinnerCategory      = dialogView.findViewById(R.id.spinnerCategory);
         TextView    textTime             = dialogView.findViewById(R.id.textTime);
-        EditText    editWorkWindow       = dialogView.findViewById(R.id.editWorkWindow);
+        // Work window is now a Spinner (drop-down) offering fixed selections from 30 minutes to 2 hours
+        Spinner     spinnerWorkWindow    = dialogView.findViewById(R.id.spinnerWorkWindow);
         TextView    txtCurrentMonth      = dialogView.findViewById(R.id.txtCurrentMonth);
         GridLayout  calendarGrid         = dialogView.findViewById(R.id.calendarGrid);
         ImageButton btnPrevMonth         = dialogView.findViewById(R.id.btnPrevMonth);
@@ -402,20 +427,88 @@ public class ScheduleActivity extends AppCompatActivity {
         catAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerCategory.setAdapter(catAdapter);
 
+        // Populate work window spinner with friendly labels and corresponding minute values
+        final String[] workWindowLabels = new String[]{"30 minutes","45 minutes","60 minutes","75 minutes","90 minutes","105 minutes","120 minutes"};
+        final int[] workWindowValues = new int[]{30,45,60,75,90,105,120};
+        ArrayAdapter<String> wwAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, workWindowLabels);
+        wwAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerWorkWindow.setAdapter(wwAdapter);
+        // Set initial selection to match category default and update when category changes
+        int defaultMinutes = getDefaultWorkWindow(spinnerCategory.getSelectedItem().toString());
+        // find index
+        int defaultIndex = 0;
+        for (int i = 0; i < workWindowValues.length; i++) if (workWindowValues[i] == defaultMinutes) { defaultIndex = i; break; }
+        spinnerWorkWindow.setSelection(defaultIndex);
+
+        spinnerCategory.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
+                String cat = parent.getItemAtPosition(position).toString();
+                int def = getDefaultWorkWindow(cat);
+                for (int k = 0; k < workWindowValues.length; k++) {
+                    if (workWindowValues[k] == def) { spinnerWorkWindow.setSelection(k); break; }
+                }
+            }
+
+            @Override public void onNothingSelected(android.widget.AdapterView<?> parent) { }
+        });
+
         final String[] selectedTime = {"08:00 AM"};
         final String[] selectedRecurrence = {RECUR_ONCE};
         final int[] selHour   = {8};
         final int[] selMinute = {0};
-        textTime.setOnClickListener(v ->
-                new TimePickerDialog(this, (view, hourOfDay, minute) -> {
-                    selHour[0]   = hourOfDay;
-                    selMinute[0] = minute;
-                    String amPm  = (hourOfDay < 12) ? "AM" : "PM";
-                    int h = (hourOfDay > 12) ? hourOfDay - 12 : (hourOfDay == 0 ? 12 : hourOfDay);
-                    selectedTime[0] = String.format(Locale.getDefault(), "%02d:%02d %s", h, minute, amPm);
-                    textTime.setText(selectedTime[0]);
-                }, selHour[0], selMinute[0], false).show()
-        );
+        textTime.setOnClickListener(v -> {
+            // Create custom dialog with TimePicker to validate work hours (6 AM - 8 PM)
+            android.widget.TimePicker timePicker = new android.widget.TimePicker(this);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                timePicker.setHour(selHour[0]);
+                timePicker.setMinute(selMinute[0]);
+            } else {
+                timePicker.setCurrentHour(selHour[0]);
+                timePicker.setCurrentMinute(selMinute[0]);
+            }
+
+            AlertDialog timeDialog = new AlertDialog.Builder(this)
+                    .setTitle("Select Time (6 AM - 8 PM)")
+                    .setView(timePicker)
+                    .setPositiveButton("OK", null)  // Will override onClick
+                    .setNegativeButton("Cancel", null)
+                    .create();
+
+            // Override positive button to validate work hours
+            timeDialog.setOnShowListener(dialog -> {
+                android.widget.Button okBtn = timeDialog.getButton(AlertDialog.BUTTON_POSITIVE);
+                if (okBtn != null) {
+                    okBtn.setOnClickListener(btn -> {
+                        int hour, minute;
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            hour = timePicker.getHour();
+                            minute = timePicker.getMinute();
+                        } else {
+                            hour = timePicker.getCurrentHour();
+                            minute = timePicker.getCurrentMinute();
+                        }
+
+                        // Validate: work hours 6 AM (hour 6) to 8 PM (hour 20)
+                        if (hour < 6 || hour > 20) {
+                            Toast.makeText(this, "Please choose a time between 6:00 AM and 8:00 PM", Toast.LENGTH_SHORT).show();
+                            return;  // Keep dialog open
+                        }
+
+                        // Accept selection
+                        selHour[0] = hour;
+                        selMinute[0] = minute;
+                        String amPm = (hour < 12) ? "AM" : "PM";
+                        int h = (hour > 12) ? hour - 12 : (hour == 0 ? 12 : hour);
+                        selectedTime[0] = String.format(Locale.getDefault(), "%02d:%02d %s", h, minute, amPm);
+                        textTime.setText(selectedTime[0]);
+                        timeDialog.dismiss();
+                    });
+                }
+            });
+
+            timeDialog.show();
+        });
 
         final List<Long> selectedDates = new ArrayList<>();
         final Calendar   viewCalendar  = Calendar.getInstance();
@@ -437,11 +530,17 @@ public class ScheduleActivity extends AppCompatActivity {
                     Collections.sort(sorted);
                     long diff = sorted.get(1) - sorted.get(0);
                     int days = (int) (diff / (1000 * 60 * 60 * 24));
-                    if (days > 0) {
+                    // Only show pattern suggestion when gap is greater than 1 day.
+                    // A gap of 1 day is equivalent to daily and the suggestion is redundant.
+                    if (days > 1) {
                         patternGap[0] = days;
                         txtPatternSuggestion.setVisibility(View.VISIBLE);
                         txtPatternSuggestion.setText(getString(R.string.repeat_every_days_suggestion, days));
-                    } else txtPatternSuggestion.setVisibility(View.GONE);
+                    } else {
+                        // hide suggestion for 1-day gap (and for non-positive gaps)
+                        txtPatternSuggestion.setVisibility(View.GONE);
+                        patternGap[0] = days;
+                    }
                 } else txtPatternSuggestion.setVisibility(View.GONE);
 
                 String[] daysHeaders = {
@@ -461,6 +560,11 @@ public class ScheduleActivity extends AppCompatActivity {
                 for (int i = 0; i < firstDow; i++) calendarGrid.addView(makeSpacer());
 
                 int daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
+                // compute today's midnight to prevent selecting previous dates
+                Calendar todayMid = Calendar.getInstance();
+                todayMid.set(Calendar.HOUR_OF_DAY, 0); todayMid.set(Calendar.MINUTE, 0); todayMid.set(Calendar.SECOND, 0); todayMid.set(Calendar.MILLISECOND, 0);
+                long todayKey = todayMid.getTimeInMillis();
+
                 for (int i = 1; i <= daysInMonth; i++) {
                     final int day = i;
                     final int month = cal.get(Calendar.MONTH);
@@ -471,22 +575,32 @@ public class ScheduleActivity extends AppCompatActivity {
                     final long dateKey = dateCal.getTimeInMillis();
 
                     TextView tv = makeDayCell(String.valueOf(i));
-                    if (selectedDates.contains(dateKey)) {
-                        tv.setBackgroundResource(R.drawable.bg_dayselected);
-                        tv.setTextColor(Color.WHITE);
-                    }
-                    tv.setOnClickListener(v -> {
+
+                    // If date is in the past, disable selection and dim it
+                    if (dateKey < todayKey) {
+                        // Remove any previously selected past date
+                        if (selectedDates.contains(dateKey)) selectedDates.remove(dateKey);
+                        tv.setAlpha(0.35f);
+                        tv.setEnabled(false);
+                        tv.setTextColor(Color.parseColor("#9CA3AF"));
+                    } else {
                         if (selectedDates.contains(dateKey)) {
-                            selectedDates.remove(dateKey);
-                            if (selectedDates.isEmpty()) selectedRecurrence[0] = RECUR_ONCE;
-                            else if (selectedDates.size() == 1) selectedRecurrence[0] = RECUR_ONCE;
-                            else selectedRecurrence[0] = getString(R.string.recur_custom);
-                        } else {
-                            selectedDates.add(dateKey);
-                            selectedRecurrence[0] = selectedDates.size() > 1 ? getString(R.string.recur_custom) : RECUR_ONCE;
+                            tv.setBackgroundResource(R.drawable.bg_dayselected);
+                            tv.setTextColor(Color.WHITE);
                         }
-                        run();
-                    });
+                        tv.setOnClickListener(v -> {
+                            if (selectedDates.contains(dateKey)) {
+                                selectedDates.remove(dateKey);
+                                if (selectedDates.isEmpty()) selectedRecurrence[0] = RECUR_ONCE;
+                                else if (selectedDates.size() == 1) selectedRecurrence[0] = RECUR_ONCE;
+                                else selectedRecurrence[0] = getString(R.string.recur_custom);
+                            } else {
+                                selectedDates.add(dateKey);
+                                selectedRecurrence[0] = selectedDates.size() > 1 ? getString(R.string.recur_custom) : RECUR_ONCE;
+                            }
+                            run();
+                        });
+                    }
                     calendarGrid.addView(tv);
                 }
             }
@@ -494,7 +608,7 @@ public class ScheduleActivity extends AppCompatActivity {
 
         btnWeekdays.setOnClickListener(v -> {
             selectedRecurrence[0] = getString(R.string.recur_weekdays);
-            new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
+            DatePickerDialog dp = new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
                 Calendar cal = Calendar.getInstance();
                 cal.set(year, month, 1, 0, 0, 0);
                 cal.set(Calendar.MILLISECOND, 0);
@@ -508,12 +622,17 @@ public class ScheduleActivity extends AppCompatActivity {
                     }
                 }
                 updateGrid.run();
-            }, viewCalendar.get(Calendar.YEAR), viewCalendar.get(Calendar.MONTH), 1).show();
+            }, viewCalendar.get(Calendar.YEAR), viewCalendar.get(Calendar.MONTH), 1);
+            // Prevent selecting dates before today
+            Calendar min = Calendar.getInstance();
+            min.set(Calendar.HOUR_OF_DAY, 0); min.set(Calendar.MINUTE, 0); min.set(Calendar.SECOND, 0); min.set(Calendar.MILLISECOND, 0);
+            dp.getDatePicker().setMinDate(min.getTimeInMillis());
+            dp.show();
         });
 
         btnWeekends.setOnClickListener(v -> {
             selectedRecurrence[0] = getString(R.string.recur_weekends);
-            new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
+            DatePickerDialog dp = new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
                 Calendar cal = Calendar.getInstance();
                 cal.set(year, month, 1, 0, 0, 0);
                 cal.set(Calendar.MILLISECOND, 0);
@@ -527,12 +646,16 @@ public class ScheduleActivity extends AppCompatActivity {
                     }
                 }
                 updateGrid.run();
-            }, viewCalendar.get(Calendar.YEAR), viewCalendar.get(Calendar.MONTH), 1).show();
+            }, viewCalendar.get(Calendar.YEAR), viewCalendar.get(Calendar.MONTH), 1);
+            Calendar min2 = Calendar.getInstance();
+            min2.set(Calendar.HOUR_OF_DAY, 0); min2.set(Calendar.MINUTE, 0); min2.set(Calendar.SECOND, 0); min2.set(Calendar.MILLISECOND, 0);
+            dp.getDatePicker().setMinDate(min2.getTimeInMillis());
+            dp.show();
         });
 
         btnFullMonth.setOnClickListener(v -> {
             selectedRecurrence[0] = getString(R.string.recur_monthly);
-            new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
+            DatePickerDialog dp = new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
                 Calendar cal = Calendar.getInstance();
                 cal.set(year, month, 1, 0, 0, 0);
                 cal.set(Calendar.MILLISECOND, 0);
@@ -543,7 +666,11 @@ public class ScheduleActivity extends AppCompatActivity {
                     if (!selectedDates.contains(key)) selectedDates.add(key);
                 }
                 updateGrid.run();
-            }, viewCalendar.get(Calendar.YEAR), viewCalendar.get(Calendar.MONTH), 1).show();
+            }, viewCalendar.get(Calendar.YEAR), viewCalendar.get(Calendar.MONTH), 1);
+            Calendar min3 = Calendar.getInstance();
+            min3.set(Calendar.HOUR_OF_DAY, 0); min3.set(Calendar.MINUTE, 0); min3.set(Calendar.SECOND, 0); min3.set(Calendar.MILLISECOND, 0);
+            dp.getDatePicker().setMinDate(min3.getTimeInMillis());
+            dp.show();
         });
 
         btnFullYear.setOnClickListener(v -> {
@@ -562,17 +689,25 @@ public class ScheduleActivity extends AppCompatActivity {
             textEndDate.setText(df.format(endCal.getTime()));
 
             textStartDate.setOnClickListener(vStart -> {
-                new DatePickerDialog(this, (view, year, month, day) -> {
+                DatePickerDialog dpStart = new DatePickerDialog(this, (view, year, month, day) -> {
                     startCal.set(year, month, day);
                     textStartDate.setText(df.format(startCal.getTime()));
-                }, startCal.get(Calendar.YEAR), startCal.get(Calendar.MONTH), startCal.get(Calendar.DAY_OF_MONTH)).show();
+                }, startCal.get(Calendar.YEAR), startCal.get(Calendar.MONTH), startCal.get(Calendar.DAY_OF_MONTH));
+                Calendar minStart = Calendar.getInstance();
+                minStart.set(Calendar.HOUR_OF_DAY, 0); minStart.set(Calendar.MINUTE, 0); minStart.set(Calendar.SECOND, 0); minStart.set(Calendar.MILLISECOND, 0);
+                dpStart.getDatePicker().setMinDate(minStart.getTimeInMillis());
+                dpStart.show();
             });
 
             textEndDate.setOnClickListener(vEnd -> {
-                new DatePickerDialog(this, (view, year, month, day) -> {
+                DatePickerDialog dpEnd = new DatePickerDialog(this, (view, year, month, day) -> {
                     endCal.set(year, month, day);
                     textEndDate.setText(df.format(endCal.getTime()));
-                }, endCal.get(Calendar.YEAR), endCal.get(Calendar.MONTH), endCal.get(Calendar.DAY_OF_MONTH)).show();
+                }, endCal.get(Calendar.YEAR), endCal.get(Calendar.MONTH), endCal.get(Calendar.DAY_OF_MONTH));
+                Calendar minEnd = Calendar.getInstance();
+                minEnd.set(Calendar.HOUR_OF_DAY, 0); minEnd.set(Calendar.MINUTE, 0); minEnd.set(Calendar.SECOND, 0); minEnd.set(Calendar.MILLISECOND, 0);
+                dpEnd.getDatePicker().setMinDate(minEnd.getTimeInMillis());
+                dpEnd.show();
             });
 
             new AlertDialog.Builder(this)
@@ -616,6 +751,7 @@ public class ScheduleActivity extends AppCompatActivity {
 
         txtPatternSuggestion.setOnClickListener(v -> {
             if (selectedDates.size() < 2) return;
+            if (patternGap[0] <= 1) return; // ignore clicks when gap is 1 (daily) or invalid
             List<Long> sorted = new ArrayList<>(selectedDates);
             Collections.sort(sorted);
             Calendar cur = Calendar.getInstance();
@@ -634,6 +770,36 @@ public class ScheduleActivity extends AppCompatActivity {
         btnNextMonth.setOnClickListener(v -> { viewCalendar.add(Calendar.MONTH,  1); updateGrid.run(); });
         updateGrid.run();
 
+        // Assignee spinner — populate with approved staff from user_access
+        Spinner spinnerAssignee = dialogView.findViewById(R.id.spinnerAssignee);
+        final List<String> assigneeEmails = new ArrayList<>();
+        final List<String> assigneeDisplay = new ArrayList<>();
+        assigneeDisplay.add("(No specific staff)");
+        assigneeEmails.add("");
+        final ArrayAdapter<String> assAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, assigneeDisplay);
+        assAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerAssignee.setAdapter(assAdapter);
+
+        db.collection("user_access")
+                .whereEqualTo("role", "staff")
+                .whereEqualTo("status", "approved")
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    assigneeDisplay.clear();
+                    assigneeEmails.clear();
+                    assigneeDisplay.add("(No specific staff)");
+                    assigneeEmails.add("");
+                    for (QueryDocumentSnapshot doc : querySnapshot) {
+                        String email = doc.getId();
+                        String name = doc.getString("name");
+                        if (email == null) continue;
+                        assigneeEmails.add(email);
+                        assigneeDisplay.add((name != null && !name.isEmpty()) ? name + " (" + email + ")" : email);
+                    }
+                    assAdapter.notifyDataSetChanged();
+                })
+                .addOnFailureListener(e -> { /* ignore and keep default */ });
+
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(getString(R.string.add_new_task))
                 .setView(dialogView)
@@ -646,8 +812,9 @@ public class ScheduleActivity extends AppCompatActivity {
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             String title = editTaskTitle.getText().toString().trim();
             String category = spinnerCategory.getSelectedItem().toString();
-            String windowStr = editWorkWindow.getText().toString();
-            int window = windowStr.isEmpty() ? getDefaultWorkWindow(category) : Integer.parseInt(windowStr);
+            // Read selected work window minutes from spinner; fallback to category default if none selected
+            int selPos = spinnerWorkWindow.getSelectedItemPosition();
+            int window = (selPos >= 0 && selPos < workWindowValues.length) ? workWindowValues[selPos] : getDefaultWorkWindow(category);
 
             if (title.isEmpty()) { Toast.makeText(this, getString(R.string.task_title_empty), Toast.LENGTH_SHORT).show(); return; }
             if (selectedDates.isEmpty()) { Toast.makeText(this, getString(R.string.please_select_date), Toast.LENGTH_SHORT).show(); return; }
@@ -928,18 +1095,32 @@ public class ScheduleActivity extends AppCompatActivity {
         for (Task task : taskList) {
             if (task.year != selYear || task.month != selMonth || task.day != selDay) continue;
 
-            if (!getString(R.string.status_done).equals(task.status)) {
+            // Determine current status (auto-updated for non-Done tasks)
+            String sDone = getString(R.string.status_done);
+            String sOngoing = getString(R.string.status_ongoing);
+            String sMissed = getString(R.string.status_missed);
+            String sPending = getString(R.string.status_pending);
+
+            if (!sDone.equals(task.status)) {
                 task.status = getAutoStatus(task);
             }
+
+            // Update counts (reflects all tasks for the day)
+            if (sDone.equals(task.status)) done++;
+            else if (sOngoing.equals(task.status)) ongoing++;
+            else pending++;
+
+            // Apply active filter: ASSIGNED -> pending, MISSING -> missed, DONE -> done
+            boolean includeByFilter = true;
+            if (FILTER_ASSIGNED.equals(activeFilter)) includeByFilter = sPending.equals(task.status);
+            else if (FILTER_MISSING.equals(activeFilter)) includeByFilter = sMissed.equals(task.status);
+            else if (FILTER_DONE.equals(activeFilter)) includeByFilter = sDone.equals(task.status);
+            if (!includeByFilter) continue;
 
             if (!categoryGroups.containsKey(task.category)) {
                 categoryGroups.put(task.category, new ArrayList<>());
             }
             categoryGroups.get(task.category).add(task);
-
-            if (getString(R.string.status_done).equals(task.status)) done++;
-            else if (getString(R.string.status_ongoing).equals(task.status)) ongoing++;
-            else pending++;
         }
 
         for (Map.Entry<String, List<Task>> entry : categoryGroups.entrySet()) {
@@ -1161,13 +1342,17 @@ public class ScheduleActivity extends AppCompatActivity {
     }
 
     private void showFullCalendar() {
-        new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
+        DatePickerDialog dpFull = new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
             selectedDate.set(year, month, dayOfMonth);
             currentWeekCalendar = (Calendar) selectedDate.clone();
             alignCalendarToMonday(currentWeekCalendar);
             updateCalendarUI();
             updateTasksUI();
-        }, selectedDate.get(Calendar.YEAR), selectedDate.get(Calendar.MONTH), selectedDate.get(Calendar.DAY_OF_MONTH)).show();
+        }, selectedDate.get(Calendar.YEAR), selectedDate.get(Calendar.MONTH), selectedDate.get(Calendar.DAY_OF_MONTH));
+        Calendar minFull = Calendar.getInstance();
+        minFull.set(Calendar.HOUR_OF_DAY, 0); minFull.set(Calendar.MINUTE, 0); minFull.set(Calendar.SECOND, 0); minFull.set(Calendar.MILLISECOND, 0);
+        dpFull.getDatePicker().setMinDate(minFull.getTimeInMillis());
+        dpFull.show();
     }
 
     private void updateCalendarUI() {
@@ -1186,6 +1371,39 @@ public class ScheduleActivity extends AppCompatActivity {
                 dayLabelViews[i].setTextColor(Color.parseColor("#4B5563"));
             }
             tempCal.add(Calendar.DAY_OF_MONTH, 1);
+        }
+    }
+
+    private void updateFilterButtonsUI() {
+        if (filterAssignedBtn == null || filterMissingBtn == null || filterDoneBtn == null) return;
+        int colorSelectedText = ContextCompat.getColor(this, android.R.color.white);
+        int colorUnselectedText = ContextCompat.getColor(this, R.color.dark_blue);
+
+        // Assigned (pending)
+        if (FILTER_ASSIGNED.equals(activeFilter)) {
+            filterAssignedBtn.setBackgroundResource(R.drawable.bg_filter_chip_selected);
+            filterAssignedBtn.setTextColor(colorSelectedText);
+        } else {
+            filterAssignedBtn.setBackgroundResource(R.drawable.bg_filter_chip_unselected);
+            filterAssignedBtn.setTextColor(colorUnselectedText);
+        }
+
+        // Missing (missed)
+        if (FILTER_MISSING.equals(activeFilter)) {
+            filterMissingBtn.setBackgroundResource(R.drawable.bg_filter_chip_selected);
+            filterMissingBtn.setTextColor(colorSelectedText);
+        } else {
+            filterMissingBtn.setBackgroundResource(R.drawable.bg_filter_chip_unselected);
+            filterMissingBtn.setTextColor(colorUnselectedText);
+        }
+
+        // Done
+        if (FILTER_DONE.equals(activeFilter)) {
+            filterDoneBtn.setBackgroundResource(R.drawable.bg_filter_chip_selected);
+            filterDoneBtn.setTextColor(colorSelectedText);
+        } else {
+            filterDoneBtn.setBackgroundResource(R.drawable.bg_filter_chip_unselected);
+            filterDoneBtn.setTextColor(colorUnselectedText);
         }
     }
 
