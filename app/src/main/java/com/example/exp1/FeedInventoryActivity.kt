@@ -441,8 +441,8 @@ class FeedInventoryActivity : AppCompatActivity() {
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // Atomic quantity update + audit log
-    // Uses a Firestore transaction so both writes succeed or both fail.
+    // Atomic quantity update + audit log  (staff quantity-only edits)
+    // Thin wrapper around [commitFeedChange] with no extra field changes.
     // ──────────────────────────────────────────────────────────────────────────
     private fun commitQuantityUpdate(
         item: FeedItem,
@@ -450,13 +450,44 @@ class FeedInventoryActivity : AppCompatActivity() {
         notes: String,
         onSuccess: () -> Unit
     ) {
+        commitFeedChange(
+            item         = item,
+            feedDocRef   = feedCol.document(item.firestoreId),
+            fieldUpdates = emptyMap(),
+            newQty       = newQty,
+            notes        = notes,
+            onSuccess    = onSuccess
+        )
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Atomic feed update + audit log  (shared by staff quantity edits and owner
+    // restocks/edits).  [fieldUpdates] carries any owner-only fields (name,
+    // description, invNumber, location, unitPrice, category); quantity,
+    // initialQuantity, status, and updatedAt are always recomputed here.
+    // Uses a Firestore transaction so the stock write and the audit entry
+    // always succeed or fail together. No audit entry is written when the
+    // quantity is unchanged. Negative stock is rejected before any write.
+    // ──────────────────────────────────────────────────────────────────────────
+    private fun commitFeedChange(
+        item: FeedItem,
+        feedDocRef: com.google.firebase.firestore.DocumentReference,
+        fieldUpdates: Map<String, Any>,
+        newQty: Long,
+        notes: String,
+        onSuccess: () -> Unit
+    ) {
+        if (newQty < 0) {
+            Toast.makeText(this, "Quantity cannot be negative", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         val uid          = auth.currentUser?.uid ?: "unknown"
         val editorName   = accountManager.getCurrentUsername() ?: "User"
         val editorRole   = roleManager.role
         val quantityDiff = newQty - item.quantity
         val action       = if (quantityDiff >= 0) "add" else "deduct"
 
-        val feedDocRef  = feedCol.document(item.firestoreId)
         val auditDocRef = auditCol.document()   // auto-id
 
         val newInitialQty = if (newQty > item.initialQuantity) newQty else item.initialQuantity
@@ -464,44 +495,138 @@ class FeedInventoryActivity : AppCompatActivity() {
 
         db.runTransaction { transaction ->
             // Read the current document to guard against concurrent edits
-            val snapshot = transaction.get(feedDocRef)
+            val snapshot   = transaction.get(feedDocRef)
             val currentQty = snapshot.getLong("quantity") ?: item.quantity
             if (currentQty != item.quantity) {
                 // Another write occurred between load and save; abort to prevent
                 // a silent overwrite — the Firestore listener will refresh the UI.
-                throw Exception("Quantity was modified concurrently. Please try again.")
+                throw Exception("Item was modified concurrently. Please try again.")
             }
 
-            // Write 1: update stock quantity and status
-            val stockUpdate = mapOf(
-                "quantity"        to newQty,
-                "initialQuantity" to newInitialQty,
-                "status"          to newStatus,
-                "updatedAt"       to FieldValue.serverTimestamp()
-            )
+            // Write 1: update stock quantity/status plus any owner-edited fields
+            val stockUpdate = fieldUpdates.toMutableMap()
+            stockUpdate["quantity"]        = newQty
+            stockUpdate["initialQuantity"] = newInitialQty
+            stockUpdate["status"]          = newStatus
+            stockUpdate["updatedAt"]       = FieldValue.serverTimestamp()
             transaction.update(feedDocRef, stockUpdate)
 
-            // Write 2: create audit log entry
-            val auditEntry = mapOf(
-                "productId"       to item.firestoreId,
-                "productName"     to item.name,
-                "category"        to item.category,
-                "action"          to action,
-                "quantityBefore"  to item.quantity,
-                "quantityChanged" to quantityDiff,
-                "quantityAfter"   to newQty,
-                "editedByUid"     to uid,
-                "editedByName"    to editorName,
-                "editedByRole"    to editorRole,
-                "timestamp"       to FieldValue.serverTimestamp(),
-                "notes"           to notes
-            )
-            transaction.set(auditDocRef, auditEntry)
+            // Write 2: create audit log entry — only when quantity actually changed
+            if (quantityDiff != 0L) {
+                val auditEntry = mapOf(
+                    "productId"       to item.firestoreId,
+                    "productName"     to item.name,
+                    "category"        to item.category,
+                    "action"          to action,
+                    "quantityBefore"  to item.quantity,
+                    "quantityChanged" to quantityDiff,
+                    "quantityAfter"   to newQty,
+                    "editedByUid"     to uid,
+                    "editedByName"    to editorName,
+                    "editedByRole"    to editorRole,
+                    "timestamp"       to FieldValue.serverTimestamp(),
+                    "notes"           to notes
+                )
+                transaction.set(auditDocRef, auditEntry)
+            }
+            null
         }.addOnSuccessListener {
             onSuccess()
         }.addOnFailureListener { e ->
             Toast.makeText(this, "Update failed: ${e.message}", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Atomic create: new feed item + initial-stock audit entry (batch write).
+    // A transaction isn't needed here since there is no existing document to
+    // read/guard — a batch already guarantees both writes succeed or fail
+    // together. No audit entry is written when the starting quantity is zero.
+    // ──────────────────────────────────────────────────────────────────────────
+    private fun commitNewFeedItem(
+        data: Map<String, Any>,
+        qty: Long,
+        name: String,
+        category: String,
+        onSuccess: () -> Unit
+    ) {
+        if (qty < 0) {
+            Toast.makeText(this, "Quantity cannot be negative", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val uid        = auth.currentUser?.uid ?: "unknown"
+        val editorName = accountManager.getCurrentUsername() ?: "User"
+        val editorRole = roleManager.role
+
+        val newFeedRef  = feedCol.document()   // pre-generate id so it can be reused below
+        val auditDocRef = auditCol.document()
+
+        val batch = db.batch()
+        batch.set(newFeedRef, data)
+
+        if (qty != 0L) {
+            val auditEntry = mapOf(
+                "productId"       to newFeedRef.id,
+                "productName"     to name,
+                "category"        to category,
+                "action"          to "add",
+                "quantityBefore"  to 0L,
+                "quantityChanged" to qty,
+                "quantityAfter"   to qty,
+                "editedByUid"     to uid,
+                "editedByName"    to editorName,
+                "editedByRole"    to editorRole,
+                "timestamp"       to FieldValue.serverTimestamp(),
+                "notes"           to "Initial stock added"
+            )
+            batch.set(auditDocRef, auditEntry)
+        }
+
+        batch.commit()
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { e ->
+                Toast.makeText(this, "Add failed: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Atomic delete: remove feed item + closing audit entry (batch write).
+    // ──────────────────────────────────────────────────────────────────────────
+    private fun commitFeedDelete(item: FeedItem, onSuccess: () -> Unit) {
+        val uid        = auth.currentUser?.uid ?: "unknown"
+        val editorName = accountManager.getCurrentUsername() ?: "User"
+        val editorRole = roleManager.role
+
+        val feedDocRef  = feedCol.document(item.firestoreId)
+        val auditDocRef = auditCol.document()
+
+        val batch = db.batch()
+        batch.delete(feedDocRef)
+
+        if (item.quantity != 0L) {
+            val auditEntry = mapOf(
+                "productId"       to item.firestoreId,
+                "productName"     to item.name,
+                "category"        to item.category,
+                "action"          to "deduct",
+                "quantityBefore"  to item.quantity,
+                "quantityChanged" to -item.quantity,
+                "quantityAfter"   to 0L,
+                "editedByUid"     to uid,
+                "editedByName"    to editorName,
+                "editedByRole"    to editorRole,
+                "timestamp"       to FieldValue.serverTimestamp(),
+                "notes"           to "Item deleted"
+            )
+            batch.set(auditDocRef, auditEntry)
+        }
+
+        batch.commit()
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { e ->
+                Toast.makeText(this, "Delete failed: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -653,7 +778,15 @@ class FeedInventoryActivity : AppCompatActivity() {
 
                 val location = locationInput.text.toString().trim().ifEmpty { "Location Info" }
                 val price    = priceInput.text.toString().toDoubleOrNull() ?: 0.0
-                val qtyIn    = qtyInput.text.toString().toLongOrNull() ?: 0L
+                val qtyIn    = qtyInput.text.toString().toLongOrNull()
+                if (qtyIn == null) {
+                    qtyInput.error = "Enter a valid quantity"
+                    return@setOnClickListener
+                }
+                if (qtyIn < 0) {
+                    qtyInput.error = "Quantity cannot be negative"
+                    return@setOnClickListener
+                }
                 val cat      = catSpinner.selectedItem.toString()
                 var desc     = descInput.text.toString().trim()
                 val inv      = invInput.text.toString().trim().ifEmpty { generateInvNumber() }
@@ -672,93 +805,70 @@ class FeedInventoryActivity : AppCompatActivity() {
                 }
 
                 if (matchingItem != null) {
-                    val previousQty = matchingItem.quantity
                     val finalQty = if (isEdit && item?.firestoreId == matchingItem.firestoreId) {
                         qtyIn
                     } else {
                         matchingItem.quantity + qtyIn
                     }
 
-                    val finalInit = if (finalQty > matchingItem.initialQuantity) finalQty else matchingItem.initialQuantity
-                    val status = calculateStatus(finalQty, finalInit)
-
-                    val updateData = hashMapOf<String, Any>(
-                        "name"            to name,
-                        "description"     to desc,
-                        "quantity"        to finalQty,
-                        "initialQuantity" to finalInit,
-                        "status"          to status,
-                        "updatedAt"       to FieldValue.serverTimestamp()
+                    val fieldUpdates = mapOf<String, Any>(
+                        "name"        to name,
+                        "description" to desc
                     )
 
-                    feedCol.document(matchingItem.firestoreId).update(updateData)
-                        .addOnSuccessListener {
+                    commitFeedChange(
+                        item         = matchingItem,
+                        feedDocRef   = feedCol.document(matchingItem.firestoreId),
+                        fieldUpdates = fieldUpdates,
+                        newQty       = finalQty,
+                        notes        = if (isEdit) "Stock updated" else "Stock restocked",
+                        onSuccess    = {
                             logHistory(if (isEdit) "UPDATE" else "RESTOCK", matchingItem.name, qtyIn, price, matchingItem.category)
-                            // Write audit trail only if quantity actually changed
-                            if (finalQty != previousQty) {
-                                writeAuditLog(
-                                    productId     = matchingItem.firestoreId,
-                                    productName   = matchingItem.name,
-                                    category      = matchingItem.category,
-                                    quantityBefore = previousQty,
-                                    quantityAfter  = finalQty,
-                                    notes          = if (isEdit) "Stock updated" else "Stock restocked"
-                                )
-                            }
                             if (isEdit && item != null && item.firestoreId != matchingItem.firestoreId) {
                                 feedCol.document(item.firestoreId).delete()
                             }
                             dialog.dismiss()
                         }
-                        .addOnFailureListener { e ->
-                            Toast.makeText(this, "Operation failed: ${e.message}", Toast.LENGTH_SHORT).show()
-                        }
-                } else {
-                    val status = calculateStatus(qtyIn, qtyIn)
-                    val data = hashMapOf<String, Any>(
-                        "name"            to name,
-                        "description"     to desc,
-                        "invNumber"       to inv,
-                        "location"        to location,
-                        "quantity"        to qtyIn,
-                        "initialQuantity" to qtyIn,
-                        "unitPrice"       to price,
-                        "category"        to cat,
-                        "status"          to status,
-                        "updatedAt"       to FieldValue.serverTimestamp()
                     )
-
+                } else {
                     if (isEdit && item != null) {
-                        val previousQty = item.quantity
-                        feedCol.document(item.firestoreId).set(data)
-                            .addOnSuccessListener {
+                        val fieldUpdates = mapOf<String, Any>(
+                            "name"        to name,
+                            "description" to desc,
+                            "invNumber"   to inv,
+                            "location"    to location,
+                            "unitPrice"   to price,
+                            "category"    to cat
+                        )
+                        commitFeedChange(
+                            item         = item,
+                            feedDocRef   = feedCol.document(item.firestoreId),
+                            fieldUpdates = fieldUpdates,
+                            newQty       = qtyIn,
+                            notes        = "Stock updated",
+                            onSuccess    = {
                                 logHistory("UPDATE", name, qtyIn, price, cat)
-                                if (qtyIn != previousQty) {
-                                    writeAuditLog(
-                                        productId      = item.firestoreId,
-                                        productName    = name,
-                                        category       = cat,
-                                        quantityBefore = previousQty,
-                                        quantityAfter  = qtyIn,
-                                        notes          = "Stock updated"
-                                    )
-                                }
                                 dialog.dismiss()
                             }
+                        )
                     } else {
-                        feedCol.add(data)
-                            .addOnSuccessListener { newDocRef ->
-                                logHistory("ADDED", name, qtyIn, price, cat)
-                                writeAuditLog(
-                                    productId      = newDocRef.id,
-                                    productName    = name,
-                                    category       = cat,
-                                    quantityBefore = 0L,
-                                    quantityAfter  = qtyIn,
-                                    notes          = "Initial stock added"
-                                )
-                                dialog.dismiss()
-                            }
+                        val status = calculateStatus(qtyIn, qtyIn)
+                        val data = hashMapOf<String, Any>(
+                            "name"            to name,
+                            "description"     to desc,
+                            "invNumber"       to inv,
+                            "location"        to location,
+                            "quantity"        to qtyIn,
+                            "initialQuantity" to qtyIn,
+                            "unitPrice"       to price,
+                            "category"        to cat,
+                            "status"          to status,
+                            "updatedAt"       to FieldValue.serverTimestamp()
+                        )
+                        commitNewFeedItem(data, qtyIn, name, cat) {
+                            logHistory("ADDED", name, qtyIn, price, cat)
+                            dialog.dismiss()
+                        }
                     }
                 }
             }
@@ -774,19 +884,9 @@ class FeedInventoryActivity : AppCompatActivity() {
             .setTitle("Delete Feed Item")
             .setMessage("Are you sure you want to delete \"${item.name}\"?")
             .setPositiveButton("Delete") { _: DialogInterface, _: Int ->
-                logHistory("DELETED", item.name, item.quantity, item.unitPrice, item.category)
-                writeAuditLog(
-                    productId      = item.firestoreId,
-                    productName    = item.name,
-                    category       = item.category,
-                    quantityBefore = item.quantity,
-                    quantityAfter  = 0L,
-                    notes          = "Item deleted"
-                )
-                feedCol.document(item.firestoreId).delete()
-                    .addOnFailureListener { e ->
-                        Toast.makeText(this, "Delete failed: ${e.message}", Toast.LENGTH_SHORT).show()
-                    }
+                commitFeedDelete(item) {
+                    logHistory("DELETED", item.name, item.quantity, item.unitPrice, item.category)
+                }
             }
             .setNegativeButton("Cancel", null)
             .show()
@@ -810,45 +910,6 @@ class FeedInventoryActivity : AppCompatActivity() {
             "timestamp" to FieldValue.serverTimestamp()
         )
         historyCol.add(entry)
-    }
-
-    /**
-     * Writes a structured audit entry to inventory_history/{autoId}.
-     * Called whenever a quantity change occurs (add, deduct, delete).
-     * When [quantityBefore] == [quantityAfter] this method is a no-op so
-     * callers do not need to guard the call site.
-     */
-    private fun writeAuditLog(
-        productId: String,
-        productName: String,
-        category: String,
-        quantityBefore: Long,
-        quantityAfter: Long,
-        notes: String
-    ) {
-        val diff = quantityAfter - quantityBefore
-        if (diff == 0L) return
-
-        val uid        = auth.currentUser?.uid ?: "unknown"
-        val editorName = accountManager.getCurrentUsername() ?: "User"
-        val editorRole = roleManager.role
-        val action     = if (diff > 0) "add" else "deduct"
-
-        val entry = hashMapOf(
-            "productId"       to productId,
-            "productName"     to productName,
-            "category"        to category,
-            "action"          to action,
-            "quantityBefore"  to quantityBefore,
-            "quantityChanged" to diff,
-            "quantityAfter"   to quantityAfter,
-            "editedByUid"     to uid,
-            "editedByName"    to editorName,
-            "editedByRole"    to editorRole,
-            "timestamp"       to FieldValue.serverTimestamp(),
-            "notes"           to notes
-        )
-        auditCol.add(entry)
     }
 
     private fun calculateStatus(qty: Long, initialQty: Long): String {

@@ -237,6 +237,13 @@ object NavigationHelper {
                 }
                 R.id.nav_logout -> {
                     accountManager.clearSession()
+                    // Delete the session doc so the UID-based rules revoke access immediately
+                    val uid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+                    if (uid != null) {
+                        com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                            .collection("sessions").document(uid).delete()
+                    }
+                    com.google.firebase.auth.FirebaseAuth.getInstance().signOut()
                     val intent = Intent(activity, MainActivity::class.java)
                     intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                     activity.startActivity(intent)

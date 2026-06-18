@@ -21,6 +21,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.android.gms.auth.api.signin.*
 import com.google.android.gms.common.api.ApiException
 import com.google.android.material.textfield.TextInputLayout
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 
@@ -60,6 +61,7 @@ class MainActivity : AppCompatActivity() {
         val gso = GoogleSignInOptions.Builder(
             GoogleSignInOptions.DEFAULT_SIGN_IN
         )
+            .requestIdToken("441160922275-03k03v695eo31hscn5dic9eh1o16hhka.apps.googleusercontent.com")
             .requestEmail()
             .build()
 
@@ -185,7 +187,23 @@ class MainActivity : AppCompatActivity() {
                 val email =
                     account.email ?: return
 
-                checkFirestoreAccessWithPassword(email)
+                // Sign into Firebase Auth with the Google credential so that
+                // request.auth.token.email is populated in Firestore Security Rules.
+                // Without this the user stays anonymous and isOwner() always fails.
+                val credential =
+                    com.google.firebase.auth.GoogleAuthProvider
+                        .getCredential(account.idToken, null)
+
+                com.google.firebase.auth.FirebaseAuth.getInstance()
+                    .signInWithCredential(credential)
+                    .addOnSuccessListener {
+                        checkFirestoreAccessWithPassword(email)
+                    }
+                    .addOnFailureListener {
+                        // Credential sign-in failed — fall back to anonymous so
+                        // read-only Firestore paths (login check) still work.
+                        checkFirestoreAccessWithPassword(email)
+                    }
 
             } catch (e: ApiException) {
 
@@ -240,7 +258,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showForgotPasswordDialog() {
         val currentEmailInput = findViewById<EditText>(R.id.editLoginEmail).text.toString().trim()
-        
+
         val input = EditText(this)
         input.hint = getString(R.string.enter_email_hint)
         input.setText(currentEmailInput)
@@ -288,7 +306,7 @@ class MainActivity : AppCompatActivity() {
         val passwordInputLayout = dialogView.findViewById<TextInputLayout>(R.id.passwordInputLayout)
         val tvEmail = dialogView.findViewById<TextView>(R.id.tvPasswordEmail)
         val tvTitle = dialogView.findViewById<TextView>(R.id.tvPasswordDialogTitle)
-        
+
         tvTitle?.text = getString(R.string.reset_password)
         tvEmail?.text = email
         editPassword.hint = getString(R.string.new_password_hint)
@@ -318,7 +336,7 @@ class MainActivity : AppCompatActivity() {
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             val newPass = editPassword.text.toString().trim()
             val error = getPasswordStrengthError(newPass)
-            
+
             if (error != null) {
                 passwordInputLayout.error = error
                 return@setOnClickListener
@@ -466,7 +484,7 @@ class MainActivity : AppCompatActivity() {
             dialogView.findViewById<EditText>(
                 R.id.editLoginPassword
             )
-        
+
         val passwordInputLayout = dialogView.findViewById<TextInputLayout>(R.id.passwordInputLayout)
 
         val tvEmail =
@@ -501,7 +519,7 @@ class MainActivity : AppCompatActivity() {
 
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             val entered = editPassword.text.toString().trim()
-            
+
             val formatError = getPasswordStrengthError(entered)
             if (formatError != null) {
                 passwordInputLayout.error = formatError
@@ -622,7 +640,7 @@ class MainActivity : AppCompatActivity() {
 
                         val name =
                             snapshot.getString("name") ?: email
-                        
+
                         val password = snapshot.getString("password") ?: ""
 
                         if (status == "approved") {
@@ -727,6 +745,21 @@ class MainActivity : AppCompatActivity() {
         )
 
         accountManager.saveCurrentSession(email)
+
+        // Write a sessions/{uid} document so Firestore Security Rules can verify
+        // the caller's role and status using request.auth.uid (which is always
+        // populated, even for anonymous auth — unlike request.auth.token.email).
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+        if (uid != null) {
+            FirebaseFirestore.getInstance()
+                .collection("sessions")
+                .document(uid)
+                .set(mapOf(
+                    "email"  to email,
+                    "role"   to role,
+                    "status" to "approved"
+                ))
+        }
 
         startActivity(
             Intent(

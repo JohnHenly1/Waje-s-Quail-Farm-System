@@ -43,6 +43,7 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Source;
+import com.google.firebase.firestore.ListenerRegistration;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -72,6 +73,7 @@ public class ProfileActivity extends AppCompatActivity {
     private String userRole = "staff";
     private String currentEmail = "";
     private final Handler handler = new Handler(Looper.getMainLooper());
+    private ListenerRegistration userProfileListener;
 
 
 
@@ -247,27 +249,48 @@ public class ProfileActivity extends AppCompatActivity {
 
     private void fetchUserData() {
         if (currentEmail == null || currentEmail.isEmpty()) return;
-        FirebaseFirestore.getInstance().collection("user_access").document(currentEmail).get()
-                .addOnSuccessListener(doc -> {
-                    if (doc.exists()) {
+
+        // Use a real-time snapshot listener so the UI reflects any server-side
+        // changes (role updates, name edits) immediately — no manual refresh needed.
+        userProfileListener = FirebaseFirestore.getInstance()
+                .collection("user_access").document(currentEmail)
+                .addSnapshotListener((doc, error) -> {
+                    if (error != null) {
+                        Toast.makeText(this,
+                                "Failed to load profile: " + error.getMessage(),
+                                Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    if (doc != null && doc.exists()) {
                         String name = doc.getString("name");
                         String role = doc.getString("role");
 
-                        if (name != null) {
+                        if (name != null && !name.isEmpty()) {
                             userNameTv.setText(name);
-                            profileInitialTv.setText(String.valueOf(name.charAt(0)).toUpperCase());
+                            profileInitialTv.setText(
+                                    String.valueOf(name.charAt(0)).toUpperCase());
                         }
                         userEmailTv.setText(currentEmail);
 
                         if (userRoleTv != null && role != null) {
-                            userRoleTv.setText(getString(R.string.role_label, RoleManager.Companion.displayName(role)));
+                            // Keep in-memory role in sync so isAdmin() stays accurate.
+                            userRole = role;
+                            userRoleTv.setText(getString(R.string.role_label,
+                                    RoleManager.Companion.displayName(role)));
                         }
-
-
                     }
-                })
-                .addOnFailureListener(e ->
-                        Toast.makeText(this, "Failed to load profile: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+                });
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        // Detach the listener when the activity is no longer visible to avoid
+        // unnecessary Firestore reads and potential memory leaks.
+        if (userProfileListener != null) {
+            userProfileListener.remove();
+            userProfileListener = null;
+        }
     }
 
     private boolean isAdmin() {
