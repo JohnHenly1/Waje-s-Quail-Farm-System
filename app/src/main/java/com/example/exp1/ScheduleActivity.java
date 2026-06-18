@@ -73,6 +73,7 @@ public class ScheduleActivity extends AppCompatActivity {
 
     private Calendar currentWeekCalendar;
     private TextView monthText;
+    private TextView weekRangeLabel;
     private TextView[] dayTextViews;
     private TextView[] dayLabelViews;
     private View[] dayContainers;
@@ -151,6 +152,7 @@ public class ScheduleActivity extends AppCompatActivity {
         alignCalendarToMonday(currentWeekCalendar);
 
         monthText      = findViewById(R.id.month);
+        weekRangeLabel = findViewById(R.id.weekRangeLabel);
         tasksContainer = findViewById(R.id.tasksContainer);
         doneCount      = findViewById(R.id.doneCount);
         ongoingCount   = findViewById(R.id.ongoingCount);
@@ -226,6 +228,7 @@ public class ScheduleActivity extends AppCompatActivity {
         listenToTasks();
     }
 
+
     @Override
     protected void onResume() {
         super.onResume();
@@ -270,6 +273,7 @@ public class ScheduleActivity extends AppCompatActivity {
                             );
                             task.extensionMinutes = doc.getLong("extensionMinutes") != null ? doc.getLong("extensionMinutes").intValue() : 0;
                             task.workWindowMinutes = doc.getLong("workWindowMinutes") != null ? doc.getLong("workWindowMinutes").intValue() : 60;
+                            task.assignedTo = doc.getString("assignedTo");
                             taskList.add(task);
                         }
                     }
@@ -298,6 +302,7 @@ public class ScheduleActivity extends AppCompatActivity {
         data.put("day",                task.day);
         data.put("recurrence",         task.recurrence);
         data.put("recurrenceGroupId",  task.recurrenceGroupId);
+        data.put("assignedTo",         task.assignedTo != null ? task.assignedTo : "");
         data.put("extensionMinutes",   task.extensionMinutes);
         data.put("workWindowMinutes",  task.workWindowMinutes);
         data.put("createdAt", com.google.firebase.firestore.FieldValue.serverTimestamp());
@@ -857,6 +862,8 @@ public class ScheduleActivity extends AppCompatActivity {
                                             cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH),
                                             selectedRecurrence[0], groupId);
                                     t.workWindowMinutes = window;
+                                    t.assignedTo = (spinnerAssignee.getSelectedItemPosition() > 0)
+                                            ? assigneeEmails.get(spinnerAssignee.getSelectedItemPosition()) : "";
 
                                     batch.set(ref, buildTaskMap(t));
                                     scheduleNotification(t, selHour[0], selMinute[0]);
@@ -1092,8 +1099,14 @@ public class ScheduleActivity extends AppCompatActivity {
         int selDay   = selectedDate.get(Calendar.DAY_OF_MONTH);
 
         Map<String, List<Task>> categoryGroups = new TreeMap<>();
+        boolean isOwner = roleManager.isOwner();
         for (Task task : taskList) {
             if (task.year != selYear || task.month != selMonth || task.day != selDay) continue;
+            // Visibility: owner sees ALL tasks; staff only sees tasks explicitly assigned to them
+            if (!isOwner) {
+                String assigned = (task.assignedTo != null) ? task.assignedTo.trim() : "";
+                if (assigned.isEmpty() || !assigned.equalsIgnoreCase(currentUserEmail)) continue;
+            }
 
             // Determine current status (auto-updated for non-Done tasks)
             String sDone = getString(R.string.status_done);
@@ -1341,6 +1354,63 @@ public class ScheduleActivity extends AppCompatActivity {
         while (cal.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) cal.add(Calendar.DAY_OF_MONTH, -1);
     }
 
+    /** Syncs the Assigned/Missing/Done chip selection with {@link #activeFilter}. */
+    private void updateFilterButtonsUI() {
+        if (filterAssignedBtn instanceof com.google.android.material.chip.Chip) {
+            ((com.google.android.material.chip.Chip) filterAssignedBtn).setChecked(FILTER_ASSIGNED.equals(activeFilter));
+        }
+        if (filterMissingBtn instanceof com.google.android.material.chip.Chip) {
+            ((com.google.android.material.chip.Chip) filterMissingBtn).setChecked(FILTER_MISSING.equals(activeFilter));
+        }
+        if (filterDoneBtn instanceof com.google.android.material.chip.Chip) {
+            ((com.google.android.material.chip.Chip) filterDoneBtn).setChecked(FILTER_DONE.equals(activeFilter));
+        }
+    }
+
+    /** Lets the user swipe left/right over the week calendar card to move between weeks. */
+    private void setupSwipeGestures() {
+        View swipeArea = findViewById(R.id.calendarCard);
+        if (swipeArea == null) return;
+
+        gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+            private static final int SWIPE_THRESHOLD = 100;
+            private static final int SWIPE_VELOCITY_THRESHOLD = 100;
+
+            @Override
+            public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+                if (e1 == null) return false;
+                float diffX = e2.getX() - e1.getX();
+                float diffY = e2.getY() - e1.getY();
+
+                if (Math.abs(diffX) > Math.abs(diffY)
+                        && Math.abs(diffX) > SWIPE_THRESHOLD
+                        && Math.abs(velocityX) > SWIPE_VELOCITY_THRESHOLD) {
+                    if (diffX < 0) {
+                        goToNextWeek();
+                    } else {
+                        goToPreviousWeek();
+                    }
+                    return true;
+                }
+                return false;
+            }
+        });
+
+        swipeArea.setOnTouchListener((v, event) -> gestureDetector.onTouchEvent(event));
+    }
+
+    private void goToNextWeek() {
+        currentWeekCalendar.add(Calendar.DAY_OF_MONTH, 7);
+        updateCalendarUI();
+        updateTasksUI();
+    }
+
+    private void goToPreviousWeek() {
+        currentWeekCalendar.add(Calendar.DAY_OF_MONTH, -7);
+        updateCalendarUI();
+        updateTasksUI();
+    }
+
     private void showFullCalendar() {
         DatePickerDialog dpFull = new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
             selectedDate.set(year, month, dayOfMonth);
@@ -1358,13 +1428,40 @@ public class ScheduleActivity extends AppCompatActivity {
     private void updateCalendarUI() {
         if (isSameDay(selectedDate, today)) monthText.setText(new SimpleDateFormat(getString(R.string.today_format), Locale.getDefault()).format(today.getTime()));
         else monthText.setText(new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(selectedDate.getTime()));
+
+        // Dynamic week label + current month
+        if (weekRangeLabel != null) {
+            Calendar todayWeekStart = (Calendar) today.clone();
+            alignCalendarToMonday(todayWeekStart);
+            long diffMillis = currentWeekCalendar.getTimeInMillis() - todayWeekStart.getTimeInMillis();
+            long millisPerWeek = 7L * 24 * 60 * 60 * 1000;
+            long weekOffset = diffMillis / millisPerWeek;
+            String monthName = new SimpleDateFormat("MMMM", Locale.getDefault()).format(currentWeekCalendar.getTime());
+            String weekLabel;
+            if (weekOffset == 0)       weekLabel = "This Week";
+            else if (weekOffset == 1)  weekLabel = "Next Week";
+            else if (weekOffset == -1) weekLabel = "Last Week";
+            else if (weekOffset > 1)   weekLabel = "Next " + weekOffset + " Weeks";
+            else                       weekLabel = Math.abs(weekOffset) + " Weeks Ago";
+            weekRangeLabel.setText(weekLabel + "  \u00b7  " + monthName);
+        }
+
         Calendar tempCal = (Calendar) currentWeekCalendar.clone();
         for (int i = 0; i < 7; i++) {
             dayTextViews[i].setText(String.valueOf(tempCal.get(Calendar.DAY_OF_MONTH)));
-            if (isSameDay(tempCal, selectedDate)) {
+            boolean isSelected = isSameDay(tempCal, selectedDate);
+            boolean isToday    = isSameDay(tempCal, today);
+
+            if (isSelected) {
+                // Selected day: dark green fill (same whether or not it is also today)
                 dayContainers[i].setBackgroundResource(R.drawable.bg_dayselected);
                 dayTextViews[i].setTextColor(Color.WHITE);
                 dayLabelViews[i].setTextColor(Color.parseColor("#E5E7EB"));
+            } else if (isToday) {
+                // Today (not selected): amber/orange outlined ring
+                dayContainers[i].setBackgroundResource(R.drawable.bg_day_today);
+                dayTextViews[i].setTextColor(Color.parseColor("#E65100"));
+                dayLabelViews[i].setTextColor(Color.parseColor("#E65100"));
             } else {
                 dayContainers[i].setBackgroundResource(R.drawable.bg_day);
                 dayTextViews[i].setTextColor(Color.parseColor("#111827"));
@@ -1373,59 +1470,6 @@ public class ScheduleActivity extends AppCompatActivity {
             tempCal.add(Calendar.DAY_OF_MONTH, 1);
         }
     }
-
-    private void updateFilterButtonsUI() {
-        if (filterAssignedBtn == null || filterMissingBtn == null || filterDoneBtn == null) return;
-        int colorSelectedText = ContextCompat.getColor(this, android.R.color.white);
-        int colorUnselectedText = ContextCompat.getColor(this, R.color.dark_blue);
-
-        // Assigned (pending)
-        if (FILTER_ASSIGNED.equals(activeFilter)) {
-            filterAssignedBtn.setBackgroundResource(R.drawable.bg_filter_chip_selected);
-            filterAssignedBtn.setTextColor(colorSelectedText);
-        } else {
-            filterAssignedBtn.setBackgroundResource(R.drawable.bg_filter_chip_unselected);
-            filterAssignedBtn.setTextColor(colorUnselectedText);
-        }
-
-        // Missing (missed)
-        if (FILTER_MISSING.equals(activeFilter)) {
-            filterMissingBtn.setBackgroundResource(R.drawable.bg_filter_chip_selected);
-            filterMissingBtn.setTextColor(colorSelectedText);
-        } else {
-            filterMissingBtn.setBackgroundResource(R.drawable.bg_filter_chip_unselected);
-            filterMissingBtn.setTextColor(colorUnselectedText);
-        }
-
-        // Done
-        if (FILTER_DONE.equals(activeFilter)) {
-            filterDoneBtn.setBackgroundResource(R.drawable.bg_filter_chip_selected);
-            filterDoneBtn.setTextColor(colorSelectedText);
-        } else {
-            filterDoneBtn.setBackgroundResource(R.drawable.bg_filter_chip_unselected);
-            filterDoneBtn.setTextColor(colorUnselectedText);
-        }
-    }
-
-    private void setupSwipeGestures() {
-        gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
-            @Override
-            public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
-                if (e1 == null || e2 == null) return false;
-                float dx = e2.getX() - e1.getX();
-                float dy = e2.getY() - e1.getY();
-                if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 100 && Math.abs(velocityX) > 100) {
-                    currentWeekCalendar.add(Calendar.DAY_OF_MONTH, dx < 0 ? 7 : -7);
-                    updateCalendarUI();
-                    return true;
-                }
-                return false;
-            }
-        });
-        findViewById(R.id.main).setOnTouchListener((v, event) -> { gestureDetector.onTouchEvent(event); return true; });
-        findViewById(R.id.scrollView).setOnTouchListener((v, event) -> { gestureDetector.onTouchEvent(event); return false; });
-    }
-
     private boolean isSameDay(Calendar c1, Calendar c2) {
         return c1.get(Calendar.YEAR) == c2.get(Calendar.YEAR) && c1.get(Calendar.DAY_OF_YEAR) == c2.get(Calendar.DAY_OF_YEAR);
     }
@@ -1545,6 +1589,7 @@ public class ScheduleActivity extends AppCompatActivity {
         int    year, month, day;
         String recurrence;
         String recurrenceGroupId;
+        String assignedTo; // email of assigned staff; empty = owner-only visible
         int extensionMinutes = 0;
         int workWindowMinutes = 60; // default
 

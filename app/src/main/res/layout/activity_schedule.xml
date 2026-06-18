@@ -1,4 +1,3 @@
-<?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -65,11 +64,11 @@
                 android:layout_centerVertical="true"
                 android:background="@drawable/circle_white"
                 android:backgroundTint="#40FFFFFF"
+                android:contentDescription="Add Schedule"
                 android:padding="10dp"
                 android:scaleType="centerInside"
                 app:srcCompat="@drawable/ic_add"
-                app:tint="@color/white"
-                android:contentDescription="Add Schedule" />
+                app:tint="@color/white" />
         </RelativeLayout>
     </androidx.appcompat.widget.Toolbar>
 
@@ -86,8 +85,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:padding="16dp">
-
-            <!-- Week Calendar Card -->
+            <!--  Week Calendar Card  -->
             <androidx.cardview.widget.CardView
                 android:id="@+id/calendarCard"
                 android:layout_width="match_parent"
@@ -112,11 +110,12 @@
                         <ImageView
                             android:layout_width="20dp"
                             android:layout_height="20dp"
+                            android:contentDescription="Calendar Icon"
                             app:srcCompat="@drawable/ic_calendar_green"
-                            app:tint="@color/dark_green"
-                            android:contentDescription="Calendar Icon" />
+                            app:tint="@color/dark_green" />
 
                         <TextView
+                            android:id="@+id/weekRangeLabel"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="8dp"
@@ -146,8 +145,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal">
-
-                        <!-- Mon -->
+                        <!--  Mon  -->
                         <LinearLayout
                             android:id="@+id/dayContainer1"
                             android:layout_width="0dp"
@@ -176,9 +174,10 @@
                                 android:textSize="16sp" />
                         </LinearLayout>
 
-                        <Space android:layout_width="4dp" android:layout_height="wrap_content" />
-
-                        <!-- Tue -->
+                        <Space
+                            android:layout_width="4dp"
+                            android:layout_height="wrap_content" />
+                        <!--  Tue  -->
                         <LinearLayout
                             android:id="@+id/dayContainer2"
                             android:layout_width="0dp"
@@ -207,9 +206,10 @@
                                 android:textSize="16sp" />
                         </LinearLayout>
 
-                        <Space android:layout_width="4dp" android:layout_height="wrap_content" />
-
-                        <!-- Wed -->
+                        <Space
+                            android:layout_width="4dp"
+                            android:layout_height="wrap_content" />
+                        <!--  Wed  -->
                         <LinearLayout
                             android:id="@+id/dayContainer3"
                             android:layout_width="0dp"
@@ -238,9 +238,10 @@
                                 android:textSize="16sp" />
                         </LinearLayout>
 
-                        <Space android:layout_width="4dp" android:layout_height="wrap_content" />
-
-                        <!-- Thu -->
+                        <Space
+                            android:layout_width="4dp"
+                            android:layout_height="wrap_content" />
+                        <!--  Thu  -->
                         <LinearLayout
                             android:id="@+id/dayContainer4"
                             android:layout_width="0dp"
@@ -269,9 +270,10 @@
                                 android:textSize="16sp" />
                         </LinearLayout>
 
-                        <Space android:layout_width="4dp" android:layout_height="wrap_content" />
-
-                        <!-- Fri -->
+                        <Space
+                            android:layout_width="4dp"
+                            android:layout_height="wrap_content" />
+                        <!--  Fri  -->
                         <LinearLayout
                             android:id="@+id/dayContainer5"
                             android:layout_width="0dp"
@@ -300,9 +302,10 @@
                                 android:textSize="16sp" />
                         </LinearLayout>
 
-                        <Space android:layout_width="4dp" android:layout_height="wrap_content" />
-
-                        <!-- Sat -->
+                        <Space
+                            android:layout_width="4dp"
+                            android:layout_height="wrap_content" />
+                        <!--  Sat  -->
                         <LinearLayout
                             android:id="@+id/dayContainer6"
                             android:layout_width="0dp"
@@ -319,7 +322,9 @@
                                 android:layout_height="wrap_content"
                                 android:text="Sat"
                                 android:textColor="@color/dark_blue"
-                                android:textSize="10sp" />                            <TextView
+                                android:textSize="10sp" />
+
+                            <TextView
                                 android:id="@+id/day6"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
@@ -329,9 +334,10 @@
                                 android:textSize="16sp" />
                         </LinearLayout>
 
-                        <Space android:layout_width="4dp" android:layout_height="wrap_content" />
-
-                        <!-- Sun -->
+                        <Space
+                            android:layout_width="4dp"
+                            android:layout_height="wrap_content" />
+                        <!--  Sun  -->
                         <LinearLayout
                             android:id="@+id/dayContainer7"
                             android:layout_width="0dp"
@@ -362,8 +368,7 @@
                     </LinearLayout>
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
-
-            <!-- Progress Summary -->
+            <!--  Progress Summary  -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -391,10 +396,10 @@
                             android:layout_marginBottom="4dp"
                             android:background="@drawable/bg_green_gradient"
                             android:backgroundTint="#F0FDF4"
+                            android:contentDescription="Done Icon"
                             android:padding="6dp"
                             app:srcCompat="@drawable/ic_check_circle"
-                            app:tint="#16A34A"
-                            android:contentDescription="Done Icon" />
+                            app:tint="#16A34A" />
 
                         <TextView
                             android:id="@+id/doneCount"
@@ -439,10 +444,10 @@
                             android:layout_marginBottom="4dp"
                             android:background="@drawable/bg_blue_gradient"
                             android:backgroundTint="#EFF6FF"
+                            android:contentDescription="Ongoing Icon"
                             android:padding="6dp"
                             app:srcCompat="@drawable/ic_notifications"
-                            app:tint="#2563EB"
-                            android:contentDescription="Ongoing Icon" />
+                            app:tint="#2563EB" />
 
                         <TextView
                             android:id="@+id/ongoingCount"
@@ -467,9 +472,9 @@
                     android:layout_height="wrap_content" />
 
                 <androidx.cardview.widget.CardView
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:layout_width="0dp"
                     app:cardBackgroundColor="@color/white"
                     app:cardCornerRadius="16dp"
                     app:cardElevation="1dp">
@@ -487,10 +492,10 @@
                             android:layout_marginBottom="4dp"
                             android:background="@drawable/bg_orange_gradient"
                             android:backgroundTint="#FFF7ED"
+                            android:contentDescription="Pending Icon"
                             android:padding="6dp"
                             app:srcCompat="@drawable/ic_notifications"
-                            app:tint="#EA580C"
-                            android:contentDescription="Pending Icon" />
+                            app:tint="#EA580C" />
 
                         <TextView
                             android:id="@+id/pendingCount"
@@ -525,89 +530,86 @@
                     android:textColor="#111827"
                     android:textSize="18sp"
                     android:visibility="gone" />
-
-                <!-- Make the container full width. Put filters in a left-weighted group and action icons to the right so delete icon is never clipped -->
+                <!--  Make the container full width. Put filters in a left-weighted group and action icons to the right so delete icon is never clipped  -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_centerVertical="true"
-                    android:orientation="horizontal"
                     android:gravity="center_vertical"
+                    android:orientation="horizontal"
                     android:paddingEnd="8dp">
-
-                    <!-- Filters: use a horizontal scrollable ChipGroup so chips look nicer and never get squeezed on small screens -->
+                    <!--  Filters: use a horizontal scrollable ChipGroup so chips look nicer and never get squeezed on small screens  -->
                     <HorizontalScrollView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:fillViewport="false"
-                        android:scrollbars="none"
-                        android:overScrollMode="never">
+                        android:overScrollMode="never"
+                        android:scrollbars="none">
 
                         <com.google.android.material.chip.ChipGroup
                             android:id="@+id/filtersGroup"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            app:singleLine="true"
-                            app:chipSpacing="8dp"
-                            app:singleSelection="true"
-                            app:selectionRequired="true"
+                            android:gravity="center_vertical"
                             android:paddingStart="4dp"
                             android:paddingEnd="4dp"
-                            android:gravity="center_vertical">
+                            app:chipSpacing="8dp"
+                            app:selectionRequired="true"
+                            app:singleLine="true"
+                            app:singleSelection="true">
 
                             <com.google.android.material.chip.Chip
                                 android:id="@+id/filterAssignedBtn"
                                 style="@style/Widget.MaterialComponents.Chip.Choice"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="Assigned"
-                                android:textAllCaps="false"
+                                android:checkable="true"
+                                android:checked="true"
                                 android:minWidth="72dp"
                                 android:paddingLeft="12dp"
                                 android:paddingRight="12dp"
-                                android:checkable="true"
-                                android:checked="true"
+                                android:text="Assigned"
+                                android:textAllCaps="false"
+                                android:textColor="@color/chip_text_green"
+                                app:checkedIconVisible="false"
                                 app:chipBackgroundColor="@color/chip_bg_green"
                                 app:chipStrokeColor="@color/dark_green"
-                                app:chipStrokeWidth="1dp"
-                                app:checkedIconVisible="false"
-                                android:textColor="@color/chip_text_green" />
+                                app:chipStrokeWidth="1dp" />
 
                             <com.google.android.material.chip.Chip
                                 android:id="@+id/filterMissingBtn"
                                 style="@style/Widget.MaterialComponents.Chip.Choice"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="Missing"
-                                android:textAllCaps="false"
+                                android:checkable="true"
                                 android:minWidth="72dp"
                                 android:paddingLeft="12dp"
                                 android:paddingRight="12dp"
-                                android:checkable="true"
+                                android:text="Missing"
+                                android:textAllCaps="false"
+                                android:textColor="@color/chip_text_orange"
+                                app:checkedIconVisible="false"
                                 app:chipBackgroundColor="@color/chip_bg_orange"
                                 app:chipStrokeColor="#EA580C"
-                                app:chipStrokeWidth="1dp"
-                                app:checkedIconVisible="false"
-                                android:textColor="@color/chip_text_orange" />
+                                app:chipStrokeWidth="1dp" />
 
                             <com.google.android.material.chip.Chip
                                 android:id="@+id/filterDoneBtn"
                                 style="@style/Widget.MaterialComponents.Chip.Choice"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="Done"
-                                android:textAllCaps="false"
+                                android:checkable="true"
                                 android:minWidth="72dp"
                                 android:paddingLeft="12dp"
                                 android:paddingRight="12dp"
-                                android:checkable="true"
+                                android:text="Done"
+                                android:textAllCaps="false"
+                                android:textColor="@color/card_green_light"
+                                app:checkedIconVisible="false"
                                 app:chipBackgroundColor="@color/chip_bg_green"
                                 app:chipStrokeColor="@color/dark_green"
-                                app:chipStrokeWidth="1dp"
-                                app:checkedIconVisible="false"
-                                android:textColor="@color/card_green_light" />
-
+                                app:chipStrokeWidth="1dp" />
                         </com.google.android.material.chip.ChipGroup>
                     </HorizontalScrollView>
 
@@ -615,36 +617,34 @@
                         android:id="@+id/taskDetailsBtn"
                         android:layout_width="40dp"
                         android:layout_height="40dp"
-                        android:layout_marginEnd="8dp"
                         android:layout_gravity="center_vertical"
+                        android:layout_marginEnd="8dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="All Task Details"
                         android:padding="6dp"
                         app:srcCompat="@drawable/ic_info"
-                        app:tint="@color/dark_green"
-                        android:contentDescription="All Task Details" />
+                        app:tint="@color/dark_green" />
 
                     <ImageButton
                         android:id="@+id/bulkDeleteBtn"
                         android:layout_width="40dp"
                         android:layout_height="40dp"
-                        android:layout_marginEnd="4dp"
                         android:layout_gravity="center_vertical"
+                        android:layout_marginEnd="4dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Bulk Delete"
                         android:padding="6dp"
                         app:srcCompat="@android:drawable/ic_menu_delete"
-                        app:tint="#EF4444"
-                        android:contentDescription="Bulk Delete" />
+                        app:tint="#EF4444" />
                 </LinearLayout>
             </RelativeLayout>
-
-            <!-- Tasks Container -->
+            <!--  Tasks Container  -->
             <LinearLayout
                 android:id="@+id/tasksContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical" />
-
-            <!-- Placeholder for no tasks -->
+            <!--  Placeholder for no tasks  -->
             <LinearLayout
                 android:id="@+id/noTasksPlaceholder"
                 android:layout_width="match_parent"
@@ -656,9 +656,9 @@
                     android:layout_width="64dp"
                     android:layout_height="64dp"
                     android:alpha="0.1"
+                    android:contentDescription="No Tasks Icon"
                     app:srcCompat="@drawable/ic_clipboard_list"
-                    app:tint="@color/dark_green"
-                    android:contentDescription="No Tasks Icon" />
+                    app:tint="@color/dark_green" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -670,11 +670,9 @@
                     android:textColor="#6B7280"
                     android:textSize="16sp" />
             </LinearLayout>
-
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
-
-    <!-- Bottom Navigation -->
+    <!--  Bottom Navigation  -->
     <LinearLayout
         android:id="@+id/bottomNavContainer"
         android:layout_width="match_parent"
@@ -689,17 +687,17 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:gravity="center"
-            android:orientation="vertical"
             android:clickable="true"
-            android:focusable="true">
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical">
 
             <ImageView
                 android:layout_width="24dp"
                 android:layout_height="24dp"
+                android:contentDescription="Home"
                 app:srcCompat="@drawable/ic_home"
-                app:tint="@color/white"
-                android:contentDescription="Home" />
+                app:tint="@color/white" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -714,17 +712,17 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:gravity="center"
-            android:orientation="vertical"
             android:clickable="true"
-            android:focusable="true">
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical">
 
             <ImageView
                 android:layout_width="24dp"
                 android:layout_height="24dp"
+                android:contentDescription="Analytics"
                 app:srcCompat="@drawable/ic_chart"
-                app:tint="@color/white"
-                android:contentDescription="Analytics" />
+                app:tint="@color/white" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -739,17 +737,17 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:gravity="center"
-            android:orientation="vertical"
             android:clickable="true"
-            android:focusable="true">
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical">
 
             <ImageView
                 android:layout_width="24dp"
                 android:layout_height="24dp"
+                android:contentDescription="Schedule"
                 app:srcCompat="@drawable/ic_schedule"
-                app:tint="@color/white"
-                android:contentDescription="Schedule" />
+                app:tint="@color/white" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -764,17 +762,17 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:gravity="center"
-            android:orientation="vertical"
             android:clickable="true"
-            android:focusable="true">
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical">
 
             <ImageView
                 android:layout_width="24dp"
                 android:layout_height="24dp"
+                android:contentDescription="Profile"
                 app:srcCompat="@drawable/ic_profile"
-                app:tint="@color/white"
-                android:contentDescription="Profile" />
+                app:tint="@color/white" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -784,8 +782,6 @@
                 android:textSize="10sp" />
         </LinearLayout>
     </LinearLayout>
-
-    <!-- Include Loading Overlay -->
+    <!--  Include Loading Overlay  -->
     <include layout="@layout/layout_loading" />
-
 </androidx.constraintlayout.widget.ConstraintLayout>
