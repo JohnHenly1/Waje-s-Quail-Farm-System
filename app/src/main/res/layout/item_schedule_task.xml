@@ -56,6 +56,15 @@
                 android:textSize="11sp"
                 android:textStyle="bold"
                 android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/taskAssignedTo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Assigned To: Owner"
+                android:textColor="@color/schedule_task_subtitle"
+                android:textSize="11sp" />
         </LinearLayout>
 
         <LinearLayout
