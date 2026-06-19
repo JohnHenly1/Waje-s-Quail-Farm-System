@@ -496,6 +496,13 @@ object NavigationHelper {
                             "Invite saved, but the email failed to send (code $responseCode).",
                             Toast.LENGTH_LONG
                         ).show()
+                    } else {
+                        // Inform the owner that the invite email was successfully sent.
+                        Toast.makeText(
+                            activity,
+                            "Invite email sent to $email Kindly inform the invited user to check their inbox or spam at Gmail",
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
                 }
             } catch (e: Exception) {

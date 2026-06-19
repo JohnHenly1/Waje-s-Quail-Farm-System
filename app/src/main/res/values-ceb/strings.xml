@@ -333,6 +333,5 @@
     <string name="admin_group_label">MGA USER SA FARM UG PAGDUMALA SA DATABASE</string>
     <string name="user_access_list">Listahan sa Access sa User</string>
     <string name="generate_invite_code">Paghimo og Invite Code</string>
-    <string name="manage_users">Pagdumala sa mga User</string>
 
 </resources>

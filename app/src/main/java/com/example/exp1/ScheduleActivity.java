@@ -1123,9 +1123,9 @@ public class ScheduleActivity extends AppCompatActivity {
             else if (sOngoing.equals(task.status)) ongoing++;
             else pending++;
 
-            // Apply active filter: ASSIGNED -> pending, MISSING -> missed, DONE -> done
+            // Apply active filter: ASSIGNED -> pending or ongoing, MISSING -> missed, DONE -> done
             boolean includeByFilter = true;
-            if (FILTER_ASSIGNED.equals(activeFilter)) includeByFilter = sPending.equals(task.status);
+            if (FILTER_ASSIGNED.equals(activeFilter)) includeByFilter = sPending.equals(task.status) || sOngoing.equals(task.status);
             else if (FILTER_MISSING.equals(activeFilter)) includeByFilter = sMissed.equals(task.status);
             else if (FILTER_DONE.equals(activeFilter)) includeByFilter = sDone.equals(task.status);
             if (!includeByFilter) continue;

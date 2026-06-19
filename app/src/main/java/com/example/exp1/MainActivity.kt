@@ -24,6 +24,10 @@ import com.google.android.material.textfield.TextInputLayout
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
+import kotlin.random.Random
 
 class MainActivity : AppCompatActivity() {
 
@@ -58,9 +62,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_login)
 
         // GOOGLE ACCOUNT PICKER SETUP
-        val gso = GoogleSignInOptions.Builder(
-            GoogleSignInOptions.DEFAULT_SIGN_IN
-        )
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken("441160922275-03k03v695eo31hscn5dic9eh1o16hhka.apps.googleusercontent.com")
             .requestEmail()
             .build()
@@ -70,19 +72,11 @@ class MainActivity : AppCompatActivity() {
         val editLoginEmail = findViewById<EditText>(R.id.editLoginEmail)
 
         editLoginEmail.addTextChangedListener(object : TextWatcher {
-
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-
             override fun afterTextChanged(s: android.text.Editable?) {
-
                 val email = s.toString().trim()
-
-                if (
-                    email.isNotEmpty() &&
-                    !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
-                ) {
+                if (email.isNotEmpty() && !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
                     editLoginEmail.error = "Invalid email format"
                 } else {
                     editLoginEmail.error = null
@@ -103,36 +97,22 @@ class MainActivity : AppCompatActivity() {
         loadingLayout.visibility = View.VISIBLE
         noInternetSection.visibility = View.GONE
 
-        loadingIcon.startAnimation(
-            AnimationUtils.loadAnimation(this, R.anim.quail_jump)
-        )
+        loadingIcon.startAnimation(AnimationUtils.loadAnimation(this, R.anim.quail_jump))
 
         findViewById<View>(R.id.btnRetryConnection).setOnClickListener {
-
             if (isInternetActuallyWorking()) {
-
                 noInternetSection.visibility = View.GONE
                 progressBar.visibility = View.VISIBLE
                 percentageText.visibility = View.VISIBLE
-
                 startEntrySequence(currentEmail)
-
             } else {
-
-                Toast.makeText(
-                    this,
-                    "Still no connection...",
-                    Toast.LENGTH_SHORT
-                ).show()
+                Toast.makeText(this, "Still no connection...", Toast.LENGTH_SHORT).show()
             }
         }
 
         btnOffline.setOnClickListener {
-
             if (currentEmail != null) {
-
                 val role = accountManager.getRole(currentEmail)
-                // For offline, we rely on cached data in AccountManager
                 enterApp("User", currentEmail, role, "cached", false)
             }
         }
@@ -148,113 +128,71 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        findViewById<View>(R.id.btnManualLogin).setOnClickListener {
-
-            handleManualLogin()
-        }
-
-        findViewById<View>(R.id.btnRegister).setOnClickListener {
-
-            startActivity(Intent(this, RegisterActivity::class.java))
-        }
-
-        findViewById<View>(R.id.btnForgotPassword).setOnClickListener {
-            showForgotPasswordDialog()
-        }
+        findViewById<View>(R.id.btnManualLogin).setOnClickListener { handleManualLogin() }
+        findViewById<View>(R.id.btnRegister).setOnClickListener { startActivity(Intent(this, RegisterActivity::class.java)) }
+        findViewById<View>(R.id.btnForgotPassword).setOnClickListener { showForgotPasswordDialog() }
     }
 
 
-    // GOOGLE LOGIN RESULT HANDLER
+    // ─────────────────────────────────────────────────────────────────────────
+    // Google Login Result Handler
+    // ─────────────────────────────────────────────────────────────────────────
 
-    override fun onActivityResult(
-        requestCode: Int,
-        resultCode: Int,
-        data: Intent?
-    ) {
-
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
 
         if (requestCode == GOOGLE_SIGN_IN_REQUEST) {
-
-            val task =
-                GoogleSignIn.getSignedInAccountFromIntent(data)
-
+            val task = GoogleSignIn.getSignedInAccountFromIntent(data)
             try {
+                val account = task.getResult(ApiException::class.java)
+                val email = account.email ?: return
 
-                val account =
-                    task.getResult(ApiException::class.java)
-
-                val email =
-                    account.email ?: return
-
-                // Sign into Firebase Auth with the Google credential so that
-                // request.auth.token.email is populated in Firestore Security Rules.
-                // Without this the user stays anonymous and isOwner() always fails.
-                val credential =
-                    com.google.firebase.auth.GoogleAuthProvider
-                        .getCredential(account.idToken, null)
+                val credential = com.google.firebase.auth.GoogleAuthProvider
+                    .getCredential(account.idToken, null)
 
                 com.google.firebase.auth.FirebaseAuth.getInstance()
                     .signInWithCredential(credential)
-                    .addOnSuccessListener {
-                        checkFirestoreAccessWithPassword(email)
-                    }
-                    .addOnFailureListener {
-                        // Credential sign-in failed — fall back to anonymous so
-                        // read-only Firestore paths (login check) still work.
-                        checkFirestoreAccessWithPassword(email)
-                    }
+                    .addOnSuccessListener { checkFirestoreAccessWithPassword(email) }
+                    .addOnFailureListener { checkFirestoreAccessWithPassword(email) }
 
             } catch (e: ApiException) {
-
-                Toast.makeText(
-                    this,
-                    "Google sign-in cancelled",
-                    Toast.LENGTH_SHORT
-                ).show()
+                Toast.makeText(this, "Google sign-in cancelled", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
 
-    // GOOGLE + MANUAL SHARE SAME PASSWORD CHECK FUNCTION (Bypassing Firebase Auth)
+    // ─────────────────────────────────────────────────────────────────────────
+    // Shared password check (Google + manual login both flow through here)
+    // ─────────────────────────────────────────────────────────────────────────
 
     private fun checkFirestoreAccessWithPassword(email: String) {
-
         loadingLayout.visibility = View.VISIBLE
 
         FirebaseFirestore.getInstance()
             .collection("user_access")
             .document(email)
             .get()
-
             .addOnSuccessListener { doc ->
-
                 loadingLayout.visibility = View.GONE
 
                 if (!doc.exists()) {
-
                     showNotRegisteredDialog()
                     return@addOnSuccessListener
                 }
 
-                val password =
-                    doc.getString("password") ?: ""
+                val password = doc.getString("password") ?: ""
+                val name = doc.getString("name") ?: email
+                val role = doc.getString("role") ?: "staff"
 
-                val name =
-                    doc.getString("name") ?: email
-
-                val role =
-                    doc.getString("role") ?: "staff"
-
-                showPasswordDialog(
-                    email,
-                    password,
-                    name,
-                    role
-                )
+                showPasswordDialog(email, password, name, role)
             }
     }
+
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Forgot Password — Step 1: ask for email
+    // ─────────────────────────────────────────────────────────────────────────
 
     private fun showForgotPasswordDialog() {
         val currentEmailInput = findViewById<EditText>(R.id.editLoginEmail).text.toString().trim()
@@ -266,12 +204,12 @@ class MainActivity : AppCompatActivity() {
 
         AlertDialog.Builder(this)
             .setTitle(getString(R.string.forgot_password_label))
-            .setMessage(getString(R.string.verify_email_msg))
+            .setMessage("Enter your registered email. We'll send you a 6-digit verification code.")
             .setView(input)
-            .setPositiveButton("Verify") { _, _ ->
+            .setPositiveButton("Send Code") { _, _ ->
                 val email = input.text.toString().trim().lowercase()
                 if (email.isNotEmpty()) {
-                    verifyEmailForPasswordReset(email)
+                    showResetCodeConfirmationDialog(email)
                 } else {
                     Toast.makeText(this, "Email cannot be empty", Toast.LENGTH_SHORT).show()
                 }
@@ -280,25 +218,145 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun verifyEmailForPasswordReset(email: String) {
+    // ─────────────────────────────────────────────────────────────────────────
+    // Forgot Password — Step 1b: confirm before sending the code
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private fun showResetCodeConfirmationDialog(email: String) {
+        AlertDialog.Builder(this)
+            .setTitle("Send Verification Code?")
+            .setMessage("A 6-digit reset code will be sent to:\n\n$email\n\nDo you want to proceed?")
+            .setPositiveButton("Proceed") { _, _ -> checkEmailThenSendResetCode(email) }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Forgot Password — Step 2: verify email exists, generate & email the code
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private fun checkEmailThenSendResetCode(email: String) {
         loadingLayout.visibility = View.VISIBLE
+        statusText.text = "Sending verification code..."
+
         FirebaseFirestore.getInstance()
             .collection("user_access")
             .document(email)
             .get()
             .addOnSuccessListener { doc ->
                 loadingLayout.visibility = View.GONE
-                if (doc.exists()) {
-                    showResetPasswordDialog(email)
-                } else {
+
+                if (!doc.exists()) {
                     Toast.makeText(this, getString(R.string.email_not_found), Toast.LENGTH_SHORT).show()
+                    return@addOnSuccessListener
                 }
+
+                // 6-digit code, valid for 15 minutes
+                val code = "%06d".format(Random.nextInt(1000000))
+                val expiresAt = System.currentTimeMillis() + (15 * 60 * 1000)
+
+                sendResetCodeViaAppsScript(email, code)
+                showVerificationCodeDialog(email, code, expiresAt)
             }
             .addOnFailureListener {
                 loadingLayout.visibility = View.GONE
                 Toast.makeText(this, "Error: ${it.message}", Toast.LENGTH_SHORT).show()
             }
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Forgot Password — send reset code email via Apps Script (background thread)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private fun sendResetCodeViaAppsScript(email: String, code: String) {
+        val scriptUrl = "https://script.google.com/macros/s/AKfycbxd3Jv_ysFbqaH0Rf5Qw8_Zxv6g2Sy2muDSkISnmPjxk2KMENJF7RA8ybXdQ5GYyMHF/exec"
+        val secret    = "Red0455"
+
+        Thread {
+            try {
+                val url  = URL(scriptUrl)
+                val conn = url.openConnection() as HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                conn.doOutput       = true
+                conn.connectTimeout = 10000
+                conn.readTimeout    = 10000
+
+                val payload = JSONObject().apply {
+                    put("secret", secret)
+                    put("email",  email)
+                    put("code",   code)
+                    put("type",   "reset") // tells Apps Script to use the reset email template
+                }
+
+                conn.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
+
+                val responseCode = conn.responseCode
+                val responseText = try {
+                    conn.inputStream.bufferedReader().use { it.readText() }
+                } catch (_: Exception) {
+                    conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+                }
+
+                Handler(Looper.getMainLooper()).post {
+                    if (responseCode != 200 || !responseText.contains("\"success\":true")) {
+                        Toast.makeText(
+                            this,
+                            "Failed to send reset code. Please try again.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            } catch (e: Exception) {
+                Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(this, "Network error: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }.start()
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Forgot Password — Step 3: user enters the code they received
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private fun showVerificationCodeDialog(email: String, expectedCode: String, expiresAt: Long) {
+        val codeInput = EditText(this)
+        codeInput.hint = "Enter 6-digit code"
+        codeInput.inputType = android.text.InputType.TYPE_CLASS_NUMBER
+        codeInput.setPadding(50, 40, 50, 40)
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Verify Your Email")
+            .setMessage("A 6-digit code was sent to $email.\nIt expires in 15 minutes.")
+            .setView(codeInput)
+            .setPositiveButton("Verify", null)
+            .setNegativeButton("Cancel", null)
+            .create()
+
+        dialog.show()
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val entered = codeInput.text.toString().trim()
+
+            if (System.currentTimeMillis() > expiresAt) {
+                Toast.makeText(this, "Code has expired. Please request a new one.", Toast.LENGTH_LONG).show()
+                dialog.dismiss()
+                return@setOnClickListener
+            }
+
+            if (entered == expectedCode) {
+                dialog.dismiss()
+                showResetPasswordDialog(email)
+            } else {
+                codeInput.error = "Incorrect code"
+                Toast.makeText(this, "Incorrect code. Please try again.", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Forgot Password — Step 4: set the new password
+    // ─────────────────────────────────────────────────────────────────────────
 
     private fun showResetPasswordDialog(email: String) {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_password_entry, null)
@@ -311,17 +369,12 @@ class MainActivity : AppCompatActivity() {
         tvEmail?.text = email
         editPassword.hint = getString(R.string.new_password_hint)
 
-        // Reuse the same validation as login
         editPassword.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
                 val pass = s.toString()
-                if (pass.isNotEmpty()) {
-                    passwordInputLayout.error = getPasswordStrengthError(pass)
-                } else {
-                    passwordInputLayout.error = null
-                }
+                passwordInputLayout.error = if (pass.isNotEmpty()) getPasswordStrengthError(pass) else null
             }
         })
 
@@ -336,12 +389,10 @@ class MainActivity : AppCompatActivity() {
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             val newPass = editPassword.text.toString().trim()
             val error = getPasswordStrengthError(newPass)
-
             if (error != null) {
                 passwordInputLayout.error = error
                 return@setOnClickListener
             }
-
             updatePasswordInFirestore(email, newPass, dialog)
         }
     }
@@ -364,154 +415,84 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    private fun registerNetworkSensor(email: String?) {
+    // ─────────────────────────────────────────────────────────────────────────
+    // Network
+    // ─────────────────────────────────────────────────────────────────────────
 
+    private fun registerNetworkSensor(email: String?) {
         val request = NetworkRequest.Builder()
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .addCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
             .build()
 
         networkCallback = object : ConnectivityManager.NetworkCallback() {
-
             override fun onAvailable(network: Network) {
-
                 runOnUiThread {
-
                     if (noInternetSection.visibility == View.VISIBLE) {
-
                         noInternetSection.visibility = View.GONE
                         progressBar.visibility = View.VISIBLE
                         percentageText.visibility = View.VISIBLE
-
                         startEntrySequence(email)
                     }
                 }
             }
-
             override fun onLost(network: Network) {
-
-                runOnUiThread {
-
-                    showNoInternetUI(email != null)
-                }
+                runOnUiThread { showNoInternetUI(email != null) }
             }
         }
 
         cm.registerNetworkCallback(request, networkCallback!!)
 
         if (!isInternetActuallyWorking()) {
-
             showNoInternetUI(email != null)
-
         } else {
-
             startEntrySequence(email)
         }
     }
 
-
     private fun handleManualLogin() {
-
         if (!isInternetActuallyWorking()) {
-
             showNoInternetUI(false)
             return
         }
 
-        val email =
-            findViewById<EditText>(R.id.editLoginEmail)
-                .text
-                .toString()
-                .trim()
-                .lowercase()
-
+        val email = findViewById<EditText>(R.id.editLoginEmail).text.toString().trim().lowercase()
         if (email.isEmpty()) {
-
-            Toast.makeText(
-                this,
-                "Enter valid email",
-                Toast.LENGTH_SHORT
-            ).show()
-
+            Toast.makeText(this, "Enter valid email", Toast.LENGTH_SHORT).show()
             return
         }
-
         checkFirestoreAccessWithPassword(email)
     }
 
-
     private fun showNotRegisteredDialog() {
-
         AlertDialog.Builder(this)
-
             .setTitle("Account Not Found")
-
-            .setMessage(
-                "This email is not registered. Request access?"
-            )
-
-            .setPositiveButton("Request Access") { _, _ ->
-
-                startActivity(
-                    Intent(
-                        this,
-                        RegisterActivity::class.java
-                    )
-                )
-            }
-
+            .setMessage("This email is not registered. Request access?")
+            .setPositiveButton("Request Access") { _, _ -> startActivity(Intent(this, RegisterActivity::class.java)) }
             .setNegativeButton("Cancel", null)
-
             .show()
     }
 
-
-    private fun showPasswordDialog(
-        email: String,
-        correctPass: String,
-        name: String,
-        role: String
-    ) {
-
-        val dialogView =
-            LayoutInflater.from(this)
-                .inflate(
-                    R.layout.dialog_password_entry,
-                    null
-                )
-
-        val editPassword =
-            dialogView.findViewById<EditText>(
-                R.id.editLoginPassword
-            )
-
+    private fun showPasswordDialog(email: String, correctPass: String, name: String, role: String) {
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_password_entry, null)
+        val editPassword = dialogView.findViewById<EditText>(R.id.editLoginPassword)
         val passwordInputLayout = dialogView.findViewById<TextInputLayout>(R.id.passwordInputLayout)
-
-        val tvEmail =
-            dialogView.findViewById<TextView>(
-                R.id.tvPasswordEmail
-            )
+        val tvEmail = dialogView.findViewById<TextView>(R.id.tvPasswordEmail)
         tvEmail?.text = email
 
-        // Auto-detect format for login password
         editPassword.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
                 val pass = s.toString()
-                if (pass.isNotEmpty()) {
-                    val error = getPasswordStrengthError(pass)
-                    passwordInputLayout.error = error
-                } else {
-                    passwordInputLayout.error = null
-                }
+                passwordInputLayout.error = if (pass.isNotEmpty()) getPasswordStrengthError(pass) else null
             }
         })
 
         val dialog = AlertDialog.Builder(this)
             .setTitle("Verify Identity")
             .setView(dialogView)
-            .setPositiveButton("Verify & Login", null) // Set to null first to override click
+            .setPositiveButton("Verify & Login", null)
             .setNegativeButton("Cancel", null)
             .create()
 
@@ -519,8 +500,8 @@ class MainActivity : AppCompatActivity() {
 
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             val entered = editPassword.text.toString().trim()
-
             val formatError = getPasswordStrengthError(entered)
+
             if (formatError != null) {
                 passwordInputLayout.error = formatError
                 Toast.makeText(this, formatError, Toast.LENGTH_SHORT).show()
@@ -547,68 +528,45 @@ class MainActivity : AppCompatActivity() {
         return null
     }
 
-
     private fun isInternetActuallyWorking(): Boolean {
-
         val network = cm.activeNetwork ?: return false
         val caps = cm.getNetworkCapabilities(network) ?: return false
-
-        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 
-
     private fun showNoInternetUI(canGoOffline: Boolean) {
-
         handler.removeCallbacksAndMessages(null)
-
         loadingIcon.clearAnimation()
-
         statusText.text = "Connection Required"
-
         progressBar.visibility = View.GONE
         percentageText.visibility = View.GONE
         noInternetSection.visibility = View.VISIBLE
-
-        btnOffline.visibility =
-            if (canGoOffline) View.VISIBLE else View.GONE
+        btnOffline.visibility = if (canGoOffline) View.VISIBLE else View.GONE
     }
 
-
+    @SuppressLint("SetTextI18n")
     private fun startEntrySequence(email: String?) {
-
         var progress = 0
-
         val progressHandler = Handler(Looper.getMainLooper())
 
         val runnable = object : Runnable {
-
             override fun run() {
-
                 if (progress <= 100) {
-
                     progressBar.progress = progress
                     percentageText.text = "$progress%"
 
                     if (progress == 40 && email != null) {
-
                         statusText.text = "Syncing with Cloud..."
-
                         startLivePendingCheck(email)
                     }
 
                     progress += 4
-
                     progressHandler.postDelayed(this, 30)
-
                 } else {
-
                     if (email == null) {
-
                         loadingLayout.visibility = View.GONE
-
                         loadingIcon.clearAnimation()
-
                         loginUIContainer.visibility = View.VISIBLE
                     }
                 }
@@ -620,169 +578,79 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("SetTextI18n")
     private fun startLivePendingCheck(email: String) {
-
         firestoreListener?.remove()
 
-        firestoreListener =
-            FirebaseFirestore.getInstance()
-                .collection("user_access")
-                .document(email)
+        firestoreListener = FirebaseFirestore.getInstance()
+            .collection("user_access")
+            .document(email)
+            .addSnapshotListener { snapshot, _ ->
+                if (snapshot != null && snapshot.exists()) {
+                    val status   = snapshot.getString("status") ?: ""
+                    val role     = snapshot.getString("role") ?: "staff"
+                    val name     = snapshot.getString("name") ?: email
+                    val password = snapshot.getString("password") ?: ""
 
-                .addSnapshotListener { snapshot, _ ->
+                    if (status == "approved") {
+                        val setupDone = snapshot.getBoolean("setupCompleted") ?: false
 
-                    if (snapshot != null && snapshot.exists()) {
-
-                        val status =
-                            snapshot.getString("status") ?: ""
-
-                        val role =
-                            snapshot.getString("role") ?: "staff"
-
-                        val name =
-                            snapshot.getString("name") ?: email
-
-                        val password = snapshot.getString("password") ?: ""
-
-                        if (status == "approved") {
-
-                            val setupDone =
-                                snapshot.getBoolean("setupCompleted")
-                                    ?: false
-
-                            if (setupDone) {
-
-                                statusText.text =
-                                    "Welcome, $name!"
-
-                                handler.postDelayed({
-
-                                    enterApp(
-                                        name,
-                                        email,
-                                        role,
-                                        password,
-                                        true
-                                    )
-
-                                }, 600)
-
-                            } else {
-
-                                loadingLayout.visibility = View.GONE
-
-                                loadingIcon.clearAnimation()
-
-                                startActivity(
-                                    Intent(
-                                        this,
-                                        EnterCodeActivity::class.java
-                                    )
-                                )
-
-                                finish()
-                            }
-
-                        } else if (status == "pending") {
-
-                            statusText.text =
-                                "Waiting for Farm Owner Approval..."
-
+                        if (setupDone) {
+                            statusText.text = "Welcome, $name!"
+                            handler.postDelayed({ enterApp(name, email, role, password, true) }, 600)
                         } else {
-
-                            handleAccessDenied()
+                            loadingLayout.visibility = View.GONE
+                            loadingIcon.clearAnimation()
+                            startActivity(Intent(this, EnterCodeActivity::class.java))
+                            finish()
                         }
-
+                    } else if (status == "pending") {
+                        statusText.text = "Waiting for Farm Owner Approval..."
                     } else {
-
                         handleAccessDenied()
                     }
+                } else {
+                    handleAccessDenied()
                 }
+            }
     }
+
     private fun handleAccessDenied() {
-
-        Toast.makeText(
-            this,
-            "Access Denied or Account Removed.",
-            Toast.LENGTH_LONG
-        ).show()
-
+        Toast.makeText(this, "Access Denied or Account Removed.", Toast.LENGTH_LONG).show()
         stopCheckingAndClear()
     }
 
-
     private fun stopCheckingAndClear() {
-
         firestoreListener?.remove()
-
         accountManager.clearSession()
-
         recreate()
     }
 
-
-    private fun enterApp(
-        name: String,
-        email: String,
-        role: String,
-        password: String,
-        showToast: Boolean
-    ) {
-
+    private fun enterApp(name: String, email: String, role: String, password: String, showToast: Boolean) {
         if (networkCallback != null) {
-
-            try {
-                cm.unregisterNetworkCallback(networkCallback!!)
-            } catch (_: Exception) {}
+            try { cm.unregisterNetworkCallback(networkCallback!!) } catch (_: Exception) {}
         }
 
         firestoreListener?.remove()
 
-        accountManager.registerAccount(
-            email,
-            email,
-            password,
-            role
-        )
-
+        accountManager.registerAccount(email, email, password, role)
         accountManager.saveCurrentSession(email)
 
-        // Write a sessions/{uid} document so Firestore Security Rules can verify
-        // the caller's role and status using request.auth.uid (which is always
-        // populated, even for anonymous auth — unlike request.auth.token.email).
         val uid = FirebaseAuth.getInstance().currentUser?.uid
         if (uid != null) {
             FirebaseFirestore.getInstance()
                 .collection("sessions")
                 .document(uid)
-                .set(mapOf(
-                    "email"  to email,
-                    "role"   to role,
-                    "status" to "approved"
-                ))
+                .set(mapOf("email" to email, "role" to role, "status" to "approved"))
         }
 
-        startActivity(
-            Intent(
-                this,
-                DashboardActivity::class.java
-            ).putExtra("username", email)
-        )
-
+        startActivity(Intent(this, DashboardActivity::class.java).putExtra("username", email))
         finish()
     }
 
-
     override fun onDestroy() {
-
         if (networkCallback != null) {
-
-            try {
-                cm.unregisterNetworkCallback(networkCallback!!)
-            } catch (_: Exception) {}
+            try { cm.unregisterNetworkCallback(networkCallback!!) } catch (_: Exception) {}
         }
-
         firestoreListener?.remove()
-
         super.onDestroy()
     }
 }
