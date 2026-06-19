@@ -506,41 +506,7 @@
                         android:layout_height="1dp"
                         android:layout_marginHorizontal="16dp"
                         android:background="#F3F4F6" />
-                    <!--  Manage Users  -->
-                    <LinearLayout
-                        android:id="@+id/manageUsersButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="64dp"
-                        android:background="?attr/selectableItemBackground"
-                        android:gravity="center_vertical"
-                        android:paddingHorizontal="16dp">
-
-                        <View
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:background="@drawable/rounded_corner"
-                            android:backgroundTint="@color/bg_green_100"
-                            android:foreground="@drawable/ic_users"
-                            android:foregroundGravity="center"
-                            android:foregroundTint="@color/dark_green" />
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="16dp"
-                            android:layout_weight="1"
-                            android:fontFamily="sans-serif-medium"
-                            android:text="@string/manage_users"
-                            android:textColor="@color/black"
-                            android:textSize="16sp" />
-
-                        <ImageView
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:contentDescription="@string/chevron_icon"
-                            android:src="@drawable/ic_chevron_right"
-                            app:tint="#D1D5DB" />
-                    </LinearLayout>
+                    <!--  Manage Users removed (redundant with User Access List) -->
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
             <!--  General Group  -->

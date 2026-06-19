@@ -163,10 +163,7 @@ public class ProfileActivity extends AppCompatActivity {
             if (generateInviteButton != null) {
                 generateInviteButton.setOnClickListener(v -> NavigationHelper.INSTANCE.showGenerateInviteCodeDialog(this, currentEmail));
             }
-            View manageUsersButton = findViewById(R.id.manageUsersButton);
-            if (manageUsersButton != null) {
-                manageUsersButton.setOnClickListener(v -> showPendingRequestsDialog());
-            }
+            // 'Manage Users' button removed from layout (redundant with User Access List).
         } else {
             if (adminGroupLabel != null) adminGroupLabel.setVisibility(View.GONE);
             if (adminCard != null) adminCard.setVisibility(View.GONE);
@@ -912,6 +909,10 @@ public class ProfileActivity extends AppCompatActivity {
         errorTextView.setVisibility(View.GONE);
         rvUserList.setVisibility(View.GONE);
 
+        // Create the dialog first so callbacks can dismiss it instead of stacking
+        builder.setPositiveButton(getString(R.string.close), null);
+        final AlertDialog dialog = builder.create();
+
         FirebaseFirestore.getInstance().collection("user_access")
                 .whereEqualTo("status", "approved")
                 .get()
@@ -920,13 +921,22 @@ public class ProfileActivity extends AppCompatActivity {
                     rvUserList.setVisibility(View.VISIBLE);
                     List<DocumentSnapshot> userDocs = new ArrayList<>(docs.getDocuments());
                     UserAdapter adapter = new UserAdapter(userDocs, email -> {
-                        FirebaseFirestore.getInstance().collection("user_access").document(email).delete()
-                                .addOnSuccessListener(a -> {
-                                    Toast.makeText(this, getString(R.string.user_removed), Toast.LENGTH_SHORT).show();
-                                    showUserListDialog();
-                                })
-                                .addOnFailureListener(e ->
-                                        Toast.makeText(this, getString(R.string.failed_to_remove_user), Toast.LENGTH_SHORT).show());
+                        // Confirm before deleting a user
+                        new AlertDialog.Builder(ProfileActivity.this)
+                                .setTitle("Remove user")
+                                .setMessage("Are you sure you want to remove user " + email + "?")
+                                .setPositiveButton("Remove", (d, w) ->
+                                        FirebaseFirestore.getInstance().collection("user_access").document(email).delete()
+                                                .addOnSuccessListener(a -> {
+                                                    Toast.makeText(this, getString(R.string.user_removed), Toast.LENGTH_SHORT).show();
+                                                    // Close current dialog and refresh to avoid stacking
+                                                    dialog.dismiss();
+                                                    showUserListDialog();
+                                                })
+                                                .addOnFailureListener(e ->
+                                                        Toast.makeText(this, getString(R.string.failed_to_remove_user), Toast.LENGTH_SHORT).show()))
+                                .setNegativeButton(getString(R.string.cancel), null)
+                                .show();
                     });
                     rvUserList.setAdapter(adapter);
                 })
@@ -936,8 +946,7 @@ public class ProfileActivity extends AppCompatActivity {
                     rvUserList.setVisibility(View.GONE);
                 });
 
-        builder.setPositiveButton(getString(R.string.close), null);
-        builder.show();
+        dialog.show();
     }
 
     private void showInviteCodesManagementDialog() {
@@ -948,6 +957,15 @@ public class ProfileActivity extends AppCompatActivity {
         container.setOrientation(LinearLayout.VERTICAL);
         container.setPadding(40, 40, 40, 40);
 
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(container);
+        builder.setView(scroll);
+        builder.setPositiveButton(getString(R.string.close), null);
+
+        final AlertDialog dialog = builder.create();
+
+        // Load invite codes and populate the container. Use the dialog reference
+        // so delete callbacks can dismiss then refresh without stacking.
         FirebaseFirestore.getInstance().collection("invite_codes").get()
                 .addOnSuccessListener(docs -> {
                     container.removeAllViews();
@@ -969,20 +987,23 @@ public class ProfileActivity extends AppCompatActivity {
                                         RoleManager.Companion.displayName(role != null ? role : "staff")));
 
                         ImageButton deleteBtn = row.findViewById(R.id.deleteUserBtn);
-                        deleteBtn.setOnClickListener(v -> doc.getReference().delete()
-                                .addOnSuccessListener(a -> {
-                                    Toast.makeText(this, "Invite code deleted", Toast.LENGTH_SHORT).show();
-                                    showInviteCodesManagementDialog();
-                                }));
+                        deleteBtn.setOnClickListener(v -> new AlertDialog.Builder(ProfileActivity.this)
+                                .setTitle(getString(R.string.delete))
+                                .setMessage("Delete invite code for " + (invitedEmail != null ? invitedEmail : code) + "?")
+                                .setPositiveButton(getString(R.string.delete), (d, w) -> doc.getReference().delete()
+                                        .addOnSuccessListener(a -> {
+                                            Toast.makeText(this, "Invite code deleted", Toast.LENGTH_SHORT).show();
+                                            dialog.dismiss();
+                                            showInviteCodesManagementDialog();
+                                        })
+                                        .addOnFailureListener(e -> Toast.makeText(this, getString(R.string.save_failed, e.getMessage()), Toast.LENGTH_SHORT).show()))
+                                .setNegativeButton(getString(R.string.cancel), null)
+                                .show());
                         container.addView(row);
                     }
                 });
 
-        ScrollView scroll = new ScrollView(this);
-        scroll.addView(container);
-        builder.setView(scroll);
-        builder.setPositiveButton(getString(R.string.close), null);
-        builder.show();
+        dialog.show();
     }
 
     private void showRoleLimitsDialog() {
@@ -1027,6 +1048,12 @@ public class ProfileActivity extends AppCompatActivity {
         container.setOrientation(LinearLayout.VERTICAL);
         container.setPadding(40, 40, 40, 40);
 
+
+
+        builder.setView(container);
+        builder.setPositiveButton(getString(R.string.close), null);
+        final AlertDialog dialog = builder.create();
+
         FirebaseFirestore.getInstance().collection("user_access")
                 .whereEqualTo("status", "pending")
                 .get()
@@ -1061,6 +1088,7 @@ public class ProfileActivity extends AppCompatActivity {
                                 .setPositiveButton(getString(R.string.reject), (d, w) ->
                                         doc.getReference().delete().addOnSuccessListener(a -> {
                                             Toast.makeText(this, getString(R.string.request_rejected), Toast.LENGTH_SHORT).show();
+                                            dialog.dismiss();
                                             showPendingRequestsDialog();
                                         }))
                                 .setNegativeButton(getString(R.string.cancel), null)
@@ -1096,18 +1124,22 @@ public class ProfileActivity extends AppCompatActivity {
                                                     intent.setPackage(null);
                                                     startActivity(Intent.createChooser(intent, "Send Email"));
                                                 }
-                                                new Handler(Looper.getMainLooper()).postDelayed(this::showPendingRequestsDialog, 2000);
+                                                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                                                    dialog.dismiss();
+                                                    showPendingRequestsDialog();
+                                                }, 2000);
                                             })
-                                            .setNegativeButton(R.string.close, (d, w) -> showPendingRequestsDialog())
+                                            .setNegativeButton(R.string.close, (d, w) -> {
+                                                dialog.dismiss();
+                                                showPendingRequestsDialog();
+                                            })
                                             .show());
                         });
                         container.addView(row);
                     }
                 });
 
-        builder.setView(container);
-        builder.setPositiveButton(getString(R.string.close), null);
-        builder.show();
+        dialog.show();
     }
 
 
