@@ -145,8 +145,6 @@ class SetupAccountActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            val db = FirebaseFirestore.getInstance()
-
             val addressMap = if (street.isNotEmpty()) {
                 mapOf(
                     "street" to street,
@@ -177,27 +175,52 @@ class SetupAccountActivity : AppCompatActivity() {
             btnComplete.isEnabled = false
             btnComplete.text = "Saving..."
 
-            // Use merge to update the existing approved request record
-            db.collection("user_access").document(email).set(userData, SetOptions.merge())
-                .addOnSuccessListener {
-                    val accountManager = AccountManager(this)
-                    // Use email as the key to remain consistent with MainActivity
-                    accountManager.registerAccount(email, email, pass, role)
-                    accountManager.saveCurrentSession(email)
-
-                    Toast.makeText(this, "Profile Setup Complete!", Toast.LENGTH_SHORT).show()
-                    val intent = Intent(this, DashboardActivity::class.java)
-                    intent.putExtra("username", email)
-                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                    startActivity(intent)
-                    finish()
-                }
-                .addOnFailureListener { e ->
-                    btnComplete.isEnabled = true
-                    btnComplete.text = "Complete Setup"
-                    Toast.makeText(this, "Error saving data: ${e.message}", Toast.LENGTH_LONG).show()
-                }
+            // ── Auth guard ──────────────────────────────────────────────
+            // signInAnonymously() in WajeApplication is async. If this screen
+            // is reached before it completes, request.auth is still null and
+            // Firestore rejects the write with PERMISSION_DENIED. Re-trigger
+            // sign-in here and only run the write once auth is confirmed
+            // (same pattern as ScheduleActivity.ensureAuthThenRun).
+            val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
+            if (auth.currentUser != null) {
+                saveUserAccess(email, userData)
+            } else {
+                auth.signInAnonymously()
+                    .addOnSuccessListener { saveUserAccess(email, userData) }
+                    .addOnFailureListener { e ->
+                        btnComplete.isEnabled = true
+                        btnComplete.text = "Complete Setup"
+                        Toast.makeText(this, "Auth error: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+            }
         }
+    }
+
+    /**
+     * Performs the actual user_access write. Extracted so it can run either
+     * immediately (already authed) or after signInAnonymously() succeeds.
+     */
+    private fun saveUserAccess(email: String, userData: Map<String, Any>) {
+        val db = FirebaseFirestore.getInstance()
+        db.collection("user_access").document(email).set(userData, SetOptions.merge())
+            .addOnSuccessListener {
+                val accountManager = AccountManager(this)
+                // Use email as the key to remain consistent with MainActivity
+                accountManager.registerAccount(email, email, userData["password"] as String, role)
+                accountManager.saveCurrentSession(email)
+
+                Toast.makeText(this, "Profile Setup Complete!", Toast.LENGTH_SHORT).show()
+                val intent = Intent(this, DashboardActivity::class.java)
+                intent.putExtra("username", email)
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                startActivity(intent)
+                finish()
+            }
+            .addOnFailureListener { e ->
+                btnComplete.isEnabled = true
+                btnComplete.text = "Complete Setup"
+                Toast.makeText(this, "Error saving data: ${e.message}", Toast.LENGTH_LONG).show()
+            }
     }
 
     /**
