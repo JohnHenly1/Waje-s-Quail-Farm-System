@@ -224,14 +224,15 @@ class SetupAccountActivity : AppCompatActivity() {
     }
 
     /**
-     * Full names may contain letters, spaces, hyphens, and apostrophes
-     * (covers names like "Mary-Jane" or "O'Brien"), but no digits or
-     * other symbols. Returns null when the name is valid or empty.
+     * Full names may contain letters, spaces, hyphens, apostrophes, and
+     * periods (covers names like "Mary-Jane", "O'Brien", or "J. Smith"),
+     * but no digits or other symbols. Returns null when the name is valid
+     * or empty.
      */
     private fun getNameValidationError(name: String): String? {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return null
-        val nameRegex = Regex("^[A-Za-z\\s'-]+$")
+        val nameRegex = Regex("^[A-Za-z\\s'.-]+$")
         if (!nameRegex.matches(trimmed)) {
             return "Name can only contain letters (no numbers or symbols)"
         }
