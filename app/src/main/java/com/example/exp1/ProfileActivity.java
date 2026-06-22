@@ -45,6 +45,12 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Source;
 import com.google.firebase.firestore.ListenerRegistration;
 
+import org.json.JSONObject;
+
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -69,13 +75,13 @@ public class ProfileActivity extends AppCompatActivity {
     private TextView userRoleTv;
     private TextView profileInitialTv;
 
-
     private String userRole = "staff";
     private String currentEmail = "";
     private final Handler handler = new Handler(Looper.getMainLooper());
     private ListenerRegistration userProfileListener;
 
-
+    private static final String SCRIPT_URL = "https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec";
+    private static final String SCRIPT_SECRET = "Red0455";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -163,7 +169,6 @@ public class ProfileActivity extends AppCompatActivity {
             if (generateInviteButton != null) {
                 generateInviteButton.setOnClickListener(v -> NavigationHelper.INSTANCE.showGenerateInviteCodeDialog(this, currentEmail));
             }
-            // 'Manage Users' button removed from layout (redundant with User Access List).
         } else {
             if (adminGroupLabel != null) adminGroupLabel.setVisibility(View.GONE);
             if (adminCard != null) adminCard.setVisibility(View.GONE);
@@ -247,8 +252,6 @@ public class ProfileActivity extends AppCompatActivity {
     private void fetchUserData() {
         if (currentEmail == null || currentEmail.isEmpty()) return;
 
-        // Use a real-time snapshot listener so the UI reflects any server-side
-        // changes (role updates, name edits) immediately — no manual refresh needed.
         userProfileListener = FirebaseFirestore.getInstance()
                 .collection("user_access").document(currentEmail)
                 .addSnapshotListener((doc, error) -> {
@@ -270,7 +273,6 @@ public class ProfileActivity extends AppCompatActivity {
                         userEmailTv.setText(currentEmail);
 
                         if (userRoleTv != null && role != null) {
-                            // Keep in-memory role in sync so isAdmin() stays accurate.
                             userRole = role;
                             userRoleTv.setText(getString(R.string.role_label,
                                     RoleManager.Companion.displayName(role)));
@@ -282,8 +284,6 @@ public class ProfileActivity extends AppCompatActivity {
     @Override
     protected void onStop() {
         super.onStop();
-        // Detach the listener when the activity is no longer visible to avoid
-        // unnecessary Firestore reads and potential memory leaks.
         if (userProfileListener != null) {
             userProfileListener.remove();
             userProfileListener = null;
@@ -476,14 +476,8 @@ public class ProfileActivity extends AppCompatActivity {
         builder.show();
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    //  FIX 1 — Change Password
-    //  • Guards currentEmail null/empty before Firestore call
-    //  • Verifies current password against Firestore (source of truth)
-    //  • Mirrors new password to local SharedPreferences via forceUpdatePassword
-    //  • Correctly re-enables the button on every failure path
-    //  • Uses separate error labels for every field
-    // ══════════════════════════════════════════════════════════════════════════
+    // ── Change Password ────────────────────────────────────────────────────────
+
     private void showChangePasswordDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle(getString(R.string.change_password));
@@ -502,15 +496,10 @@ public class ProfileActivity extends AppCompatActivity {
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
             @Override public void afterTextChanged(Editable s) {
                 String pass = s.toString();
-                if (!pass.isEmpty()) {
-                    newPasswordLayout.setError(getPasswordStrengthError(pass));
-                } else {
-                    newPasswordLayout.setError(null);
-                }
+                newPasswordLayout.setError(!pass.isEmpty() ? getPasswordStrengthError(pass) : null);
                 String confirm = confirmPass.getText().toString();
                 if (!confirm.isEmpty()) {
-                    confirmPasswordLayout.setError(
-                            pass.equals(confirm) ? null : "Passwords do not match");
+                    confirmPasswordLayout.setError(pass.equals(confirm) ? null : "Passwords do not match");
                 }
             }
         });
@@ -541,14 +530,12 @@ public class ProfileActivity extends AppCompatActivity {
             String newP     = newPass.getText().toString().trim();
             String confirmP = confirmPass.getText().toString().trim();
 
-            // ── Validate: current password field ──────────────────────────
             if (oldP.isEmpty()) {
                 oldPass.setError("Please enter your current password");
                 oldPass.requestFocus();
                 return;
             }
 
-            // ── Validate: new password strength ───────────────────────────
             String strengthError = getPasswordStrengthError(newP);
             if (strengthError != null) {
                 newPasswordLayout.setError(strengthError);
@@ -557,7 +544,6 @@ public class ProfileActivity extends AppCompatActivity {
             }
             newPasswordLayout.setError(null);
 
-            // ── Validate: passwords match ─────────────────────────────────
             if (!newP.equals(confirmP)) {
                 confirmPasswordLayout.setError("Passwords do not match");
                 confirmPass.requestFocus();
@@ -565,14 +551,12 @@ public class ProfileActivity extends AppCompatActivity {
             }
             confirmPasswordLayout.setError(null);
 
-            // ── Validate: new != old ──────────────────────────────────────
             if (newP.equals(oldP)) {
                 newPasswordLayout.setError("New password must be different from current password");
                 newPass.requestFocus();
                 return;
             }
 
-            // ── Guard: email must be known ────────────────────────────────
             if (currentEmail == null || currentEmail.isEmpty()) {
                 Toast.makeText(ProfileActivity.this,
                         "Cannot identify your account. Please log out and back in.",
@@ -580,17 +564,11 @@ public class ProfileActivity extends AppCompatActivity {
                 return;
             }
 
-            // ── Disable button while working ──────────────────────────────
             Button positiveBtn = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
             positiveBtn.setEnabled(false);
-            positiveBtn.setText("Updating...");
+            positiveBtn.setText("Verifying...");
 
-            // ── Verify against Firestore (the authoritative password store) ─
-            // Source.SERVER forces a live read instead of the local cache.
-            // This ensures the same authenticated session is used for both the
-            // .get() verification and the subsequent .update() write, preventing
-            // the "Permission Denied" error that occurs when .get() is served from
-            // cache (no auth needed) but .update() requires a live server write.
+            // Verify current password against Firestore (source of truth)
             FirebaseFirestore.getInstance()
                     .collection("user_access").document(currentEmail)
                     .get(Source.SERVER)
@@ -598,7 +576,7 @@ public class ProfileActivity extends AppCompatActivity {
                         if (!doc.exists()) {
                             runOnUiThread(() -> {
                                 Toast.makeText(ProfileActivity.this,
-                                        "User profile not found. Please contact your administrator.",
+                                        "User profile not found.",
                                         Toast.LENGTH_LONG).show();
                                 positiveBtn.setEnabled(true);
                                 positiveBtn.setText(getString(R.string.update));
@@ -608,7 +586,6 @@ public class ProfileActivity extends AppCompatActivity {
 
                         String remotePass = doc.getString("password");
                         if (remotePass == null || !remotePass.equals(oldP)) {
-                            // Wrong current password
                             runOnUiThread(() -> {
                                 oldPass.setError(getString(R.string.incorrect_password));
                                 oldPass.requestFocus();
@@ -620,27 +597,12 @@ public class ProfileActivity extends AppCompatActivity {
                             return;
                         }
 
-                        // ── Correct — save new password to Firestore ──────
-                        doc.getReference().update("password", newP)
-                                .addOnSuccessListener(aVoid -> {
-                                    // Mirror to local SharedPreferences so offline logins keep working.
-                                    String sessionUsername = accountManager.getCurrentUsername();
-                                    String keyForPrefs = (sessionUsername != null && !sessionUsername.isEmpty())
-                                            ? sessionUsername : currentEmail;
-                                    accountManager.forceUpdatePassword(keyForPrefs, newP);
-                                    runOnUiThread(() -> {
-                                        Toast.makeText(ProfileActivity.this,
-                                                getString(R.string.password_updated), Toast.LENGTH_SHORT).show();
-                                        dialog.dismiss();
-                                    });
-                                })
-                                .addOnFailureListener(e -> runOnUiThread(() -> {
-                                    Toast.makeText(ProfileActivity.this,
-                                            "Failed to save new password: " + e.getMessage(),
-                                            Toast.LENGTH_LONG).show();
-                                    positiveBtn.setEnabled(true);
-                                    positiveBtn.setText(getString(R.string.update));
-                                }));
+                        // ── Password verified — show confirmation then send code ──
+                        runOnUiThread(() -> {
+                            positiveBtn.setEnabled(true);
+                            positiveBtn.setText(getString(R.string.update));
+                            showChangePasswordConfirmation(dialog, newP);
+                        });
                     })
                     .addOnFailureListener(e -> runOnUiThread(() -> {
                         Toast.makeText(ProfileActivity.this,
@@ -650,6 +612,129 @@ public class ProfileActivity extends AppCompatActivity {
                         positiveBtn.setText(getString(R.string.update));
                     }));
         });
+    }
+
+    // ── Step 2: Confirm before sending the verification code ──────────────────
+
+    private void showChangePasswordConfirmation(AlertDialog parentDialog, String newPassword) {
+        new AlertDialog.Builder(this)
+                .setTitle("Confirm Password Change")
+                .setMessage("A 6-digit verification code will be sent to:\n\n" + currentEmail +
+                        "\n\nYou'll need to enter it to complete the password change.\n\nProceed?")
+                .setPositiveButton("Proceed", (d, w) -> {
+                    String code = String.format(Locale.getDefault(), "%06d", new Random().nextInt(1000000));
+                    long expiresAt = System.currentTimeMillis() + (15 * 60 * 1000); // 15 minutes
+                    sendChangePasswordCode(currentEmail, code);
+                    showChangePasswordCodeDialog(parentDialog, code, expiresAt, newPassword);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    // ── Step 3: Send the code via Apps Script ─────────────────────────────────
+
+    private void sendChangePasswordCode(String email, String code) {
+        new Thread(() -> {
+            try {
+                URL url = new URL(SCRIPT_URL);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+                conn.setDoOutput(true);
+                conn.setConnectTimeout(10000);
+                conn.setReadTimeout(10000);
+
+                JSONObject payload = new JSONObject();
+                payload.put("secret", SCRIPT_SECRET);
+                payload.put("email", email);
+                payload.put("code", code);
+                payload.put("type", "reset"); // reuses the reset email template
+
+                byte[] body = payload.toString().getBytes(StandardCharsets.UTF_8);
+                try (OutputStream os = conn.getOutputStream()) {
+                    os.write(body);
+                }
+
+                int responseCode = conn.getResponseCode();
+                if (responseCode != 200) {
+                    runOnUiThread(() -> Toast.makeText(this,
+                            "Failed to send verification code. Please try again.",
+                            Toast.LENGTH_LONG).show());
+                }
+            } catch (Exception e) {
+                runOnUiThread(() -> Toast.makeText(this,
+                        "Network error sending code: " + e.getMessage(),
+                        Toast.LENGTH_LONG).show());
+            }
+        }).start();
+    }
+
+    // ── Step 4: User enters the code ─────────────────────────────────────────
+
+    private void showChangePasswordCodeDialog(AlertDialog parentDialog, String expectedCode,
+                                              long expiresAt, String newPassword) {
+        EditText codeInput = new EditText(this);
+        codeInput.setHint("Enter 6-digit code");
+        codeInput.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        codeInput.setPadding(50, 40, 50, 40);
+
+        AlertDialog codeDialog = new AlertDialog.Builder(this)
+                .setTitle("Verify Your Identity")
+                .setMessage("A 6-digit code was sent to " + currentEmail + ".\nIt expires in 15 minutes.")
+                .setView(codeInput)
+                .setPositiveButton("Verify", null)
+                .setNegativeButton("Cancel", null)
+                .create();
+
+        codeDialog.show();
+
+        codeDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String entered = codeInput.getText().toString().trim();
+
+            if (System.currentTimeMillis() > expiresAt) {
+                Toast.makeText(this, "Code has expired. Please try again.", Toast.LENGTH_LONG).show();
+                codeDialog.dismiss();
+                return;
+            }
+
+            if (!entered.equals(expectedCode)) {
+                codeInput.setError("Incorrect code");
+                Toast.makeText(this, "Incorrect code. Please try again.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            // ── Code matched — ask for final confirmation before writing ──
+            new AlertDialog.Builder(this)
+                    .setTitle("Confirm Password Change")
+                    .setMessage("Your identity has been verified.\n\nDo you want to proceed with changing your password?")
+                    .setPositiveButton("Proceed", (confirmDialog, w) -> {
+                        codeDialog.dismiss();
+                        parentDialog.dismiss();
+                        performPasswordUpdate(newPassword);
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+        });
+    }
+
+    // ── Step 5: Write the new password to Firestore ───────────────────────────
+
+    private void performPasswordUpdate(String newPassword) {
+        FirebaseFirestore.getInstance()
+                .collection("user_access").document(currentEmail)
+                .update("password", newPassword)
+                .addOnSuccessListener(aVoid -> {
+                    String sessionUsername = accountManager.getCurrentUsername();
+                    String keyForPrefs = (sessionUsername != null && !sessionUsername.isEmpty())
+                            ? sessionUsername : currentEmail;
+                    accountManager.forceUpdatePassword(keyForPrefs, newPassword);
+                    runOnUiThread(() -> Toast.makeText(this,
+                            getString(R.string.password_updated), Toast.LENGTH_SHORT).show());
+                })
+                .addOnFailureListener(e -> runOnUiThread(() ->
+                        Toast.makeText(this,
+                                "Failed to save new password: " + e.getMessage(),
+                                Toast.LENGTH_LONG).show()));
     }
 
     private String getPasswordStrengthError(String password) {
@@ -687,7 +772,6 @@ public class ProfileActivity extends AppCompatActivity {
                 .setNegativeButton(getString(R.string.cancel), null)
                 .show();
     }
-
 
     // ── Language & Region ──────────────────────────────────────────────────────
 
@@ -909,7 +993,6 @@ public class ProfileActivity extends AppCompatActivity {
         errorTextView.setVisibility(View.GONE);
         rvUserList.setVisibility(View.GONE);
 
-        // Create the dialog first so callbacks can dismiss it instead of stacking
         builder.setPositiveButton(getString(R.string.close), null);
         final AlertDialog dialog = builder.create();
 
@@ -921,7 +1004,6 @@ public class ProfileActivity extends AppCompatActivity {
                     rvUserList.setVisibility(View.VISIBLE);
                     List<DocumentSnapshot> userDocs = new ArrayList<>(docs.getDocuments());
                     UserAdapter adapter = new UserAdapter(userDocs, email -> {
-                        // Confirm before deleting a user
                         new AlertDialog.Builder(ProfileActivity.this)
                                 .setTitle("Remove user")
                                 .setMessage("Are you sure you want to remove user " + email + "?")
@@ -929,7 +1011,6 @@ public class ProfileActivity extends AppCompatActivity {
                                         FirebaseFirestore.getInstance().collection("user_access").document(email).delete()
                                                 .addOnSuccessListener(a -> {
                                                     Toast.makeText(this, getString(R.string.user_removed), Toast.LENGTH_SHORT).show();
-                                                    // Close current dialog and refresh to avoid stacking
                                                     dialog.dismiss();
                                                     showUserListDialog();
                                                 })
@@ -964,8 +1045,6 @@ public class ProfileActivity extends AppCompatActivity {
 
         final AlertDialog dialog = builder.create();
 
-        // Load invite codes and populate the container. Use the dialog reference
-        // so delete callbacks can dismiss then refresh without stacking.
         FirebaseFirestore.getInstance().collection("invite_codes").get()
                 .addOnSuccessListener(docs -> {
                     container.removeAllViews();
@@ -1014,7 +1093,6 @@ public class ProfileActivity extends AppCompatActivity {
         layout.setPadding(40, 40, 40, 40);
 
         EditText editBackupLimit = new EditText(this);
-        // Role limits: staff_limit field in system_settings/role_limits
         layout.addView(editBackupLimit);
 
         EditText editStaffLimit = new EditText(this);
@@ -1024,7 +1102,6 @@ public class ProfileActivity extends AppCompatActivity {
         FirebaseFirestore.getInstance().collection("system_settings").document("role_limits").get()
                 .addOnSuccessListener(doc -> {
                     if (doc.exists()) {
-                        // staff limit loaded below
                         editStaffLimit.setText(String.valueOf(doc.getLong("staff_limit")));
                     }
                 });
@@ -1032,7 +1109,6 @@ public class ProfileActivity extends AppCompatActivity {
         builder.setView(layout);
         builder.setPositiveButton(getString(R.string.save), (d, w) -> {
             Map<String, Object> limits = new HashMap<>();
-            // consolidated into single staff_limit below
             limits.put("staff_limit", Long.parseLong(editStaffLimit.getText().toString()));
             FirebaseFirestore.getInstance().collection("system_settings").document("role_limits").set(limits)
                     .addOnSuccessListener(a ->
@@ -1047,8 +1123,6 @@ public class ProfileActivity extends AppCompatActivity {
         LinearLayout container = new LinearLayout(this);
         container.setOrientation(LinearLayout.VERTICAL);
         container.setPadding(40, 40, 40, 40);
-
-
 
         builder.setView(container);
         builder.setPositiveButton(getString(R.string.close), null);
@@ -1141,7 +1215,6 @@ public class ProfileActivity extends AppCompatActivity {
 
         dialog.show();
     }
-
 
     // ── Help & Support ─────────────────────────────────────────────────────────
 
