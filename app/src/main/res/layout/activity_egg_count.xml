@@ -1,14 +1,78 @@
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" xmlns:tools="http://schemas.android.com/tools" android:id="@+id/main" android:layout_width="match_parent" android:layout_height="match_parent" android:background="@color/light_gray" tools:context=".EggCountActivity">
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/light_gray"
+    tools:context=".EggCountActivity">
+
     <!--  ══════════════════════  HEADER  ══════════════════════  -->
-    <androidx.appcompat.widget.Toolbar android:id="@+id/toolbar" android:layout_width="match_parent" android:layout_height="wrap_content" android:background="@color/dark_green" android:minHeight="?attr/actionBarSize" android:paddingStart="12dp" android:paddingEnd="12dp" android:theme="?attr/actionBarTheme" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toTopOf="parent">
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal" android:paddingVertical="8dp">
-            <ImageButton android:id="@+id/backButton" android:layout_width="36dp" android:layout_height="36dp" android:background="?attr/selectableItemBackgroundBorderless" android:contentDescription="Back" android:scaleType="centerInside" app:srcCompat="@drawable/ic_arrow_back" app:tint="@color/white"/>
-            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:layout_weight="1" android:gravity="center" android:text="Egg Count and Quality" android:textColor="@color/white" android:textSize="20sp" android:textStyle="bold"/>
-            <TextView android:id="@+id/liveTimeText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="12:00 PM\nApr 7, 2026" android:textColor="@color/white" android:textSize="12sp" android:gravity="end"/>
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/dark_green"
+        android:minHeight="?attr/actionBarSize"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:theme="?attr/actionBarTheme"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingVertical="8dp">
+
+            <ImageButton
+                android:id="@+id/backButton"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Back"
+                android:scaleType="centerInside"
+                app:srcCompat="@drawable/ic_arrow_back"
+                app:tint="@color/white"/>
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="Egg Count and Quality"
+                android:textColor="@color/white"
+                android:textSize="20sp"
+                android:textStyle="bold"/>
+
+            <TextView
+                android:id="@+id/liveTimeText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="12:00 PM\nApr 7, 2026"
+                android:textColor="@color/white"
+                android:textSize="12sp"
+                android:gravity="end"/>
+
             <!--  Reset / refresh counts  -->
-            <ImageButton android:id="@+id/refreshButton" android:layout_width="36dp" android:layout_height="36dp" android:background="?attr/selectableItemBackgroundBorderless" android:contentDescription="Reset counts" android:scaleType="centerInside" app:srcCompat="@android:drawable/stat_notify_sync" app:tint="@color/white"/>
+            <ImageButton
+                android:id="@+id/refreshButton"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Reset counts"
+                android:scaleType="centerInside"
+                app:srcCompat="@android:drawable/stat_notify_sync"
+                app:tint="@color/white"/>
         </LinearLayout>
     </androidx.appcompat.widget.Toolbar>
+
     <!--  ══════════════════════  SCROLLABLE BODY  ══════════════════════  -->
     <androidx.core.widget.NestedScrollView
         android:id="@+id/scrollView"
@@ -24,10 +88,11 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            :padding="16dp">
+            android:padding="16dp">
 
             <!--  ─────────────  STATUS BANNER (hidden by default)  ─────────────  -->
-            <TextView android:id="@+id/statusBanner"
+            <TextView
+                android:id="@+id/statusBanner"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="10dp"
@@ -88,14 +153,16 @@
             </androidx.cardview.widget.CardView>
 
             <!--  ─────────────  CAMERA CONTROL ROW  ─────────────  -->
-            <LinearLayout android:layout_width="match_parent"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="14dp"
                 android:gravity="center"
                 android:orientation="horizontal">
 
                 <!--  Capture current frame & analyze  -->
-                <Button android:id="@+id/captureBtn"
+                <Button
+                    android:id="@+id/captureBtn"
                     android:layout_width="0dp"
                     android:layout_height="48dp"
                     android:layout_marginEnd="6dp"
@@ -132,7 +199,7 @@
                     android:textSize="12sp"/>
             </LinearLayout>
 
-            <!--  Save Collection button this is hidden until a capture is completed  -->
+            <!--  Save Collection button — hidden until a capture is completed  -->
             <Button
                 android:id="@+id/saveCollectionBtn"
                 android:layout_width="match_parent"
@@ -178,7 +245,8 @@
                             app:tint="@color/white"/>
                     </FrameLayout>
 
-                    <TextView android:id="@+id/todayTotalValue"
+                    <TextView
+                        android:id="@+id/todayTotalValue"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0"
@@ -212,7 +280,7 @@
                 android:layout_marginBottom="22dp"
                 android:columnCount="3">
 
-                <!-- Grade A -->
+                <!-- Grade A — Normal -->
                 <androidx.cardview.widget.CardView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
@@ -251,6 +319,16 @@
                             android:textColor="@color/dark_gray"
                             android:textSize="11sp"/>
 
+                        <!-- gradeADesc: shows "Normal" — referenced in Kotlin -->
+                        <TextView
+                            android:id="@+id/gradeADesc"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Normal"
+                            android:textColor="#2E7D32"
+                            android:textSize="10sp"
+                            android:textStyle="italic"/>
+
                         <TextView
                             android:id="@+id/gradeAPercent"
                             android:layout_width="wrap_content"
@@ -263,7 +341,7 @@
                     </LinearLayout>
                 </androidx.cardview.widget.CardView>
 
-                <!-- Grade B -->
+                <!-- Grade B — Cracked -->
                 <androidx.cardview.widget.CardView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
@@ -302,6 +380,16 @@
                             android:textColor="@color/dark_gray"
                             android:textSize="11sp"/>
 
+                        <!-- gradeBDesc: shows "Cracked" — referenced in Kotlin -->
+                        <TextView
+                            android:id="@+id/gradeBDesc"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Cracked"
+                            android:textColor="#F57F17"
+                            android:textSize="10sp"
+                            android:textStyle="italic"/>
+
                         <TextView
                             android:id="@+id/gradeBPercent"
                             android:layout_width="wrap_content"
@@ -314,7 +402,7 @@
                     </LinearLayout>
                 </androidx.cardview.widget.CardView>
 
-                <!-- Grade C -->
+                <!-- Grade C — Reject -->
                 <androidx.cardview.widget.CardView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
@@ -352,6 +440,16 @@
                             android:text="Grade C"
                             android:textColor="@color/dark_gray"
                             android:textSize="11sp"/>
+
+                        <!-- gradeCDesc: shows "Reject" — referenced in Kotlin -->
+                        <TextView
+                            android:id="@+id/gradeCDesc"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Reject"
+                            android:textColor="#C62828"
+                            android:textSize="10sp"
+                            android:textStyle="italic"/>
 
                         <TextView
                             android:id="@+id/gradeCPercent"
@@ -499,6 +597,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
+                android:layout_marginTop="20dp"
                 android:layout_marginBottom="10dp">
 
                 <TextView
@@ -618,8 +717,6 @@
                 android:textSize="10sp"
                 android:layout_marginTop="2dp"/>
         </LinearLayout>
-
-        <!-- Camera -->
 
         <!-- Schedule -->
         <LinearLayout

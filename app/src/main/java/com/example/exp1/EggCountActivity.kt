@@ -52,42 +52,48 @@ class EggCountActivity : AppCompatActivity() {
     // ── Camera ────────────────────────────────────────────────────────────────
     private lateinit var cameraExecutor: ExecutorService
     private var imageCapture: ImageCapture? = null
+    private var cameraProvider: ProcessCameraProvider? = null
 
     // ── Mode: camera is OFF by default, user must manually activate ───────────
-    // false = camera not started | true = live continuous scan
     private var isLiveMode = false
     private val analyzing = AtomicBoolean(false)
+
+    // ── Double-tap to stop camera ─────────────────────────────────────────────
+    private var lastTapTime = 0L
+    private val doubleTapInterval = 400L
 
     // ── Egg counts ────────────────────────────────────────────────────────────
     private var gradeA = 0
     private var gradeB = 0
     private var gradeC = 0
-    /** Bounding boxes already counted in live mode (dedup) */
     private val countedBoxes = mutableListOf<android.graphics.RectF>()
 
     // ── Price / Revenue / Profit ──────────────────────────────────────────────
     /**
-     * Price per quail egg in PHP.
-     * Loaded from Firestore: farm_data/shared.pricePerEgg
-     * Falls back to 3.50 until Firestore delivers the value.
+     * Price per egg (PHP) for Grade A — Normal (full price).
+     * Grade B — Cracked = pricePerEgg * 0.5
+     * Grade C — Reject  = ₱0.00 (not sold)
      */
     private var pricePerEgg: Double = 3.50
-    /**
-     * Daily operating expenses.
-     * Loaded from Firestore: farm_data/shared.dailyExpenses
-     */
     private var dailyExpenses: Double = 0.0
+
+    // ── Derived per-grade prices (read-only helpers) ──────────────────────────
+    private val priceGradeA get() = pricePerEgg          // full price
+    private val priceGradeB get() = pricePerEgg * 0.5    // half price
+    private val priceGradeC get() = 0.0                  // reject — not sold
+
+    /** Compute revenue from individual grade counts using grade-specific prices. */
+    private fun calcRevenue(a: Int, b: Int, @Suppress("UNUSED_PARAMETER") c: Int): Double =
+        (a * priceGradeA) + (b * priceGradeB) // Grade C contributes ₱0
 
     // ── Firebase Realtime Database ────────────────────────────────────────────
     private val database by lazy { FirebaseDatabase.getInstance() }
     private val auth by lazy { FirebaseAuth.getInstance() }
-    /** Realtime listener for the collection history — kept so we can remove it */
     private var historyListener: ValueEventListener? = null
     private var historyRef: com.google.firebase.database.DatabaseReference? = null
-    /** Cached collection records for populating log without re-fetching */
     private var collectionRecords = mutableMapOf<String, Map<String, Any>>()
 
-    // ── Firestore (centralised pricing under farm_data/shared) ────────────────
+    // ── Firestore ─────────────────────────────────────────────────────────────
     private val firestore by lazy { FirebaseFirestore.getInstance() }
     private var pricingListener: ListenerRegistration? = null
 
@@ -149,12 +155,27 @@ class EggCountActivity : AppCompatActivity() {
         setupUI()
         NavigationHelper.setupBottomNavigation(this)
 
-        // Load YOLO — degrades gracefully if model can't be loaded
         tryLoadDetector()
 
-        // Camera executor is created but camera does NOT start automatically.
-        // The user must tap the preview area or the activate button to start it.
         cameraExecutor = Executors.newSingleThreadExecutor()
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Grade helpers
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private fun gradeDisplayName(grade: String): String = when (grade) {
+        "A" -> "Grade A — Normal"
+        "B" -> "Grade B — Cracked"
+        "C" -> "Grade C — Reject"
+        else -> grade
+    }
+
+    private fun gradeTag(grade: String): String = when (grade) {
+        "A" -> "Normal"
+        "B" -> "Cracked"
+        "C" -> "Reject"
+        else -> grade
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -185,10 +206,8 @@ class EggCountActivity : AppCompatActivity() {
             else resumeLive()
         }
 
-        // Save today's egg count to Firebase Realtime Database
         saveBtn.setOnClickListener { saveCollectionToDatabase() }
 
-        // Price / revenue settings button (optional — safe if not in layout yet)
         findViewById<View>(R.id.priceSettingsBtn)?.setOnClickListener { showPriceDialog() }
 
         findViewById<View>(R.id.calendarBtn).setOnClickListener { openCalendarPicker() }
@@ -197,9 +216,21 @@ class EggCountActivity : AppCompatActivity() {
             if (weekOffset < 0) { weekOffset++; setupUI() }
         }
 
-        // Tapping the preview area activates the camera when it's off
         previewView.setOnClickListener {
-            if (imageCapture == null) startCameraIfNeeded()
+            val now = System.currentTimeMillis()
+            val isSingleActivation = imageCapture == null
+
+            if (isSingleActivation) {
+                startCameraIfNeeded()
+                return@setOnClickListener
+            }
+
+            if (now - lastTapTime <= doubleTapInterval) {
+                stopCamera()
+                lastTapTime = 0L
+            } else {
+                lastTapTime = now
+            }
         }
     }
 
@@ -225,26 +256,20 @@ class EggCountActivity : AppCompatActivity() {
                 "⚠ Model opset error — re-export your YOLO model with opset=19:\n" +
                         "  model.export(format='onnx', opset=19)\n" +
                         "Camera preview is still active."
-
             raw.contains("FileNotFoundException", ignoreCase = true) ||
                     raw.contains("my_model", ignoreCase = true) ->
                 "⚠ my_model.onnx not found in assets/.\n" +
                         "Add it at app/src/main/assets/ and rebuild.\n" +
                         "Camera preview is still active."
-
             else ->
                 "⚠ Model error: ${raw.take(120)}\nCamera preview is still active."
         }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  Camera activation — manual trigger only
+    //  Camera activation
     // ─────────────────────────────────────────────────────────────────────────
 
-    /**
-     * Activates the camera only when explicitly called by the user.
-     * The camera does NOT start automatically on activity creation.
-     */
     private fun startCameraIfNeeded() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
             == PackageManager.PERMISSION_GRANTED
@@ -258,10 +283,29 @@ class EggCountActivity : AppCompatActivity() {
         }
     }
 
+    private fun stopCamera() {
+        cameraProvider?.unbindAll()
+        cameraProvider = null
+        imageCapture = null
+        isLiveMode = false
+        analyzing.set(false)
+        overlayView.setResults(emptyList())
+        frozenOverlay.visibility = View.VISIBLE
+        liveScanLabel.text = "● CAMERA OFF"
+        captureBtn.visibility = View.VISIBLE
+        retakeBtn.visibility  = View.GONE
+        modeSwitchBtn.text    = "Pick Photo"
+        saveBtn.visibility    = View.GONE
+        resetCounts()
+        showBanner("Camera stopped — tap preview to restart", isError = false, autoHide = true)
+        toast("Double-tap detected — camera off")
+    }
+
     private fun bindCamera() {
         val future = ProcessCameraProvider.getInstance(this)
         future.addListener({
             val provider = future.get()
+            cameraProvider = provider
 
             val preview = Preview.Builder().build().also {
                 it.setSurfaceProvider(previewView.surfaceProvider)
@@ -315,7 +359,6 @@ class EggCountActivity : AppCompatActivity() {
     // ─────────────────────────────────────────────────────────────────────────
 
     private fun captureFrame() {
-        // If camera hasn't been activated yet, start it first
         if (imageCapture == null) {
             startCameraIfNeeded()
             toast("Camera activating — try again in a moment")
@@ -337,7 +380,6 @@ class EggCountActivity : AppCompatActivity() {
         })
     }
 
-    /** Freeze live feed, run YOLO on [bmp], display results */
     private fun freezeAndAnalyze(bmp: Bitmap, saveToGallery: Boolean = false) {
         isLiveMode = false
         frozenOverlay.visibility = View.VISIBLE
@@ -361,18 +403,19 @@ class EggCountActivity : AppCompatActivity() {
                 val total = gradeA + gradeB + gradeC
                 liveScanLabel.text = "● CAPTURED"
                 captureBtn.isEnabled = true
-
                 saveBtn.visibility = View.VISIBLE
 
                 showBanner(
-                    if (detector != null) "Found $total egg(s). Tap 'Save Collection' to record."
-                    else "Detection disabled — model error. See banner above.",
+                    if (detector != null)
+                        "Found $total egg(s) — " +
+                                "A:$gradeA Normal · B:$gradeB Cracked · C:$gradeC Reject\n" +
+                                "Tap 'Save Collection' to record."
+                    else
+                        "Detection disabled — model error. See banner above.",
                     isError = detector == null,
                     autoHide = detector != null
                 )
-                if (saveToGallery) {
-                    trySaveToGallery(bmp)
-                }
+                if (saveToGallery) trySaveToGallery(bmp)
             }
         }
     }
@@ -392,7 +435,7 @@ class EggCountActivity : AppCompatActivity() {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  Firebase: Save today's collection to Realtime Database with Adding and Total EVery Scan
+    //  Firebase: Save today's collection to Realtime Database
     // ─────────────────────────────────────────────────────────────────────────
 
     private fun saveCollectionToDatabase() {
@@ -404,11 +447,9 @@ class EggCountActivity : AppCompatActivity() {
 
         saveBtn.isEnabled = false
         val today = dbDateFmt.format(Calendar.getInstance().time)
-
         val ref = database.getReference("egg_collections").child(today)
 
         ref.get().addOnSuccessListener { snapshot ->
-
             val prevTotal = snapshot.child("total").getValue(Int::class.java) ?: 0
             val prevA = snapshot.child("gradeA").getValue(Int::class.java) ?: 0
             val prevB = snapshot.child("gradeB").getValue(Int::class.java) ?: 0
@@ -419,27 +460,39 @@ class EggCountActivity : AppCompatActivity() {
             val updatedB = prevB + gradeB
             val updatedC = prevC + gradeC
 
-            val revenue = updatedTotal * pricePerEgg
+            // ── Grade-specific pricing ────────────────────────────────────────
+            // Grade A (Normal)  = full pricePerEgg
+            // Grade B (Cracked) = 50% of pricePerEgg
+            // Grade C (Reject)  = ₱0.00 — not sold
+            val revenue   = calcRevenue(updatedA, updatedB, updatedC)
             val netProfit = revenue - dailyExpenses
 
             val updatedRecord = mapOf(
-                "date" to today,
-                "total" to updatedTotal,
-                "gradeA" to updatedA,
-                "gradeB" to updatedB,
-                "gradeC" to updatedC,
-                "pricePerEgg" to pricePerEgg,
-                "revenue" to revenue,
-                "expenses" to dailyExpenses,
-                "netProfit" to netProfit,
-                "timestamp" to System.currentTimeMillis(),
-                "savedBy" to (auth.currentUser?.uid ?: "unknown")
+                "date"          to today,
+                "total"         to updatedTotal,
+                "gradeA"        to updatedA,
+                "gradeB"        to updatedB,
+                "gradeC"        to updatedC,
+                "pricePerEgg"   to pricePerEgg,          // Grade A full price
+                "priceGradeA"   to priceGradeA,          // same as pricePerEgg
+                "priceGradeB"   to priceGradeB,          // half price
+                "priceGradeC"   to priceGradeC,          // ₱0
+                "revenue"       to revenue,
+                "expenses"      to dailyExpenses,
+                "netProfit"     to netProfit,
+                "timestamp"     to System.currentTimeMillis(),
+                "savedBy"       to (auth.currentUser?.uid ?: "unknown")
             )
 
             ref.setValue(updatedRecord)
                 .addOnSuccessListener {
                     showBanner(
-                        "✓ Saved $updatedTotal eggs | Revenue: ₱${"%.2f".format(revenue)}",
+                        "✓ Saved $updatedTotal eggs — " +
+                                "A:$updatedA Normal · B:$updatedB Cracked · C:$updatedC Reject\n" +
+                                "Revenue: ₱${"%.2f".format(revenue)}  " +
+                                "(A@₱${"%.2f".format(priceGradeA)} · " +
+                                "B@₱${"%.2f".format(priceGradeB)} · " +
+                                "C=₱0.00)",
                         isError = false,
                         autoHide = true
                     )
@@ -496,15 +549,6 @@ class EggCountActivity : AppCompatActivity() {
     //  Firestore: Centralised egg pricing from farm_data/shared
     // ─────────────────────────────────────────────────────────────────────────
 
-    /**
-     * Attaches a real-time listener to the farm_data/shared Firestore document.
-     * Reads:
-     *   pricePerEgg   — selling price per quail egg in PHP
-     *   dailyExpenses — default daily operating expenses
-     *
-     * Any change made via the price dialog (or from Firebase console / another
-     * module) is reflected here immediately without restarting the activity.
-     */
     private fun loadPricingFromFirestore() {
         pricingListener = firestore
             .collection("farm_data")
@@ -526,7 +570,8 @@ class EggCountActivity : AppCompatActivity() {
             }
             val selectedWeekMonday = selectedCal.clone() as Calendar
             selectedWeekMonday.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
-            val diff = ((selectedWeekMonday.timeInMillis - currentWeekMonday.timeInMillis) / (7 * 24 * 60 * 60 * 1000)).toInt()
+            val diff = ((selectedWeekMonday.timeInMillis - currentWeekMonday.timeInMillis) /
+                    (7 * 24 * 60 * 60 * 1000)).toInt()
             weekOffset = diff
             setupUI()
         }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH))
@@ -543,30 +588,46 @@ class EggCountActivity : AppCompatActivity() {
             set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
             add(Calendar.WEEK_OF_YEAR, weekOffset)
         }
-        val dayNames = arrayOf("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
+        val dayNames = arrayOf("Sunday", "Monday", "Tuesday", "Wednesday",
+            "Thursday", "Friday", "Saturday")
+
         repeat(7) {
-            val displayDate = sdf.format(cal.time)
-            val dayOfWeek = dayNames[cal.get(Calendar.DAY_OF_WEEK) - 1]
+            val displayDate  = sdf.format(cal.time)
+            val dayOfWeek    = dayNames[cal.get(Calendar.DAY_OF_WEEK) - 1]
             val fullDateText = "$dayOfWeek, $displayDate"
-            val dbDate = dbDateFmt.format(cal.time)
-            val record = records[dbDate]
-            val total = (record?.get("total") as? Long)?.toInt() ?: 0
-            val gA = (record?.get("gradeA") as? Long)?.toInt() ?: 0
-            val gB = (record?.get("gradeB") as? Long)?.toInt() ?: 0
-            val gC = (record?.get("gradeC") as? Long)?.toInt() ?: 0
-            val revenue   = record?.get("revenue")   as? Double ?: (total * pricePerEgg)
+            val dbDate  = dbDateFmt.format(cal.time)
+            val record  = records[dbDate]
+
+            val total = (record?.get("total")  as? Long)?.toInt() ?: 0
+            val gA    = (record?.get("gradeA") as? Long)?.toInt() ?: 0
+            val gB    = (record?.get("gradeB") as? Long)?.toInt() ?: 0
+            val gC    = (record?.get("gradeC") as? Long)?.toInt() ?: 0
+
+            // ── Grade-specific revenue fallback ───────────────────────────────
+            // If a stored revenue exists use it (already computed with correct grades),
+            // otherwise re-compute using current grade prices so the log is consistent.
+            val revenue   = record?.get("revenue")   as? Double ?: calcRevenue(gA, gB, gC)
             val expenses  = record?.get("expenses")  as? Double ?: 0.0
             val netProfit = record?.get("netProfit") as? Double ?: (revenue - expenses)
+
             val item = inflater.inflate(R.layout.item_collection_log, container, false)
-            item.findViewById<TextView>(R.id.logDate).text = fullDateText
+            item.findViewById<TextView>(R.id.logDate).text  = fullDateText
             item.findViewById<TextView>(R.id.logTotal).text = total.toString()
-            item.findViewById<TextView>(R.id.logGradeA).text = gA.toString()
-            item.findViewById<TextView>(R.id.logGradeB).text = gB.toString()
-            item.findViewById<TextView>(R.id.logGradeC).text = gC.toString()
+
+            item.findViewById<TextView>(R.id.logGradeA).text           = "$gA"
+            item.findViewById<TextView>(R.id.logGradeALabel)?.text     = "Normal"
+
+            item.findViewById<TextView>(R.id.logGradeB).text           = "$gB"
+            item.findViewById<TextView>(R.id.logGradeBLabel)?.text     = "Cracked"
+
+            item.findViewById<TextView>(R.id.logGradeC).text           = "$gC"
+            item.findViewById<TextView>(R.id.logGradeCLabel)?.text     = "Reject"
+
             item.findViewById<TextView>(R.id.logRevenue)?.text   = "₱${"%.2f".format(revenue)}"
             item.findViewById<TextView>(R.id.logNetProfit)?.text = "₱${"%.2f".format(netProfit)}"
             item.findViewById<TextView>(R.id.todayBadge).visibility =
                 if (displayDate == todayStr) View.VISIBLE else View.GONE
+
             container.addView(item)
             cal.add(Calendar.DAY_OF_YEAR, 1)
         }
@@ -601,8 +662,8 @@ class EggCountActivity : AppCompatActivity() {
         val ir = minOf(a.right, b.right); val ib = minOf(a.bottom, b.bottom)
         val inter = maxOf(0f, ir - il) * maxOf(0f, ib - it)
         if (inter == 0f) return 0f
-        return inter / ((a.right-a.left)*(a.bottom-a.top) +
-                (b.right-b.left)*(b.bottom-b.top) - inter)
+        return inter / ((a.right - a.left) * (a.bottom - a.top) +
+                (b.right - b.left) * (b.bottom - b.top) - inter)
     }
 
     private fun resetCounts() {
@@ -617,26 +678,45 @@ class EggCountActivity : AppCompatActivity() {
 
     private fun updateCountUI() {
         val total = gradeA + gradeB + gradeC
-        val revenue   = total * pricePerEgg
+
+        // ── Grade-specific revenue ────────────────────────────────────────────
+        // Grade A (Normal)  — full pricePerEgg
+        // Grade B (Cracked) — 50% of pricePerEgg
+        // Grade C (Reject)  — ₱0.00, not included in revenue
+        val revenue   = calcRevenue(gradeA, gradeB, gradeC)
         val netProfit = revenue - dailyExpenses
+
         findViewById<TextView>(R.id.todayTotalValue).text = total.toString()
-        findViewById<TextView>(R.id.gradeAValue).text     = gradeA.toString()
-        findViewById<TextView>(R.id.gradeBValue).text     = gradeB.toString()
-        findViewById<TextView>(R.id.gradeCValue).text     = gradeC.toString()
+
+        // Grade A — Normal (full price)
+        findViewById<TextView>(R.id.gradeAValue).text  = gradeA.toString()
+        findViewById<TextView>(R.id.gradeADesc)?.text  = "Normal"
+
+        // Grade B — Cracked (half price)
+        findViewById<TextView>(R.id.gradeBValue).text  = gradeB.toString()
+        findViewById<TextView>(R.id.gradeBDesc)?.text  = "Cracked"
+
+        // Grade C — Reject (no revenue)
+        findViewById<TextView>(R.id.gradeCValue).text  = gradeC.toString()
+        findViewById<TextView>(R.id.gradeCDesc)?.text  = "Reject"
+
         val pct = if (total > 0) { a: Int -> "${"%.0f".format(a * 100f / total)}%" }
         else { _: Int -> "0%" }
         findViewById<TextView>(R.id.gradeAPercent).text = pct(gradeA)
         findViewById<TextView>(R.id.gradeBPercent).text = pct(gradeB)
         findViewById<TextView>(R.id.gradeCPercent).text = pct(gradeC)
-        findViewById<TextView>(R.id.revenueValue)?.text   = "₱${"%.2f".format(revenue)}"
-        findViewById<TextView>(R.id.netProfitValue)?.text = "₱${"%.2f".format(netProfit)}"
-        findViewById<TextView>(R.id.pricePerEggValue)?.text = "₱${"%.2f".format(pricePerEgg)}/egg"
+
+        // Revenue reflects grade-specific pricing
+        findViewById<TextView>(R.id.revenueValue)?.text     = "₱${"%.2f".format(revenue)}"
+        findViewById<TextView>(R.id.netProfitValue)?.text   = "₱${"%.2f".format(netProfit)}"
+        // Show Grade A price as the reference price per egg
+        findViewById<TextView>(R.id.pricePerEggValue)?.text = "₱${"%.2f".format(priceGradeA)}/egg (A)"
     }
 
     /**
-     * Shows a dialog to configure price per egg and daily expenses.
-     * Changes are saved back to Firestore (farm_data/shared) so all
-     * modules (Analytics, etc.) immediately see the updated values.
+     * Revenue / price settings dialog.
+     * Grade A = set price | Grade B = 50% | Grade C = ₱0 (auto-derived, not editable).
+     * Changes persist to Firestore farm_data/shared.
      */
     private fun showPriceDialog() {
         val ctx = this
@@ -645,7 +725,7 @@ class EggCountActivity : AppCompatActivity() {
             setPadding(64, 32, 64, 16)
         }
         val priceEdit = android.widget.EditText(ctx).apply {
-            hint = "Price per egg (₱)"
+            hint = "Grade A price per egg (₱) — full price"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER or
                     android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
             setText(pricePerEgg.toString())
@@ -656,11 +736,26 @@ class EggCountActivity : AppCompatActivity() {
                     android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
             setText(dailyExpenses.toString())
         }
-        layout.addView(android.widget.TextView(ctx).apply { text = "Price per egg (₱)" })
+
+        // Informational labels so the user understands grade pricing
+        layout.addView(android.widget.TextView(ctx).apply {
+            text = "Grade A — Normal price per egg (₱)"
+        })
         layout.addView(priceEdit)
         layout.addView(android.widget.TextView(ctx).apply {
+            text = "Grade B — Cracked (auto: 50% of Grade A)"
+            setPadding(0, 16, 0, 0)
+            setTextColor(android.graphics.Color.GRAY)
+            textSize = 12f
+        })
+        layout.addView(android.widget.TextView(ctx).apply {
+            text = "Grade C — Reject (auto: ₱0.00, not sold)"
+            setPadding(0, 4, 0, 16)
+            setTextColor(android.graphics.Color.GRAY)
+            textSize = 12f
+        })
+        layout.addView(android.widget.TextView(ctx).apply {
             text = "Daily expenses (₱)"
-            setPadding(0, 24, 0, 0)
         })
         layout.addView(expenseEdit)
 
@@ -674,17 +769,17 @@ class EggCountActivity : AppCompatActivity() {
                 dailyExpenses = newExpenses
                 updateCountUI()
 
-                // Persist centrally to Firestore so Analytics and other modules
-                // automatically pick up the new values via their own listeners.
-                val update = mapOf("pricePerEgg" to newPrice, "dailyExpenses" to newExpenses)
+                val update = mapOf(
+                    "pricePerEgg"  to newPrice,
+                    "dailyExpenses" to newExpenses
+                )
                 firestore.collection("farm_data").document("shared")
                     .update(update)
                     .addOnFailureListener {
-                        // Document may not exist yet — use merge to create it
                         firestore.collection("farm_data").document("shared")
                             .set(update, SetOptions.merge())
                     }
-                toast("Pricing updated")
+                toast("Pricing updated — B=₱${"%.2f".format(newPrice * 0.5)}, C=₱0.00")
             }
             .setNegativeButton("Cancel", null)
             .show()
@@ -737,9 +832,11 @@ class EggCountActivity : AppCompatActivity() {
                 put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/QuailFarm")
             }
             val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv)
-            uri?.let { contentResolver.openOutputStream(it)?.use { out ->
-                bmp.compress(Bitmap.CompressFormat.JPEG, 90, out)
-            }}
+            uri?.let {
+                contentResolver.openOutputStream(it)?.use { out ->
+                    bmp.compress(Bitmap.CompressFormat.JPEG, 90, out)
+                }
+            }
         } catch (e: Exception) { Log.w(TAG, "Gallery save failed", e) }
     }
 
@@ -753,7 +850,7 @@ class EggCountActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         loadCollectionHistory()
-        loadPricingFromFirestore()   // attach real-time pricing listener
+        loadPricingFromFirestore()
         handler.post(timeUpdateRunnable)
     }
 
@@ -761,7 +858,7 @@ class EggCountActivity : AppCompatActivity() {
         super.onPause()
         historyListener?.let { historyRef?.removeEventListener(it) }
         historyListener = null
-        pricingListener?.remove()   // detach pricing listener while off-screen
+        pricingListener?.remove()
         pricingListener = null
         handler.removeCallbacks(timeUpdateRunnable)
     }
@@ -770,6 +867,7 @@ class EggCountActivity : AppCompatActivity() {
         super.onDestroy()
         cameraExecutor.shutdown()
         detector?.close()
+        cameraProvider?.unbindAll()
         historyListener?.let { historyRef?.removeEventListener(it) }
         pricingListener?.remove()
     }

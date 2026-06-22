@@ -80,9 +80,10 @@
                 android:background="#10000000">
 
                 <TextView
+                    android:id="@+id/logGradeALabel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Grade A"
+                    android:text="Normal"
                     android:textColor="@color/dark_gray"
                     android:textSize="10sp"/>
 
@@ -107,9 +108,10 @@
                 android:background="#10000000">
 
                 <TextView
+                    android:id="@+id/logGradeBLabel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Grade B"
+                    android:text="Cracked"
                     android:textColor="@color/dark_gray"
                     android:textSize="10sp"/>
 
@@ -133,9 +135,10 @@
                 android:background="#10000000">
 
                 <TextView
+                    android:id="@+id/logGradeCLabel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Grade C"
+                    android:text="Reject"
                     android:textColor="@color/dark_gray"
                     android:textSize="10sp"/>
 
@@ -147,6 +150,7 @@
                     android:textColor="#C62828"
                     android:textStyle="bold"/>
             </LinearLayout>
+
         </LinearLayout>
 
         <!-- Revenue + Net Profit -->
@@ -214,4 +218,5 @@
         </LinearLayout>
 
     </LinearLayout>
+
 </androidx.cardview.widget.CardView>
