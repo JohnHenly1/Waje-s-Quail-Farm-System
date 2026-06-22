@@ -96,6 +96,16 @@ public class ScheduleActivity extends AppCompatActivity {
     private ListenerRegistration tasksListener;
     private RoleManager roleManager;
 
+    // Caches email -> full name for the "Assigned To" identifier on each task
+    // card. Populated lazily from the existing user_access collection (same
+    // source already used by the assignee spinner) — no user data is duplicated.
+    private final Map<String, String> staffNameCache = new HashMap<>();
+
+    // Tracks task IDs already logged as Missed this session, since Missed is
+    // derived client-side on every render and would otherwise be re-logged
+    // on every auto-refresh.
+    private final java.util.Set<String> loggedMissedTaskIds = new java.util.HashSet<>();
+
     private String[] monthNames;
     private Handler autoUpdateHandler = new Handler();
     private Runnable autoUpdateRunnable = new Runnable() {
@@ -226,6 +236,7 @@ public class ScheduleActivity extends AppCompatActivity {
         updateCalendarUI();
         setupSwipeGestures();
         listenToTasks();
+        if (roleManager.isOwner()) cleanupOldTaskHistory();
     }
 
 
@@ -314,6 +325,7 @@ public class ScheduleActivity extends AppCompatActivity {
         db.collection("farm_data").document("shared")
                 .collection("tasks").document(task.firestoreId)
                 .update("status", task.status, "extensionMinutes", task.extensionMinutes, "workWindowMinutes", task.workWindowMinutes)
+                .addOnSuccessListener(unused -> logTaskHistory(task, task.status))
                 .addOnFailureListener(e ->
                         Toast.makeText(this, getString(R.string.error_updating_status, e.getMessage()), Toast.LENGTH_SHORT).show());
     }
@@ -1115,7 +1127,15 @@ public class ScheduleActivity extends AppCompatActivity {
             String sPending = getString(R.string.status_pending);
 
             if (!sDone.equals(task.status)) {
+                String previousStatus = task.status;
                 task.status = getAutoStatus(task);
+                // Missed is derived client-side and never written back to the
+                // task document, so log the transition once here (it would
+                // otherwise never reach updateTaskStatus()).
+                if (sMissed.equals(task.status) && !sMissed.equals(previousStatus)
+                        && task.firestoreId != null && loggedMissedTaskIds.add(task.firestoreId)) {
+                    logTaskHistory(task, sMissed);
+                }
             }
 
             // Update counts (reflects all tasks for the day)
@@ -1145,6 +1165,7 @@ public class ScheduleActivity extends AppCompatActivity {
                 TextView timeTv = taskView.findViewById(R.id.taskTime);
                 TextView deadlineTv = taskView.findViewById(R.id.taskDeadline);
                 TextView recurrenceTv = taskView.findViewById(R.id.taskRecurrence);
+                TextView assignedToTv = taskView.findViewById(R.id.taskAssignedTo);
                 View statusIndicator = taskView.findViewById(R.id.statusIndicator);
                 ImageButton deleteBtn = taskView.findViewById(R.id.deleteTaskBtn);
 
@@ -1152,6 +1173,7 @@ public class ScheduleActivity extends AppCompatActivity {
                 categoryTv.setText(task.category);
                 timeTv.setText(task.time);
                 if (recurrenceTv != null) recurrenceTv.setText(task.recurrence != null ? task.recurrence : RECUR_ONCE);
+                if (assignedToTv != null) assignedToTv.setText(getString(R.string.assigned_to_format, resolveAssignedToLabel(task)));
 
                 boolean isDone = getString(R.string.status_done).equals(task.status);
                 boolean isOngoing = getString(R.string.status_ongoing).equals(task.status);
@@ -1308,6 +1330,7 @@ public class ScheduleActivity extends AppCompatActivity {
                 .setMessage("Task '" + task.title + "' is MISSED. Reset it to Ongoing?")
                 .setPositiveButton("Reset to Ongoing", (d, w) -> {
                     task.extensionMinutes += 60; // Add an hour to make it ongoing again
+                    task.status = getString(R.string.status_ongoing);
                     updateTaskStatus(task);
                     Toast.makeText(this, "Task reset to Ongoing (1 hour added)", Toast.LENGTH_SHORT).show();
                 })
@@ -1409,6 +1432,84 @@ public class ScheduleActivity extends AppCompatActivity {
         currentWeekCalendar.add(Calendar.DAY_OF_MONTH, -7);
         updateCalendarUI();
         updateTasksUI();
+    }
+
+    // ── Assigned To identifier ────────────────────────────────────────────
+    // Resolves task.assignedTo (an email, or empty for owner-self tasks) to
+    // a display label using only the existing user_access collection — the
+    // same source the assignee spinner already reads from. No new user
+    // records are created; staffNameCache just avoids re-querying Firestore
+    // for the same email on every card render.
+    private String resolveAssignedToLabel(Task task) {
+        String email = (task.assignedTo != null) ? task.assignedTo.trim() : "";
+        if (email.isEmpty()) return "Owner";
+
+        String cached = staffNameCache.get(email);
+        if (cached != null) return cached;
+
+        // Not cached yet: kick off a one-time lookup and show the email in
+        // the meantime; the card refreshes on the next updateTasksUI() pass
+        // (triggered every minute by autoUpdateRunnable, or on any task change).
+        db.collection("user_access").document(email).get()
+                .addOnSuccessListener(doc -> {
+                    String name = doc.getString("name");
+                    staffNameCache.put(email, (name != null && !name.isEmpty()) ? name : email);
+                    updateTasksUI();
+                })
+                .addOnFailureListener(e -> staffNameCache.put(email, email));
+        return email;
+    }
+
+    // ── Owner task history ────────────────────────────────────────────────
+    // Logs Done / Ongoing / Missed status changes for the owner's reference.
+    // Mirrors the existing farm_data/shared/feed_history sibling structure —
+    // no new top-level collection, no schema redesign.
+    private void logTaskHistory(Task task, String status) {
+        if (!roleManager.isOwner()) return; // history log is owner-only per spec
+
+        Map<String, Object> entry = new HashMap<>();
+        entry.put("taskId", task.firestoreId);
+        entry.put("taskTitle", task.title);
+        entry.put("assignedStaffName", resolveAssignedToLabel(task));
+        entry.put("status", status);
+        entry.put("updatedAt", com.google.firebase.firestore.FieldValue.serverTimestamp());
+        if (getString(R.string.status_done).equals(status)) {
+            entry.put("completedAt", com.google.firebase.firestore.FieldValue.serverTimestamp());
+        }
+        entry.put("createdBy", currentUserEmail);
+        entry.put("timestamp", com.google.firebase.firestore.FieldValue.serverTimestamp());
+
+        ensureAuthThenRun(() ->
+                db.collection("farm_data").document("shared")
+                        .collection("task_history").document()
+                        .set(entry)
+                        .addOnFailureListener(e -> { /* non-critical: history log only */ }));
+    }
+
+    // ── Auto cleanup (max 1 month of history) ─────────────────────────────
+    // Keeps only the current calendar month's history entries; anything
+    // from a prior month is deleted automatically the next time Schedule
+    // Activity opens. Active task documents (farm_data/shared/tasks) are
+    // never touched here — only farm_data/shared/task_history records.
+    private void cleanupOldTaskHistory() {
+        Calendar monthStart = Calendar.getInstance();
+        monthStart.set(Calendar.DAY_OF_MONTH, 1);
+        monthStart.set(Calendar.HOUR_OF_DAY, 0);
+        monthStart.set(Calendar.MINUTE, 0);
+        monthStart.set(Calendar.SECOND, 0);
+        monthStart.set(Calendar.MILLISECOND, 0);
+
+        ensureAuthThenRun(() ->
+                db.collection("farm_data").document("shared")
+                        .collection("task_history")
+                        .whereLessThan("timestamp", new com.google.firebase.Timestamp(monthStart.getTime()))
+                        .get()
+                        .addOnSuccessListener(snapshots -> {
+                            if (snapshots.isEmpty()) return;
+                            com.google.firebase.firestore.WriteBatch batch = db.batch();
+                            for (QueryDocumentSnapshot doc : snapshots) batch.delete(doc.getReference());
+                            batch.commit();
+                        }));
     }
 
     private void showFullCalendar() {

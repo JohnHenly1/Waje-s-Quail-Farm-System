@@ -211,6 +211,7 @@
     <string name="confirm_and_save">Confirm &amp; Save</string>
     <string name="scheduling_tasks">Scheduling tasks&#8230; please wait</string>
     <string name="tasks_scheduled">%1$d tasks scheduled!</string>
+    <string name="assigned_to_format">Assigned To: %1$s</string>
     <string name="delete_task_title">Delete Task</string>
     <string name="delete_task_msg">Are you sure you want to delete this task?</string>
     <string name="delete_recurring_title">Delete Recurring Task</string>
