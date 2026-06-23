@@ -745,7 +745,7 @@
             <ImageView
                 android:layout_width="24dp"
                 android:layout_height="24dp"
-                android:contentDescription="@string/analytics"
+                android:contentDescription="@string/Report"
                 android:src="@drawable/ic_chart"
                 app:tint="@color/white" />
 
@@ -753,7 +753,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:text="@string/analytics"
+                android:text="@string/Report"
                 android:textColor="@color/white"
                 android:textSize="11sp" />
         </LinearLayout>
