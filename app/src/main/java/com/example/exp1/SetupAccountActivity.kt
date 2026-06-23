@@ -24,6 +24,8 @@ class SetupAccountActivity : AppCompatActivity() {
     private lateinit var editAddressPostal: EditText
     private lateinit var editPassword: EditText
     private lateinit var editPasswordLayout: TextInputLayout
+    private lateinit var editPasswordConfirm: EditText
+    private lateinit var editPasswordConfirmLayout: TextInputLayout
     private lateinit var imgProfile: ImageView
     private lateinit var btnComplete: Button
 
@@ -56,6 +58,8 @@ class SetupAccountActivity : AppCompatActivity() {
         editAddressPostal = findViewById(R.id.editAddressPostal)
         editPassword = findViewById(R.id.editSetupPassword)
         editPasswordLayout = findViewById(R.id.setupPasswordInputLayout)
+        editPasswordConfirm = findViewById(R.id.editSetupPasswordConfirm)
+        editPasswordConfirmLayout = findViewById(R.id.setupPasswordConfirmInputLayout)
         imgProfile = findViewById(R.id.imgSetupProfile)
         btnComplete = findViewById(R.id.btnCompleteSetup)
 
@@ -91,6 +95,34 @@ class SetupAccountActivity : AppCompatActivity() {
                 } else {
                     editPasswordLayout.error = null
                 }
+                // if confirm has value, validate match live
+                val conf = editPasswordConfirm.text.toString()
+                if (conf.isNotEmpty()) {
+                    if (pass != conf) {
+                        editPasswordConfirmLayout.error = "Passwords do not match"
+                    } else {
+                        editPasswordConfirmLayout.error = null
+                    }
+                }
+            }
+        })
+
+        // Live validation for confirm password
+        editPasswordConfirm.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                val conf = s.toString()
+                val pass = editPassword.text.toString()
+                if (conf.isNotEmpty()) {
+                    if (pass != conf) {
+                        editPasswordConfirmLayout.error = "Passwords do not match"
+                    } else {
+                        editPasswordConfirmLayout.error = null
+                    }
+                } else {
+                    editPasswordConfirmLayout.error = null
+                }
             }
         })
 
@@ -102,6 +134,7 @@ class SetupAccountActivity : AppCompatActivity() {
             val state = editAddressState.text.toString().trim()
             val postal = editAddressPostal.text.toString().trim()
             val pass = editPassword.text.toString().trim()
+            val passConfirm = editPasswordConfirm.text.toString().trim()
 
             if (name.isEmpty() || pass.isEmpty()) {
                 Toast.makeText(this, "Name and Password are required", Toast.LENGTH_SHORT).show()
@@ -142,6 +175,13 @@ class SetupAccountActivity : AppCompatActivity() {
             if (passwordError != null) {
                 editPasswordLayout.error = passwordError
                 Toast.makeText(this, passwordError, Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
+
+            // Confirm password matches
+            if (pass != passConfirm) {
+                editPasswordConfirmLayout.error = "Passwords do not match"
+                Toast.makeText(this, "Passwords do not match", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 

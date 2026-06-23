@@ -63,6 +63,17 @@
                 android:scaleType="centerInside"
                 app:srcCompat="@drawable/ic_settings"
                 app:tint="@color/white" />
+
+            <!-- Refresh button to force a sync -->
+            <ImageButton
+                android:id="@+id/refreshButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Refresh"
+                android:scaleType="centerInside"
+                app:srcCompat="@drawable/lc_farmrefresh"
+                app:tint="@color/white" />
         </LinearLayout>
     </com.google.android.material.appbar.AppBarLayout>
 

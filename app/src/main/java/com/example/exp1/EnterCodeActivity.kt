@@ -108,15 +108,59 @@ class EnterCodeActivity : AppCompatActivity() {
     private fun showRegistrationChoice() {
         AlertDialog.Builder(this)
             .setTitle("Code Verified")
-            .setMessage("This code is linked to $detectedEmail.\n\nHow would you like to continue?")
+            .setMessage(if (detectedEmail.isNotEmpty()) "This code is linked to an email.\n\nHow would you like to continue?" else "How would you like to continue?")
             .setPositiveButton("Google Account") { _, _ ->
                 attemptAutoSignIn()
             }
             .setNeutralButton("Manual Setup") { _, _ ->
-                proceedToSetupWithoutAccount()
+                showEmailInputDialog()
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    private fun showEmailInputDialog() {
+        val editEmailInput = EditText(this).apply {
+            hint = "Enter your email address"
+            inputType = android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+            setText(detectedEmail)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Enter Your Email")
+            .setView(editEmailInput)
+            .setPositiveButton("Proceed") { _, _ ->
+                val email = editEmailInput.text.toString().trim().lowercase()
+                val emailError = validateEmailFormat(email)
+                if (emailError != null) {
+                    Toast.makeText(this, emailError, Toast.LENGTH_SHORT).show()
+                    // Re-show dialog
+                    showEmailInputDialog()
+                } else {
+                    // Check if email matches the one from the code
+                    if (email != detectedEmail) {
+                        Toast.makeText(this, "Email does not match the code. Please try again.", Toast.LENGTH_SHORT).show()
+                        // Re-show dialog
+                        showEmailInputDialog()
+                    } else {
+                        proceedToSetupWithoutAccount()
+                    }
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun validateEmailFormat(email: String): String? {
+        if (email.isEmpty()) {
+            return "Email is required"
+        }
+        // Basic email regex validation
+        val emailRegex = Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}$")
+        if (!emailRegex.matches(email)) {
+            return "Please enter a valid email address (e.g., user@example.com)"
+        }
+        return null
     }
 
     private fun attemptAutoSignIn() {
