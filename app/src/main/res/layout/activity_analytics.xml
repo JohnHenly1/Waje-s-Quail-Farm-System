@@ -46,7 +46,7 @@
                 android:layout_marginStart="16dp"
                 android:layout_weight="1"
                 android:fontFamily="sans-serif"
-                android:text="@string/analytic"
+                android:text="@string/Report"
                 android:gravity="center"
                 android:textColor="@color/white"
                 android:textSize="24sp"

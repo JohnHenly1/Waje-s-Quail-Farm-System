@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.widget.*
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -45,7 +46,9 @@ class FeedInventoryActivity : AppCompatActivity() {
         val quantity: Long,
         val initialQuantity: Long,
         val unitPrice: Double,
-        val status: String
+        val status: String,
+        val unit: String,
+        val updatedAt: com.google.firebase.Timestamp?
     ) {
         val totalValue: Double get() = quantity * unitPrice
     }
@@ -53,6 +56,12 @@ class FeedInventoryActivity : AppCompatActivity() {
     private val allItems    = mutableListOf<FeedItem>()
     private var activeTab   = "All Items"
     private var searchQuery = ""
+
+    private val sortOptions = arrayOf(
+        "Name A→Z", "Quantity Low→High", "Value High→Low", "Recently Updated"
+    )
+    private var sortOption = sortOptions[0]
+    private lateinit var sortSpinner: Spinner
 
     private val statusOptions = arrayOf("In Stock", "Medium", "Low Stock")
     private val categoryOptions = arrayOf(
@@ -103,6 +112,7 @@ class FeedInventoryActivity : AppCompatActivity() {
         bindViews()
         setupToolbar(currentUsername)
         setupFilterTabs()
+        setupSortBar()
         NavigationHelper.setupBottomNavigation(this)
         startFirestoreListener()
     }
@@ -122,6 +132,7 @@ class FeedInventoryActivity : AppCompatActivity() {
         locationsTv      = findViewById(R.id.locationsValue)
         itemCountTv      = findViewById(R.id.itemCountLabel)
         inventoryList    = findViewById(R.id.inventoryList)
+        sortSpinner      = findViewById(R.id.sortSpinner)
 
         tabAllItems      = findViewById(R.id.tabAllItems)
         tabFeed          = findViewById(R.id.tabFeed)
@@ -196,8 +207,34 @@ class FeedInventoryActivity : AppCompatActivity() {
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // Firestore listener  —  farm_data/shared/feed
+    // Sort bar
     // ──────────────────────────────────────────────────────────────────────────
+    private fun setupSortBar() {
+        val sortAdapter = object : ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, sortOptions) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val view = super.getView(position, convertView, parent) as TextView
+                view.setTextColor(android.graphics.Color.parseColor("#1C1C1E"))
+                return view
+            }
+            override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val view = super.getDropDownView(position, convertView, parent) as TextView
+                view.setTextColor(android.graphics.Color.parseColor("#1C1C1E"))
+                return view
+            }
+        }
+        sortAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        sortSpinner.adapter = sortAdapter
+        sortSpinner.setSelection(sortOptions.indexOf(sortOption).coerceAtLeast(0))
+        sortSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
+                sortOption = sortOptions[pos]
+                renderList()
+            }
+            override fun onNothingSelected(p: AdapterView<*>?) {}
+        }
+    }
+
+
     private fun startFirestoreListener() {
         feedListener = feedCol.addSnapshotListener { snaps, err ->
             if (err != null) {
@@ -208,18 +245,22 @@ class FeedInventoryActivity : AppCompatActivity() {
             snaps?.documents?.forEach { doc ->
                 val qty = doc.getLong("quantity") ?: 0L
                 val initQty = doc.getLong("initialQuantity") ?: qty
+                val category = doc.getString("category") ?: "Feed"
+                val defaultUnit = if (category == "Feed") "Sacks" else "Bottle"
                 allItems.add(
                     FeedItem(
                         firestoreId = doc.id,
                         name        = doc.getString("name")        ?: "Unnamed",
                         invNumber   = doc.getString("invNumber")   ?: "#INV----",
                         description = doc.getString("description") ?: "",
-                        category    = doc.getString("category")    ?: "Feed",
+                        category    = category,
                         location    = doc.getString("location")    ?: "Location Info",
                         quantity    = qty,
                         initialQuantity = initQty,
                         unitPrice   = doc.getDouble("unitPrice")   ?: 0.0,
-                        status      = doc.getString("status")      ?: "In Stock"
+                        status      = doc.getString("status")      ?: "In Stock",
+                        unit        = doc.getString("unit")        ?: defaultUnit,
+                        updatedAt   = doc.getTimestamp("updatedAt")
                     )
                 )
             }
@@ -259,7 +300,14 @@ class FeedInventoryActivity : AppCompatActivity() {
                     item.category.contains(searchQuery, ignoreCase = true) ||
                     item.location.contains(searchQuery, ignoreCase = true)
             matchesTab && matchesSearch
-        }
+        }.sortedWith(
+            when (sortOption) {
+                "Quantity Low→High" -> compareBy { it.quantity }
+                "Value High→Low"    -> compareByDescending { it.totalValue }
+                "Recently Updated"  -> compareByDescending { it.updatedAt?.seconds ?: 0L }
+                else                -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.name }
+            }
+        )
 
         itemCountTv.text = "${filtered.size} items found"
         inventoryList.removeAllViews()
@@ -298,11 +346,7 @@ class FeedInventoryActivity : AppCompatActivity() {
         card.findViewById<TextView>(R.id.totalValueText).text  = currency.format(item.totalValue)
 
         val qtyLabel = card.findViewById<TextView>(R.id.quantityLabel)
-        qtyLabel.text = when (item.category) {
-            "Feed" -> "Quantity (Sack)"
-            "Supplements" -> "Quantity (Bottle)"
-            else -> "Quantity"
-        }
+        qtyLabel.text = "Quantity (${item.unit})"
 
         val badge = card.findViewById<TextView>(R.id.statusBadge)
         badge.text = item.status
@@ -380,6 +424,7 @@ class FeedInventoryActivity : AppCompatActivity() {
         dialogView.findViewById<TextView>(R.id.statusLabel)?.visibility = View.GONE
         dialogView.findViewById<View>(R.id.selectItemLabel)?.visibility = View.GONE
         dialogView.findViewById<View>(R.id.selectItemContainer)?.visibility = View.GONE
+        dialogView.findViewById<View>(R.id.invNumberContainer)?.visibility = View.GONE
 
         // Pre-fill all fields
         nameInput.setText(item.name)
@@ -388,6 +433,19 @@ class FeedInventoryActivity : AppCompatActivity() {
         locationInput.setText(item.location)
         qtyInput.setText(item.quantity.toString())
         priceInput.setText(item.unitPrice.toString())
+
+        // +/− stepper: faster than typing, and avoids accidentally leaving a 0
+        // while restocking by small amounts.
+        val qtyDecreaseBtn = dialogView.findViewById<TextView>(R.id.foodQtyDecreaseBtn)
+        val qtyIncreaseBtn = dialogView.findViewById<TextView>(R.id.foodQtyIncreaseBtn)
+        qtyDecreaseBtn.setOnClickListener {
+            val current = qtyInput.text.toString().toLongOrNull() ?: 0L
+            qtyInput.setText((current - 1).coerceAtLeast(0L).toString())
+        }
+        qtyIncreaseBtn.setOnClickListener {
+            val current = qtyInput.text.toString().toLongOrNull() ?: 0L
+            qtyInput.setText((current + 1).toString())
+        }
 
         val catAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, categoryOptions)
         catAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)

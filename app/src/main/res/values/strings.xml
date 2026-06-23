@@ -1,7 +1,7 @@
 <resources>
     <!-- Header Nav -->
     <string name="app_name">Waje\'s Quail Farm</string>
-    <string name="analytic">Analytics</string>
+    <string name="Report">Report</string>
     <string name="schedule_dashboard">Schedule</string>
     <string name="profile_dashboard">Profile</string>
     <string name="AddBtn">Add</string>

@@ -6,8 +6,7 @@
     android:layout_height="match_parent"
     android:background="#F8F9FA"
     tools:context=".FeedInventoryActivity">
-
-    <!--  ===== TOP APP BAR =====  -->
+    <!--   ===== TOP APP BAR =====   -->
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
@@ -89,8 +88,7 @@
             </LinearLayout>
         </RelativeLayout>
     </androidx.appcompat.widget.Toolbar>
-
-    <!--  ===== SCROLLABLE CONTENT =====  -->
+    <!--   ===== SCROLLABLE CONTENT =====   -->
     <androidx.core.widget.NestedScrollView
         android:id="@+id/scrollView"
         android:layout_width="match_parent"
@@ -107,8 +105,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">
-
-            <!--  ===== TOTAL INVENTORY VALUE BANNER =====  -->
+            <!--   ===== TOTAL INVENTORY VALUE BANNER =====   -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -122,11 +119,11 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:fontFamily="sans-serif"
+                    android:letterSpacing="0.05"
                     android:text="Total Inventory Value"
-                    android:textColor="#B3FFFFFF"
-                    android:textSize="12sp"
                     android:textAllCaps="true"
-                    android:letterSpacing="0.05" />
+                    android:textColor="#B3FFFFFF"
+                    android:textSize="12sp" />
 
                 <TextView
                     android:id="@+id/totalInventoryValue"
@@ -138,8 +135,7 @@
                     android:textColor="@color/white"
                     android:textSize="32sp" />
             </LinearLayout>
-
-            <!--  ===== MAIN CONTENT WRAPPER (Rounded overlap effect) =====  -->
+            <!--   ===== MAIN CONTENT WRAPPER (Rounded overlap effect) =====   -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -148,21 +144,19 @@
                 android:backgroundTint="#F8F9FA"
                 android:orientation="vertical"
                 android:paddingTop="8dp">
-
-                <!--  ===== STAT CARDS =====  -->
+                <!--   ===== STAT CARDS =====   -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
                     android:orientation="horizontal"
-                    android:paddingHorizontal="12dp"
-                    android:layout_marginTop="16dp">
-
-                    <!--  Total Items Card  -->
+                    android:paddingHorizontal="12dp">
+                    <!--   Total Items Card   -->
                     <androidx.cardview.widget.CardView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
                         android:layout_marginHorizontal="6dp"
+                        android:layout_weight="1"
                         app:cardCornerRadius="16dp"
                         app:cardElevation="3dp">
 
@@ -197,18 +191,17 @@
                                 android:layout_height="wrap_content"
                                 android:fontFamily="sans-serif"
                                 android:text="Items"
+                                android:textAllCaps="true"
                                 android:textColor="#8E8E93"
-                                android:textSize="10sp"
-                                android:textAllCaps="true" />
+                                android:textSize="10sp" />
                         </LinearLayout>
                     </androidx.cardview.widget.CardView>
-
-                    <!--  Low Stock Card  -->
+                    <!--   Low Stock Card   -->
                     <androidx.cardview.widget.CardView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
                         android:layout_marginHorizontal="6dp"
+                        android:layout_weight="1"
                         app:cardCornerRadius="16dp"
                         app:cardElevation="3dp">
 
@@ -243,18 +236,17 @@
                                 android:layout_height="wrap_content"
                                 android:fontFamily="sans-serif"
                                 android:text="Low Stock"
+                                android:textAllCaps="true"
                                 android:textColor="#8E8E93"
-                                android:textSize="10sp"
-                                android:textAllCaps="true" />
+                                android:textSize="10sp" />
                         </LinearLayout>
                     </androidx.cardview.widget.CardView>
-
-                    <!--  Locations Card  -->
+                    <!--   Locations Card   -->
                     <androidx.cardview.widget.CardView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
                         android:layout_marginHorizontal="6dp"
+                        android:layout_weight="1"
                         app:cardCornerRadius="16dp"
                         app:cardElevation="3dp">
 
@@ -289,14 +281,13 @@
                                 android:layout_height="wrap_content"
                                 android:fontFamily="sans-serif"
                                 android:text="Shops"
+                                android:textAllCaps="true"
                                 android:textColor="#8E8E93"
-                                android:textSize="10sp"
-                                android:textAllCaps="true" />
+                                android:textSize="10sp" />
                         </LinearLayout>
                     </androidx.cardview.widget.CardView>
                 </LinearLayout>
-
-                <!--  ===== FILTER TABS =====  -->
+                <!--   ===== FILTER TABS =====   -->
                 <HorizontalScrollView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -352,20 +343,41 @@
                             android:textSize="13sp" />
                     </LinearLayout>
                 </HorizontalScrollView>
-
-                <!--  ===== ITEM COUNT LABEL =====  -->
+                <!--   ===== ITEM COUNT LABEL =====   -->
                 <TextView
                     android:id="@+id/itemCountLabel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
                     android:layout_marginHorizontal="20dp"
+                    android:layout_marginTop="16dp"
                     android:fontFamily="sans-serif-medium"
                     android:text="0 items found"
                     android:textColor="#3C3C43"
                     android:textSize="14sp" />
+                <!--   ===== SORT BAR =====   -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="20dp"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-                <!--  ===== INVENTORY LIST =====  -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif"
+                        android:text="Sort by:"
+                        android:textColor="#3C3C43"
+                        android:textSize="13sp" />
+
+                    <Spinner
+                        android:id="@+id/sortSpinner"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp" />
+                </LinearLayout>
+                <!--   ===== INVENTORY LIST =====   -->
                 <LinearLayout
                     android:id="@+id/inventoryList"
                     android:layout_width="match_parent"
@@ -376,21 +388,19 @@
             </LinearLayout>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
-
-    <!--  ===== BOTTOM NAVIGATION BAR =====  -->
+    <!--   ===== BOTTOM NAVIGATION BAR =====   -->
     <LinearLayout
         android:id="@+id/bottomNavContainer"
         android:layout_width="match_parent"
         android:layout_height="56dp"
         android:background="@color/dark_green"
+        android:baselineAligned="false"
         android:gravity="center"
         android:orientation="horizontal"
-        android:baselineAligned="false"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
-
-        <!--  Home Button  -->
+        <!--   Home Button   -->
         <LinearLayout
             android:id="@+id/homeButton"
             android:layout_width="0dp"
@@ -414,8 +424,7 @@
                 android:textColor="@color/white"
                 android:textSize="10sp" />
         </LinearLayout>
-
-        <!--  Analytics Button  -->
+        <!--   Analytics Button   -->
         <LinearLayout
             android:id="@+id/analyticsButton"
             android:layout_width="0dp"
@@ -439,10 +448,8 @@
                 android:textColor="@color/white"
                 android:textSize="10sp" />
         </LinearLayout>
-
-        <!--  Camera Button  -->
-
-        <!--  Schedule Button  -->
+        <!--   Camera Button   -->
+        <!--   Schedule Button   -->
         <LinearLayout
             android:id="@+id/scheduleButton"
             android:layout_width="0dp"
@@ -466,8 +473,7 @@
                 android:textColor="@color/white"
                 android:textSize="10sp" />
         </LinearLayout>
-
-        <!--  Profile Button  -->
+        <!--   Profile Button   -->
         <LinearLayout
             android:id="@+id/profileButton"
             android:layout_width="0dp"
@@ -492,7 +498,6 @@
                 android:textSize="10sp" />
         </LinearLayout>
     </LinearLayout>
-
-    <!--  Loading Overlay  -->
+    <!--   Loading Overlay   -->
     <include layout="@layout/layout_loading" />
 </androidx.constraintlayout.widget.ConstraintLayout>
