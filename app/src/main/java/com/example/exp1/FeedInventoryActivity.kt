@@ -81,7 +81,6 @@ class FeedInventoryActivity : AppCompatActivity() {
     val currency = NumberFormat.getCurrencyInstance(Locale("en", "PH"))
 
     // View references
-    private lateinit var totalInventoryTv: TextView
     private lateinit var totalItemsTv: TextView
     private lateinit var lowStockTv: TextView
     private lateinit var locationsTv: TextView
@@ -126,7 +125,6 @@ class FeedInventoryActivity : AppCompatActivity() {
     // View binding
     // ──────────────────────────────────────────────────────────────────────────
     private fun bindViews() {
-        totalInventoryTv = findViewById(R.id.totalInventoryValue)
         totalItemsTv     = findViewById(R.id.totalItemsValue)
         lowStockTv       = findViewById(R.id.lowStockValue)
         locationsTv      = findViewById(R.id.locationsValue)
@@ -277,11 +275,9 @@ class FeedInventoryActivity : AppCompatActivity() {
             activeTab == "All Items" || item.category == activeTab
         }
 
-        val totalValue  = filteredForStats.sumOf { it.totalValue }
         val lowCount    = filteredForStats.count { it.status == "Low Stock" }
         val locationSet = filteredForStats.map { it.location }.toSet()
 
-        totalInventoryTv.text = currency.format(totalValue)
         totalItemsTv.text     = filteredForStats.size.toString()
         lowStockTv.text       = lowCount.toString()
         locationsTv.text      = locationSet.size.toString()

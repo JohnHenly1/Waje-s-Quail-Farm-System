@@ -1,4 +1,3 @@
-<?xml version="1.0" encoding="utf-8"?>
 <androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -14,38 +13,36 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
+            android:layout_marginBottom="24dp"
             android:gravity="center_vertical"
-            android:layout_marginBottom="24dp">
+            android:orientation="horizontal">
 
             <ImageView
                 android:layout_width="32dp"
                 android:layout_height="32dp"
+                android:contentDescription="Privacy Icon"
                 android:src="@drawable/ic_lock"
-                app:tint="@color/dark_green"
-                android:contentDescription="Privacy Icon" />
+                app:tint="@color/dark_green" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="12dp"
-                android:text="Privacy &amp; Security"
+                android:text="Privacy and Security"
                 android:textColor="@color/dark_green"
                 android:textSize="22sp"
                 android:textStyle="bold" />
         </LinearLayout>
-
-        <!-- Feature Content -->
+        <!--  Feature Content  -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
             android:text="System Policies"
             android:textColor="@color/dark_green"
-            android:textStyle="bold"
             android:textSize="14sp"
-            android:layout_marginBottom="12dp" />
-
-        <!-- 1. Data Collection -->
+            android:textStyle="bold" />
+        <!--  1. Data Collection  -->
         <androidx.cardview.widget.CardView
             android:id="@+id/sectionDataCollection"
             android:layout_width="match_parent"
@@ -54,9 +51,9 @@
             android:clickable="true"
             android:focusable="true"
             android:foreground="?android:attr/selectableItemBackground"
+            app:cardBackgroundColor="@color/light_green"
             app:cardCornerRadius="12dp"
-            app:cardElevation="2dp"
-            app:cardBackgroundColor="@color/light_green">
+            app:cardElevation="2dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -67,16 +64,16 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
+                    android:layout_marginBottom="8dp"
                     android:gravity="center_vertical"
-                    android:layout_marginBottom="8dp">
+                    android:orientation="horizontal">
 
                     <ImageView
                         android:layout_width="20dp"
                         android:layout_height="20dp"
+                        android:contentDescription="Collection Icon"
                         android:src="@drawable/ic_clipboard_list"
-                        app:tint="@color/dark_green"
-                        android:contentDescription="Collection Icon" />
+                        app:tint="@color/dark_green" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -84,21 +81,20 @@
                         android:layout_marginStart="8dp"
                         android:text="1. Data Collection (The 'What')"
                         android:textColor="@color/dark_green"
-                        android:textStyle="bold"
-                        android:textSize="16sp" />
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
                 </LinearLayout>
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="• Farm Profile: Name, contact info, and GPS location.\n• Flock Records: Quail counts, breeds, age, and mortality rates.\n• Production: Daily egg counts, meat weight, and feed consumption.\n• Health &amp; Biosecurity: Vaccination dates, illness logs, and visitor records.\n• Financials: Feed costs, medicine expenses, and sales revenue."
-                    android:textSize="13sp"
+                    android:lineSpacingExtra="4dp"
+                    android:text="• Farm Profile: Name, contact info, and GPS location.\n• Flock Records: Quail counts, breeds, age, and mortality rates.\n• Production: Daily egg counts, meat weight, and feed consumption.\n• Health and Biosecurity: Vaccination dates, illness logs, and visitor records.\n• Financials: Feed costs and medicine expenses."
                     android:textColor="@color/black"
-                    android:lineSpacingExtra="4dp" />
+                    android:textSize="13sp" />
             </LinearLayout>
         </androidx.cardview.widget.CardView>
-
-        <!-- 2. Privacy Content -->
+        <!--  2. Privacy Content  -->
         <androidx.cardview.widget.CardView
             android:id="@+id/sectionPrivacyContent"
             android:layout_width="match_parent"
@@ -107,9 +103,9 @@
             android:clickable="true"
             android:focusable="true"
             android:foreground="?android:attr/selectableItemBackground"
+            app:cardBackgroundColor="@color/bg_blue_100"
             app:cardCornerRadius="12dp"
-            app:cardElevation="2dp"
-            app:cardBackgroundColor="@color/bg_blue_100">
+            app:cardElevation="2dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -120,16 +116,16 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
+                    android:layout_marginBottom="8dp"
                     android:gravity="center_vertical"
-                    android:layout_marginBottom="8dp">
+                    android:orientation="horizontal">
 
                     <ImageView
                         android:layout_width="20dp"
                         android:layout_height="20dp"
+                        android:contentDescription="Privacy Policy Icon"
                         android:src="@drawable/ic_visibility"
-                        app:tint="@color/text_blue_600"
-                        android:contentDescription="Privacy Policy Icon" />
+                        app:tint="@color/text_blue_600" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -137,21 +133,20 @@
                         android:layout_marginStart="8dp"
                         android:text="2. Privacy Content (The 'How')"
                         android:textColor="@color/text_blue_600"
-                        android:textStyle="bold"
-                        android:textSize="16sp" />
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
                 </LinearLayout>
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:lineSpacingExtra="4dp"
                     android:text="• Ownership: The farmer owns all farm-generated data.\n• Usage: Data is used only for reports, trend analysis, or vet consultations.\n• Sharing: We disclose if data goes to 3rd parties (e.g., government disease tracking or researchers).\n• Anonymity: Any shared regional data is stripped of the farm's name and exact location."
-                    android:textSize="13sp"
                     android:textColor="@color/black"
-                    android:lineSpacingExtra="4dp" />
+                    android:textSize="13sp" />
             </LinearLayout>
         </androidx.cardview.widget.CardView>
-
-        <!-- 3. Security Measures -->
+        <!--  3. Security Measures  -->
         <androidx.cardview.widget.CardView
             android:id="@+id/sectionSecurityMeasures"
             android:layout_width="match_parent"
@@ -160,9 +155,9 @@
             android:clickable="true"
             android:focusable="true"
             android:foreground="?android:attr/selectableItemBackground"
+            app:cardBackgroundColor="@color/bg_orange_100"
             app:cardCornerRadius="12dp"
-            app:cardElevation="2dp"
-            app:cardBackgroundColor="@color/bg_orange_100">
+            app:cardElevation="2dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -173,16 +168,16 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
+                    android:layout_marginBottom="8dp"
                     android:gravity="center_vertical"
-                    android:layout_marginBottom="8dp">
+                    android:orientation="horizontal">
 
                     <ImageView
                         android:layout_width="20dp"
                         android:layout_height="20dp"
+                        android:contentDescription="Security Armor Icon"
                         android:src="@drawable/ic_lock"
-                        app:tint="@color/text_orange_600"
-                        android:contentDescription="Security Armor Icon" />
+                        app:tint="@color/text_orange_600" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -190,19 +185,18 @@
                         android:layout_marginStart="8dp"
                         android:text="3. Security Measures (The 'Armor')"
                         android:textColor="@color/text_orange_600"
-                        android:textStyle="bold"
-                        android:textSize="16sp" />
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
                 </LinearLayout>
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:lineSpacingExtra="4dp"
                     android:text="• Encryption: Data is scrambled (encrypted) during upload and while stored on servers.\n• Secure Login: Access is protected by passwords and/or biometric authentication.\n• Offline Safety: Data stored on the device (when offline) is also protected.\n• Access Control: Only authorized users can see specific farm records."
-                    android:textSize="13sp"
                     android:textColor="@color/black"
-                    android:lineSpacingExtra="4dp" />
+                    android:textSize="13sp" />
             </LinearLayout>
         </androidx.cardview.widget.CardView>
-
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

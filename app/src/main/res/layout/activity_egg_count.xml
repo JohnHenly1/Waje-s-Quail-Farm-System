@@ -1,6 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/main"
@@ -8,8 +6,7 @@
     android:layout_height="match_parent"
     android:background="@color/light_gray"
     tools:context=".EggCountActivity">
-
-    <!--  ══════════════════════  HEADER  ══════════════════════  -->
+    <!--   ══════════════════════  HEADER  ══════════════════════   -->
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
@@ -38,7 +35,7 @@
                 android:contentDescription="Back"
                 android:scaleType="centerInside"
                 app:srcCompat="@drawable/ic_arrow_back"
-                app:tint="@color/white"/>
+                app:tint="@color/white" />
 
             <TextView
                 android:layout_width="0dp"
@@ -49,18 +46,17 @@
                 android:text="Egg Count and Quality"
                 android:textColor="@color/white"
                 android:textSize="20sp"
-                android:textStyle="bold"/>
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/liveTimeText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:gravity="end"
                 android:text="12:00 PM\nApr 7, 2026"
                 android:textColor="@color/white"
-                android:textSize="12sp"
-                android:gravity="end"/>
-
-            <!--  Reset / refresh counts  -->
+                android:textSize="12sp" />
+            <!--   Reset / refresh counts   -->
             <ImageButton
                 android:id="@+id/refreshButton"
                 android:layout_width="36dp"
@@ -69,11 +65,10 @@
                 android:contentDescription="Reset counts"
                 android:scaleType="centerInside"
                 app:srcCompat="@android:drawable/stat_notify_sync"
-                app:tint="@color/white"/>
+                app:tint="@color/white" />
         </LinearLayout>
     </androidx.appcompat.widget.Toolbar>
-
-    <!--  ══════════════════════  SCROLLABLE BODY  ══════════════════════  -->
+    <!--   ══════════════════════  SCROLLABLE BODY  ══════════════════════   -->
     <androidx.core.widget.NestedScrollView
         android:id="@+id/scrollView"
         android:layout_width="match_parent"
@@ -89,8 +84,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:padding="16dp">
-
-            <!--  ─────────────  STATUS BANNER (hidden by default)  ─────────────  -->
+            <!--   ─────────────  STATUS BANNER (hidden by default)  ─────────────   -->
             <TextView
                 android:id="@+id/statusBanner"
                 android:layout_width="match_parent"
@@ -101,9 +95,8 @@
                 android:textColor="@color/white"
                 android:textSize="13sp"
                 android:visibility="gone"
-                tools:text="Model loaded"/>
-
-            <!--  ─────────────  CAMERA CARD  ─────────────  -->
+                tools:text="Model loaded" />
+            <!--   ─────────────  CAMERA CARD  ─────────────   -->
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -114,28 +107,24 @@
                 <FrameLayout
                     android:layout_width="match_parent"
                     android:layout_height="300dp">
-
-                    <!--  Live camera preview  -->
+                    <!--   Live camera preview   -->
                     <androidx.camera.view.PreviewView
                         android:id="@+id/cameraPreview"
                         android:layout_width="match_parent"
-                        android:layout_height="match_parent"/>
-
-                    <!--  Dim overlay when frame is frozen  -->
+                        android:layout_height="match_parent" />
+                    <!--   Dim overlay when frame is frozen   -->
                     <View
                         android:id="@+id/frozenOverlay"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:background="#55000000"
-                        android:visibility="gone"/>
-
-                    <!--  Bounding-box overlay  -->
+                        android:visibility="gone" />
+                    <!--   Bounding-box overlay   -->
                     <com.example.exp1.DetectionOverlayView
                         android:id="@+id/detectionOverlay"
                         android:layout_width="match_parent"
-                        android:layout_height="match_parent"/>
-
-                    <!--  LIVE / ANALYZING / CAPTURED badge (top-left)  -->
+                        android:layout_height="match_parent" />
+                    <!--   LIVE / ANALYZING / CAPTURED badge (top-left)   -->
                     <TextView
                         android:id="@+id/liveScanLabel"
                         android:layout_width="wrap_content"
@@ -148,19 +137,17 @@
                         android:text="● LIVE SCAN"
                         android:textColor="@color/white"
                         android:textSize="11sp"
-                        android:textStyle="bold"/>
+                        android:textStyle="bold" />
                 </FrameLayout>
             </androidx.cardview.widget.CardView>
-
-            <!--  ─────────────  CAMERA CONTROL ROW  ─────────────  -->
+            <!--   ─────────────  CAMERA CONTROL ROW  ─────────────   -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="14dp"
                 android:gravity="center"
                 android:orientation="horizontal">
-
-                <!--  Capture current frame & analyze  -->
+                <!--   Capture current frame & analyze   -->
                 <Button
                     android:id="@+id/captureBtn"
                     android:layout_width="0dp"
@@ -171,9 +158,8 @@
                     android:text="Capture and Analyze"
                     android:textColor="@color/white"
                     android:textSize="13sp"
-                    android:textStyle="bold"/>
-
-                <!--  Retake: resume live scanning (visible only when frozen)  -->
+                    android:textStyle="bold" />
+                <!--   Retake: resume live scanning (visible only when frozen)   -->
                 <Button
                     android:id="@+id/retakeBtn"
                     android:layout_width="0dp"
@@ -185,9 +171,8 @@
                     android:textColor="@color/white"
                     android:textSize="13sp"
                     android:textStyle="bold"
-                    android:visibility="gone"/>
-
-                <!--  Pick from gallery  -->
+                    android:visibility="gone" />
+                <!--   Pick from gallery   -->
                 <Button
                     android:id="@+id/modeSwitchBtn"
                     android:layout_width="0dp"
@@ -196,10 +181,9 @@
                     android:backgroundTint="#37474F"
                     android:text="Pick Photo"
                     android:textColor="@color/white"
-                    android:textSize="12sp"/>
+                    android:textSize="12sp" />
             </LinearLayout>
-
-            <!--  Save Collection button — hidden until a capture is completed  -->
+            <!--   Save Collection button — hidden until a capture is completed   -->
             <Button
                 android:id="@+id/saveCollectionBtn"
                 android:layout_width="match_parent"
@@ -212,9 +196,8 @@
                 android:textColor="@color/white"
                 android:textSize="15sp"
                 android:textStyle="bold"
-                android:visibility="gone"/>
-
-            <!--  ─────────────  Today's Count Card  ─────────────  -->
+                android:visibility="gone" />
+            <!--   ─────────────  Today's Count Card  ─────────────   -->
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -242,7 +225,7 @@
                             android:layout_height="30dp"
                             android:layout_gravity="center"
                             app:srcCompat="@drawable/lc_egg"
-                            app:tint="@color/white"/>
+                            app:tint="@color/white" />
                     </FrameLayout>
 
                     <TextView
@@ -252,7 +235,7 @@
                         android:text="0"
                         android:textColor="@color/white"
                         android:textSize="56sp"
-                        android:textStyle="bold"/>
+                        android:textStyle="bold" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -260,11 +243,10 @@
                         android:alpha="0.9"
                         android:text="Total Eggs Detected"
                         android:textColor="@color/white"
-                        android:textSize="15sp"/>
+                        android:textSize="15sp" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
-
-            <!-- ───────────── QUALITY DISTRIBUTION ───────────── -->
+            <!--  ───────────── QUALITY DISTRIBUTION ─────────────  -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -272,15 +254,14 @@
                 android:text="Quality Distribution"
                 android:textColor="@color/black"
                 android:textSize="17sp"
-                android:textStyle="bold"/>
+                android:textStyle="bold" />
 
             <GridLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="22dp"
                 android:columnCount="3">
-
-                <!-- Grade A — Normal -->
+                <!--  Grade A — Normal  -->
                 <androidx.cardview.widget.CardView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
@@ -292,16 +273,16 @@
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical"
+                        android:background="@android:color/white"
                         android:gravity="center"
-                        android:padding="12dp"
-                        android:background="@android:color/white">
+                        android:orientation="vertical"
+                        android:padding="12dp">
 
                         <View
                             android:layout_width="8dp"
                             android:layout_height="8dp"
                             android:layout_marginBottom="4dp"
-                            android:background="#2E7D32"/>
+                            android:background="#2E7D32" />
 
                         <TextView
                             android:id="@+id/gradeAValue"
@@ -310,16 +291,15 @@
                             android:text="0"
                             android:textColor="#2E7D32"
                             android:textSize="26sp"
-                            android:textStyle="bold"/>
+                            android:textStyle="bold" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Grade A"
                             android:textColor="@color/dark_gray"
-                            android:textSize="11sp"/>
-
-                        <!-- gradeADesc: shows "Normal" — referenced in Kotlin -->
+                            android:textSize="11sp" />
+                        <!--  gradeADesc: shows "Normal" — referenced in Kotlin  -->
                         <TextView
                             android:id="@+id/gradeADesc"
                             android:layout_width="wrap_content"
@@ -327,7 +307,7 @@
                             android:text="Normal"
                             android:textColor="#2E7D32"
                             android:textSize="10sp"
-                            android:textStyle="italic"/>
+                            android:textStyle="italic" />
 
                         <TextView
                             android:id="@+id/gradeAPercent"
@@ -337,11 +317,10 @@
                             android:text="0%"
                             android:textColor="#2E7D32"
                             android:textSize="12sp"
-                            android:textStyle="bold"/>
+                            android:textStyle="bold" />
                     </LinearLayout>
                 </androidx.cardview.widget.CardView>
-
-                <!-- Grade B — Cracked -->
+                <!--  Grade B — Cracked  -->
                 <androidx.cardview.widget.CardView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
@@ -353,16 +332,16 @@
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical"
+                        android:background="@android:color/white"
                         android:gravity="center"
-                        android:padding="12dp"
-                        android:background="@android:color/white">
+                        android:orientation="vertical"
+                        android:padding="12dp">
 
                         <View
                             android:layout_width="8dp"
                             android:layout_height="8dp"
                             android:layout_marginBottom="4dp"
-                            android:background="#F57F17"/>
+                            android:background="#F57F17" />
 
                         <TextView
                             android:id="@+id/gradeBValue"
@@ -371,16 +350,15 @@
                             android:text="0"
                             android:textColor="#F57F17"
                             android:textSize="26sp"
-                            android:textStyle="bold"/>
+                            android:textStyle="bold" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Grade B"
                             android:textColor="@color/dark_gray"
-                            android:textSize="11sp"/>
-
-                        <!-- gradeBDesc: shows "Cracked" — referenced in Kotlin -->
+                            android:textSize="11sp" />
+                        <!--  gradeBDesc: shows "Cracked" — referenced in Kotlin  -->
                         <TextView
                             android:id="@+id/gradeBDesc"
                             android:layout_width="wrap_content"
@@ -388,7 +366,7 @@
                             android:text="Cracked"
                             android:textColor="#F57F17"
                             android:textSize="10sp"
-                            android:textStyle="italic"/>
+                            android:textStyle="italic" />
 
                         <TextView
                             android:id="@+id/gradeBPercent"
@@ -398,11 +376,10 @@
                             android:text="0%"
                             android:textColor="#F57F17"
                             android:textSize="12sp"
-                            android:textStyle="bold"/>
+                            android:textStyle="bold" />
                     </LinearLayout>
                 </androidx.cardview.widget.CardView>
-
-                <!-- Grade C — Reject -->
+                <!--  Grade C — Reject  -->
                 <androidx.cardview.widget.CardView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
@@ -414,16 +391,16 @@
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical"
+                        android:background="@android:color/white"
                         android:gravity="center"
-                        android:padding="12dp"
-                        android:background="@android:color/white">
+                        android:orientation="vertical"
+                        android:padding="12dp">
 
                         <View
                             android:layout_width="8dp"
                             android:layout_height="8dp"
                             android:layout_marginBottom="4dp"
-                            android:background="#C62828"/>
+                            android:background="#C62828" />
 
                         <TextView
                             android:id="@+id/gradeCValue"
@@ -432,16 +409,15 @@
                             android:text="0"
                             android:textColor="#C62828"
                             android:textSize="26sp"
-                            android:textStyle="bold"/>
+                            android:textStyle="bold" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Grade C"
                             android:textColor="@color/dark_gray"
-                            android:textSize="11sp"/>
-
-                        <!-- gradeCDesc: shows "Reject" — referenced in Kotlin -->
+                            android:textSize="11sp" />
+                        <!--  gradeCDesc: shows "Reject" — referenced in Kotlin  -->
                         <TextView
                             android:id="@+id/gradeCDesc"
                             android:layout_width="wrap_content"
@@ -449,7 +425,7 @@
                             android:text="Reject"
                             android:textColor="#C62828"
                             android:textSize="10sp"
-                            android:textStyle="italic"/>
+                            android:textStyle="italic" />
 
                         <TextView
                             android:id="@+id/gradeCPercent"
@@ -459,146 +435,18 @@
                             android:text="0%"
                             android:textColor="#C62828"
                             android:textSize="12sp"
-                            android:textStyle="bold"/>
+                            android:textStyle="bold" />
                     </LinearLayout>
                 </androidx.cardview.widget.CardView>
-
             </GridLayout>
-
-            <!-- ───────────── REVENUE / PROFIT CARDS ───────────── -->
+            <!--  ───────────── COLLECTION HISTORY HEADER ─────────────  -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:layout_marginBottom="4dp"
-                android:orientation="horizontal">
-
-                <!-- Price per egg + settings button -->
-                <androidx.cardview.widget.CardView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="6dp"
-                    app:cardCornerRadius="14dp"
-                    app:cardElevation="2dp"
-                    app:cardBackgroundColor="#FFF8E1">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:gravity="center"
-                        android:padding="12dp">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Price / Egg"
-                            android:textColor="#E65100"
-                            android:textSize="11sp"/>
-
-                        <TextView
-                            android:id="@+id/pricePerEggValue"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="₱3.50/egg"
-                            android:textColor="#BF360C"
-                            android:textSize="15sp"
-                            android:textStyle="bold"/>
-
-                        <Button
-                            android:id="@+id/priceSettingsBtn"
-                            android:layout_width="wrap_content"
-                            android:layout_height="28dp"
-                            android:layout_marginTop="6dp"
-                            android:text="Set Price"
-                            android:textColor="@color/white"
-                            android:textSize="10sp"
-                            android:paddingHorizontal="10dp"
-                            android:backgroundTint="#E65100"
-                            style="@style/Widget.AppCompat.Button.Colored"/>
-                    </LinearLayout>
-                </androidx.cardview.widget.CardView>
-
-                <!-- Revenue -->
-                <androidx.cardview.widget.CardView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="6dp"
-                    app:cardCornerRadius="14dp"
-                    app:cardElevation="2dp"
-                    app:cardBackgroundColor="#E8F5E9">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:gravity="center"
-                        android:padding="12dp">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Revenue"
-                            android:textColor="#2E7D32"
-                            android:textSize="11sp"/>
-
-                        <TextView
-                            android:id="@+id/revenueValue"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="₱0.00"
-                            android:textColor="#1B5E20"
-                            android:textSize="15sp"
-                            android:textStyle="bold"/>
-                    </LinearLayout>
-                </androidx.cardview.widget.CardView>
-
-                <!-- Net Profit -->
-                <androidx.cardview.widget.CardView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    app:cardCornerRadius="14dp"
-                    app:cardElevation="2dp"
-                    app:cardBackgroundColor="#E3F2FD">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:gravity="center"
-                        android:padding="12dp">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Net Profit"
-                            android:textColor="#1565C0"
-                            android:textSize="11sp"/>
-
-                        <TextView
-                            android:id="@+id/netProfitValue"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="₱0.00"
-                            android:textColor="#0D47A1"
-                            android:textSize="15sp"
-                            android:textStyle="bold"/>
-                    </LinearLayout>
-                </androidx.cardview.widget.CardView>
-
-            </LinearLayout>
-
-            <!-- ───────────── COLLECTION HISTORY HEADER ───────────── -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
                 android:layout_marginTop="20dp"
-                android:layout_marginBottom="10dp">
+                android:layout_marginBottom="10dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
                 <TextView
                     android:layout_width="0dp"
@@ -607,7 +455,7 @@
                     android:text="Collection History"
                     android:textColor="@color/black"
                     android:textSize="17sp"
-                    android:textStyle="bold"/>
+                    android:textStyle="bold" />
 
                 <ImageButton
                     android:id="@+id/calendarBtn"
@@ -615,7 +463,7 @@
                     android:layout_height="32dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     app:srcCompat="@android:drawable/ic_menu_my_calendar"
-                    app:tint="@color/dark_green"/>
+                    app:tint="@color/dark_green" />
 
                 <ImageButton
                     android:id="@+id/prevWeekBtn"
@@ -623,7 +471,7 @@
                     android:layout_height="32dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     app:srcCompat="@drawable/ic_arrow_back"
-                    app:tint="@color/dark_green"/>
+                    app:tint="@color/dark_green" />
 
                 <TextView
                     android:id="@+id/weekRangeTxt"
@@ -633,7 +481,7 @@
                     android:text="This Week"
                     android:textColor="@color/dark_gray"
                     android:textSize="12sp"
-                    android:textStyle="bold"/>
+                    android:textStyle="bold" />
 
                 <ImageButton
                     android:id="@+id/nextWeekBtn"
@@ -641,132 +489,123 @@
                     android:layout_height="32dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     app:srcCompat="@drawable/ic_arrow_forward"
-                    app:tint="@color/dark_green"/>
-
+                    app:tint="@color/dark_green" />
             </LinearLayout>
-
-            <!-- Collection log rows injected here at runtime -->
+            <!--  Collection log rows injected here at runtime  -->
             <LinearLayout
                 android:id="@+id/collectionLogList"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"/>
-
+                android:orientation="vertical" />
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
-
-    <!-- ══════════════════════ BOTTOM NAV ══════════════════════ -->
+    <!--  ══════════════════════ BOTTOM NAV ══════════════════════  -->
     <LinearLayout
         android:id="@+id/bottomNavContainer"
         android:layout_width="match_parent"
         android:layout_height="56dp"
-        android:orientation="horizontal"
-        android:gravity="center"
-        android:baselineAligned="false"
         android:background="@color/dark_green"
+        android:baselineAligned="false"
+        android:gravity="center"
+        android:orientation="horizontal"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <!-- Home -->
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+        <!--  Home  -->
         <LinearLayout
             android:id="@+id/homeButton"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center">
+            android:gravity="center"
+            android:orientation="vertical">
 
             <ImageView
                 android:layout_width="22dp"
                 android:layout_height="22dp"
                 android:scaleType="centerInside"
                 app:srcCompat="@drawable/ic_home"
-                app:tint="@color/white"/>
+                app:tint="@color/white" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
                 android:text="@string/home"
                 android:textColor="@color/white"
-                android:textSize="10sp"
-                android:layout_marginTop="2dp"/>
+                android:textSize="10sp" />
         </LinearLayout>
-
-        <!-- Analytics -->
+        <!--  Analytics  -->
         <LinearLayout
             android:id="@+id/analyticsButton"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center">
+            android:gravity="center"
+            android:orientation="vertical">
 
             <ImageView
                 android:layout_width="22dp"
                 android:layout_height="22dp"
                 android:scaleType="centerInside"
                 app:srcCompat="@drawable/ic_chart"
-                app:tint="@color/white"/>
+                app:tint="@color/white" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
                 android:text="@string/analytics"
                 android:textColor="@color/white"
-                android:textSize="10sp"
-                android:layout_marginTop="2dp"/>
+                android:textSize="10sp" />
         </LinearLayout>
-
-        <!-- Schedule -->
+        <!--  Schedule  -->
         <LinearLayout
             android:id="@+id/scheduleButton"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center">
+            android:gravity="center"
+            android:orientation="vertical">
 
             <ImageView
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:scaleType="centerInside"
                 app:srcCompat="@drawable/ic_schedule"
-                app:tint="@color/white"/>
+                app:tint="@color/white" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
                 android:text="@string/schedule"
                 android:textColor="@color/white"
-                android:textSize="10sp"
-                android:layout_marginTop="2dp"/>
+                android:textSize="10sp" />
         </LinearLayout>
-
-        <!-- Profile -->
+        <!--  Profile  -->
         <LinearLayout
             android:id="@+id/profileButton"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center">
+            android:gravity="center"
+            android:orientation="vertical">
 
             <ImageView
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:scaleType="centerInside"
                 app:srcCompat="@drawable/ic_profile"
-                app:tint="@color/white"/>
+                app:tint="@color/white" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
                 android:text="@string/profile"
                 android:textColor="@color/white"
-                android:textSize="10sp"
-                android:layout_marginTop="2dp"/>
+                android:textSize="10sp" />
         </LinearLayout>
-
     </LinearLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>
