@@ -80,7 +80,7 @@ public class ProfileActivity extends AppCompatActivity {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private ListenerRegistration userProfileListener;
 
-    private static final String SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxd3Jv_ysFbqaH0Rf5Qw8_Zxv6g2Sy2muDSkISnmPjxk2KMENJF7RA8ybXdQ5GYyMHF/exec";
+    private static final String SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx-_H4Jy4KTuZQSPTMCxTAIKIAJxGMAaIzGF-uKB0m05YLWb1Flgdor-wGD-ieOym_0/exec";
     private static final String SCRIPT_SECRET = "Red0455";
 
     @Override
@@ -167,7 +167,7 @@ public class ProfileActivity extends AppCompatActivity {
 
             View generateInviteButton = findViewById(R.id.generateInviteButton);
             if (generateInviteButton != null) {
-                generateInviteButton.setOnClickListener(v -> NavigationHelper.INSTANCE.showGenerateInviteCodeDialog(this, currentEmail));
+                generateInviteButton.setOnClickListener(v -> NavigationHelper.INSTANCE.showAddUserDialog(this, currentEmail));
             }
         } else {
             if (adminGroupLabel != null) adminGroupLabel.setVisibility(View.GONE);
@@ -986,7 +986,7 @@ public class ProfileActivity extends AppCompatActivity {
         rvUserList.setLayoutManager(new LinearLayoutManager(this));
 
         view.findViewById(R.id.btnRoleLimits).setOnClickListener(v -> showRoleLimitsDialog());
-        view.findViewById(R.id.btnInviteNew).setOnClickListener(v -> NavigationHelper.INSTANCE.showGenerateInviteCodeDialog(this, currentEmail));
+        view.findViewById(R.id.btnInviteNew).setOnClickListener(v -> NavigationHelper.INSTANCE.showAddUserDialog(this, currentEmail));
         view.findViewById(R.id.btnViewCodes).setOnClickListener(v -> showInviteCodesManagementDialog());
 
         progressBar.setVisibility(View.VISIBLE);

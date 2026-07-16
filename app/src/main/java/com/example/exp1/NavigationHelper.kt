@@ -2,35 +2,49 @@ package com.example.exp1
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.DatePickerDialog
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Handler
 import android.os.Looper
 import android.text.TextWatcher
 import android.util.Patterns
+import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.animation.AnimationUtils
+import android.widget.AbsListView
+import android.widget.ArrayAdapter
+import android.widget.BaseAdapter
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ListView
 import android.widget.ProgressBar
-import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import com.bumptech.glide.Glide
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.navigation.NavigationView
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.SetOptions
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.UUID
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 import kotlin.random.Random
 
 object NavigationHelper {
@@ -193,9 +207,13 @@ object NavigationHelper {
         val currentEmail = accountManager.getCurrentUsername()
         val currentRole = accountManager.getRole(currentEmail ?: "")
 
-        // Hide Invite User if role is staff
+        // Hide Add User if role is staff. NOTE: the menu item id is left as
+        // "nav_invite_user" to avoid requiring a menu XML id change, but its
+        // label is switched to "Add User" here. If you'd rather rename the id
+        // itself, update it in the nav menu XML and swap the id below too.
         val navMenu = navigationView.menu
         val inviteItem = navMenu.findItem(R.id.nav_invite_user)
+        inviteItem?.title = "Add User"
         if (currentRole == "staff") {
             inviteItem?.isVisible = false
         } else {
@@ -219,9 +237,11 @@ object NavigationHelper {
                     drawerLayout.closeDrawer(GravityCompat.START)
                     val currentRm = RoleManager(currentRole)
                     if (currentRm.canGenerateInviteCodes()) {
-                        showGenerateInviteCodeDialog(activity, currentEmail ?: "")
+                        // "Add User" now opens the member list first; adding
+                        // a brand new person happens from the "+" button there.
+                        showUserListDialog(activity, currentEmail ?: "")
                     } else {
-                        Toast.makeText(activity, "Only owners can generate invite codes.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(activity, "Only owners can add users.", Toast.LENGTH_SHORT).show()
                     }
                 }
                 R.id.nav_dashboard -> {
@@ -293,39 +313,262 @@ object NavigationHelper {
         }
     }
 
-    fun showGenerateInviteCodeDialog(activity: Activity, ownerEmail: String) {
-        val dialogView = LayoutInflater.from(activity).inflate(R.layout.dialog_invite_user, null)
-        val editEmail = dialogView.findViewById<EditText>(R.id.inviteEmail)
-        val roleGroup = dialogView.findViewById<android.widget.RadioGroup>(R.id.inviteRoleGroup)
+    // ─────────────────────────────────────────────────────────────────────
+    // USER LIST  ("Add User" side-menu entry opens this first)
+    // Shows only PENDING ("invited") users — approved/active users don't
+    // clutter this screen. Each row has an "Unlock" action that runs the
+    // verification-code procedure for that one person, after confirmation.
+    // ─────────────────────────────────────────────────────────────────────
 
+    private data class PendingUser(
+        val email: String,
+        val name: String,
+        val role: String
+    )
+
+    fun showUserListDialog(activity: Activity, ownerEmail: String) {
+        val dp = activity.resources.displayMetrics.density
+
+        val root = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((16 * dp).toInt(), (16 * dp).toInt(), (16 * dp).toInt(), (8 * dp).toInt())
+        }
+
+        val addButton = MaterialButtonOrPlainButton(activity, "+  Add User")
+        root.addView(addButton)
+
+        val listView = ListView(activity).apply {
+            divider = null
+            dividerHeight = (10 * dp).toInt()
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                (360 * dp).toInt()
+            ).apply { topMargin = (14 * dp).toInt() }
+        }
+        root.addView(listView)
+
+        val emptyText = TextView(activity).apply {
+            text = "No pending invites. Tap \"Add User\" to invite your first team member."
+            setTextColor(Color.parseColor("#8A8A8E"))
+            setPadding(0, (24 * dp).toInt(), 0, (24 * dp).toInt())
+            visibility = View.GONE
+        }
+        root.addView(emptyText)
+
+        val dialog = AlertDialog.Builder(activity)
+            .setTitle("Farm Users — Pending")
+            .setView(root)
+            .setNegativeButton("Close", null)
+            .create()
+
+        addButton.setOnClickListener {
+            dialog.dismiss()
+            showAddUserDialog(activity, ownerEmail)
+        }
+
+        dialog.show()
+
+        val items = mutableListOf<PendingUser>()
+        val adapter = PendingUserAdapter(activity, items) { user ->
+            showUnlockConfirmationDialog(activity, ownerEmail, user)
+        }
+        listView.adapter = adapter
+
+        FirebaseFirestore.getInstance().collection("user_access")
+            .whereEqualTo("status", "invited")
+            .get()
+            .addOnSuccessListener { docs ->
+                items.clear()
+                docs.documents.forEach { doc ->
+                    items.add(
+                        PendingUser(
+                            email = doc.id,
+                            name = doc.getString("name") ?: doc.id,
+                            role = doc.getString("role") ?: "staff"
+                        )
+                    )
+                }
+                if (items.isEmpty()) {
+                    listView.visibility = View.GONE
+                    emptyText.visibility = View.VISIBLE
+                } else {
+                    listView.visibility = View.VISIBLE
+                    emptyText.visibility = View.GONE
+                    adapter.notifyDataSetChanged()
+                }
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(activity, "Could not load users: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    /** Modern, card-style row: initial avatar, name/role/email, pending badge, Unlock action. */
+    private class PendingUserAdapter(
+        private val activity: Activity,
+        private val items: MutableList<PendingUser>,
+        private val onUnlockClicked: (PendingUser) -> Unit
+    ) : BaseAdapter() {
+
+        private val dp = activity.resources.displayMetrics.density
+
+        override fun getCount() = items.size
+        override fun getItem(position: Int): Any = items[position]
+        override fun getItemId(position: Int) = position.toLong()
+
+        override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
+            val user = items[position]
+
+            val card = LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding((14 * dp).toInt(), (12 * dp).toInt(), (14 * dp).toInt(), (12 * dp).toInt())
+                background = GradientDrawable().apply {
+                    cornerRadius = 18 * dp
+                    setColor(Color.parseColor("#F4F4F7"))
+                }
+                layoutParams = AbsListView.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            }
+
+            val avatar = TextView(activity).apply {
+                text = (user.name.firstOrNull() ?: '?').uppercaseChar().toString()
+                setTextColor(Color.WHITE)
+                textSize = 16f
+                gravity = Gravity.CENTER
+                layoutParams = LinearLayout.LayoutParams((40 * dp).toInt(), (40 * dp).toInt())
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(
+                        if (user.role == "owner") Color.parseColor("#5B6DFF")
+                        else Color.parseColor("#34A853")
+                    )
+                }
+            }
+            card.addView(avatar)
+
+            val textColumn = LinearLayout(activity).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    marginStart = (12 * dp).toInt()
+                    marginEnd = (10 * dp).toInt()
+                }
+            }
+            textColumn.addView(TextView(activity).apply {
+                text = user.name
+                setTextColor(Color.parseColor("#1C1C1E"))
+                textSize = 15f
+                setTypeface(typeface, Typeface.BOLD)
+            })
+            textColumn.addView(TextView(activity).apply {
+                text = "${RoleManager.displayName(user.role)}  •  ${user.email}"
+                setTextColor(Color.parseColor("#8A8A8E"))
+                textSize = 12.5f
+            })
+            textColumn.addView(TextView(activity).apply {
+                text = "Pending — not unlocked yet"
+                setTextColor(Color.parseColor("#C08A00"))
+                textSize = 11.5f
+            })
+            card.addView(textColumn)
+
+            val unlockButton: View = try {
+                MaterialButton(activity).apply {
+                    text = "Unlock"
+                    textSize = 12f
+                    cornerRadius = (14 * dp).toInt()
+                    setPadding((12 * dp).toInt(), 0, (12 * dp).toInt(), 0)
+                }
+            } catch (e: Throwable) {
+                android.widget.Button(activity).apply { text = "Unlock" }
+            }
+            unlockButton.setOnClickListener { onUnlockClicked(user) }
+            card.addView(unlockButton)
+
+            return card
+        }
+    }
+
+    /** Small helper so we don't hard-depend on a MaterialButton style resource. */
+    private fun MaterialButtonOrPlainButton(activity: Activity, label: String): View {
+        return try {
+            MaterialButton(activity).apply { text = label }
+        } catch (e: Throwable) {
+            android.widget.Button(activity).apply { text = label }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // ADD USER  (owner fills in the new person's info; this ONLY saves the
+    // pre-fill profile with status "invited". No verification code is
+    // generated and no email is sent here — that only happens from the
+    // "Unlock" action in the pending-users list.)
+    // ─────────────────────────────────────────────────────────────────────
+
+    fun showAddUserDialog(activity: Activity, ownerEmail: String) {
+        val dialogView = LayoutInflater.from(activity).inflate(R.layout.dialog_invite_user, null)
+        val editName = dialogView.findViewById<EditText>(R.id.inviteName)
+        val editEmail = dialogView.findViewById<EditText>(R.id.inviteEmail)
+        val editBirthday = dialogView.findViewById<EditText>(R.id.inviteBirthday)
+        val editStreet = dialogView.findViewById<EditText>(R.id.inviteAddressStreet)
+        val editCity = dialogView.findViewById<EditText>(R.id.inviteAddressCity)
+        val editState = dialogView.findViewById<EditText>(R.id.inviteAddressState)
+        val editPostal = dialogView.findViewById<EditText>(R.id.inviteAddressPostal)
         val rbStaff = dialogView.findViewById<android.widget.RadioButton>(R.id.radioInviteStaff)
+
+        editName.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                editName.error = getNameValidationError(s.toString())
+            }
+        })
 
         editEmail.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: android.text.Editable?) {
-                val email = s.toString().trim()
-                if (email.isNotEmpty() && !Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-                    editEmail.error = "Invalid email format"
-                } else {
-                    editEmail.error = null
-                }
+                val emailText = s.toString().trim()
+                editEmail.error = if (emailText.isNotEmpty() && !Patterns.EMAIL_ADDRESS.matcher(emailText).matches()) {
+                    "Invalid email format"
+                } else null
             }
         })
 
-        // Update availability
+        val calendar = Calendar.getInstance()
+        editBirthday.setOnClickListener {
+            val maxBirthday = Calendar.getInstance().apply { add(Calendar.YEAR, -18) }
+            val listener = DatePickerDialog.OnDateSetListener { _, y, m, d ->
+                calendar.set(y, m, d)
+                val sdf = SimpleDateFormat("MM/dd/yyyy", Locale.US)
+                editBirthday.setText(sdf.format(calendar.time))
+            }
+            val picker = DatePickerDialog(
+                activity, listener,
+                maxBirthday.get(Calendar.YEAR), maxBirthday.get(Calendar.MONTH), maxBirthday.get(Calendar.DAY_OF_MONTH)
+            )
+            picker.datePicker.maxDate = maxBirthday.timeInMillis
+            picker.show()
+        }
+
+        // Update availability, same pattern as the original invite dialog,
+        // but counting "invited" (pending) staff too so open invites reserve a spot.
         val db = FirebaseFirestore.getInstance()
+        var isRoleFull = false
+
         db.collection("system_settings").document("role_limits").get()
             .addOnSuccessListener { limitDoc ->
                 val staffLimit = limitDoc.getLong("staff_limit") ?: 5L
                 db.collection("user_access")
                     .whereEqualTo("role", "staff")
-                    .whereEqualTo("status", "approved")
+                    .whereIn("status", listOf("approved", "invited"))
                     .get()
                     .addOnSuccessListener { docs ->
                         val available = (staffLimit - docs.size()).coerceAtLeast(0)
                         rbStaff.text = "Farm Staff ($available spots left)"
-                        if (available <= 0) {
+                        isRoleFull = available <= 0
+                        if (isRoleFull) {
                             rbStaff.isEnabled = false
                             rbStaff.text = "Farm Staff (Full)"
                         }
@@ -340,92 +583,213 @@ object NavigationHelper {
 
         val builder = AlertDialog.Builder(activity)
             .setView(dialogView)
-            .setPositiveButton("Generate Invite", null)
+            .setPositiveButton("Add User", null)
             .setNegativeButton("Cancel", null)
 
         val dialog = builder.create()
         dialog.show()
 
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val name = editName.text.toString().trim()
             val invitedEmail = editEmail.text.toString().trim().lowercase()
+            val birthday = editBirthday.text.toString().trim()
+            val street = editStreet.text.toString().trim()
+            val city = editCity.text.toString().trim()
+            val state = editState.text.toString().trim()
+            val postal = editPostal.text.toString().trim()
+            val selectedRole = "staff"
+
+            if (name.isEmpty()) {
+                Toast.makeText(activity, "Please enter the user's name", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val nameError = getNameValidationError(name)
+            if (nameError != null) {
+                Toast.makeText(activity, nameError, Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
             if (invitedEmail.isEmpty()) {
                 Toast.makeText(activity, "Please enter an email", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-
             if (!Patterns.EMAIL_ADDRESS.matcher(invitedEmail).matches()) {
                 Toast.makeText(activity, "Please enter a valid email address", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
+            if (birthday.isNotEmpty() && !isAtLeast18(birthday)) {
+                Toast.makeText(activity, "User must be at least 18 years old", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val anyAddress = street.isNotEmpty() || city.isNotEmpty() || state.isNotEmpty() || postal.isNotEmpty()
+            if (anyAddress) {
+                if (street.isEmpty() || city.isEmpty() || state.isEmpty() || postal.isEmpty()) {
+                    Toast.makeText(activity, "Please fill all address fields or leave them all empty", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                val addressError = validateAddress(street, city, state, postal)
+                if (addressError != null) {
+                    Toast.makeText(activity, addressError, Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+            }
+            if (isRoleFull) {
+                Toast.makeText(activity, "Farm Staff is full — free up a spot first.", Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
 
-            // Only staff invites are supported now
-            val selectedRole = "staff"
+            val addressMap = if (anyAddress) {
+                mapOf("street" to street, "city" to city, "state" to state, "postalCode" to postal)
+            } else null
 
-            // Check role availability
-            db.collection("system_settings").document("role_limits").get()
-                .addOnSuccessListener { limitDoc ->
-                    val limit = limitDoc.getLong("${selectedRole}_limit") ?: 5L
-                    db.collection("user_access")
-                        .whereEqualTo("role", selectedRole)
-                        .whereEqualTo("status", "approved")
-                        .get()
-                        .addOnSuccessListener { users ->
-                            if (users.size() >= limit) {
-                                val roleDisplayName = RoleManager.displayName(selectedRole)
-                                Toast.makeText(activity, "The limit for $roleDisplayName has been reached.", Toast.LENGTH_LONG).show()
-                            } else {
-                                // Check if email is already in use
-                                db.collection("user_access").document(invitedEmail).get()
-                                    .addOnSuccessListener { doc ->
-                                        if (doc.exists()) {
-                                            Toast.makeText(activity, "This email is already registered.", Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            // Confirm before actually creating the code and sending the email
-                                            showInviteConfirmationDialog(activity, invitedEmail, selectedRole) {
-                                                generateAndSendInvite(activity, db, ownerEmail, invitedEmail, selectedRole, dialog)
-                                            }
-                                        }
-                                    }
-                                    .addOnFailureListener { e ->
-                                        Toast.makeText(activity, "Error checking email: ${e.message}", Toast.LENGTH_SHORT).show()
-                                    }
-                            }
+            // Check whether this email already belongs to an active account.
+            db.collection("user_access").document(invitedEmail).get()
+                .addOnSuccessListener { doc ->
+                    if (doc.exists() && doc.getString("status") == "approved") {
+                        Toast.makeText(activity, "This email already belongs to an active user.", Toast.LENGTH_SHORT).show()
+                    } else {
+                        showAddUserConfirmationDialog(activity, invitedEmail, selectedRole) {
+                            savePendingUser(
+                                activity, db, ownerEmail, invitedEmail, selectedRole,
+                                name, birthday, addressMap, dialog
+                            )
                         }
-                        .addOnFailureListener { e ->
-                            Toast.makeText(activity, "Error checking role availability: ${e.message}", Toast.LENGTH_SHORT).show()
-                        }
+                    }
                 }
                 .addOnFailureListener { e ->
-                    Toast.makeText(activity, "Error fetching role limits: ${e.message}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(activity, "Error checking email: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
         }
     }
 
+    private fun getNameValidationError(name: String): String? {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return null
+        val nameRegex = Regex("^[A-Za-z._,\\s'-]+$")
+        if (!nameRegex.matches(trimmed)) {
+            return "Name may contain letters, spaces, commas, periods, underscores, hyphens and apostrophes (no digits or other symbols)"
+        }
+        return null
+    }
+
+    private fun validateAddress(street: String, city: String, state: String, postal: String): String? {
+        if (street.length < 5) return "Street address must be at least 5 characters"
+        if (city.length < 2) return "City must be at least 2 characters"
+        if (state.length < 2) return "State/Province must be at least 2 characters"
+        if (postal.length < 3) return "Postal code must be at least 3 characters"
+
+        val invalidChars = "!@#$%^&*()=[]{}|;':\",<>?"
+        if (street.any { it in invalidChars } || city.any { it in invalidChars } ||
+            state.any { it in invalidChars } || postal.any { it in invalidChars }) {
+            return "Address contains invalid characters"
+        }
+        return null
+    }
+
+    private fun isAtLeast18(bday: String): Boolean {
+        return try {
+            val sdf = SimpleDateFormat("MM/dd/yyyy", Locale.US)
+            sdf.isLenient = false
+            val birthDate = sdf.parse(bday) ?: return false
+            val birthCal = Calendar.getInstance().apply { time = birthDate }
+            val today = Calendar.getInstance()
+            var age = today.get(Calendar.YEAR) - birthCal.get(Calendar.YEAR)
+            if (today.get(Calendar.DAY_OF_YEAR) < birthCal.get(Calendar.DAY_OF_YEAR)) age--
+            age >= 18
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     /**
-     * Asks the owner to confirm before the invite is generated and the email
-     * is sent, since both actions happen immediately and aren't easily undone.
+     * Asks the owner to confirm before saving the pending profile. Note this
+     * step no longer sends anything — it only writes the pre-fill data.
      */
-    private fun showInviteConfirmationDialog(activity: Activity, email: String, role: String, onConfirm: () -> Unit) {
+    private fun showAddUserConfirmationDialog(activity: Activity, email: String, role: String, onConfirm: () -> Unit) {
         val roleDisplayName = RoleManager.displayName(role)
         AlertDialog.Builder(activity)
-            .setTitle("Confirm Invite")
-            .setMessage("Generate an invite code for $email as $roleDisplayName?\n\nAn email will be sent to them automatically.")
-            .setPositiveButton("Proceed") { _, _ -> onConfirm() }
+            .setTitle("Confirm Add User")
+            .setMessage("Add $email as $roleDisplayName?\n\nThis only saves their profile as pending. You'll unlock them (and send their setup code) separately from the Farm Users list.")
+            .setPositiveButton("Save") { _, _ -> onConfirm() }
             .setNegativeButton("Cancel", null)
             .show()
     }
 
     /**
-     * Performs the actual Firestore write and email send for a new invite.
-     * Only called after the owner has confirmed via showInviteConfirmationDialog.
+     * Writes the owner-provided profile straight into user_access/{email}
+     * with status "invited" (so it shows up in the pending list and
+     * SetupAccountActivity can find/pre-fill it later). Deliberately does
+     * NOT generate an invite code or send an email — that's the Unlock
+     * action's job.
      */
-    private fun generateAndSendInvite(
+    private fun savePendingUser(
         activity: Activity,
         db: FirebaseFirestore,
         ownerEmail: String,
         invitedEmail: String,
         selectedRole: String,
+        name: String,
+        birthday: String,
+        addressMap: Map<String, String>?,
         parentDialog: AlertDialog
+    ) {
+        val prefillData = mutableMapOf<String, Any>(
+            "name" to name,
+            "email" to invitedEmail,
+            "role" to selectedRole,
+            "status" to "invited",
+            "setupCompleted" to false,
+            "invitedBy" to ownerEmail,
+            "invitedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
+        )
+        if (birthday.isNotEmpty()) prefillData["birthday"] = birthday
+        if (addressMap != null) prefillData["address"] = addressMap
+
+        db.collection("user_access").document(invitedEmail)
+            .set(prefillData, SetOptions.merge())
+            .addOnSuccessListener {
+                Toast.makeText(
+                    activity,
+                    "$name added as pending. Open Farm Users and tap Unlock when you're ready to send their setup code.",
+                    Toast.LENGTH_LONG
+                ).show()
+                parentDialog.dismiss()
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(activity, "Failed to save user info: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // UNLOCK  (per-row action in the pending-users list — this is where the
+    // verification code is actually generated and emailed.)
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * Confirms before running the verification-code procedure, since it
+     * immediately emails the user and isn't easily undone.
+     */
+    private fun showUnlockConfirmationDialog(activity: Activity, ownerEmail: String, user: PendingUser) {
+        AlertDialog.Builder(activity)
+            .setTitle("Unlock ${user.name}?")
+            .setMessage("This will generate a verification code and email it to ${user.email} so they can set up their account.\n\nProceed?")
+            .setPositiveButton("Unlock") { _, _ ->
+                unlockAndSendVerificationCode(activity, FirebaseFirestore.getInstance(), ownerEmail, user.email, user.role)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    /**
+     * The actual verification-code procedure: generates a one-time code,
+     * stores it, and emails it to the pending user. Only ever runs after
+     * the owner explicitly taps Unlock and confirms.
+     */
+    private fun unlockAndSendVerificationCode(
+        activity: Activity,
+        db: FirebaseFirestore,
+        ownerEmail: String,
+        invitedEmail: String,
+        role: String
     ) {
         val expirationTime = System.currentTimeMillis() + (24 * 60 * 60 * 1000)
         val code = "%06d".format(Random.nextInt(1000000))
@@ -433,21 +797,18 @@ object NavigationHelper {
         db.collection("invite_codes")
             .document(code)
             .set(mapOf(
-                "role"      to selectedRole,
+                "role" to role,
                 "invitedEmail" to invitedEmail,
                 "createdBy" to ownerEmail,
                 "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp(),
                 "expiresAt" to expirationTime
             ))
             .addOnSuccessListener {
-                // Fire-and-forget call to the Apps Script web app,
-                // which sends the invite email via Gmail (MailApp).
-                sendInviteEmailViaAppsScript(activity, invitedEmail, code, selectedRole)
-                showCodeResultDialog(activity, code, invitedEmail, selectedRole)
-                parentDialog.dismiss()
+                sendInviteEmailViaAppsScript(activity, invitedEmail, code, role)
+                showCodeResultDialog(activity, code, invitedEmail, role)
             }
             .addOnFailureListener { e ->
-                Toast.makeText(activity, "Failed to generate: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(activity, "Failed to generate invite code: ${e.message}", Toast.LENGTH_LONG).show()
             }
     }
 
@@ -457,7 +818,7 @@ object NavigationHelper {
      * This runs on a background thread since it's a blocking network call.
      */
     private fun sendInviteEmailViaAppsScript(activity: Activity, email: String, code: String, role: String) {
-        val scriptUrl = "https://script.google.com/macros/s/AKfycbxd3Jv_ysFbqaH0Rf5Qw8_Zxv6g2Sy2muDSkISnmPjxk2KMENJF7RA8ybXdQ5GYyMHF/exec"
+        val scriptUrl = "https://script.google.com/macros/s/AKfycbx-_H4Jy4KTuZQSPTMCxTAIKIAJxGMAaIzGF-uKB0m05YLWb1Flgdor-wGD-ieOym_0/exec"
         val secret = "Red0455"
 
         Thread {
@@ -493,14 +854,13 @@ object NavigationHelper {
                     if (responseCode != 200) {
                         Toast.makeText(
                             activity,
-                            "Invite saved, but the email failed to send (code $responseCode).",
+                            "User saved, but the email failed to send (code $responseCode).",
                             Toast.LENGTH_LONG
                         ).show()
                     } else {
-                        // Inform the owner that the invite email was successfully sent.
                         Toast.makeText(
                             activity,
-                            "Invite email sent to $email Kindly inform the invited user to check their inbox or spam at Gmail",
+                            "Invite email sent to $email. Ask them to check their inbox or spam at Gmail.",
                             Toast.LENGTH_SHORT
                         ).show()
                     }
@@ -509,7 +869,7 @@ object NavigationHelper {
                 Handler(Looper.getMainLooper()).post {
                     Toast.makeText(
                         activity,
-                        "Invite saved, but the email failed to send: ${e.message}",
+                        "User saved, but the email failed to send: ${e.message}",
                         Toast.LENGTH_LONG
                     ).show()
                 }
@@ -519,9 +879,9 @@ object NavigationHelper {
 
     private fun showCodeResultDialog(activity: Activity, code: String, email: String, role: String) {
         val roleDisplayName = RoleManager.displayName(role)
-        val message = "An invite email has been automatically sent to $email.\n\nCode: $code\nRole: $roleDisplayName\n\nIt will expire in 24 hours."
+        val message = "An invite email has been automatically sent to $email.\n\nCode: $code\nRole: $roleDisplayName\n\nIt will expire in 24 hours.\n\nTheir name, birthday and address are already saved — they'll only be asked to set a password."
         AlertDialog.Builder(activity)
-            .setTitle("Invite Sent")
+            .setTitle("User Unlocked")
             .setMessage(message)
             .setPositiveButton("Close", null)
             .show()

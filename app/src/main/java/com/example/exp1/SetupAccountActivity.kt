@@ -28,11 +28,17 @@ class SetupAccountActivity : AppCompatActivity() {
     private lateinit var editPasswordConfirmLayout: TextInputLayout
     private lateinit var imgProfile: ImageView
     private lateinit var btnComplete: Button
+    private var prefilledInfoText: TextView? = null
 
     private var email: String = ""
     private var role: String = ""
     private var photoUrl: String = ""
     private val calendar = Calendar.getInstance()
+
+    // True once we've confirmed an owner-created record already exists for
+    // this email (status == "invited"). In that case name/birthday/address
+    // came from the owner and are locked — the user only sets a password.
+    private var infoWasPrefilledByOwner: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,7 +69,8 @@ class SetupAccountActivity : AppCompatActivity() {
         imgProfile = findViewById(R.id.imgSetupProfile)
         btnComplete = findViewById(R.id.btnCompleteSetup)
 
-        // Pre-fill from Google Account
+        // Pre-fill from Google Account as a fallback; may be overwritten
+        // below once we check for an owner-entered record.
         editName.setText(googleName)
         if (photoUrl.isNotEmpty()) {
             Glide.with(this).load(photoUrl).circleCrop().into(imgProfile)
@@ -141,12 +148,16 @@ class SetupAccountActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            // Full name must contain letters only (no digits or stray symbols)
-            val nameError = getNameValidationError(name)
-            if (nameError != null) {
-                editName.error = nameError
-                Toast.makeText(this, nameError, Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
+            // Full name must contain letters only (no digits or stray symbols).
+            // Skipped when the owner already supplied a validated name, since
+            // the field is locked and can't have been edited.
+            if (!infoWasPrefilledByOwner) {
+                val nameError = getNameValidationError(name)
+                if (nameError != null) {
+                    editName.error = nameError
+                    Toast.makeText(this, nameError, Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
             }
 
             // Safety net: enforce 18+ even if the birthday text was set some
@@ -157,8 +168,12 @@ class SetupAccountActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            // Validate address if any component is provided
-            if (street.isNotEmpty() || city.isNotEmpty() || state.isNotEmpty() || postal.isNotEmpty()) {
+            // Validate address if any component is provided (only relevant
+            // when the user is filling it in themselves; owner-provided
+            // addresses were already validated at Add User time).
+            if (!infoWasPrefilledByOwner &&
+                (street.isNotEmpty() || city.isNotEmpty() || state.isNotEmpty() || postal.isNotEmpty())
+            ) {
                 if (street.isEmpty() || city.isEmpty() || state.isEmpty() || postal.isEmpty()) {
                     Toast.makeText(this, "Please fill all address fields or leave them all empty", Toast.LENGTH_SHORT).show()
                     return@setOnClickListener
@@ -170,7 +185,8 @@ class SetupAccountActivity : AppCompatActivity() {
                 }
             }
 
-            // Strong Password Restriction
+            // Strong Password Restriction — always required, this is the
+            // one thing the user always sets themselves.
             val passwordError = getPasswordStrengthError(pass)
             if (passwordError != null) {
                 editPasswordLayout.error = passwordError
@@ -234,6 +250,60 @@ class SetupAccountActivity : AppCompatActivity() {
                     }
             }
         }
+
+        loadOwnerPrefilledInfoIfAny()
+    }
+
+    /**
+     * Checks whether the owner already created a record for this email via
+     * "Add User" (status == "invited"). If so, pulls the name/birthday/address
+     * they entered, fills the fields in, and locks them so the invited person
+     * can't change what the owner set — they only pick a password.
+     */
+    private fun loadOwnerPrefilledInfoIfAny() {
+        FirebaseFirestore.getInstance().collection("user_access").document(email).get()
+            .addOnSuccessListener { doc ->
+                if (!doc.exists()) return@addOnSuccessListener
+                val status = doc.getString("status")
+                if (status != "invited") return@addOnSuccessListener // already approved, or unknown state — leave fields editable
+
+                val ownerName = doc.getString("name")
+                val ownerBirthday = doc.getString("birthday")
+                @Suppress("UNCHECKED_CAST")
+                val ownerAddress = doc.get("address") as? Map<String, Any>
+
+                if (!ownerName.isNullOrEmpty()) {
+                    editName.setText(ownerName)
+                    editName.isEnabled = false
+                }
+                if (!ownerBirthday.isNullOrEmpty()) {
+                    editBirthday.setText(ownerBirthday)
+                    editBirthday.isEnabled = false
+                    editBirthday.isClickable = false
+                }
+                if (ownerAddress != null) {
+                    editAddressStreet.setText(ownerAddress["street"]?.toString() ?: "")
+                    editAddressCity.setText(ownerAddress["city"]?.toString() ?: "")
+                    editAddressState.setText(ownerAddress["state"]?.toString() ?: "")
+                    editAddressPostal.setText(ownerAddress["postalCode"]?.toString() ?: "")
+                    editAddressStreet.isEnabled = false
+                    editAddressCity.isEnabled = false
+                    editAddressState.isEnabled = false
+                    editAddressPostal.isEnabled = false
+                }
+
+                infoWasPrefilledByOwner = !ownerName.isNullOrEmpty()
+                if (infoWasPrefilledByOwner) {
+                    Toast.makeText(
+                        this,
+                        "Your info was added by your farm owner. Just set a password to finish.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+            .addOnFailureListener {
+                // Non-fatal: fall back to the fully manual flow the person can still fill in themselves.
+            }
     }
 
     /**

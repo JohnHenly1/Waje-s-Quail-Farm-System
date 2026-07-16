@@ -342,8 +342,6 @@
     <string name="wipe_everything_label">Wipe Everything</string>
     <string name="total_tasks_loading">Total Tasks: Loading&#8230;</string>
     <string name="active_invite_codes_loading">Active Invite Codes: Loading&#8230;</string>
-    <string name="view_farm_stats_btn">View Farm Stats Data</string>
-    <string name="manage_invite_codes_btn">Manage Active Invite Codes</string>
     <string name="approved_users_error">Approved Users: Error</string>
     <string name="pending_requests_error">Pending Requests: Error</string>
     <string name="total_tasks_count_placeholder">Total Tasks: %1$d</string>
@@ -370,5 +368,15 @@
     <string name="admin_group_label">FARM ADMIN</string>
     <string name="user_access_list">User Access List</string>
     <string name="generate_invite_code">Generate Invite Code</string>
+
+    <!-- Setup Account Strings -->
+    <string name="setup_profile_title">Complete Your Profile</string>
+    <string name="full_name_hint">Full Name</string>
+    <string name="birthday_hint">Birthday (MM/DD/YYYY)</string>
+    <string name="create_password_hint">Create Password</string>
+    <string name="confirm_password_hint">Confirm Password</string>
+    <string name="finish_registration">Finish Registration</string>
+    <string name="profile_picture_desc">Profile Picture</string>
+    <string name="your_address_header">Your Address</string>
 
 </resources>
