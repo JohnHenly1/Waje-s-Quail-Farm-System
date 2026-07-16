@@ -24,10 +24,6 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import java.io.File
@@ -50,12 +46,8 @@ class DashboardActivity : AppCompatActivity() {
 
     private var photoUri: Uri? = null
 
-    private var eggListener: ValueEventListener? = null
-    private var feedListener: ListenerRegistration? = null
     private var roleListener: ListenerRegistration? = null
     private var alertsListener: ListenerRegistration? = null
-    private lateinit var eggsTodayText: TextView
-    private lateinit var feedRemainingText: TextView
     private lateinit var notificationBadge: TextView
 
     private val takePictureLauncher =
@@ -102,7 +94,6 @@ class DashboardActivity : AppCompatActivity() {
         showLoading(getString(R.string.syncing_farm_stats)) {
             fetchUserData()
             setupButtons()
-            setupStats()
             applyEntranceAnimations()
             checkAdminAccess()
             setupAlertListener()
@@ -217,8 +208,6 @@ class DashboardActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        eggListener?.let { FirebaseDatabase.getInstance().getReference("egg_collections").removeEventListener(it) }
-        feedListener?.remove()
         roleListener?.remove()
         alertsListener?.remove()
         if (::updateTimeRunnable.isInitialized) {
@@ -256,7 +245,6 @@ class DashboardActivity : AppCompatActivity() {
         findViewById<View>(R.id.welcomeCard)?.startAnimation(fadeIn)
         findViewById<View>(R.id.aiCard)?.startAnimation(slideUp)
         findViewById<View>(R.id.shortcutsGrid)?.startAnimation(slideUp)
-        findViewById<View>(R.id.statsGrid)?.startAnimation(slideUp)
     }
     fun showLoading(label: String, action: () -> Unit) {
         val loadingLayout = findViewById<View>(R.id.loadingLayout)
@@ -383,35 +371,4 @@ class DashboardActivity : AppCompatActivity() {
         showRandomTip()
     }
 
-    private fun setupStats() {
-        eggsTodayText = findViewById(R.id.total_eggs_value)
-        feedRemainingText = findViewById(R.id.feed_remaining_value)
-
-        // Setup egg listener
-        val dbDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Calendar.getInstance().time)
-        val eggRef = FirebaseDatabase.getInstance().getReference("egg_collections").child(dbDate)
-        eggListener = object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val total = snapshot.child("total").getValue(Int::class.java) ?: 0
-                eggsTodayText.text = total.toString()
-            }
-            override fun onCancelled(error: DatabaseError) {
-                eggsTodayText.text = "0"
-            }
-        }
-        eggRef.addValueEventListener(eggListener!!)
-
-        // Setup feed listener
-        val feedCol = FirebaseFirestore.getInstance().collection("farm_data").document("shared").collection("feed")
-        feedListener = feedCol.addSnapshotListener { querySnapshot, e ->
-            if (e != null) {
-                feedRemainingText.text = "0"
-                return@addSnapshotListener
-            }
-            val docs = querySnapshot?.documents ?: emptyList()
-            // Updated to check for "Low Stock" instead of "Low"
-            val remaining = docs.count { (it["status"] as? String) != "Low Stock" }
-            feedRemainingText.text = remaining.toString()
-        }
-    }
 }

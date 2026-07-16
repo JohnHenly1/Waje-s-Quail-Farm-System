@@ -1,5 +1,4 @@
-<androidx.cardview.widget.CardView
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -13,13 +12,12 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:padding="16dp">
-
-        <!-- Top Row -->
+        <!--  Top Row  -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -31,53 +29,51 @@
                     android:id="@+id/logDate"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-bold"
                     android:text="Mar 10, 2026"
                     android:textColor="@color/black"
-                    android:textSize="14sp"
-                    android:fontFamily="sans-serif-bold"/>
+                    android:textSize="14sp" />
 
                 <TextView
                     android:id="@+id/todayBadge"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="8dp"
-                    android:text="Today"
-                    android:textColor="@color/white"
-                    android:textSize="10sp"
                     android:background="@drawable/rounded_green_bg"
                     android:backgroundTint="#2E7D32"
                     android:paddingHorizontal="6dp"
                     android:paddingVertical="2dp"
-                    android:visibility="gone"/>
+                    android:text="Today"
+                    android:textColor="@color/white"
+                    android:textSize="10sp"
+                    android:visibility="gone" />
             </LinearLayout>
 
             <TextView
                 android:id="@+id/logTotal"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-bold"
                 android:text="650"
                 android:textColor="@color/dark_green"
-                android:textSize="22sp"
-                android:fontFamily="sans-serif-bold"/>
+                android:textSize="22sp" />
         </LinearLayout>
-
-        <!-- Grades Row -->
+        <!--  Grades Row  -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:orientation="horizontal">
-
-            <!-- Grade A -->
+            <!--  Grade A  -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:layout_marginEnd="8dp"
-                android:orientation="vertical"
+                android:layout_weight="1"
+                android:background="#10000000"
                 android:gravity="center"
-                android:padding="8dp"
-                android:background="#10000000">
+                android:orientation="vertical"
+                android:padding="8dp">
 
                 <TextView
                     android:id="@+id/logGradeALabel"
@@ -85,7 +81,7 @@
                     android:layout_height="wrap_content"
                     android:text="Normal"
                     android:textColor="@color/dark_gray"
-                    android:textSize="10sp"/>
+                    android:textSize="10sp" />
 
                 <TextView
                     android:id="@+id/logGradeA"
@@ -93,19 +89,18 @@
                     android:layout_height="wrap_content"
                     android:text="420"
                     android:textColor="#2E7D32"
-                    android:textStyle="bold"/>
+                    android:textStyle="bold" />
             </LinearLayout>
-
-            <!-- Grade B -->
+            <!--  Grade B  -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:layout_marginEnd="8dp"
-                android:orientation="vertical"
+                android:layout_weight="1"
+                android:background="#10000000"
                 android:gravity="center"
-                android:padding="8dp"
-                android:background="#10000000">
+                android:orientation="vertical"
+                android:padding="8dp">
 
                 <TextView
                     android:id="@+id/logGradeBLabel"
@@ -113,7 +108,7 @@
                     android:layout_height="wrap_content"
                     android:text="Cracked"
                     android:textColor="@color/dark_gray"
-                    android:textSize="10sp"/>
+                    android:textSize="10sp" />
 
                 <TextView
                     android:id="@+id/logGradeB"
@@ -121,18 +116,17 @@
                     android:layout_height="wrap_content"
                     android:text="180"
                     android:textColor="#F57F17"
-                    android:textStyle="bold"/>
+                    android:textStyle="bold" />
             </LinearLayout>
-
-            <!-- Grade C -->
+            <!--  Grade C  -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:orientation="vertical"
+                android:background="#10000000"
                 android:gravity="center"
-                android:padding="8dp"
-                android:background="#10000000">
+                android:orientation="vertical"
+                android:padding="8dp">
 
                 <TextView
                     android:id="@+id/logGradeCLabel"
@@ -140,7 +134,7 @@
                     android:layout_height="wrap_content"
                     android:text="Reject"
                     android:textColor="@color/dark_gray"
-                    android:textSize="10sp"/>
+                    android:textSize="10sp" />
 
                 <TextView
                     android:id="@+id/logGradeC"
@@ -148,75 +142,8 @@
                     android:layout_height="wrap_content"
                     android:text="50"
                     android:textColor="#C62828"
-                    android:textStyle="bold"/>
+                    android:textStyle="bold" />
             </LinearLayout>
-
         </LinearLayout>
-
-        <!-- Revenue + Net Profit -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:orientation="horizontal">
-
-            <!-- Revenue -->
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="6dp"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:padding="8dp"
-                android:background="#E8F5E9">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Revenue"
-                    android:textColor="#2E7D32"
-                    android:textSize="10sp"/>
-
-                <TextView
-                    android:id="@+id/logRevenue"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="₱0.00"
-                    android:textColor="#1B5E20"
-                    android:textSize="13sp"
-                    android:textStyle="bold"/>
-            </LinearLayout>
-
-            <!-- Net Profit -->
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:padding="8dp"
-                android:background="#E3F2FD">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Net Profit"
-                    android:textColor="#1565C0"
-                    android:textSize="10sp"/>
-
-                <TextView
-                    android:id="@+id/logNetProfit"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="₱0.00"
-                    android:textColor="#0D47A1"
-                    android:textSize="13sp"
-                    android:textStyle="bold"/>
-            </LinearLayout>
-
-        </LinearLayout>
-
     </LinearLayout>
-
 </androidx.cardview.widget.CardView>

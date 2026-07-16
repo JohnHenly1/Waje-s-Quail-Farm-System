@@ -899,7 +899,7 @@ public class ProfileActivity extends AppCompatActivity {
                 "• Farm Profile: Location, GPS coordinates, farm name",
                 "• Flock Records: Bird count, breed type, age range",
                 "• Daily Production: Egg count, health status, mortality",
-                "• Financial Records: Feed costs, sales revenue, expenses",
+                "• Financial Records: Feed costs, expenses",
                 "• Health Logs: Vaccination records, disease incidents",
                 "• Environmental: Temperature, humidity readings, weather data"
         };

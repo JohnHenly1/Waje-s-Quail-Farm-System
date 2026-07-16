@@ -29,9 +29,6 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ListenerRegistration
-import com.google.firebase.firestore.SetOptions
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -68,34 +65,12 @@ class EggCountActivity : AppCompatActivity() {
     private var gradeC = 0
     private val countedBoxes = mutableListOf<android.graphics.RectF>()
 
-    // ── Price / Revenue / Profit ──────────────────────────────────────────────
-    /**
-     * Price per egg (PHP) for Grade A — Normal (full price).
-     * Grade B — Cracked = pricePerEgg * 0.5
-     * Grade C — Reject  = ₱0.00 (not sold)
-     */
-    private var pricePerEgg: Double = 3.50
-    private var dailyExpenses: Double = 0.0
-
-    // ── Derived per-grade prices (read-only helpers) ──────────────────────────
-    private val priceGradeA get() = pricePerEgg          // full price
-    private val priceGradeB get() = pricePerEgg * 0.5    // half price
-    private val priceGradeC get() = 0.0                  // reject — not sold
-
-    /** Compute revenue from individual grade counts using grade-specific prices. */
-    private fun calcRevenue(a: Int, b: Int, @Suppress("UNUSED_PARAMETER") c: Int): Double =
-        (a * priceGradeA) + (b * priceGradeB) // Grade C contributes ₱0
-
     // ── Firebase Realtime Database ────────────────────────────────────────────
     private val database by lazy { FirebaseDatabase.getInstance() }
     private val auth by lazy { FirebaseAuth.getInstance() }
     private var historyListener: ValueEventListener? = null
     private var historyRef: com.google.firebase.database.DatabaseReference? = null
     private var collectionRecords = mutableMapOf<String, Map<String, Any>>()
-
-    // ── Firestore ─────────────────────────────────────────────────────────────
-    private val firestore by lazy { FirebaseFirestore.getInstance() }
-    private var pricingListener: ListenerRegistration? = null
 
     // ── Cached views ──────────────────────────────────────────────────────────
     private lateinit var previewView: PreviewView
@@ -207,8 +182,6 @@ class EggCountActivity : AppCompatActivity() {
         }
 
         saveBtn.setOnClickListener { saveCollectionToDatabase() }
-
-        findViewById<View>(R.id.priceSettingsBtn)?.setOnClickListener { showPriceDialog() }
 
         findViewById<View>(R.id.calendarBtn).setOnClickListener { openCalendarPicker() }
         findViewById<View>(R.id.prevWeekBtn).setOnClickListener { weekOffset--; setupUI() }
@@ -460,26 +433,12 @@ class EggCountActivity : AppCompatActivity() {
             val updatedB = prevB + gradeB
             val updatedC = prevC + gradeC
 
-            // ── Grade-specific pricing ────────────────────────────────────────
-            // Grade A (Normal)  = full pricePerEgg
-            // Grade B (Cracked) = 50% of pricePerEgg
-            // Grade C (Reject)  = ₱0.00 — not sold
-            val revenue   = calcRevenue(updatedA, updatedB, updatedC)
-            val netProfit = revenue - dailyExpenses
-
             val updatedRecord = mapOf(
                 "date"          to today,
                 "total"         to updatedTotal,
                 "gradeA"        to updatedA,
                 "gradeB"        to updatedB,
                 "gradeC"        to updatedC,
-                "pricePerEgg"   to pricePerEgg,          // Grade A full price
-                "priceGradeA"   to priceGradeA,          // same as pricePerEgg
-                "priceGradeB"   to priceGradeB,          // half price
-                "priceGradeC"   to priceGradeC,          // ₱0
-                "revenue"       to revenue,
-                "expenses"      to dailyExpenses,
-                "netProfit"     to netProfit,
                 "timestamp"     to System.currentTimeMillis(),
                 "savedBy"       to (auth.currentUser?.uid ?: "unknown")
             )
@@ -488,11 +447,7 @@ class EggCountActivity : AppCompatActivity() {
                 .addOnSuccessListener {
                     showBanner(
                         "✓ Saved $updatedTotal eggs — " +
-                                "A:$updatedA Normal · B:$updatedB Cracked · C:$updatedC Reject\n" +
-                                "Revenue: ₱${"%.2f".format(revenue)}  " +
-                                "(A@₱${"%.2f".format(priceGradeA)} · " +
-                                "B@₱${"%.2f".format(priceGradeB)} · " +
-                                "C=₱0.00)",
+                                "A:$updatedA Normal · B:$updatedB Cracked · C:$updatedC Reject",
                         isError = false,
                         autoHide = true
                     )
@@ -545,22 +500,6 @@ class EggCountActivity : AppCompatActivity() {
         historyListener = listener
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Firestore: Centralised egg pricing from farm_data/shared
-    // ─────────────────────────────────────────────────────────────────────────
-
-    private fun loadPricingFromFirestore() {
-        pricingListener = firestore
-            .collection("farm_data")
-            .document("shared")
-            .addSnapshotListener { snapshot, error ->
-                if (error != null || snapshot == null || !snapshot.exists()) return@addSnapshotListener
-                snapshot.getDouble("pricePerEgg")?.let { pricePerEgg = it }
-                snapshot.getDouble("dailyExpenses")?.let { dailyExpenses = it }
-                runOnUiThread { updateCountUI() }
-            }
-    }
-
     private fun openCalendarPicker() {
         val cal = Calendar.getInstance()
         val datePicker = DatePickerDialog(this, { _, year, month, day ->
@@ -603,13 +542,6 @@ class EggCountActivity : AppCompatActivity() {
             val gB    = (record?.get("gradeB") as? Long)?.toInt() ?: 0
             val gC    = (record?.get("gradeC") as? Long)?.toInt() ?: 0
 
-            // ── Grade-specific revenue fallback ───────────────────────────────
-            // If a stored revenue exists use it (already computed with correct grades),
-            // otherwise re-compute using current grade prices so the log is consistent.
-            val revenue   = record?.get("revenue")   as? Double ?: calcRevenue(gA, gB, gC)
-            val expenses  = record?.get("expenses")  as? Double ?: 0.0
-            val netProfit = record?.get("netProfit") as? Double ?: (revenue - expenses)
-
             val item = inflater.inflate(R.layout.item_collection_log, container, false)
             item.findViewById<TextView>(R.id.logDate).text  = fullDateText
             item.findViewById<TextView>(R.id.logTotal).text = total.toString()
@@ -623,8 +555,6 @@ class EggCountActivity : AppCompatActivity() {
             item.findViewById<TextView>(R.id.logGradeC).text           = "$gC"
             item.findViewById<TextView>(R.id.logGradeCLabel)?.text     = "Reject"
 
-            item.findViewById<TextView>(R.id.logRevenue)?.text   = "₱${"%.2f".format(revenue)}"
-            item.findViewById<TextView>(R.id.logNetProfit)?.text = "₱${"%.2f".format(netProfit)}"
             item.findViewById<TextView>(R.id.todayBadge).visibility =
                 if (displayDate == todayStr) View.VISIBLE else View.GONE
 
@@ -679,13 +609,6 @@ class EggCountActivity : AppCompatActivity() {
     private fun updateCountUI() {
         val total = gradeA + gradeB + gradeC
 
-        // ── Grade-specific revenue ────────────────────────────────────────────
-        // Grade A (Normal)  — full pricePerEgg
-        // Grade B (Cracked) — 50% of pricePerEgg
-        // Grade C (Reject)  — ₱0.00, not included in revenue
-        val revenue   = calcRevenue(gradeA, gradeB, gradeC)
-        val netProfit = revenue - dailyExpenses
-
         findViewById<TextView>(R.id.todayTotalValue).text = total.toString()
 
         // Grade A — Normal (full price)
@@ -696,7 +619,7 @@ class EggCountActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.gradeBValue).text  = gradeB.toString()
         findViewById<TextView>(R.id.gradeBDesc)?.text  = "Cracked"
 
-        // Grade C — Reject (no revenue)
+        // Grade C — Reject
         findViewById<TextView>(R.id.gradeCValue).text  = gradeC.toString()
         findViewById<TextView>(R.id.gradeCDesc)?.text  = "Reject"
 
@@ -705,84 +628,6 @@ class EggCountActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.gradeAPercent).text = pct(gradeA)
         findViewById<TextView>(R.id.gradeBPercent).text = pct(gradeB)
         findViewById<TextView>(R.id.gradeCPercent).text = pct(gradeC)
-
-        // Revenue reflects grade-specific pricing
-        findViewById<TextView>(R.id.revenueValue)?.text     = "₱${"%.2f".format(revenue)}"
-        findViewById<TextView>(R.id.netProfitValue)?.text   = "₱${"%.2f".format(netProfit)}"
-        // Show Grade A price as the reference price per egg
-        findViewById<TextView>(R.id.pricePerEggValue)?.text = "₱${"%.2f".format(priceGradeA)}/egg (A)"
-    }
-
-    /**
-     * Revenue / price settings dialog.
-     * Grade A = set price | Grade B = 50% | Grade C = ₱0 (auto-derived, not editable).
-     * Changes persist to Firestore farm_data/shared.
-     */
-    private fun showPriceDialog() {
-        val ctx = this
-        val layout = android.widget.LinearLayout(ctx).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-            setPadding(64, 32, 64, 16)
-        }
-        val priceEdit = android.widget.EditText(ctx).apply {
-            hint = "Grade A price per egg (₱) — full price"
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER or
-                    android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
-            setText(pricePerEgg.toString())
-        }
-        val expenseEdit = android.widget.EditText(ctx).apply {
-            hint = "Daily expenses (₱) — feed, etc."
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER or
-                    android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
-            setText(dailyExpenses.toString())
-        }
-
-        // Informational labels so the user understands grade pricing
-        layout.addView(android.widget.TextView(ctx).apply {
-            text = "Grade A — Normal price per egg (₱)"
-        })
-        layout.addView(priceEdit)
-        layout.addView(android.widget.TextView(ctx).apply {
-            text = "Grade B — Cracked (auto: 50% of Grade A)"
-            setPadding(0, 16, 0, 0)
-            setTextColor(android.graphics.Color.GRAY)
-            textSize = 12f
-        })
-        layout.addView(android.widget.TextView(ctx).apply {
-            text = "Grade C — Reject (auto: ₱0.00, not sold)"
-            setPadding(0, 4, 0, 16)
-            setTextColor(android.graphics.Color.GRAY)
-            textSize = 12f
-        })
-        layout.addView(android.widget.TextView(ctx).apply {
-            text = "Daily expenses (₱)"
-        })
-        layout.addView(expenseEdit)
-
-        android.app.AlertDialog.Builder(ctx)
-            .setTitle("Revenue Settings")
-            .setView(layout)
-            .setPositiveButton("Apply") { _, _ ->
-                val newPrice    = priceEdit.text.toString().toDoubleOrNull() ?: pricePerEgg
-                val newExpenses = expenseEdit.text.toString().toDoubleOrNull() ?: dailyExpenses
-                pricePerEgg   = newPrice
-                dailyExpenses = newExpenses
-                updateCountUI()
-
-                val update = mapOf(
-                    "pricePerEgg"  to newPrice,
-                    "dailyExpenses" to newExpenses
-                )
-                firestore.collection("farm_data").document("shared")
-                    .update(update)
-                    .addOnFailureListener {
-                        firestore.collection("farm_data").document("shared")
-                            .set(update, SetOptions.merge())
-                    }
-                toast("Pricing updated — B=₱${"%.2f".format(newPrice * 0.5)}, C=₱0.00")
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
     }
 
     private fun showBanner(msg: String, isError: Boolean, autoHide: Boolean) {
@@ -850,7 +695,6 @@ class EggCountActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         loadCollectionHistory()
-        loadPricingFromFirestore()
         handler.post(timeUpdateRunnable)
     }
 
@@ -858,8 +702,6 @@ class EggCountActivity : AppCompatActivity() {
         super.onPause()
         historyListener?.let { historyRef?.removeEventListener(it) }
         historyListener = null
-        pricingListener?.remove()
-        pricingListener = null
         handler.removeCallbacks(timeUpdateRunnable)
     }
 
@@ -869,7 +711,6 @@ class EggCountActivity : AppCompatActivity() {
         detector?.close()
         cameraProvider?.unbindAll()
         historyListener?.let { historyRef?.removeEventListener(it) }
-        pricingListener?.remove()
     }
 
     companion object {

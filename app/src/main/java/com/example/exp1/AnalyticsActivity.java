@@ -45,14 +45,8 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
-// Firestore — feed inventory value + centralised pricing
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.ListenerRegistration;
-import com.google.firebase.firestore.QueryDocumentSnapshot;
-
 import java.io.File;
 import java.io.FileOutputStream;
-import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -61,7 +55,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Random;
 import java.util.TreeMap;
 
 import kotlin.Unit;
@@ -76,21 +69,7 @@ public class AnalyticsActivity extends AppCompatActivity {
     private Map<String, Integer> allData = new TreeMap<>();
     private int totalEggs;
 
-    // ── Firestore — feed inventory value + centralised pricing ────────────────
-    private FirebaseFirestore db;
-    private ListenerRegistration feedInventoryListener;
-    private ListenerRegistration pricingListener;
-    private double totalInventoryValue = 0.0;
-    /**
-     * Price per egg read from farm_data/shared.pricePerEgg — same document
-     * EggCountActivity writes to, ensuring a single source of truth.
-     * Falls back to 3.50 until Firestore delivers the value.
-     */
-    private double pricePerEgg = 3.50;
-
     // ── Views ──────────────────────────────────────────────────────────────────
-    private TextView revenueValue, inventoryValueTv, profitValue,
-            recommendationText, performanceTitle, performanceDesc;
     private TextView weeklyMonthLabel, monthlyYearLabel, serverTimeLabel;
     private LineChart weeklyChart;
     private BarChart monthlyChart;
@@ -100,9 +79,6 @@ public class AnalyticsActivity extends AppCompatActivity {
     private int selectedWeeklyMonth;
     private int selectedMonthlyYear;
 
-    private final NumberFormat currencyFormat =
-            NumberFormat.getCurrencyInstance(new Locale("en", "PH"));
-
     // ─────────────────────────────────────────────────────────────────────────
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -110,7 +86,6 @@ public class AnalyticsActivity extends AppCompatActivity {
         EdgeToEdge.enable(this);
 
         eggCollectionsRef = FirebaseDatabase.getInstance().getReference("egg_collections");
-        db = FirebaseFirestore.getInstance();
 
         cameraHelper = new CameraHelper(this, (uri, results) -> {
             int gradeA = 0, gradeB = 0, gradeC = 0;
@@ -136,12 +111,6 @@ public class AnalyticsActivity extends AppCompatActivity {
         // Bind views
         weeklyChart        = findViewById(R.id.weeklyChart);
         monthlyChart       = findViewById(R.id.monthlyChart);
-        recommendationText = findViewById(R.id.recommendationText);
-        performanceTitle   = findViewById(R.id.performanceTitle);
-        performanceDesc    = findViewById(R.id.performanceDesc);
-        revenueValue       = findViewById(R.id.revenueValue);
-        inventoryValueTv   = findViewById(R.id.feedCostValue);   // same view ID; label changed to "Inventory Value" in layout
-        profitValue        = findViewById(R.id.profitValue);
         weeklyMonthLabel   = findViewById(R.id.weeklyMonthLabel);
         monthlyYearLabel   = findViewById(R.id.monthlyYearLabel);
         serverTimeLabel    = findViewById(R.id.serverTimeLabel);
@@ -152,8 +121,6 @@ public class AnalyticsActivity extends AppCompatActivity {
         } else {
             NavigationHelper.INSTANCE.showGlobalLoading(this, "Analyzing Farm Yield...", () -> {
                 attachRealtimeListener();
-                attachFeedInventoryListener();
-                attachPricingListener();
                 return Unit.INSTANCE;
             });
         }
@@ -237,46 +204,6 @@ public class AnalyticsActivity extends AppCompatActivity {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  Firestore — live feed inventory value
-    //  farm_data/shared/feed collection (same as FeedInventoryActivity)
-    //  totalInventoryValue = Σ (quantity × unitPrice)
-    // ─────────────────────────────────────────────────────────────────────────
-
-    private void attachFeedInventoryListener() {
-        feedInventoryListener = db.collection("farm_data")
-                .document("shared")
-                .collection("feed")
-                .addSnapshotListener((snapshots, error) -> {
-                    if (error != null || snapshots == null) return;
-                    double sum = 0.0;
-                    for (QueryDocumentSnapshot doc : snapshots) {
-                        Long qty = doc.getLong("quantity");
-                        Double price = doc.getDouble("unitPrice");
-                        if (qty != null && price != null) sum += qty * price;
-                    }
-                    totalInventoryValue = sum;
-                    runOnUiThread(() -> updateDashboard());
-                });
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Firestore — centralised egg pricing from farm_data/shared
-    //  Reads pricePerEgg written by EggCountActivity's showPriceDialog()
-    //  so both modules always use the same price without hardcoding.
-    // ─────────────────────────────────────────────────────────────────────────
-
-    private void attachPricingListener() {
-        pricingListener = db.collection("farm_data")
-                .document("shared")
-                .addSnapshotListener((snapshot, error) -> {
-                    if (error != null || snapshot == null || !snapshot.exists()) return;
-                    Double p = snapshot.getDouble("pricePerEgg");
-                    if (p != null) pricePerEgg = p;
-                    runOnUiThread(() -> updateDashboard());
-                });
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
     //  Internet sensor
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -314,8 +241,6 @@ public class AnalyticsActivity extends AppCompatActivity {
                     .unregisterNetworkCallback(networkCallback);
         if (eggCollectionsListener != null)
             eggCollectionsRef.removeEventListener(eggCollectionsListener);
-        if (feedInventoryListener != null) feedInventoryListener.remove();
-        if (pricingListener != null)       pricingListener.remove();
     }
 
     @Override
@@ -346,22 +271,9 @@ public class AnalyticsActivity extends AppCompatActivity {
 
     // ─────────────────────────────────────────────────────────────────────────
     //  Dashboard rendering
-    //  Revenue          = totalEggs × pricePerEgg  (from Firestore)
-    //  Inventory Value  = live sum from FeedInventory (Firestore)
-    //  Net Profit       = Revenue − Inventory Value
     // ─────────────────────────────────────────────────────────────────────────
 
     private void updateDashboard() {
-        double revenue = totalEggs * pricePerEgg;
-        double profit  = revenue - totalInventoryValue;
-
-        if (revenueValue     != null) revenueValue.setText(String.format(Locale.getDefault(), "₱%.2f", revenue));
-        if (inventoryValueTv != null) inventoryValueTv.setText(currencyFormat.format(totalInventoryValue));
-        if (profitValue      != null) {
-            profitValue.setText(String.format(Locale.getDefault(), "₱%.2f", profit));
-            profitValue.setTextColor(profit < 0 ? Color.parseColor("#FFCDD2") : Color.WHITE);
-        }
-
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
 
         // Weekly chart
@@ -428,56 +340,6 @@ public class AnalyticsActivity extends AppCompatActivity {
                 selectedWeeklyMonth + 1, selectedWeeklyYear);
         if (weeklyMonthLabel != null) weeklyMonthLabel.setText(monthYear);
         if (monthlyYearLabel  != null) monthlyYearLabel.setText(String.valueOf(selectedMonthlyYear));
-
-        // Performance & smart tips
-        if (!allData.isEmpty()) {
-            List<Integer> values = new ArrayList<>(allData.values());
-            int    latest  = values.get(values.size() - 1);
-            double average = totalEggs / (double) allData.size();
-            calculatePerformance(latest, average);
-            generateSmartTip(latest, values.size() > 1 ? values.get(values.size() - 2) : latest, profit);
-        }
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Performance & smart tip logic
-    // ─────────────────────────────────────────────────────────────────────────
-
-    private void calculatePerformance(int latest, double average) {
-        if (average == 0) return;
-        double d = ((latest - average) / average) * 100;
-        if (performanceTitle != null)
-            performanceTitle.setText(d >= 10 ? "Excellent Performance!" : d >= -5 ? "Stable Production" : "Production Alert");
-        if (performanceDesc != null)
-            performanceDesc.setText(String.format(Locale.getDefault(),
-                    "You're %.1f%% %s average production this month",
-                    Math.abs(d), d >= 0 ? "above" : "below"));
-    }
-
-    private void generateSmartTip(int latest, int prev, double profit) {
-        String tip;
-        if (latest < prev * 0.8)
-            tip = "Urgent: Production dropped significantly (>20%). Check for diseases or extreme environmental stress immediately.";
-        else if (latest < prev * 0.9)
-            tip = "Critical Tip: Production dropped by 10%. Check for sudden temperature changes or stressors in the cages.";
-        else if (latest > prev * 1.2)
-            tip = "Outstanding! Yield is up by 20%. Analyze if recent changes in feed or lighting contributed to this boost.";
-        else if (latest > prev * 1.1)
-            tip = "Great Job! Yield is up. Ensure consistent feed supply to maintain this peak production rate.";
-        else if (profit < 0)
-            tip = "Financial Alert: Inventory value is currently exceeding egg revenue. Review feed efficiency and waste management.";
-        else if (latest > 0 && latest < 10)
-            tip = "Startup Tip: Low volume detected. Ensure your quails have reached laying age (usually 6-7 weeks).";
-        else {
-            String[] stableTips = {
-                    "Maintenance Tip: Production is stable. Remember to maintain 14-16 hours of daily light exposure for quails.",
-                    "Efficiency Tip: Stable output. This is a good time to audit your bio-security measures.",
-                    "Quality Tip: Ensure you are collecting eggs twice daily to prevent breakage during stable production.",
-                    "Nutrition Tip: Maintain high-protein layer crumbles to sustain this steady production rate."
-            };
-            tip = stableTips[new Random().nextInt(stableTips.length)];
-        }
-        if (recommendationText != null) recommendationText.setText(tip);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -485,31 +347,13 @@ public class AnalyticsActivity extends AppCompatActivity {
     // ─────────────────────────────────────────────────────────────────────────
 
     private void showReportDialog() {
-        double revenue = totalEggs * pricePerEgg;
-        double profit  = revenue - totalInventoryValue;
-        String tip       = (recommendationText != null) ? recommendationText.getText().toString() : "N/A";
-        String perfTitle = (performanceTitle   != null) ? performanceTitle.getText().toString()   : "N/A";
-        String perfDesc  = (performanceDesc    != null) ? performanceDesc.getText().toString()    : "N/A";
         String ts        = new SimpleDateFormat("MM/dd/yyyy hh:mm a", Locale.getDefault()).format(new Date());
 
         String summary =
                 "     FARM ANALYTICS REPORT\n" +
                         "Generated: " + ts + "\n\n" +
                         " EGG PRODUCTION\n" +
-                        "Total Month Eggs Collected : " + totalEggs + " eggs\n\n" +
-                        " REVENUE\n" +
-                        "Price per Egg        : " + currencyFormat.format(pricePerEgg) + "\n" +
-                        "Egg Sales Revenue    : " + currencyFormat.format(revenue) + "\n\n" +
-                        " INVENTORY VALUE\n" +
-                        "Total Inventory Value: " + currencyFormat.format(totalInventoryValue) + "\n\n" +
-                        " NET PROFIT\n" +
-                        "Net Profit           : " + currencyFormat.format(profit) +
-                        (profit < 0 ? "  Loss" : "  Profit") + "\n\n" +
-                        " PERFORMANCE\n" +
-                        "" + perfTitle + "\n" +
-                        "" + perfDesc + "\n\n" +
-                        " AI RECOMMENDATION\n" +
-                        "" + tip;
+                        "Total Month Eggs Collected : " + totalEggs + " eggs";
 
         new AlertDialog.Builder(this)
                 .setTitle("Farm Analytics Report")
@@ -525,12 +369,7 @@ public class AnalyticsActivity extends AppCompatActivity {
 
     private void generatePdfReport() {
         try {
-            double revenue = totalEggs * pricePerEgg;
-            double profit  = revenue - totalInventoryValue;
             String ts        = new SimpleDateFormat("MM/dd/yyyy hh:mm a", Locale.getDefault()).format(new Date());
-            String tip       = (recommendationText != null) ? recommendationText.getText().toString() : "N/A";
-            String perfTitle = (performanceTitle   != null) ? performanceTitle.getText().toString()   : "N/A";
-            String perfDesc  = (performanceDesc    != null) ? performanceDesc.getText().toString()    : "N/A";
 
             PdfDocument document = new PdfDocument();
             PdfDocument.PageInfo pageInfo = new PdfDocument.PageInfo.Builder(595, 842, 1).create(); // A4
@@ -552,32 +391,10 @@ public class AnalyticsActivity extends AppCompatActivity {
             int y = 100;
             Paint divider = new Paint(); divider.setColor(Color.LTGRAY); divider.setStrokeWidth(1f);
 
-            // Financial Summary
-            drawSectionTitle(canvas, "Financial Summary", y); y += 28;
-            drawRow(canvas, "Price per Egg",        currencyFormat.format(pricePerEgg),        y, Color.parseColor("#555555")); y += 24;
-            drawRow(canvas, "Egg Sales Revenue",    currencyFormat.format(revenue),            y, Color.parseColor("#2E7D32")); y += 24;
-            drawRow(canvas, "Total Inventory Value",currencyFormat.format(totalInventoryValue),y, Color.parseColor("#E65100")); y += 24;
-            drawRow(canvas, "Net Profit",           currencyFormat.format(profit),             y,
-                    profit < 0 ? Color.parseColor("#C62828") : Color.parseColor("#1565C0")); y += 14;
-            canvas.drawLine(20, y, 575, y, divider); y += 20;
-
             // Egg Production
             drawSectionTitle(canvas, "Egg Production", y); y += 28;
             drawRow(canvas, "Total Month Eggs Collected", totalEggs + " eggs", y, Color.BLACK); y += 14;
             canvas.drawLine(20, y, 575, y, divider); y += 20;
-
-            // Performance
-            drawSectionTitle(canvas, "Performance", y); y += 28;
-            Paint bold = new Paint(); bold.setTextSize(13f); bold.setFakeBoldText(true); bold.setColor(Color.parseColor("#333333"));
-            canvas.drawText(perfTitle, 24, y, bold); y += 18;
-            Paint body = new Paint(); body.setTextSize(12f); body.setColor(Color.parseColor("#555555"));
-            y = drawWrappedText(canvas, perfDesc, 24, y, 550, body); y += 6;
-            canvas.drawLine(20, y, 575, y, divider); y += 20;
-
-            // AI Recommendation
-            drawSectionTitle(canvas, "Smart Recommendation", y); y += 28;
-            y = drawWrappedText(canvas, tip, 24, y, 550, body);
-            canvas.drawLine(20, y + 6, 575, y + 6, divider);
 
             // Footer
             Paint footer = new Paint(); footer.setTextSize(10f); footer.setColor(Color.GRAY);
@@ -620,26 +437,5 @@ public class AnalyticsActivity extends AppCompatActivity {
         Paint vp = new Paint(); vp.setTextSize(13f); vp.setFakeBoldText(true); vp.setColor(valueColor);
         canvas.drawText(label, 24, y, lp);
         canvas.drawText(value, 390, y, vp);
-    }
-
-    /** Wraps text at maxWidth, returns updated y position. */
-    private int drawWrappedText(Canvas canvas, String text, int x, int y, int maxWidth, Paint paint) {
-        String[] words = text.split(" ");
-        StringBuilder line = new StringBuilder();
-        for (String word : words) {
-            String test = line.length() == 0 ? word : line + " " + word;
-            if (paint.measureText(test) > (maxWidth - x)) {
-                canvas.drawText(line.toString(), x, y, paint);
-                y += (int)(paint.getTextSize() * 1.4f);
-                line = new StringBuilder(word);
-            } else {
-                line = new StringBuilder(test);
-            }
-        }
-        if (line.length() > 0) {
-            canvas.drawText(line.toString(), x, y, paint);
-            y += (int)(paint.getTextSize() * 1.4f);
-        }
-        return y;
     }
 }
