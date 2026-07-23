@@ -24,6 +24,7 @@ import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -83,6 +84,9 @@ class EggCountActivity : AppCompatActivity() {
     private lateinit var frozenOverlay: View
     private lateinit var saveBtn: Button
     private lateinit var liveTimeText: TextView
+    private lateinit var gradeARow: View
+    private lateinit var gradeBRow: View
+    private lateinit var gradeCRow: View
 
     // ── Live time update ──────────────────────────────────────────────────────
     private val handler = Handler(Looper.getMainLooper())
@@ -168,6 +172,9 @@ class EggCountActivity : AppCompatActivity() {
         frozenOverlay = findViewById(R.id.frozenOverlay)
         saveBtn       = findViewById(R.id.saveCollectionBtn)
         liveTimeText  = findViewById(R.id.liveTimeText)
+        gradeARow     = findViewById(R.id.gradeARow)
+        gradeBRow     = findViewById(R.id.gradeBRow)
+        gradeCRow     = findViewById(R.id.gradeCRow)
     }
 
     private fun wireListeners() {
@@ -189,6 +196,10 @@ class EggCountActivity : AppCompatActivity() {
             if (weekOffset < 0) { weekOffset++; setupUI() }
         }
 
+        gradeARow.setOnClickListener { showGradeDetailDialog("A") }
+        gradeBRow.setOnClickListener { showGradeDetailDialog("B") }
+        gradeCRow.setOnClickListener { showGradeDetailDialog("C") }
+
         previewView.setOnClickListener {
             val now = System.currentTimeMillis()
             val isSingleActivation = imageCapture == null
@@ -207,6 +218,44 @@ class EggCountActivity : AppCompatActivity() {
         }
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Grade detail popup
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private fun gradeDescription(grade: String): String = when (grade) {
+        "A" -> "This is what a healthy quail egg looks like. The shell is smooth, " +
+                "unbroken, and evenly speckled in light brown/tan spots. The shape is a " +
+                "consistent small oval with no dents, cracks, or discoloration. This is " +
+                "the grade you want most of your eggs to be."
+        "B" -> "This egg grading is either had cracks or in rare cases a softshell " +
+                "— usually a hairline crack or a small chip in the shell. You can often " +
+                "spot a thin dark line running across the speckled surface. Still usable, " +
+                "not sold usually used for fertilization."
+        "C" -> "This egg is rejected. Look for major pattern difference — discoloration " +
+                "shell, leaking contents, a badly misshapen or crushed form, or shell " +
+                "discoloration/mold. These are not sold but this is eaten."
+        else -> ""
+    }
+
+    private fun gradeImageRes(grade: String): Int = when (grade) {
+        "A" -> R.drawable.egg_grade_a
+        "B" -> R.drawable.egg_grade_b
+        "C" -> R.drawable.egg_grade_c
+        else -> R.drawable.egg_grade_a
+    }
+    private fun showGradeDetailDialog(grade: String) {
+        val view = LayoutInflater.from(this)
+            .inflate(R.layout.dialog_egg_grade_detail, null)
+
+        view.findViewById<ImageView>(R.id.ivGradeImage).setImageResource(gradeImageRes(grade))
+        view.findViewById<TextView>(R.id.tvGradeDescription).text = gradeDescription(grade)
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(gradeDisplayName(grade))
+            .setView(view)
+            .setPositiveButton("Got it", null)
+            .show()
+    }
     // ─────────────────────────────────────────────────────────────────────────
     //  YOLO model loading
     // ─────────────────────────────────────────────────────────────────────────

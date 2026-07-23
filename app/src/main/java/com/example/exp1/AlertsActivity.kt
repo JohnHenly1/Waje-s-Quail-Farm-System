@@ -1,5 +1,6 @@
 package com.example.exp1
 
+import android.annotation.SuppressLint
 import android.app.AlarmManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -12,9 +13,9 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
-import android.view.LayoutInflater
+import android.os.Handler
+import android.os.Looper
 import android.view.View
-import android.view.animation.AnimationUtils
 import android.widget.*
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AlertDialog
@@ -23,6 +24,8 @@ import androidx.appcompat.widget.SwitchCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.firestore.FirebaseFirestore
 import java.text.SimpleDateFormat
@@ -36,6 +39,15 @@ class AlertsActivity : AppCompatActivity() {
     private var inventoryListener: com.google.firebase.firestore.ListenerRegistration? = null
     private var tasksListener: com.google.firebase.firestore.ListenerRegistration? = null
 
+    private lateinit var alertsRecyclerView: RecyclerView
+    private lateinit var alertsAdapter: AlertsAdapter
+
+    // Coalesces rapid-fire Firestore snapshot events (e.g. a burst of writes) into a
+    // single re-render instead of rebuilding the list once per event. This is one of
+    // the things that made the screen lag/ANR when a lot of alerts came in at once.
+    private val uiHandler = Handler(Looper.getMainLooper())
+    private val pendingListUpdate = Runnable { updateAlertsList() }
+
     private var activeFilter = "All"
 
     companion object {
@@ -43,8 +55,17 @@ class AlertsActivity : AppCompatActivity() {
         // screen open. Firestore-side dedup in FarmRepository.addAlert() is the real
         // guard; this just avoids unnecessary network queries on repeated visits.
         private var integrityChecksRanThisSession = false
+
+        // Cloud alert history can grow unbounded. Rendering every single alert ever
+        // recorded is what actually caused the lag/crash with "too many notifications" —
+        // there's no functional need to show more than the most recent ones at once.
+        private const val MAX_RENDERED_ALERTS = 200
+
+        // Debounce window for coalescing bursts of Firestore snapshot events.
+        private const val LIST_UPDATE_DEBOUNCE_MS = 150L
     }
 
+    @SuppressLint("MissingInflatedId")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -62,6 +83,20 @@ class AlertsActivity : AppCompatActivity() {
         } catch (e: Exception) {
             e.printStackTrace()
         }
+
+        // RecyclerView replaces the old approach of removeAllViews() + re-inflating
+        // every alert row from scratch on every refresh. RecyclerView recycles rows
+        // and DiffUtil (inside AlertsAdapter) only re-binds what actually changed.
+        alertsRecyclerView = findViewById(R.id.alertsRecyclerView)
+        alertsAdapter = AlertsAdapter()
+        alertsRecyclerView.layoutManager = LinearLayoutManager(this)
+        alertsRecyclerView.adapter = alertsAdapter
+        alertsRecyclerView.setHasFixedSize(true)
+        // Disabling the built-in add/remove/change animations. With potentially
+        // hundreds of rows changing (read-state flips, new alerts, filter switches),
+        // animating every change is expensive for no real benefit here. Re-enable
+        // (remove this line) if you want RecyclerView's default fade animations back.
+        alertsRecyclerView.itemAnimator = null
 
         findViewById<View>(R.id.backButton).setOnClickListener {
             finish()
@@ -324,7 +359,10 @@ class AlertsActivity : AppCompatActivity() {
                 )
             }
             GlobalData.syncWithCloud(mappedAlerts)
-            runOnUiThread { updateAlertsList() }
+            // Debounced instead of an immediate runOnUiThread { updateAlertsList() } —
+            // a burst of Firestore snapshot events (e.g. several docs changing at once)
+            // used to trigger a full list rebuild for each one individually.
+            scheduleAlertsListUpdate()
         }
 
         // Start live listeners when activity is visible
@@ -334,6 +372,7 @@ class AlertsActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
+        uiHandler.removeCallbacks(pendingListUpdate)
         farmAlertsListener?.remove()
         farmAlertsListener = null
         inventoryListener?.remove()
@@ -342,12 +381,12 @@ class AlertsActivity : AppCompatActivity() {
         tasksListener = null
     }
 
+    private fun scheduleAlertsListUpdate() {
+        uiHandler.removeCallbacks(pendingListUpdate)
+        uiHandler.postDelayed(pendingListUpdate, LIST_UPDATE_DEBOUNCE_MS)
+    }
+
     private fun updateAlertsList() {
-        val container = findViewById<LinearLayout>(R.id.alertsContainer) ?: return
-
-        container.removeAllViews()
-        val inflater = LayoutInflater.from(this)
-
         val allAlerts = GlobalData.getAlerts()
 
         // Filter logic updated to correctly handle category separation
@@ -355,7 +394,7 @@ class AlertsActivity : AppCompatActivity() {
             allAlerts
         } else {
             allAlerts.filter {
-                when(activeFilter) {
+                when (activeFilter) {
                     "Inventory" -> it.type == "Inventory" || (it.type == "Critical" && it.message.contains("Inventory", true))
                     "Schedule" -> it.type == "Schedule" || (it.type == "Critical" && it.message.contains("Missed", true))
                     else -> true
@@ -363,11 +402,22 @@ class AlertsActivity : AppCompatActivity() {
             }
         }
 
-        // Proper date-based alignment/sorting for the alert list
+        // Parse each timestamp ONCE and reuse it for both sorting and the relative-time
+        // label below, instead of parsing the same string twice per alert on every
+        // single refresh (the old code parsed once for sorting and again inside
+        // getRelativeTime() for every visible row).
         val sdf = SimpleDateFormat("yyyy/MM/dd hh:mm a", Locale.getDefault())
-        val sortedAlerts = alerts.sortedByDescending {
-            try { sdf.parse(it.timestamp) } catch (e: Exception) { Date(0) }
+        val withDates = alerts.map { alert ->
+            val parsed = try { sdf.parse(alert.timestamp) } catch (e: Exception) { Date(0) }
+            alert to parsed
         }
+        val sortedWithDates = withDates.sortedByDescending { it.second }
+
+        // Cap how many rows we actually build/bind. Cloud alert history can grow
+        // unbounded; rendering thousands of them is what caused the lag/crash — there's
+        // no practical reason to show more than the most recent alerts at a time.
+        val capped = sortedWithDates.take(MAX_RENDERED_ALERTS)
+        val sortedAlerts = capped.map { it.first }
 
         // Summary Cards - Count based on current filtered view and priority
         val urgentCount = sortedAlerts.count { it.type == "Critical" || it.message.contains("EMPTY", true) || it.message.contains("DEPLETED", true) }
@@ -379,62 +429,22 @@ class AlertsActivity : AppCompatActivity() {
 
         updateSummaryLabels()
 
-        if (sortedAlerts.isEmpty()) {
-            val emptyTxt = TextView(this)
-            emptyTxt.text = "No $activeFilter alerts available"
-            emptyTxt.textAlignment = View.TEXT_ALIGNMENT_CENTER
-            emptyTxt.setPadding(32, 64, 32, 32)
-            container.addView(emptyTxt)
+        val displayList: List<DisplayAlert> = if (capped.isEmpty()) {
+            listOf(AlertsAdapter.emptyPlaceholder("No $activeFilter alerts available"))
         } else {
-            val slideUp = AnimationUtils.loadAnimation(this, R.anim.slide_up)
-            for ((index, alert) in sortedAlerts.withIndex()) {
-                val itemView = inflater.inflate(R.layout.item_alert, container, false)
-
-                val icon = itemView.findViewById<ImageView>(R.id.alertIcon)
-                val stripe = itemView.findViewById<View>(R.id.alertAccentStripe)
-                val categoryTv = itemView.findViewById<TextView>(R.id.alertCategory)
-                val timeTv = itemView.findViewById<TextView>(R.id.alertTime)
-                val titleTv = itemView.findViewById<TextView>(R.id.alertTitle)
-                val msgTv = itemView.findViewById<TextView>(R.id.alertMessage)
-                val pillTv = itemView.findViewById<TextView>(R.id.alertStatusPill)
-
-                msgTv.text = alert.message
-                timeTv.text = getRelativeTime(alert.timestamp)
-
-                // Enhanced descriptive UI configuration
-                when {
-                    alert.type == "Egg Count" || alert.type == "System" || alert.message.contains("Egg", true) -> {
-                        setupAlertUI(stripe, icon, pillTv, categoryTv, "EGG PRODUCTION", "PRODUCTION", "#4CAF50", R.drawable.lc_egg)
-                        titleTv.text = if (alert.message.contains("summary")) "Daily Production Summary" else "Egg Collection Alert"
-                    }
-                    alert.type == "Inventory" || alert.message.contains("Inventory", true) || alert.type == "Critical" && alert.message.contains("Inventory", true) -> {
-                        val isDepleted = alert.message.contains("EMPTY", true) || alert.message.contains("DEPLETED", true)
-                        val isCritical = isDepleted || alert.message.contains("LOW", true)
-                        val status = when {
-                            isDepleted -> "STOCK DEPLETED"
-                            alert.message.contains("LOW", true) -> "CRITICALLY LOW"
-                            else -> "REORDER SOON"
-                        }
-                        setupAlertUI(stripe, icon, pillTv, categoryTv, "INVENTORY", status, if (isCritical) "#F44336" else "#FF9800", R.drawable.ic_shopping_bag)
-                        titleTv.text = if (isCritical) "Critical Stock Warning" else "Inventory Update"
-                    }
-                    alert.type == "Schedule" || alert.message.contains("Missed", true) || alert.type == "Critical" && alert.message.contains("Missed", true) -> {
-                        val isMissed = alert.message.contains("Missed", true)
-                        setupAlertUI(stripe, icon, pillTv, categoryTv, "SCHEDULE", if (isMissed) "OVERDUE" else "DUE TODAY", if (isMissed) "#B71C1C" else "#2196F3", R.drawable.ic_calendar)
-                        titleTv.text = if (isMissed) "Task Overdue Notice" else "Upcoming Task"
-                    }
-                    else -> {
-                        setupAlertUI(stripe, icon, pillTv, categoryTv, "FARM ALERT", "INFO", "#9E9E9E", R.drawable.ic_info)
-                        titleTv.text = "Notification"
-                    }
-                }
-
-                itemView.alpha = if (alert.isRead) 0.6f else 1.0f
-                slideUp.startOffset = (index * 50).toLong()
-                itemView.startAnimation(slideUp)
-                container.addView(itemView)
+            capped.map { (alert, parsedDate) ->
+                DisplayAlert(
+                    alert = alert,
+                    relativeTime = getRelativeTime(alert, parsedDate),
+                    stableId = "${alert.timestamp}|${alert.message}"
+                )
             }
         }
+
+        // ListAdapter.submitList() diffs the old/new lists on a background thread and
+        // only rebinds the rows that actually changed — this is what replaces the old
+        // removeAllViews() + re-inflate-everything-from-scratch approach.
+        alertsAdapter.submitList(displayList)
     }
 
     // Live snapshot listener for feed/inventory updates while activity runs
@@ -529,34 +539,16 @@ class AlertsActivity : AppCompatActivity() {
         }
     }
 
-    private fun setupAlertUI(stripe: View, icon: ImageView, pill: TextView, cat: TextView, catName: String, statusText: String, colorHex: String, iconRes: Int) {
-        val color = Color.parseColor(colorHex)
-        stripe.setBackgroundColor(color)
-        icon.setImageResource(iconRes)
-        icon.setColorFilter(color)
-        icon.backgroundTintList = ColorStateList.valueOf(color).withAlpha(30)
-        pill.text = statusText
-        pill.backgroundTintList = ColorStateList.valueOf(color)
-        cat.text = catName
-        cat.setTextColor(color)
-    }
+    private fun getRelativeTime(alert: GlobalData.AlertItem, parsedDate: Date): String {
+        val now = System.currentTimeMillis()
+        val diff = now - parsedDate.time
 
-    private fun getRelativeTime(timestamp: String): String {
-        try {
-            val sdf = SimpleDateFormat("yyyy/MM/dd hh:mm a", Locale.getDefault())
-            val date = sdf.parse(timestamp) ?: return timestamp
-            val now = System.currentTimeMillis()
-            val diff = now - date.time
-
-            return when {
-                diff < TimeUnit.MINUTES.toMillis(1) -> "Just now"
-                diff < TimeUnit.HOURS.toMillis(1) -> "${TimeUnit.MILLISECONDS.toMinutes(diff)} mins ago"
-                diff < TimeUnit.DAYS.toMillis(1) -> "${TimeUnit.MILLISECONDS.toHours(diff)} hours ago"
-                diff < TimeUnit.DAYS.toMillis(7) -> "${TimeUnit.MILLISECONDS.toDays(diff)} days ago"
-                else -> timestamp.split(" ")[0]
-            }
-        } catch (e: Exception) {
-            return timestamp
+        return when {
+            diff < TimeUnit.MINUTES.toMillis(1) -> "Just now"
+            diff < TimeUnit.HOURS.toMillis(1) -> "${TimeUnit.MILLISECONDS.toMinutes(diff)} mins ago"
+            diff < TimeUnit.DAYS.toMillis(1) -> "${TimeUnit.MILLISECONDS.toHours(diff)} hours ago"
+            diff < TimeUnit.DAYS.toMillis(7) -> "${TimeUnit.MILLISECONDS.toDays(diff)} days ago"
+            else -> alert.timestamp.split(" ")[0]
         }
     }
 

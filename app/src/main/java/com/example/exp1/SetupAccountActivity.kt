@@ -2,9 +2,11 @@ package com.example.exp1
 
 import android.app.DatePickerDialog
 import android.content.Intent
+import android.graphics.Rect
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import com.bumptech.glide.Glide
@@ -28,6 +30,7 @@ class SetupAccountActivity : AppCompatActivity() {
     private lateinit var editPasswordConfirmLayout: TextInputLayout
     private lateinit var imgProfile: ImageView
     private lateinit var btnComplete: Button
+    private lateinit var scrollView: ScrollView
     private var prefilledInfoText: TextView? = null
 
     private var email: String = ""
@@ -68,6 +71,27 @@ class SetupAccountActivity : AppCompatActivity() {
         editPasswordConfirmLayout = findViewById(R.id.setupPasswordConfirmInputLayout)
         imgProfile = findViewById(R.id.imgSetupProfile)
         btnComplete = findViewById(R.id.btnCompleteSetup)
+        scrollView = findViewById(R.id.setupScrollView)
+
+        // Ensure keyboard doesn't block input fields by scrolling them into view on focus
+        val focusScrollListener = View.OnFocusChangeListener { v, hasFocus ->
+            if (hasFocus) {
+                scrollView.postDelayed({
+                    val rect = Rect()
+                    v.getDrawingRect(rect)
+                    scrollView.offsetDescendantRectToMyCoords(v, rect)
+                    // Scroll a bit higher than the field to keep it well above the keyboard
+                    scrollView.smoothScrollTo(0, rect.top - 150)
+                }, 250)
+            }
+        }
+        editName.onFocusChangeListener = focusScrollListener
+        editAddressStreet.onFocusChangeListener = focusScrollListener
+        editAddressCity.onFocusChangeListener = focusScrollListener
+        editAddressState.onFocusChangeListener = focusScrollListener
+        editAddressPostal.onFocusChangeListener = focusScrollListener
+        editPassword.onFocusChangeListener = focusScrollListener
+        editPasswordConfirm.onFocusChangeListener = focusScrollListener
 
         // Pre-fill from Google Account as a fallback; may be overwritten
         // below once we check for an owner-entered record.

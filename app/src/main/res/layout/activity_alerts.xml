@@ -180,11 +180,12 @@
                 </LinearLayout>
             </HorizontalScrollView>
 
-            <LinearLayout
-                android:id="@+id/alertsContainer"
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/alertsRecyclerView"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical" />
+                android:nestedScrollingEnabled="false"
+                tools:listitem="@layout/item_alert" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/clearAllButton"

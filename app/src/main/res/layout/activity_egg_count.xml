@@ -197,253 +197,295 @@
                 android:textSize="15sp"
                 android:textStyle="bold"
                 android:visibility="gone" />
-            <!--   ─────────────  Today's Count Card  ─────────────   -->
-            <androidx.cardview.widget.CardView
+            <!--  ═══════════════ COUNT + QUALITY ROW (combined, compact) ═══════════════  -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="20dp"
-                app:cardCornerRadius="24dp"
-                app:cardElevation="4dp">
+                android:orientation="horizontal">
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="@drawable/bg_orange_gradient"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:padding="28dp">
-
-                    <FrameLayout
-                        android:layout_width="60dp"
-                        android:layout_height="60dp"
-                        android:layout_marginBottom="10dp"
-                        android:background="@drawable/circle_white"
-                        android:backgroundTint="#33FFFFFF">
-
-                        <ImageView
-                            android:layout_width="30dp"
-                            android:layout_height="30dp"
-                            android:layout_gravity="center"
-                            app:srcCompat="@drawable/lc_egg"
-                            app:tint="@color/white" />
-                    </FrameLayout>
-
-                    <TextView
-                        android:id="@+id/todayTotalValue"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0"
-                        android:textColor="@color/white"
-                        android:textSize="56sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:alpha="0.9"
-                        android:text="Total Eggs Detected"
-                        android:textColor="@color/white"
-                        android:textSize="15sp" />
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
-            <!--  ───────────── QUALITY DISTRIBUTION ─────────────  -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="10dp"
-                android:text="Quality Distribution"
-                android:textColor="@color/black"
-                android:textSize="17sp"
-                android:textStyle="bold" />
-
-            <GridLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="22dp"
-                android:columnCount="3">
-                <!--  Grade A — Normal  -->
+                <!--   ─── LEFT: Today's Total (shrunk) ───   -->
                 <androidx.cardview.widget.CardView
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_columnWeight="1"
-                    android:layout_marginEnd="4dp"
-                    app:cardCornerRadius="18dp"
-                    app:cardElevation="2dp">
+                    android:layout_height="match_parent"
+                    android:layout_weight="0.85"
+                    android:layout_marginEnd="8dp"
+                    app:cardCornerRadius="20dp"
+                    app:cardElevation="4dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:background="@android:color/white"
+                        android:layout_height="match_parent"
+                        android:background="@drawable/bg_orange_gradient"
                         android:gravity="center"
                         android:orientation="vertical"
-                        android:padding="12dp">
+                        android:padding="18dp">
 
-                        <View
-                            android:layout_width="8dp"
-                            android:layout_height="8dp"
-                            android:layout_marginBottom="4dp"
-                            android:background="#2E7D32" />
+                        <FrameLayout
+                            android:layout_width="42dp"
+                            android:layout_height="42dp"
+                            android:layout_marginBottom="6dp"
+                            android:background="@drawable/circle_white"
+                            android:backgroundTint="#33FFFFFF">
+
+                            <ImageView
+                                android:layout_width="22dp"
+                                android:layout_height="22dp"
+                                android:layout_gravity="center"
+                                app:srcCompat="@drawable/lc_egg"
+                                app:tint="@color/white" />
+                        </FrameLayout>
 
                         <TextView
-                            android:id="@+id/gradeAValue"
+                            android:id="@+id/todayTotalValue"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="0"
-                            android:textColor="#2E7D32"
-                            android:textSize="26sp"
+                            android:textColor="@color/white"
+                            android:textSize="38sp"
                             android:textStyle="bold" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Grade A"
-                            android:textColor="@color/dark_gray"
-                            android:textSize="11sp" />
-                        <!--  gradeADesc: shows "Normal" — referenced in Kotlin  -->
-                        <TextView
-                            android:id="@+id/gradeADesc"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Normal"
-                            android:textColor="#2E7D32"
-                            android:textSize="10sp"
-                            android:textStyle="italic" />
-
-                        <TextView
-                            android:id="@+id/gradeAPercent"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
-                            android:text="0%"
-                            android:textColor="#2E7D32"
-                            android:textSize="12sp"
-                            android:textStyle="bold" />
+                            android:alpha="0.9"
+                            android:gravity="center"
+                            android:text="Total Eggs\nDetected"
+                            android:textColor="@color/white"
+                            android:textSize="12sp" />
                     </LinearLayout>
                 </androidx.cardview.widget.CardView>
-                <!--  Grade B — Cracked  -->
+
+                <!--   ─── RIGHT: Quality Distribution (compact rows, tappable) ───   -->
                 <androidx.cardview.widget.CardView
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_columnWeight="1"
-                    android:layout_marginHorizontal="4dp"
-                    app:cardCornerRadius="18dp"
-                    app:cardElevation="2dp">
+                    android:layout_height="match_parent"
+                    android:layout_weight="1.15"
+                    app:cardCornerRadius="20dp"
+                    app:cardElevation="4dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
+                        android:layout_height="match_parent"
                         android:background="@android:color/white"
-                        android:gravity="center"
                         android:orientation="vertical"
-                        android:padding="12dp">
+                        android:padding="14dp">
 
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="8dp"
+                            android:text="Quality Distribution"
+                            android:textColor="@color/black"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                        <!--  Grade A row (tappable)  -->
+                        <LinearLayout
+                            android:id="@+id/gradeARow"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="6dp"
+                            android:background="@drawable/bg_grade_row_a"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingHorizontal="6dp"
+                            android:paddingVertical="6dp"
+                            android:contentDescription="View Grade A details">
+
+                            <View
+                                android:layout_width="8dp"
+                                android:layout_height="8dp"
+                                android:layout_marginEnd="8dp"
+                                android:background="#2E7D32" />
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="Grade A"
+                                android:textColor="@color/black"
+                                android:textSize="12sp"
+                                android:textStyle="bold" />
+
+                            <!--  gradeADesc: shows "Normal" — referenced in Kotlin  -->
+                            <TextView
+                                android:id="@+id/gradeADesc"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginEnd="8dp"
+                                android:text="Normal"
+                                android:textColor="@color/dark_gray"
+                                android:textSize="10sp"
+                                android:textStyle="italic" />
+
+                            <TextView
+                                android:id="@+id/gradeAValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="0"
+                                android:textColor="#2E7D32"
+                                android:textSize="15sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/gradeAPercent"
+                                android:layout_width="36dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="4dp"
+                                android:gravity="end"
+                                android:text="0%"
+                                android:textColor="#2E7D32"
+                                android:textSize="11sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <!--  divider  -->
                         <View
-                            android:layout_width="8dp"
-                            android:layout_height="8dp"
-                            android:layout_marginBottom="4dp"
-                            android:background="#F57F17" />
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:layout_marginBottom="6dp"
+                            android:background="#E0E0E0" />
 
-                        <TextView
-                            android:id="@+id/gradeBValue"
-                            android:layout_width="wrap_content"
+                        <!--  Grade B row (tappable)  -->
+                        <LinearLayout
+                            android:id="@+id/gradeBRow"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="0"
-                            android:textColor="#F57F17"
-                            android:textSize="26sp"
-                            android:textStyle="bold" />
+                            android:layout_marginBottom="6dp"
+                            android:background="@drawable/bg_grade_row_b"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingHorizontal="6dp"
+                            android:paddingVertical="6dp"
+                            android:contentDescription="View Grade B details">
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Grade B"
-                            android:textColor="@color/dark_gray"
-                            android:textSize="11sp" />
-                        <!--  gradeBDesc: shows "Cracked" — referenced in Kotlin  -->
-                        <TextView
-                            android:id="@+id/gradeBDesc"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Cracked"
-                            android:textColor="#F57F17"
-                            android:textSize="10sp"
-                            android:textStyle="italic" />
+                            <View
+                                android:layout_width="8dp"
+                                android:layout_height="8dp"
+                                android:layout_marginEnd="8dp"
+                                android:background="#F57F17" />
 
-                        <TextView
-                            android:id="@+id/gradeBPercent"
-                            android:layout_width="wrap_content"
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="Grade B"
+                                android:textColor="@color/black"
+                                android:textSize="12sp"
+                                android:textStyle="bold" />
+
+                            <!--  gradeBDesc: shows "Cracked" — referenced in Kotlin  -->
+                            <TextView
+                                android:id="@+id/gradeBDesc"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginEnd="8dp"
+                                android:text="Cracked"
+                                android:textColor="@color/dark_gray"
+                                android:textSize="10sp"
+                                android:textStyle="italic" />
+
+                            <TextView
+                                android:id="@+id/gradeBValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="0"
+                                android:textColor="#F57F17"
+                                android:textSize="15sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/gradeBPercent"
+                                android:layout_width="36dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="4dp"
+                                android:gravity="end"
+                                android:text="0%"
+                                android:textColor="#F57F17"
+                                android:textSize="11sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <!--  divider  -->
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:layout_marginBottom="6dp"
+                            android:background="#E0E0E0" />
+
+                        <!--  Grade C row (tappable)  -->
+                        <LinearLayout
+                            android:id="@+id/gradeCRow"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
-                            android:text="0%"
-                            android:textColor="#F57F17"
-                            android:textSize="12sp"
-                            android:textStyle="bold" />
+                            android:background="@drawable/bg_grade_row_c"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingHorizontal="6dp"
+                            android:paddingVertical="6dp"
+                            android:contentDescription="View Grade C details">
+
+                            <View
+                                android:layout_width="8dp"
+                                android:layout_height="8dp"
+                                android:layout_marginEnd="8dp"
+                                android:background="#C62828" />
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="Grade C"
+                                android:textColor="@color/black"
+                                android:textSize="12sp"
+                                android:textStyle="bold" />
+
+                            <!--  gradeCDesc: shows "Reject" — referenced in Kotlin  -->
+                            <TextView
+                                android:id="@+id/gradeCDesc"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginEnd="8dp"
+                                android:text="Reject"
+                                android:textColor="@color/dark_gray"
+                                android:textSize="10sp"
+                                android:textStyle="italic" />
+
+                            <TextView
+                                android:id="@+id/gradeCValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="0"
+                                android:textColor="#C62828"
+                                android:textSize="15sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/gradeCPercent"
+                                android:layout_width="36dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="4dp"
+                                android:gravity="end"
+                                android:text="0%"
+                                android:textColor="#C62828"
+                                android:textSize="11sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
                     </LinearLayout>
                 </androidx.cardview.widget.CardView>
-                <!--  Grade C — Reject  -->
-                <androidx.cardview.widget.CardView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_columnWeight="1"
-                    android:layout_marginStart="4dp"
-                    app:cardCornerRadius="18dp"
-                    app:cardElevation="2dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:background="@android:color/white"
-                        android:gravity="center"
-                        android:orientation="vertical"
-                        android:padding="12dp">
-
-                        <View
-                            android:layout_width="8dp"
-                            android:layout_height="8dp"
-                            android:layout_marginBottom="4dp"
-                            android:background="#C62828" />
-
-                        <TextView
-                            android:id="@+id/gradeCValue"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="0"
-                            android:textColor="#C62828"
-                            android:textSize="26sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Grade C"
-                            android:textColor="@color/dark_gray"
-                            android:textSize="11sp" />
-                        <!--  gradeCDesc: shows "Reject" — referenced in Kotlin  -->
-                        <TextView
-                            android:id="@+id/gradeCDesc"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Reject"
-                            android:textColor="#C62828"
-                            android:textSize="10sp"
-                            android:textStyle="italic" />
-
-                        <TextView
-                            android:id="@+id/gradeCPercent"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
-                            android:text="0%"
-                            android:textColor="#C62828"
-                            android:textSize="12sp"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-                </androidx.cardview.widget.CardView>
-            </GridLayout>
+            </LinearLayout>
             <!--  ───────────── COLLECTION HISTORY HEADER ─────────────  -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
+                android:layout_marginTop="4dp"
                 android:layout_marginBottom="10dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">

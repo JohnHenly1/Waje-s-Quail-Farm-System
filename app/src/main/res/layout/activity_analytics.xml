@@ -1,385 +1,669 @@
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/white"
+    android:background="#F7F8FC"
     tools:context=".AnalyticsActivity">
-    <!--  Header  -->
+
+    <!-- ===================== -->
+    <!-- Toolbar -->
+    <!-- ===================== -->
+
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@color/dark_green"
-        android:minHeight="?attr/actionBarSize"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:theme="?attr/actionBarTheme"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.0"
-        app:layout_constraintStart_toStartOf="parent"
+        android:layout_height="56dp"
+        android:background="#355E1A"
         app:layout_constraintTop_toTopOf="parent">
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingVertical="8dp">
+            android:paddingHorizontal="12dp">
 
             <ImageButton
                 android:id="@+id/imageButton"
-                android:layout_width="30dp"
-                android:layout_height="30dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/back"
-                android:scaleType="centerInside"
-                app:srcCompat="@drawable/ic_arrow_back"
-                tools:ignore="TouchTargetSizeCheck" />
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="?android:selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_arrow_back"
+                app:tint="@android:color/white" />
 
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="16dp"
                 android:layout_weight="1"
-                android:fontFamily="sans-serif"
                 android:gravity="center"
-                android:text="@string/Report"
-                android:textColor="@color/white"
-                android:textSize="24sp"
-                android:textStyle="bold" />
+                android:text="Analytics"
+                android:textColor="@android:color/white"
+                android:textSize="22sp"
+                android:textStyle="bold"/>
 
             <TextView
                 android:id="@+id/serverTimeLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="12:00 PM"
-                android:textColor="@color/white"
-                android:textSize="12sp" />
+                android:textColor="@android:color/white"
+                android:textSize="11sp"/>
 
             <ImageButton
                 android:id="@+id/notificationButton"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/notifications"
-                android:scaleType="centerInside"
-                app:srcCompat="@drawable/ic_notifications"
-                tools:ignore="TouchTargetSizeCheck" />
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="8dp"
+                android:background="?android:selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_notifications"
+                app:tint="@android:color/white" />
+
         </LinearLayout>
+
     </androidx.appcompat.widget.Toolbar>
-    <!--  Footer  -->
-    <LinearLayout
-        android:id="@+id/bottomNavContainer"
-        android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:background="@color/dark_green"
-        android:baselineAligned="false"
-        android:gravity="center"
-        android:orientation="horizontal"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent">
-        <!--  Home Button  -->
-        <LinearLayout
-            android:id="@+id/homeButton"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:contentDescription="@string/home"
-            android:gravity="center"
-            android:orientation="vertical">
 
-            <ImageView
-                android:layout_width="22dp"
-                android:layout_height="24dp"
-                android:scaleType="centerInside"
-                app:srcCompat="@drawable/ic_home"
-                app:tint="@color/white" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:fontFamily="sans-serif"
-                android:text="@string/home"
-                android:textColor="@color/white"
-                android:textSize="10sp" />
-        </LinearLayout>
-        <!--  Analytics Button  -->
-        <LinearLayout
-            android:id="@+id/analyticsButton"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:contentDescription="@string/Report"
-            android:gravity="center"
-            android:orientation="vertical">
-
-            <ImageView
-                android:layout_width="22dp"
-                android:layout_height="24dp"
-                android:scaleType="centerInside"
-                app:srcCompat="@drawable/ic_chart"
-                app:tint="@color/white" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:fontFamily="sans-serif"
-                android:text="@string/Report"
-                android:textColor="@color/white"
-                android:textSize="10sp" />
-        </LinearLayout>
-        <!--  Schedule Button  -->
-        <LinearLayout
-            android:id="@+id/scheduleButton"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:contentDescription="@string/schedule"
-            android:gravity="center"
-            android:orientation="vertical">
-
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:scaleType="centerInside"
-                app:srcCompat="@drawable/ic_schedule"
-                app:tint="@color/white" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:fontFamily="sans-serif"
-                android:text="@string/schedule"
-                android:textColor="@color/white"
-                android:textSize="10sp" />
-        </LinearLayout>
-        <!--  Profile Button  -->
-        <LinearLayout
-            android:id="@+id/profileButton"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:contentDescription="@string/profile"
-            android:gravity="center"
-            android:orientation="vertical">
-
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:contentDescription="Profile"
-                app:srcCompat="@drawable/ic_profile"
-                app:tint="@color/white" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:fontFamily="sans-serif"
-                android:text="@string/profile"
-                android:textColor="@color/white"
-                android:textSize="10sp" />
-        </LinearLayout>
-    </LinearLayout>
+    <!-- ===================== -->
+    <!-- Scroll -->
+    <!-- ===================== -->
 
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:fillViewport="true"
-        app:layout_constraintBottom_toTopOf="@id/bottomNavContainer"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/toolbar">
+        app:layout_constraintTop_toBottomOf="@id/toolbar"
+        app:layout_constraintBottom_toTopOf="@id/bottomNavContainer">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center_horizontal"
             android:orientation="vertical"
-            android:padding="16dp">
-            <!--  Weekly Production Chart  -->
-            <androidx.cardview.widget.CardView
+            android:padding="14dp">
+
+            <!-- View By -->
+
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                app:cardBackgroundColor="@color/white"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="4dp">
+                android:orientation="vertical">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
+                    android:gravity="center_vertical">
 
-                    <LinearLayout
-                        android:layout_width="match_parent"
+                    <TextView
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="16dp"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
+                        android:layout_weight="1"
+                        android:text="View by"
+                        android:textColor="#1A1A1A"
+                        android:textSize="16sp"
+                        android:textStyle="bold"/>
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginEnd="8dp"
-                            android:text="📊"
-                            android:textSize="20sp" />
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="Weekly Egg Production"
-                            android:textColor="@color/black"
-                            android:textSize="16sp"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-
-                    <com.github.mikephil.charting.charts.LineChart
-                        android:id="@+id/weeklyChart"
-                        android:layout_width="match_parent"
-                        android:layout_height="350dp" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:gravity="center"
-                        android:orientation="horizontal">
-
-                        <ImageButton
-                            android:id="@+id/previousWeekButton"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:background="?attr/selectableItemBackgroundBorderless"
-                            android:contentDescription="@string/previous"
-                            android:scaleType="centerInside"
-                            app:srcCompat="@drawable/ic_arrow_back"
-                            app:tint="@color/black"
-                            tools:ignore="TouchTargetSizeCheck" />
-
-                        <TextView
-                            android:id="@+id/weeklyMonthLabel"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="8dp"
-                            android:layout_marginEnd="8dp"
-                            android:text="04/2026"
-                            android:textColor="@color/black"
-                            android:textSize="14sp" />
-
-                        <ImageButton
-                            android:id="@+id/nextWeekButton"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:background="?attr/selectableItemBackgroundBorderless"
-                            android:contentDescription="@string/next"
-                            android:scaleType="centerInside"
-                            app:srcCompat="@drawable/ic_arrow_forward"
-                            tools:ignore="TouchTargetSizeCheck" />
-                    </LinearLayout>
+                    <Spinner
+                        android:id="@+id/filterSpinner"
+                        android:layout_width="150dp"
+                        android:layout_height="42dp"/>
                 </LinearLayout>
-            </androidx.cardview.widget.CardView>
-            <!--  Monthly Comparison Chart  -->
-            <androidx.cardview.widget.CardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                app:cardBackgroundColor="@color/white"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="4dp">
 
-                <LinearLayout
+                <!-- Period choice row: only visible for Monthly / Yearly / Custom filters -->
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/filterChoiceCard"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
+                    android:layout_marginTop="8dp"
+                    android:visibility="gone"
+                    app:cardBackgroundColor="#EAF3E2"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="0dp"
+                    tools:visibility="visible">
 
                     <LinearLayout
+                        android:id="@+id/filterChoiceButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="16dp"
+                        android:background="?android:selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:gravity="center_vertical"
-                        android:orientation="horizontal">
+                        android:orientation="horizontal"
+                        android:padding="10dp">
+
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:src="@drawable/ic_calendar"
+                            app:tint="#355E1A" />
+
+                        <TextView
+                            android:id="@+id/filterChoiceText"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginStart="8dp"
+                            android:text="Select period"
+                            android:textColor="#355E1A"
+                            android:textStyle="bold"/>
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginEnd="8dp"
-                            android:text="📊"
-                            android:textSize="20sp" />
+                            android:text="Change ›"
+                            android:textColor="#355E1A"
+                            android:textSize="12sp"/>
 
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="Monthly Comparison"
-                            android:textColor="@color/black"
-                            android:textSize="16sp"
-                            android:textStyle="bold" />
                     </LinearLayout>
 
-                    <com.github.mikephil.charting.charts.BarChart
-                        android:id="@+id/monthlyChart"
+                </androidx.cardview.widget.CardView>
+
+            </LinearLayout>
+
+            <!-- ======================================= -->
+            <!-- Summary Cards (shortened) -->
+            <!-- ======================================= -->
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal"
+                android:weightSum="3">
+
+                <!-- Total Eggs -->
+
+                <androidx.cardview.widget.CardView
+                    android:layout_width="0dp"
+                    android:layout_height="86dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="8dp"
+                    app:cardCornerRadius="16dp"
+                    app:cardBackgroundColor="#2F6BFF">
+
+                    <LinearLayout
                         android:layout_width="match_parent"
-                        android:layout_height="370dp" />
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:orientation="vertical">
+
+                        <ImageView
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:src="@drawable/lc_egg"
+                            app:tint="@android:color/white" />
+
+                        <TextView
+                            android:id="@+id/totalEggsText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="0"
+                            android:textColor="@android:color/white"
+                            android:textSize="20sp"
+                            android:textStyle="bold"/>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Total Eggs"
+                            android:textColor="@android:color/white"
+                            android:textSize="11sp"/>
+
+                    </LinearLayout>
+
+                </androidx.cardview.widget.CardView>
+
+                <!-- Daily Avg -->
+
+                <androidx.cardview.widget.CardView
+                    android:layout_width="0dp"
+                    android:layout_height="86dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="8dp"
+                    app:cardCornerRadius="16dp"
+                    app:cardBackgroundColor="#00C853">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:orientation="vertical">
+
+                        <ImageView
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:src="@drawable/lc_trending_up"
+                            app:tint="@android:color/white" />
+
+                        <TextView
+                            android:id="@+id/dailyAverageText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="0"
+                            android:textColor="@android:color/white"
+                            android:textSize="20sp"
+                            android:textStyle="bold"/>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Daily Avg"
+                            android:textColor="@android:color/white"
+                            android:textSize="11sp"/>
+
+                    </LinearLayout>
+
+                </androidx.cardview.widget.CardView>
+
+                <!-- Grade A -->
+
+                <androidx.cardview.widget.CardView
+                    android:layout_width="0dp"
+                    android:layout_height="86dp"
+                    android:layout_weight="1"
+                    app:cardCornerRadius="16dp"
+                    app:cardBackgroundColor="#F4B400">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:orientation="vertical">
+
+                        <ImageView
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:src="@drawable/ic_calendar"
+                            app:tint="@android:color/white" />
+
+                        <TextView
+                            android:id="@+id/gradeAPercentText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="0%"
+                            android:textColor="@android:color/white"
+                            android:textSize="20sp"
+                            android:textStyle="bold"/>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Grade A"
+                            android:textColor="@android:color/white"
+                            android:textSize="11sp"/>
+
+                    </LinearLayout>
+
+                </androidx.cardview.widget.CardView>
+
+            </LinearLayout>
+
+            <!-- ======================================= -->
+            <!-- Pie chart (left) + Grade Breakdown (right), side by side -->
+            <!-- ======================================= -->
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:orientation="horizontal"
+                android:weightSum="2">
+
+                <!-- Egg Grade Distribution (pie chart) -->
+
+                <androidx.cardview.widget.CardView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="6dp"
+                    app:cardCornerRadius="16dp"
+                    app:cardElevation="3dp"
+                    app:cardBackgroundColor="@android:color/white">
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:gravity="center"
-                        android:orientation="horizontal">
-
-                        <ImageButton
-                            android:id="@+id/previousMonthButton"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:background="?attr/selectableItemBackgroundBorderless"
-                            android:contentDescription="@string/previous"
-                            android:scaleType="centerInside"
-                            app:srcCompat="@drawable/ic_arrow_back"
-                            app:tint="@color/black"
-                            tools:ignore="TouchTargetSizeCheck" />
+                        android:orientation="vertical"
+                        android:padding="10dp">
 
                         <TextView
-                            android:id="@+id/monthlyYearLabel"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="8dp"
-                            android:layout_marginEnd="8dp"
-                            android:layout_weight="1"
-                            android:gravity="center"
-                            android:text="2026"
-                            android:textColor="@color/black"
-                            android:textSize="14sp" />
-
-                        <ImageButton
-                            android:id="@+id/nextMonthButton"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:background="?attr/selectableItemBackgroundBorderless"
-                            android:contentDescription="@string/next"
-                            android:scaleType="centerInside"
-                            app:srcCompat="@drawable/ic_arrow_forward"
-                            tools:ignore="TouchTargetSizeCheck" />
+                            android:text="Egg Grade Distribution"
+                            android:textColor="#223552"
+                            android:textSize="13sp"
+                            android:textStyle="bold"/>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="1dp"
+                            android:layout_marginBottom="6dp"
+                            android:text="Overall quality"
+                            android:textColor="#9CA3AF"
+                            android:textSize="9sp"/>
+
+                        <com.github.mikephil.charting.charts.PieChart
+                            android:id="@+id/gradePieChart"
+                            android:layout_width="match_parent"
+                            android:layout_height="130dp"/>
+
+                        <!-- Legend: stacked vertically since the card is now half-width -->
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:orientation="vertical">
+
+                            <!-- Grade A -->
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal">
+
+                                <View
+                                    android:layout_width="10dp"
+                                    android:layout_height="10dp"
+                                    android:background="#355E1A"/>
+
+                                <TextView
+                                    android:id="@+id/gradeALegend"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="6dp"
+                                    android:text="Grade A"
+                                    android:textColor="#374151"
+                                    android:textSize="11sp"
+                                    android:textStyle="bold"/>
+
+                            </LinearLayout>
+
+                            <!-- Grade B -->
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal">
+
+                                <View
+                                    android:layout_width="10dp"
+                                    android:layout_height="10dp"
+                                    android:background="#7C3AED"/>
+
+                                <TextView
+                                    android:id="@+id/gradeBLegend"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="6dp"
+                                    android:text="Grade B"
+                                    android:textColor="#374151"
+                                    android:textSize="11sp"
+                                    android:textStyle="bold"/>
+
+                            </LinearLayout>
+
+                            <!-- Grade C -->
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal">
+
+                                <View
+                                    android:layout_width="10dp"
+                                    android:layout_height="10dp"
+                                    android:background="#F4B400"/>
+
+                                <TextView
+                                    android:id="@+id/gradeCLegend"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="6dp"
+                                    android:text="Grade C"
+                                    android:textColor="#374151"
+                                    android:textSize="11sp"
+                                    android:textStyle="bold"/>
+
+                            </LinearLayout>
+
+                        </LinearLayout>
+
+                        <!-- Total Eggs -->
+
+                        <TextView
+                            android:id="@+id/totalProductionLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="center"
+                            android:layout_marginTop="10dp"
+                            android:text="Total Eggs : 0"
+                            android:textColor="#111827"
+                            android:textSize="12sp"
+                            android:textStyle="bold"/>
+
                     </LinearLayout>
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
-            <!--  Generate Report Card  -->
+
+                </androidx.cardview.widget.CardView>
+
+                <!-- Grade Breakdown -->
+
+                <androidx.cardview.widget.CardView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    app:cardBackgroundColor="@android:color/white"
+                    app:cardCornerRadius="16dp"
+                    app:cardElevation="3dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="10dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Grade Breakdown"
+                            android:textColor="#111827"
+                            android:textSize="13sp"
+                            android:textStyle="bold"/>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="1dp"
+                            android:layout_marginBottom="8dp"
+                            android:text="Quality summary"
+                            android:textColor="#9CA3AF"
+                            android:textSize="9sp"/>
+
+                        <!-- Grade A: label+count on top, bar below — fits a half-width card -->
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="Grade A"
+                                android:textColor="#355E1A"
+                                android:textSize="11sp"
+                                android:textStyle="bold"/>
+
+                            <TextView
+                                android:id="@+id/gradeACount"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="0"
+                                android:textSize="11sp"
+                                android:textStyle="bold"/>
+
+                        </LinearLayout>
+
+                        <ProgressBar
+                            android:id="@+id/gradeAProgress"
+                            style="?android:attr/progressBarStyleHorizontal"
+                            android:layout_width="match_parent"
+                            android:layout_height="6dp"
+                            android:layout_marginTop="3dp"
+                            android:max="100"
+                            android:progress="0"
+                            android:progressTint="#355E1A"/>
+
+                        <!-- Grade B -->
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="Grade B"
+                                android:textColor="#7C3AED"
+                                android:textSize="11sp"
+                                android:textStyle="bold"/>
+
+                            <TextView
+                                android:id="@+id/gradeBCount"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="0"
+                                android:textSize="11sp"
+                                android:textStyle="bold"/>
+
+                        </LinearLayout>
+
+                        <ProgressBar
+                            android:id="@+id/gradeBProgress"
+                            style="?android:attr/progressBarStyleHorizontal"
+                            android:layout_width="match_parent"
+                            android:layout_height="6dp"
+                            android:layout_marginTop="3dp"
+                            android:max="100"
+                            android:progress="0"
+                            android:progressTint="#7C3AED"/>
+
+                        <!-- Grade C -->
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="Grade C"
+                                android:textColor="#F4B400"
+                                android:textSize="11sp"
+                                android:textStyle="bold"/>
+
+                            <TextView
+                                android:id="@+id/gradeCCount"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="0"
+                                android:textSize="11sp"
+                                android:textStyle="bold"/>
+
+                        </LinearLayout>
+
+                        <ProgressBar
+                            android:id="@+id/gradeCProgress"
+                            style="?android:attr/progressBarStyleHorizontal"
+                            android:layout_width="match_parent"
+                            android:layout_height="6dp"
+                            android:layout_marginTop="3dp"
+                            android:max="100"
+                            android:progress="0"
+                            android:progressTint="#F4B400"/>
+
+                        <!-- Divider -->
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:layout_marginTop="12dp"
+                            android:layout_marginBottom="10dp"
+                            android:background="#E5E7EB"/>
+
+                        <!-- Stats stacked (not side-by-side — card is half width) -->
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Best Grade"
+                            android:textColor="#6B7280"
+                            android:textSize="10sp"/>
+
+                        <TextView
+                            android:id="@+id/bestGradeText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Grade A"
+                            android:textColor="#111827"
+                            android:textSize="14sp"
+                            android:textStyle="bold"/>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="Production Rate"
+                            android:textColor="#6B7280"
+                            android:textSize="10sp"/>
+
+                        <TextView
+                            android:id="@+id/productionRateText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0%"
+                            android:textColor="#111827"
+                            android:textSize="14sp"
+                            android:textStyle="bold"/>
+
+                    </LinearLayout>
+
+                </androidx.cardview.widget.CardView>
+
+            </LinearLayout>
+
+            <!-- ======================================= -->
+            <!-- Generate Report -->
+            <!-- ======================================= -->
+
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="24dp"
-                app:cardBackgroundColor="@color/white"
-                app:cardCornerRadius="16dp"
+                android:layout_marginTop="14dp"
+                android:layout_marginBottom="14dp"
+                app:cardBackgroundColor="#355E1A"
+                app:cardCornerRadius="18dp"
                 app:cardElevation="4dp">
 
                 <LinearLayout
@@ -389,45 +673,159 @@
                     android:orientation="vertical"
                     android:padding="20dp">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="8dp"
-                        android:text="📋"
-                        android:textSize="36sp" />
+                    <ImageView
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:src="@drawable/ic_file_text"
+                        app:tint="@android:color/white" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="4dp"
-                        android:text="Farm Report"
-                        android:textColor="@color/black"
-                        android:textSize="16sp"
-                        android:textStyle="bold" />
+                        android:layout_marginTop="10dp"
+                        android:text="Farm Analytics Report"
+                        android:textColor="@android:color/white"
+                        android:textSize="18sp"
+                        android:textStyle="bold"/>
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="16dp"
+                        android:layout_marginTop="6dp"
                         android:gravity="center"
-                        android:text="View a summary of egg production and performance. Export to PDF."
-                        android:textColor="@color/dark_gray"
-                        android:textSize="12sp" />
+                        android:text="Generate a PDF summary of your egg production analytics."
+                        android:textAlignment="center"
+                        android:textColor="#E5E7EB"
+                        android:textSize="13sp"/>
 
                     <Button
                         android:id="@+id/generateReportButton"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:backgroundTint="@color/dark_green"
-                        android:drawableStart="@drawable/ic_file_text"
-                        android:drawablePadding="8dp"
-                        android:paddingHorizontal="32dp"
+                        android:layout_marginTop="16dp"
+                        android:backgroundTint="@android:color/white"
                         android:text="Generate Report"
-                        android:textColor="@color/white" />
+                        android:textAllCaps="false"
+                        android:textColor="#355E1A"
+                        android:textStyle="bold"/>
+
                 </LinearLayout>
+
             </androidx.cardview.widget.CardView>
+
         </LinearLayout>
+
     </androidx.core.widget.NestedScrollView>
-    <!--  Include Loading Overlay  -->
-    <include layout="@layout/layout_loading" />
+
+    <!-- ======================================= -->
+    <!-- Bottom Navigation -->
+    <!-- ======================================= -->
+
+    <LinearLayout
+        android:id="@+id/bottomNavContainer"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:background="#355E1A"
+        android:gravity="center"
+        android:orientation="horizontal"
+        app:layout_constraintBottom_toBottomOf="parent">
+
+        <LinearLayout
+            android:id="@+id/homeButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_home"
+                app:tint="@android:color/white" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Home"
+                android:textColor="@android:color/white"
+                android:textSize="10sp"/>
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/analyticsButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_chart"
+                app:tint="@android:color/white" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Analytics"
+                android:textColor="@android:color/white"
+                android:textSize="10sp"/>
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/scheduleButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_schedule"
+                app:tint="@android:color/white" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Schedule"
+                android:textColor="@android:color/white"
+                android:textSize="10sp"/>
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/profileButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_profile"
+                app:tint="@android:color/white" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Profile"
+                android:textColor="@android:color/white"
+                android:textSize="10sp"/>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- Existing loading overlay -->
+
+    <include layout="@layout/layout_loading"/>
+
 </androidx.constraintlayout.widget.ConstraintLayout>
