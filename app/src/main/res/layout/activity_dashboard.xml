@@ -152,6 +152,9 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="24dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground"
                     app:cardBackgroundColor="@color/white"
                     app:cardCornerRadius="20dp"
                     app:cardElevation="2dp"
@@ -169,11 +172,11 @@
                             android:layout_width="48dp"
                             android:layout_height="48dp"
                             android:layout_marginEnd="16dp"
-                            android:background="@drawable/circle_dark_green"
+                            android:background="@drawable/circle_white"
                             android:backgroundTint="#E8F5E9"
-                            android:foreground="@drawable/ic_lightbulb"
+                            android:foreground="@drawable/lc_egg"
                             android:foregroundGravity="center"
-                            android:foregroundTint="@color/dark_green" />
+                            android:foregroundTint="@color/gray" />
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -201,6 +204,13 @@
                                 android:textColor="#4B5563"
                                 android:textSize="13sp" />
                         </LinearLayout>
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_marginStart="8dp"
+                            app:srcCompat="@drawable/ic_chevron_right"
+                            app:tint="#9CA3AF" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
                 <!--  Quick Actions Title  -->

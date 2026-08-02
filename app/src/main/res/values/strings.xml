@@ -29,8 +29,8 @@
     <string name="zero">0</string>
 
     <!-- AI Recommendation -->
-    <string name="ai_recommendation">Smart Tip Recommendation</string>
-    <string name="recommendation_text">Click the card for a new tip!</string>
+    <string name="ai_recommendation">Ask Quail Assistant</string>
+    <string name="recommendation_text">Get instant answers about your flock</string>
 
     <string-array name="smart_tips">
         <item>Morning Feeding: Quails are most active in the morning. Ensure feed troughs are topped up by 7 AM.</item>

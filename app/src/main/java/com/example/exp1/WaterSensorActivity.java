@@ -267,9 +267,5 @@ public class WaterSensorActivity extends AppCompatActivity {
 
     private void setupBottomNav() {
         NavigationHelper.INSTANCE.setupBottomNavigation(this);
-        LinearLayout cameraButton = findViewById(R.id.CameraButton);
-        if (cameraButton != null) {
-            cameraButton.setOnClickListener(v -> cameraHelper.launch());
         }
     }
-}

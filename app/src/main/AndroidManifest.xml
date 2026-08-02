@@ -121,6 +121,12 @@
             android:exported="false"
             android:label="Inventory History"
             android:parentActivityName=".FeedInventoryActivity" />
+        <activity
+            android:name=".ChatBotActivity"
+            android:windowSoftInputMode="adjustResize"
+            android:exported="false"
+            android:label="Quail Assistant"
+            android:parentActivityName=".DashboardActivity" />
     </application>
 
 </manifest>

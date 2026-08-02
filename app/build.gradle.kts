@@ -1,7 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.google.gms.google.services)
-
 }
 
 android {
@@ -24,7 +23,6 @@ android {
         versionCode = 1
         versionName = "beta"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        // No Apps Script integration configured in BuildConfig
     }
 
     buildTypes {
@@ -48,30 +46,41 @@ android {
 }
 
 dependencies {
-    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
-    implementation("com.google.firebase:firebase-auth-ktx")
-    implementation("com.google.firebase:firebase-database-ktx")
-    implementation("com.google.firebase:firebase-firestore-ktx")
+    // Firebase BoM - Manages versions for Firebase libraries
+    implementation(platform("com.google.firebase:firebase-bom:34.16.0"))
+    
+    // Firebase dependencies using version catalog
+    implementation(libs.firebase.auth)
+    implementation(libs.firebase.database)
+    implementation(libs.firebase.firestore)
+    implementation(libs.firebase.storage)
+    
+    // Other Firebase libraries
+    implementation("com.google.firebase:firebase-ai")
+
+    // Google Play Services & Other Libraries
     implementation("com.google.android.gms:play-services-auth:20.7.0")
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.17.3")
+    
+    // CameraX
     implementation("androidx.camera:camera-core:1.4.1")
     implementation("androidx.camera:camera-camera2:1.4.1")
     implementation("androidx.camera:camera-lifecycle:1.4.1")
     implementation("androidx.camera:camera-view:1.4.1")
+
+    // AndroidX & UI
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
     implementation(libs.mpandroidchart)
-    implementation(libs.firebase.firestore)
-    implementation(libs.firebase.database)
-    implementation(libs.firebase.auth)
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
-    implementation(libs.firebase.storage)
     implementation(libs.glide)
+
+    // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

@@ -1,5 +1,6 @@
 package com.example.exp1;
 
+import android.annotation.SuppressLint;
 import android.app.AlarmManager;
 import android.app.DatePickerDialog;
 import android.app.NotificationChannel;
@@ -11,6 +12,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -28,6 +30,7 @@ import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.GridLayout;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RadioGroup;
 import android.widget.ScrollView;
@@ -36,10 +39,13 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
+import androidx.core.content.FileProvider;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -51,7 +57,10 @@ import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
 
+import java.io.File;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -98,13 +107,22 @@ public class ScheduleActivity extends AppCompatActivity {
 
     // Caches email -> full name for the "Assigned To" identifier on each task
     // card. Populated lazily from the existing user_access collection (same
-    // source already used by the assignee spinner) — no user data is duplicated.
+    // source already used by the assignee selector) — no user data is duplicated.
     private final Map<String, String> staffNameCache = new HashMap<>();
 
     // Tracks task IDs already logged as Missed this session, since Missed is
     // derived client-side on every render and would otherwise be re-logged
     // on every auto-refresh.
     private final java.util.Set<String> loggedMissedTaskIds = new java.util.HashSet<>();
+
+    // ── Mark-as-Done proof (comment + photo) ────────────────────────────────
+    // Marking a task Done now requires a written comment and a photo as proof
+    // of completion. These hold the in-flight state for whichever task is
+    // currently going through that flow.
+    private ActivityResultLauncher<Uri> takePictureLauncher;
+    private Uri pendingProofImageUri;
+    private ImageView proofImagePreview;
+    private Task pendingDoneTask;
 
     private String[] monthNames;
     private Handler autoUpdateHandler = new Handler();
@@ -124,6 +142,18 @@ public class ScheduleActivity extends AppCompatActivity {
 
         RECUR_ONCE = getString(R.string.recur_once);
         monthNames = getResources().getStringArray(R.array.month_names);
+
+        // Registered here (must happen before STARTED) so the "Take Photo" proof
+        // step in the Mark-as-Done flow can launch the camera and receive the result.
+        takePictureLauncher = registerForActivityResult(new ActivityResultContracts.TakePicture(), success -> {
+            if (success && pendingProofImageUri != null && proofImagePreview != null) {
+                proofImagePreview.setImageURI(pendingProofImageUri);
+                proofImagePreview.setVisibility(View.VISIBLE);
+            } else {
+                pendingProofImageUri = null;
+                Toast.makeText(this, "Photo capture failed or was cancelled", Toast.LENGTH_SHORT).show();
+            }
+        });
 
         cameraHelper = new CameraHelper(this, (uri, results) -> {
             int gradeA = 0, gradeB = 0, gradeC = 0;
@@ -226,12 +256,6 @@ public class ScheduleActivity extends AppCompatActivity {
 
         NavigationHelper.INSTANCE.setupBottomNavigation(this);
 
-        LinearLayout cameraButton = findViewById(R.id.CameraButton);
-        if (cameraButton != null) {
-            cameraButton.setClickable(true);
-            cameraButton.setFocusable(true);
-            cameraButton.setOnClickListener(v -> cameraHelper.launch());
-        }
 
         updateCalendarUI();
         setupSwipeGestures();
@@ -284,12 +308,34 @@ public class ScheduleActivity extends AppCompatActivity {
                             );
                             task.extensionMinutes = doc.getLong("extensionMinutes") != null ? doc.getLong("extensionMinutes").intValue() : 0;
                             task.workWindowMinutes = doc.getLong("workWindowMinutes") != null ? doc.getLong("workWindowMinutes").intValue() : 60;
-                            task.assignedTo = doc.getString("assignedTo");
+                            task.assignedTo = parseAssignedTo(doc.get("assignedTo"));
+                            task.doneComment = doc.getString("doneComment");
+                            task.doneImageUrl = doc.getString("doneImageUrl");
                             taskList.add(task);
                         }
                     }
                     updateTasksUI();
                 });
+    }
+
+    /**
+     * Reads the assignedTo field defensively: new docs store a List<String>
+     * (multi-assign), older docs (pre multi-assign) stored a single String
+     * email. Both are normalized into a List<String> so the rest of the
+     * code only ever deals with one shape.
+     */
+    @SuppressWarnings("unchecked")
+    private List<String> parseAssignedTo(Object raw) {
+        List<String> result = new ArrayList<>();
+        if (raw instanceof List) {
+            for (Object o : (List<Object>) raw) {
+                if (o != null && !o.toString().trim().isEmpty()) result.add(o.toString().trim());
+            }
+        } else if (raw instanceof String) {
+            String s = ((String) raw).trim();
+            if (!s.isEmpty()) result.add(s);
+        }
+        return result;
     }
 
     private void requestNotificationPermission() {
@@ -313,7 +359,7 @@ public class ScheduleActivity extends AppCompatActivity {
         data.put("day",                task.day);
         data.put("recurrence",         task.recurrence);
         data.put("recurrenceGroupId",  task.recurrenceGroupId);
-        data.put("assignedTo",         task.assignedTo != null ? task.assignedTo : "");
+        data.put("assignedTo",         task.assignedTo != null ? task.assignedTo : new ArrayList<String>());
         data.put("extensionMinutes",   task.extensionMinutes);
         data.put("workWindowMinutes",  task.workWindowMinutes);
         data.put("createdAt", com.google.firebase.firestore.FieldValue.serverTimestamp());
@@ -787,15 +833,69 @@ public class ScheduleActivity extends AppCompatActivity {
         btnNextMonth.setOnClickListener(v -> { viewCalendar.add(Calendar.MONTH,  1); updateGrid.run(); });
         updateGrid.run();
 
-        // Assignee spinner — populate with approved staff from user_access
-        Spinner spinnerAssignee = dialogView.findViewById(R.id.spinnerAssignee);
-        final List<String> assigneeEmails = new ArrayList<>();
-        final List<String> assigneeDisplay = new ArrayList<>();
-        assigneeDisplay.add("(No specific staff)");
-        assigneeEmails.add("");
-        final ArrayAdapter<String> assAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, assigneeDisplay);
-        assAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinnerAssignee.setAdapter(assAdapter);
+        // Assignee multi-select — populate with approved staff from user_access.
+        // Tapping the field opens a checkbox list so more than one staff member
+        // can be assigned to the same task (the old Spinner only ever allowed one).
+        TextView assigneeSelector = dialogView.findViewById(R.id.assigneeSelector);
+        final List<String> assigneeEmails = new ArrayList<>();   // all available staff emails (no placeholder row)
+        final List<String> assigneeDisplay = new ArrayList<>();  // matching display names
+        final List<String> selectedAssigneeEmails = new ArrayList<>(); // currently checked emails
+
+        Runnable refreshAssigneeLabel = () -> {
+            if (selectedAssigneeEmails.isEmpty()) {
+                assigneeSelector.setText("(No specific staff)");
+                assigneeSelector.setTextColor(Color.parseColor("#9CA3AF")); // gray placeholder, matches unset hint style
+                return;
+            }
+            List<String> names = new ArrayList<>();
+            for (String email : selectedAssigneeEmails) {
+                int idx = assigneeEmails.indexOf(email);
+                String display = (idx >= 0) ? assigneeDisplay.get(idx) : email;
+                // strip the "(email)" suffix for a cleaner chip-style summary
+                int parenIdx = display.indexOf(" (");
+                names.add(parenIdx > 0 ? display.substring(0, parenIdx) : display);
+            }
+            String summary = selectedAssigneeEmails.size() + " staff selected: " + android.text.TextUtils.join(", ", names);
+            assigneeSelector.setText(summary);
+            assigneeSelector.setTextColor(Color.parseColor("#111827")); // darker once filled in, matches other field text
+        };
+        refreshAssigneeLabel.run();
+
+        assigneeSelector.setOnClickListener(v -> {
+            if (assigneeDisplay.isEmpty()) {
+                Toast.makeText(this, "No approved staff available", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            CharSequence[] items = assigneeDisplay.toArray(new CharSequence[0]);
+            boolean[] checked = new boolean[assigneeEmails.size()];
+            for (int i = 0; i < assigneeEmails.size(); i++) {
+                checked[i] = selectedAssigneeEmails.contains(assigneeEmails.get(i));
+            }
+            // Work on a temp copy so Cancel doesn't mutate the real selection
+            final List<String> tempSelected = new ArrayList<>(selectedAssigneeEmails);
+
+            new AlertDialog.Builder(this)
+                    .setTitle("Assign Staff")
+                    .setMultiChoiceItems(items, checked, (dialog, which, isChecked) -> {
+                        String email = assigneeEmails.get(which);
+                        if (isChecked) {
+                            if (!tempSelected.contains(email)) tempSelected.add(email);
+                        } else {
+                            tempSelected.remove(email);
+                        }
+                    })
+                    .setPositiveButton("Done", (dialog, which) -> {
+                        selectedAssigneeEmails.clear();
+                        selectedAssigneeEmails.addAll(tempSelected);
+                        refreshAssigneeLabel.run();
+                    })
+                    .setNeutralButton("Clear", (dialog, which) -> {
+                        selectedAssigneeEmails.clear();
+                        refreshAssigneeLabel.run();
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+        });
 
         db.collection("user_access")
                 .whereEqualTo("role", "staff")
@@ -804,8 +904,6 @@ public class ScheduleActivity extends AppCompatActivity {
                 .addOnSuccessListener(querySnapshot -> {
                     assigneeDisplay.clear();
                     assigneeEmails.clear();
-                    assigneeDisplay.add("(No specific staff)");
-                    assigneeEmails.add("");
                     for (QueryDocumentSnapshot doc : querySnapshot) {
                         String email = doc.getId();
                         String name = doc.getString("name");
@@ -813,7 +911,7 @@ public class ScheduleActivity extends AppCompatActivity {
                         assigneeEmails.add(email);
                         assigneeDisplay.add((name != null && !name.isEmpty()) ? name + " (" + email + ")" : email);
                     }
-                    assAdapter.notifyDataSetChanged();
+                    refreshAssigneeLabel.run();
                 })
                 .addOnFailureListener(e -> { /* ignore and keep default */ });
 
@@ -874,8 +972,7 @@ public class ScheduleActivity extends AppCompatActivity {
                                             cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH),
                                             selectedRecurrence[0], groupId);
                                     t.workWindowMinutes = window;
-                                    t.assignedTo = (spinnerAssignee.getSelectedItemPosition() > 0)
-                                            ? assigneeEmails.get(spinnerAssignee.getSelectedItemPosition()) : "";
+                                    t.assignedTo = new ArrayList<>(selectedAssigneeEmails);
 
                                     batch.set(ref, buildTaskMap(t));
                                     scheduleNotification(t, selHour[0], selMinute[0]);
@@ -1114,10 +1211,15 @@ public class ScheduleActivity extends AppCompatActivity {
         boolean isOwner = roleManager.isOwner();
         for (Task task : taskList) {
             if (task.year != selYear || task.month != selMonth || task.day != selDay) continue;
-            // Visibility: owner sees ALL tasks; staff only sees tasks explicitly assigned to them
+            // Visibility: owner sees ALL tasks; staff only sees tasks they are assigned to
             if (!isOwner) {
-                String assigned = (task.assignedTo != null) ? task.assignedTo.trim() : "";
-                if (assigned.isEmpty() || !assigned.equalsIgnoreCase(currentUserEmail)) continue;
+                boolean assignedToMe = false;
+                if (task.assignedTo != null) {
+                    for (String email : task.assignedTo) {
+                        if (email != null && email.equalsIgnoreCase(currentUserEmail)) { assignedToMe = true; break; }
+                    }
+                }
+                if (!assignedToMe) continue;
             }
 
             // Determine current status (auto-updated for non-Done tasks)
@@ -1281,18 +1383,9 @@ public class ScheduleActivity extends AppCompatActivity {
         String[] options = {"Mark as Done", "Request 30min Extension"};
         builder.setItems(options, (dialog, which) -> {
             if (which == 0) {
-                task.status = getString(R.string.status_done);
-                cancelNotification(task); // cancel alarm & dismiss live notification
-
-                // Remove all related alerts from notification history (Firestore + local cache).
-                // This covers:
-                //   "Task Reminder: <title> (<category>)" — from TaskAlarmReceiver
-                //   "Missed Task: <title> was scheduled for..." — from checkMissedTasks
-                FarmRepository.INSTANCE.deleteAlertByMessage(task.title, null);
-                GlobalData.removeAlertsContaining(task.title);
-
-                updateTaskStatus(task);
-                Toast.makeText(this, "Task completed!", Toast.LENGTH_SHORT).show();
+                // Marking Done now requires proof (comment + photo) before anything
+                // is written, followed by an explicit confirmation step.
+                showMarkDoneProofDialog(task);
             } else {
                 task.extensionMinutes += 30;
                 updateTaskStatus(task);
@@ -1300,6 +1393,203 @@ public class ScheduleActivity extends AppCompatActivity {
             }
         });
         builder.show();
+    }
+
+    // ── Mark-as-Done proof flow ──────────────────────────────────────────────
+    // Step 1: collect a required comment + required photo.
+    // Step 2: explicit confirmation dialog.
+    // Step 3: upload photo to Firebase Storage, then write status + proof to Firestore.
+    // The task is NEVER marked Done if either the comment or the photo is missing.
+
+    private void showMarkDoneProofDialog(Task task) {
+        pendingDoneTask = task;
+        pendingProofImageUri = null;
+
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        int pad = dpToPx(20);
+        container.setPadding(pad, pad, pad, pad);
+
+        TextView label = new TextView(this);
+        label.setText("Completion proof required");
+        label.setTypeface(null, Typeface.BOLD);
+        label.setTextSize(16);
+        label.setTextColor(Color.parseColor("#111827"));
+        container.addView(label);
+
+        TextView sub = new TextView(this);
+        sub.setText("Add a comment and take a photo showing the task was completed. Both are required — this task cannot be marked Done without them.");
+        sub.setTextColor(Color.parseColor("#6B7280"));
+        sub.setTextSize(13);
+        LinearLayout.LayoutParams subParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        subParams.setMargins(0, dpToPx(4), 0, dpToPx(16));
+        sub.setLayoutParams(subParams);
+        container.addView(sub);
+
+        final EditText commentInput = new EditText(this);
+        commentInput.setHint("Describe what was done...");
+        commentInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        commentInput.setMinLines(3);
+        commentInput.setGravity(Gravity.TOP | Gravity.START);
+        container.addView(commentInput);
+
+        Button takePhotoBtn = new Button(this);
+        takePhotoBtn.setText("Take Photo");
+        LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        btnParams.setMargins(0, dpToPx(16), 0, dpToPx(12));
+        takePhotoBtn.setLayoutParams(btnParams);
+        container.addView(takePhotoBtn);
+
+        final ImageView preview = new ImageView(this);
+        preview.setVisibility(View.GONE);
+        LinearLayout.LayoutParams previewParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(200));
+        preview.setLayoutParams(previewParams);
+        preview.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        preview.setBackgroundColor(Color.parseColor("#F3F4F6"));
+        container.addView(preview);
+
+        // Let the ActivityResultCallback registered in onCreate() write into this
+        // specific preview / URI for the duration of this dialog.
+        proofImagePreview = preview;
+
+        takePhotoBtn.setOnClickListener(v -> {
+            Uri uri = createProofImageUri();
+            if (uri == null) {
+                Toast.makeText(this, "Could not prepare camera storage for the proof photo", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            pendingProofImageUri = uri;
+            takePictureLauncher.launch(uri);
+        });
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(container);
+
+        AlertDialog proofDialog = new AlertDialog.Builder(this)
+                .setTitle("Mark \"" + task.title + "\" as Done")
+                .setView(scroll)
+                .setPositiveButton("Continue", null) // overridden below so it can block on validation
+                .setNegativeButton("Cancel", (d, w) -> {
+                    pendingProofImageUri = null;
+                    proofImagePreview = null;
+                })
+                .create();
+
+        proofDialog.show();
+        proofDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String comment = commentInput.getText().toString().trim();
+            if (comment.isEmpty()) {
+                Toast.makeText(this, "A comment describing the completed work is required", Toast.LENGTH_SHORT).show();
+                return; // keep dialog open
+            }
+            if (pendingProofImageUri == null) {
+                Toast.makeText(this, "A photo is required as proof before this task can be marked Done", Toast.LENGTH_SHORT).show();
+                return; // keep dialog open
+            }
+            Uri capturedUri = pendingProofImageUri;
+            proofDialog.dismiss();
+            showMarkDoneConfirmationDialog(task, comment, capturedUri);
+        });
+    }
+
+    /** Explicit "are you sure" confirmation before the task is actually marked Done. */
+    private void showMarkDoneConfirmationDialog(Task task, String comment, Uri imageUri) {
+        new AlertDialog.Builder(this)
+                .setTitle("Confirm completion")
+                .setMessage("Mark \"" + task.title + "\" as Done?\n\nYour comment and photo will be saved as proof of completion. This action cannot be undone.")
+                .setPositiveButton("Confirm", (d, w) -> {
+                    AlertDialog progress = new AlertDialog.Builder(this)
+                            .setMessage("Saving proof and completing task...")
+                            .setCancelable(false)
+                            .show();
+                    ensureAuthThenRun(() -> uploadProofImageAndFinalize(task, comment, imageUri, progress));
+                })
+                .setNegativeButton("Back", (d, w) -> showMarkDoneProofDialog(task)) // let them fix the comment/photo instead of losing the flow
+                .setCancelable(false)
+                .show();
+    }
+
+    /** Uploads the proof photo to Firebase Storage, then writes status + proof fields to Firestore. */
+    private void uploadProofImageAndFinalize(Task task, String comment, Uri imageUri, AlertDialog progress) {
+        if (task.firestoreId == null) {
+            progress.dismiss();
+            Toast.makeText(this, "This task has no ID and cannot be updated", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        StorageReference storageRef = FirebaseStorage.getInstance().getReference()
+                .child("task_proofs")
+                .child(task.firestoreId + "_" + System.currentTimeMillis() + ".jpg");
+
+        storageRef.putFile(imageUri)
+                .addOnSuccessListener(taskSnapshot -> storageRef.getDownloadUrl()
+                        .addOnSuccessListener(downloadUri -> markTaskDoneInFirestore(task, comment, downloadUri.toString(), progress))
+                        .addOnFailureListener(e -> {
+                            progress.dismiss();
+                            Toast.makeText(this, "Failed to retrieve proof photo URL: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                        }))
+                .addOnFailureListener(e -> {
+                    progress.dismiss();
+                    Toast.makeText(this, "Failed to upload proof photo: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
+    }
+
+    /** Only reachable once a comment and an uploaded photo URL both exist. */
+    private void markTaskDoneInFirestore(Task task, String comment, String imageUrl, AlertDialog progress) {
+        task.status = getString(R.string.status_done);
+        task.doneComment = comment;
+        task.doneImageUrl = imageUrl;
+
+        cancelNotification(task); // cancel alarm & dismiss any live notification
+
+        // Remove all related alerts from notification history (Firestore + local cache).
+        FarmRepository.INSTANCE.deleteAlertByMessage(task.title, null);
+        GlobalData.removeAlertsContaining(task.title);
+
+        db.collection("farm_data").document("shared")
+                .collection("tasks").document(task.firestoreId)
+                .update("status", task.status,
+                        "extensionMinutes", task.extensionMinutes,
+                        "workWindowMinutes", task.workWindowMinutes,
+                        "doneComment", comment,
+                        "doneImageUrl", imageUrl,
+                        "doneBy", currentUserEmail,
+                        "doneAt", com.google.firebase.firestore.FieldValue.serverTimestamp())
+                .addOnSuccessListener(unused -> {
+                    progress.dismiss();
+                    logTaskHistory(task, task.status);
+                    Toast.makeText(this, "Task completed!", Toast.LENGTH_SHORT).show();
+                    pendingDoneTask = null;
+                    pendingProofImageUri = null;
+                    proofImagePreview = null;
+                })
+                .addOnFailureListener(e -> {
+                    progress.dismiss();
+                    Toast.makeText(this, getString(R.string.error_updating_status, e.getMessage()), Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    /** Creates a fresh cache file + content:// Uri (via FileProvider) for the camera to write the proof photo into. */
+    private Uri createProofImageUri() {
+        try {
+            File dir = new File(getCacheDir(), "proof_photos");
+            if (!dir.exists()) dir.mkdirs();
+            File file = new File(dir, "proof_" + System.currentTimeMillis() + ".jpg");
+            // NOTE: requires a <provider> entry for "${applicationId}.fileprovider" in
+            // AndroidManifest.xml (with a matching res/xml/file_paths.xml exposing the
+            // cache directory) — the same FileProvider setup CameraHelper already relies on.
+            return FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", file);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private int dpToPx(int dp) {
+        float density = getResources().getDisplayMetrics().density;
+        return (int) (dp * density);
     }
 
     private void showManagerWorkWindowDialog(Task task) {
@@ -1435,29 +1725,34 @@ public class ScheduleActivity extends AppCompatActivity {
     }
 
     // ── Assigned To identifier ────────────────────────────────────────────
-    // Resolves task.assignedTo (an email, or empty for owner-self tasks) to
-    // a display label using only the existing user_access collection — the
-    // same source the assignee spinner already reads from. No new user
+    // Resolves task.assignedTo (a list of emails, empty for owner-only tasks)
+    // to a display label using only the existing user_access collection —
+    // the same source the assignee selector already reads from. No new user
     // records are created; staffNameCache just avoids re-querying Firestore
     // for the same email on every card render.
     private String resolveAssignedToLabel(Task task) {
-        String email = (task.assignedTo != null) ? task.assignedTo.trim() : "";
-        if (email.isEmpty()) return "Owner";
+        if (task.assignedTo == null || task.assignedTo.isEmpty()) return "Owner";
 
-        String cached = staffNameCache.get(email);
-        if (cached != null) return cached;
-
-        // Not cached yet: kick off a one-time lookup and show the email in
-        // the meantime; the card refreshes on the next updateTasksUI() pass
-        // (triggered every minute by autoUpdateRunnable, or on any task change).
-        db.collection("user_access").document(email).get()
-                .addOnSuccessListener(doc -> {
-                    String name = doc.getString("name");
-                    staffNameCache.put(email, (name != null && !name.isEmpty()) ? name : email);
-                    updateTasksUI();
-                })
-                .addOnFailureListener(e -> staffNameCache.put(email, email));
-        return email;
+        List<String> labels = new ArrayList<>();
+        for (String email : task.assignedTo) {
+            if (email == null || email.trim().isEmpty()) continue;
+            email = email.trim();
+            String cached = staffNameCache.get(email);
+            if (cached != null) {
+                labels.add(cached);
+            } else {
+                labels.add(email); // show email until the async lookup below resolves
+                final String emailFinal = email;
+                db.collection("user_access").document(email).get()
+                        .addOnSuccessListener(doc -> {
+                            String name = doc.getString("name");
+                            staffNameCache.put(emailFinal, (name != null && !name.isEmpty()) ? name : emailFinal);
+                            updateTasksUI();
+                        })
+                        .addOnFailureListener(e -> staffNameCache.put(emailFinal, emailFinal));
+            }
+        }
+        return labels.isEmpty() ? "Owner" : android.text.TextUtils.join(", ", labels);
     }
 
     // ── Owner task history ────────────────────────────────────────────────
@@ -1476,6 +1771,9 @@ public class ScheduleActivity extends AppCompatActivity {
         if (getString(R.string.status_done).equals(status)) {
             entry.put("completedAt", com.google.firebase.firestore.FieldValue.serverTimestamp());
         }
+        // Completion proof, when this status change is the Mark-as-Done flow.
+        if (task.doneComment != null && !task.doneComment.isEmpty()) entry.put("comment", task.doneComment);
+        if (task.doneImageUrl != null && !task.doneImageUrl.isEmpty()) entry.put("proofImageUrl", task.doneImageUrl);
         entry.put("createdBy", currentUserEmail);
         entry.put("timestamp", com.google.firebase.firestore.FieldValue.serverTimestamp());
 
@@ -1690,9 +1988,11 @@ public class ScheduleActivity extends AppCompatActivity {
         int    year, month, day;
         String recurrence;
         String recurrenceGroupId;
-        String assignedTo; // email of assigned staff; empty = owner-only visible
+        List<String> assignedTo = new ArrayList<>(); // emails of assigned staff; empty = owner-only visible
         int extensionMinutes = 0;
         int workWindowMinutes = 60; // default
+        String doneComment;   // required comment proof, set only when marked Done via the proof flow
+        String doneImageUrl;  // Firebase Storage download URL of the required proof photo
 
         Task(String firestoreId, String title, String category, String time, String status, int year, int month, int day, String recurrence, String recurrenceGroupId) {
             this.firestoreId = firestoreId;

@@ -3,6 +3,8 @@ package com.example.exp1;
 import android.app.DatePickerDialog;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -100,6 +102,9 @@ public class AnalyticsActivity extends AppCompatActivity {
     private int selectedYear = Calendar.getInstance().get(Calendar.YEAR);
     private String customStartDate = null; // yyyy-MM-dd
     private String customEndDate = null;   // yyyy-MM-dd
+    // Sunday (start) of the chosen week for the "Weekly" filter. Null = default to
+    // the trailing 7-day window (today - 6 .. today), same as the old behavior.
+    private String selectedWeekStartDate = null; // yyyy-MM-dd
 
     // Fixed brand colors — keep these in sync with the legend swatches in activity_analytics.xml
     private static final int COLOR_GRADE_A = Color.parseColor("#355E1A");
@@ -205,15 +210,13 @@ public class AnalyticsActivity extends AppCompatActivity {
     private void setupPieChart() {
         gradePieChart.setUsePercentValues(true);
         gradePieChart.getDescription().setEnabled(false);
-        gradePieChart.setExtraOffsets(5, 10, 5, 5);
+        gradePieChart.setExtraOffsets(10, 10, 10, 10);
         gradePieChart.setDragDecelerationFrictionCoef(0.95f);
         gradePieChart.setDrawHoleEnabled(true);
         gradePieChart.setHoleColor(Color.WHITE);
         gradePieChart.setTransparentCircleRadius(61f);
         gradePieChart.setEntryLabelColor(Color.BLACK);
         gradePieChart.setEntryLabelTextSize(12f);
-        // Your XML already has a custom Grade A/B/C legend row below the chart,
-        // so the built-in legend AND the on-slice text labels are redundant/cluttered.
         gradePieChart.getLegend().setEnabled(false);
         gradePieChart.setDrawEntryLabels(false);
     }
@@ -241,6 +244,7 @@ public class AnalyticsActivity extends AppCompatActivity {
 
         filterChoiceButton.setOnClickListener(v -> {
             switch (currentFilter) {
+                case "Weekly": showWeekPicker(); break;
                 case "Monthly": showMonthYearPicker(); break;
                 case "Yearly": showYearPicker(); break;
                 case "Custom": showCustomRangePicker(); break;
@@ -253,6 +257,15 @@ public class AnalyticsActivity extends AppCompatActivity {
     /** Shows/hides the period-choice row and keeps its label in sync with the current filter. */
     private void updateFilterChoiceVisibility() {
         switch (currentFilter) {
+            case "Weekly":
+                filterChoiceCard.setVisibility(View.VISIBLE);
+                if (selectedWeekStartDate != null) {
+                    String weekEnd = weekEndDate(selectedWeekStartDate);
+                    filterChoiceText.setText(displayDate(selectedWeekStartDate) + "  —  " + displayDate(weekEnd));
+                } else {
+                    filterChoiceText.setText("This Week (last 7 days)");
+                }
+                break;
             case "Monthly":
                 filterChoiceCard.setVisibility(View.VISIBLE);
                 filterChoiceText.setText(monthYearLabel(selectedMonth, selectedMonthYear));
@@ -287,6 +300,45 @@ public class AnalyticsActivity extends AppCompatActivity {
         } catch (ParseException e) {
             return yyyyMmDd;
         }
+    }
+
+    /** Given a week-start (yyyy-MM-dd, Sunday), returns the Saturday 6 days later. */
+    private String weekEndDate(String weekStartYyyyMmDd) {
+        try {
+            Calendar c = Calendar.getInstance();
+            c.setTime(DATE_KEY_FORMAT.parse(weekStartYyyyMmDd));
+            c.add(Calendar.DAY_OF_YEAR, 6);
+            return DATE_KEY_FORMAT.format(c.getTime());
+        } catch (ParseException e) {
+            return weekStartYyyyMmDd;
+        }
+    }
+
+    /**
+     * Week picker for the "Weekly" filter. User picks any day; we snap that
+     * selection back to the Sunday that starts its calendar week, so the
+     * filtered range is always a clean Sunday–Saturday 7-day window.
+     */
+    private void showWeekPicker() {
+        Calendar cal = Calendar.getInstance();
+        if (selectedWeekStartDate != null) {
+            try { cal.setTime(DATE_KEY_FORMAT.parse(selectedWeekStartDate)); } catch (ParseException ignored) {}
+        }
+
+        DatePickerDialog dialog = new DatePickerDialog(this,
+                (view, year, month, day) -> {
+                    Calendar picked = Calendar.getInstance();
+                    picked.set(year, month, day, 0, 0, 0);
+                    // Snap back to the Sunday of the picked date's week
+                    int dayOfWeek = picked.get(Calendar.DAY_OF_WEEK); // 1=Sunday ... 7=Saturday
+                    picked.add(Calendar.DAY_OF_YEAR, -(dayOfWeek - 1));
+                    selectedWeekStartDate = DATE_KEY_FORMAT.format(picked.getTime());
+                    updateFilterChoiceVisibility();
+                    updateDashboard();
+                },
+                cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH));
+        dialog.setTitle("Pick Any Day in the Week");
+        dialog.show();
     }
 
     /** Month + year picker for the "Monthly" filter. */
@@ -440,19 +492,25 @@ public class AnalyticsActivity extends AppCompatActivity {
         eggCollectionsRef.addValueEventListener(eggCollectionsListener);
     }
 
-    private void updateDashboard() {
-        int filteredTotal = 0;
-        int filteredA = 0;
-        int filteredB = 0;
-        int filteredC = 0;
-        int dayCount = 0;
+    /**
+     * Returns the subset of allData matching the currently selected filter (Today / Weekly /
+     * Monthly / Yearly / Custom / All Time). Shared by the dashboard cards+chart and by the
+     * report generator so the report always reflects whichever filter is active on screen.
+     */
+    private Map<String, DailyEggData> getFilteredData() {
+        Map<String, DailyEggData> filtered = new TreeMap<>();
 
         Calendar cal = Calendar.getInstance();
         String today = DATE_KEY_FORMAT.format(cal.getTime());
 
         Calendar cal7 = Calendar.getInstance();
-        cal7.add(Calendar.DAY_OF_YEAR, -6); // today + previous 6 days = 7-day window
+        cal7.add(Calendar.DAY_OF_YEAR, -6); // today + previous 6 days = default 7-day window
         String sevenDaysAgo = DATE_KEY_FORMAT.format(cal7.getTime());
+
+        // Resolve the active weekly range: user-picked Sunday-start week, or the
+        // default trailing 7 days if they haven't picked one yet.
+        String weekStart = selectedWeekStartDate != null ? selectedWeekStartDate : sevenDaysAgo;
+        String weekEnd = selectedWeekStartDate != null ? weekEndDate(selectedWeekStartDate) : today;
 
         // "yyyy-MM" prefix for the chosen month (dateKey format is yyyy-MM-dd)
         String monthlyPrefix = String.format(Locale.getDefault(), "%04d-%02d", selectedMonthYear, selectedMonth + 1);
@@ -466,7 +524,7 @@ public class AnalyticsActivity extends AppCompatActivity {
                     if (entry.getKey().equals(today)) include = true;
                     break;
                 case "Weekly":
-                    if (entry.getKey().compareTo(sevenDaysAgo) >= 0 && entry.getKey().compareTo(today) <= 0) {
+                    if (entry.getKey().compareTo(weekStart) >= 0 && entry.getKey().compareTo(weekEnd) <= 0) {
                         include = true;
                     }
                     break;
@@ -487,15 +545,67 @@ public class AnalyticsActivity extends AppCompatActivity {
                     include = true;
                     break;
             }
+            if (include) filtered.put(entry.getKey(), entry.getValue());
+        }
+        return filtered;
+    }
 
-            if (include) {
-                DailyEggData data = entry.getValue();
-                filteredTotal += data.total;
-                filteredA += data.gradeA;
-                filteredB += data.gradeB;
-                filteredC += data.gradeC;
-                if (data.total > 0) dayCount++;
+    /** Human-readable description of the currently active filter, for display on the report. */
+    private String getReportPeriodLabel() {
+        switch (currentFilter) {
+            case "Today": {
+                String today = DATE_KEY_FORMAT.format(Calendar.getInstance().getTime());
+                return "Today — " + displayDate(today);
             }
+            case "Weekly": {
+                Calendar cal7 = Calendar.getInstance();
+                cal7.add(Calendar.DAY_OF_YEAR, -6);
+                String sevenDaysAgo = DATE_KEY_FORMAT.format(cal7.getTime());
+                String today = DATE_KEY_FORMAT.format(Calendar.getInstance().getTime());
+                String weekStart = selectedWeekStartDate != null ? selectedWeekStartDate : sevenDaysAgo;
+                String weekEnd = selectedWeekStartDate != null ? weekEndDate(selectedWeekStartDate) : today;
+                return "Weekly — " + displayDate(weekStart) + " to " + displayDate(weekEnd);
+            }
+            case "Monthly":
+                return "Monthly — " + monthYearLabel(selectedMonth, selectedMonthYear);
+            case "Yearly":
+                return "Yearly — " + selectedYear;
+            case "Custom":
+                if (customStartDate != null && customEndDate != null) {
+                    return "Custom — " + displayDate(customStartDate) + " to " + displayDate(customEndDate);
+                }
+                return "Custom Range";
+            default:
+                return "All Time";
+        }
+    }
+
+    /** Short filename-safe tag for the current filter (e.g. "Weekly", "AllTime"), used in exported report filenames. */
+    private String getReportFilterTag() {
+        switch (currentFilter) {
+            case "Today": return "Today";
+            case "Weekly": return "Weekly";
+            case "Monthly": return "Monthly_" + monthYearLabel(selectedMonth, selectedMonthYear).replace(" ", "");
+            case "Yearly": return "Yearly_" + selectedYear;
+            case "Custom": return "Custom";
+            default: return "AllTime";
+        }
+    }
+
+    private void updateDashboard() {
+        int filteredTotal = 0;
+        int filteredA = 0;
+        int filteredB = 0;
+        int filteredC = 0;
+        int dayCount = 0;
+
+        Map<String, DailyEggData> filteredData = getFilteredData();
+        for (DailyEggData data : filteredData.values()) {
+            filteredTotal += data.total;
+            filteredA += data.gradeA;
+            filteredB += data.gradeB;
+            filteredC += data.gradeC;
+            if (data.total > 0) dayCount++;
         }
 
         // Update Summary Cards
@@ -535,6 +645,17 @@ public class AnalyticsActivity extends AppCompatActivity {
         dataSet.setSliceSpace(3f);
         dataSet.setSelectionShift(5f);
 
+        // --- Straight leader lines pointing at each slice ---
+        dataSet.setValueLinePart1OffsetPercentage(80f);   // where the line starts (near slice edge)
+        dataSet.setValueLinePart1Length(0.5f);            // radial line length
+        dataSet.setValueLinePart2Length(0f);               // 0 = no horizontal kink, keeps it a straight line
+        dataSet.setValueLineWidth(1.5f);
+        dataSet.setUsingSliceColorAsValueLineColor(true);
+        dataSet.setXValuePosition(PieDataSet.ValuePosition.OUTSIDE_SLICE);
+        dataSet.setYValuePosition(PieDataSet.ValuePosition.OUTSIDE_SLICE);
+        dataSet.setValueTextColor(Color.BLACK);
+        dataSet.setValueTextSize(11f);
+
         PieData pieData = new PieData(dataSet);
         if (filteredTotal > 0) {
             pieData.setValueFormatter(new PercentFormatter(gradePieChart));
@@ -548,8 +669,14 @@ public class AnalyticsActivity extends AppCompatActivity {
             });
         }
         pieData.setValueTextSize(11f);
-        pieData.setValueTextColor(Color.WHITE);
         gradePieChart.setData(pieData);
+
+        // Force every slice to keep at least this much visual angle so that two
+        // small/near-equal grades don't collapse into each other and squish their
+        // percentage labels together. Purely visual — underlying % values shown
+        // in the labels themselves are still the real numbers.
+        gradePieChart.setMinAngleForSlices(18f);
+
         gradePieChart.invalidate();
         gradePieChart.animateY(1000);
 
@@ -588,33 +715,134 @@ public class AnalyticsActivity extends AppCompatActivity {
 
     private void showReportDialog() {
         int total = 0, a = 0, b = 0, c = 0;
-        for (DailyEggData d : allData.values()) {
+        for (DailyEggData d : getFilteredData().values()) {
             total += d.total; a += d.gradeA; b += d.gradeB; c += d.gradeC;
         }
+        String periodLabel = getReportPeriodLabel();
 
         String ts = new SimpleDateFormat("MM/dd/yyyy hh:mm a", Locale.getDefault()).format(new Date());
         String summary = String.format(Locale.getDefault(),
                 "     FARM ANALYTICS REPORT\n" +
-                        "Generated: %s\n\n" +
+                        "Generated: %s\n" +
+                        "Period: %s\n\n" +
                         " EGG PRODUCTION\n" +
                         "Total Eggs Collected: %d\n" +
                         "Grade A: %d\n" +
                         "Grade B: %d\n" +
-                        "Grade C: %d", ts, total, a, b, c);
+                        "Grade C: %d", ts, periodLabel, total, a, b, c);
 
         int finalA = a;
         int finalTotal = total;
         int finalB = b;
         int finalC = c;
         new AlertDialog.Builder(this)
-                .setTitle("Farm Analytics Report")
+                .setTitle("Farm Analytics Report — " + currentFilter)
                 .setMessage(summary)
-                .setPositiveButton("Export as PDF", (dialog, which) -> generatePdfReport(finalTotal, finalA, finalB, finalC))
+                .setPositiveButton("Export as PDF", (dialog, which) -> generatePdfReport(finalTotal, finalA, finalB, finalC, periodLabel))
+                .setNeutralButton("Export as Image", (dialog, which) -> showImageFormatChooser(finalTotal, finalA, finalB, finalC, periodLabel))
                 .setNegativeButton("Close", null)
                 .show();
     }
 
-    private void generatePdfReport(int total, int a, int b, int c) {
+    /** Lets the user pick PNG (lossless) or JPEG (smaller file) before exporting the report as an image. */
+    private void showImageFormatChooser(int total, int a, int b, int c, String periodLabel) {
+        String[] formats = {"PNG (best quality)", "JPEG (smaller file)"};
+        new AlertDialog.Builder(this)
+                .setTitle("Choose Image Format")
+                .setItems(formats, (dialog, which) -> {
+                    if (which == 0) {
+                        exportImageReport(total, a, b, c, periodLabel, Bitmap.CompressFormat.PNG, "png", "image/png");
+                    } else {
+                        exportImageReport(total, a, b, c, periodLabel, Bitmap.CompressFormat.JPEG, "jpg", "image/jpeg");
+                    }
+                })
+                .show();
+    }
+
+    /**
+     * Renders an offscreen PieChart matching the report's grade totals (using the same brand
+     * colors as the on-screen dashboard) and returns it as a Bitmap so it can be embedded into
+     * both the PDF and PNG/JPEG report exports.
+     */
+    private Bitmap createPieChartBitmap(int a, int b, int c, int widthPx, int heightPx) {
+        try {
+            PieChart chart = new PieChart(this);
+            chart.setUsePercentValues(true);
+            chart.getDescription().setEnabled(false);
+            chart.getLegend().setEnabled(true);
+            chart.getLegend().setTextSize(11f);
+            chart.getLegend().setFormSize(10f);
+            // MPAndroidChart's legend does NOT wrap by default — if all entries don't fit on
+            // one row it silently drops whichever one overflows instead of wrapping to a new
+            // line. That's what was making "Grade C" disappear from the report's legend.
+            chart.getLegend().setWordWrapEnabled(true);
+            chart.setDrawHoleEnabled(true);
+            chart.setHoleColor(Color.WHITE);
+            chart.setEntryLabelColor(Color.BLACK);
+            chart.setDrawEntryLabels(false);
+            // Room around the pie for the outside percentage labels + leader lines below.
+            chart.setExtraOffsets(24, 12, 24, 12);
+            // Keep every slice at least this wide so two small/near-equal grades don't
+            // collapse into each other and squish their labels together — same as
+            // the on-screen dashboard chart.
+            chart.setMinAngleForSlices(18f);
+
+            List<PieEntry> entries = new ArrayList<>();
+            List<Integer> colors = new ArrayList<>();
+            int total = a + b + c;
+
+            if (total > 0) {
+                if (a > 0) { entries.add(new PieEntry(a, "Grade A")); colors.add(COLOR_GRADE_A); }
+                if (b > 0) { entries.add(new PieEntry(b, "Grade B")); colors.add(COLOR_GRADE_B); }
+                if (c > 0) { entries.add(new PieEntry(c, "Grade C")); colors.add(COLOR_GRADE_C); }
+            } else {
+                entries.add(new PieEntry(1, "No Data"));
+                colors.add(COLOR_NO_DATA);
+            }
+
+            PieDataSet dataSet = new PieDataSet(entries, "");
+            dataSet.setColors(colors);
+            dataSet.setSliceSpace(3f);
+            dataSet.setValueTextColor(Color.BLACK);
+            dataSet.setValueTextSize(11f);
+
+            // --- Straight leader lines pointing at each slice, same as the dashboard chart ---
+            // This is what keeps small-percentage labels legible instead of overlapping/squishing.
+            dataSet.setValueLinePart1OffsetPercentage(80f);
+            dataSet.setValueLinePart1Length(0.5f);
+            dataSet.setValueLinePart2Length(0.3f);
+            dataSet.setValueLineWidth(1.5f);
+            dataSet.setUsingSliceColorAsValueLineColor(true);
+            dataSet.setXValuePosition(PieDataSet.ValuePosition.OUTSIDE_SLICE);
+            dataSet.setYValuePosition(PieDataSet.ValuePosition.OUTSIDE_SLICE);
+
+            PieData pieData = new PieData(dataSet);
+            if (total > 0) {
+                pieData.setValueFormatter(new PercentFormatter(chart));
+            } else {
+                pieData.setValueFormatter(new ValueFormatter() {
+                    @Override public String getPieLabel(float value, PieEntry entry) { return ""; }
+                });
+            }
+            pieData.setValueTextSize(11f);
+            chart.setData(pieData);
+
+            int widthSpec = View.MeasureSpec.makeMeasureSpec(widthPx, View.MeasureSpec.EXACTLY);
+            int heightSpec = View.MeasureSpec.makeMeasureSpec(heightPx, View.MeasureSpec.EXACTLY);
+            chart.measure(widthSpec, heightSpec);
+            chart.layout(0, 0, widthPx, heightPx);
+
+            Bitmap bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bitmap);
+            canvas.drawColor(Color.WHITE);
+            chart.draw(canvas);
+            return bitmap;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private void generatePdfReport(int total, int a, int b, int c, String periodLabel) {
         try {
             String ts = new SimpleDateFormat("MM/dd/yyyy hh:mm a", Locale.getDefault()).format(new Date());
             PdfDocument document = new PdfDocument();
@@ -626,25 +854,42 @@ public class AnalyticsActivity extends AppCompatActivity {
             canvas.drawRect(0, 0, 595, 842, bg);
 
             Paint hdr = new Paint(); hdr.setColor(Color.parseColor("#355E1A"));
-            canvas.drawRect(0, 0, 595, 75, hdr);
+            canvas.drawRect(0, 0, 595, 92, hdr);
+
+            // --- App logo, top-left of the header band ---
+            // Logo PNG lives at app/src/main/res/drawable/app_logo.png — rename here if yours differs.
+            Bitmap logoBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.logo_quailfarm);
+            if (logoBitmap != null) {
+                Bitmap scaledLogo = Bitmap.createScaledBitmap(logoBitmap, 50, 50, true);
+                canvas.drawBitmap(scaledLogo, 18, 20, null);
+            }
 
             Paint ht = new Paint(); ht.setColor(Color.WHITE); ht.setTextSize(20f); ht.setFakeBoldText(true);
-            canvas.drawText("Waje's Quail Farm — Analytics Report", 18, 34, ht);
+            canvas.drawText("Waje's Quail Farm — Analytics Report", 78, 40, ht);
 
             Paint hs = new Paint(); hs.setColor(Color.WHITE); hs.setTextSize(11f);
-            canvas.drawText("Generated: " + ts, 18, 56, hs);
+            canvas.drawText("Generated: " + ts, 78, 58, hs);
+            canvas.drawText("Period: " + periodLabel, 78, 76, hs);
 
-            int y = 120;
-            drawSection(canvas, "Production Summary", y); y += 30;
+            int y = 125;
+            drawSection(canvas, "Production Summary (" + currentFilter + ")", y); y += 30;
             drawRow(canvas, "Total Eggs Collected", String.valueOf(total), y); y += 20;
             drawRow(canvas, "Grade A (Normal)", String.valueOf(a), y); y += 20;
             drawRow(canvas, "Grade B (Cracked)", String.valueOf(b), y); y += 20;
             drawRow(canvas, "Grade C (Reject)", String.valueOf(c), y); y += 40;
 
+            // --- Grade distribution pie chart ---
+            drawSection(canvas, "Grade Distribution", y); y += 20;
+            Bitmap chartBitmap = createPieChartBitmap(a, b, c, 400, 420);
+            if (chartBitmap != null) {
+                float chartLeft = (595 - 400) / 2f;
+                canvas.drawBitmap(chartBitmap, chartLeft, y, null);
+            }
+
             document.finishPage(page);
             File dir = new File(getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "WajeReports");
             if (!dir.exists()) dir.mkdirs();
-            String filename = "FarmReport_" + System.currentTimeMillis() + ".pdf";
+            String filename = "FarmReport_" + getReportFilterTag() + "_" + System.currentTimeMillis() + ".pdf";
             File pdfFile = new File(dir, filename);
             document.writeTo(new FileOutputStream(pdfFile));
             document.close();
@@ -657,6 +902,76 @@ public class AnalyticsActivity extends AppCompatActivity {
             Toast.makeText(this, "PDF saved: " + filename, Toast.LENGTH_LONG).show();
         } catch (Exception e) {
             Toast.makeText(this, "Failed to generate PDF: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    /**
+     * Renders the same header/logo + stats + pie chart layout used in the PDF report onto a
+     * Bitmap and saves it as a PNG or JPEG, depending on what the user picked.
+     */
+    private void exportImageReport(int total, int a, int b, int c, String periodLabel, Bitmap.CompressFormat format, String ext, String mimeType) {
+        try {
+            int width = 595, height = 800;
+            Bitmap reportBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(reportBitmap);
+
+            Paint bg = new Paint(); bg.setColor(Color.WHITE);
+            canvas.drawRect(0, 0, width, height, bg);
+
+            Paint hdr = new Paint(); hdr.setColor(Color.parseColor("#355E1A"));
+            canvas.drawRect(0, 0, width, 92, hdr);
+
+            Bitmap logoBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.logo_quailfarm);
+            if (logoBitmap != null) {
+                Bitmap scaledLogo = Bitmap.createScaledBitmap(logoBitmap, 50, 50, true);
+                canvas.drawBitmap(scaledLogo, 18, 20, null);
+            }
+
+            String ts = new SimpleDateFormat("MM/dd/yyyy hh:mm a", Locale.getDefault()).format(new Date());
+            Paint ht = new Paint(); ht.setColor(Color.WHITE); ht.setTextSize(20f); ht.setFakeBoldText(true);
+            canvas.drawText("Waje's Quail Farm — Analytics Report", 78, 40, ht);
+
+            Paint hs = new Paint(); hs.setColor(Color.WHITE); hs.setTextSize(11f);
+            canvas.drawText("Generated: " + ts, 78, 58, hs);
+            canvas.drawText("Period: " + periodLabel, 78, 76, hs);
+
+            int y = 125;
+            drawSection(canvas, "Production Summary (" + currentFilter + ")", y); y += 30;
+            drawRow(canvas, "Total Eggs Collected", String.valueOf(total), y); y += 20;
+            drawRow(canvas, "Grade A (Normal)", String.valueOf(a), y); y += 20;
+            drawRow(canvas, "Grade B (Cracked)", String.valueOf(b), y); y += 20;
+            drawRow(canvas, "Grade C (Reject)", String.valueOf(c), y); y += 40;
+
+            drawSection(canvas, "Grade Distribution", y); y += 20;
+            Bitmap chartBitmap = createPieChartBitmap(a, b, c, 400, 420);
+            if (chartBitmap != null) {
+                float chartLeft = (width - 400) / 2f;
+                canvas.drawBitmap(chartBitmap, chartLeft, y, null);
+            }
+
+            // JPEG has no alpha channel — flatten onto white before compressing so
+            // transparent chart/logo edges don't turn black.
+            // NOTE: uses the same DIRECTORY_DOCUMENTS root as the PDF export (not
+            // DIRECTORY_PICTURES) because that's the root actually registered in
+            // res/xml/file_paths.xml for the FileProvider. Pointing FileProvider at an
+            // unregistered root is exactly what caused the "failed to find configured
+            // root" crash.
+            File dir = new File(getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "WajeReports");
+            if (!dir.exists()) dir.mkdirs();
+            String filename = "FarmReport_" + getReportFilterTag() + "_" + System.currentTimeMillis() + "." + ext;
+            File imageFile = new File(dir, filename);
+            try (FileOutputStream out = new FileOutputStream(imageFile)) {
+                reportBitmap.compress(format, 92, out);
+            }
+
+            android.net.Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", imageFile);
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(uri, mimeType);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(Intent.createChooser(intent, "Open Image Report"));
+            Toast.makeText(this, "Image saved: " + filename, Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            Toast.makeText(this, "Failed to generate image: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
     }
 

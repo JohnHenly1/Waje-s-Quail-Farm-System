@@ -100,7 +100,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Address (optional — fill all or leave all blank)"
+            android:text="Address (optional — fill street, barangay &amp; postal code, or leave blank)"
             android:textColor="@color/dark_green"
             android:textSize="14sp"
             android:textStyle="bold"
@@ -117,26 +117,76 @@
             android:textSize="16sp"
             android:layout_marginBottom="10dp" />
 
-        <EditText
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="City / Municipality"
+            android:textColor="@color/dark_green"
+            android:textSize="12sp"
+            android:layout_marginBottom="4dp" />
+
+        <Spinner
             android:id="@+id/inviteAddressCity"
             android:layout_width="match_parent"
             android:layout_height="52dp"
             android:background="@drawable/rounded_corner"
-            android:hint="City"
-            android:inputType="text"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:spinnerMode="dropdown"
+            android:layout_marginBottom="10dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Barangay"
+            android:textColor="@color/dark_green"
+            android:textSize="12sp"
+            android:layout_marginBottom="4dp" />
+
+        <Spinner
+            android:id="@+id/inviteAddressBarangay"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:background="@drawable/rounded_corner"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:spinnerMode="dropdown"
+            android:layout_marginBottom="10dp" />
+
+        <!-- Shown only when "Other (type manually)" is picked above, or before
+             a City / Municipality has been selected yet. -->
+        <EditText
+            android:id="@+id/inviteAddressBarangayOther"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:background="@drawable/rounded_corner"
+            android:hint="Enter barangay name"
+            android:inputType="textPostalAddress"
             android:padding="12dp"
             android:textSize="16sp"
+            android:visibility="gone"
             android:layout_marginBottom="10dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Province"
+            android:textColor="@color/dark_green"
+            android:textSize="12sp"
+            android:layout_marginBottom="4dp" />
 
         <EditText
             android:id="@+id/inviteAddressState"
             android:layout_width="match_parent"
             android:layout_height="52dp"
             android:background="@drawable/rounded_corner"
-            android:hint="State / Province"
+            android:text="Bataan"
+            android:enabled="false"
+            android:focusable="false"
             android:inputType="text"
             android:padding="12dp"
             android:textSize="16sp"
+            android:textColor="@color/dark_green"
             android:layout_marginBottom="10dp" />
 
         <EditText

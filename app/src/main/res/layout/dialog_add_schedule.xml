@@ -75,7 +75,7 @@
                 android:layout_height="match_parent" />
         </FrameLayout>
 
-        <!-- Assign To (Managers can assign tasks to staff) -->
+        <!-- Assign To (Managers can assign tasks to one or more staff) -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -85,16 +85,24 @@
             android:textSize="14sp"
             android:textStyle="bold" />
 
-        <FrameLayout
+        <TextView
+            android:id="@+id/assigneeSelector"
             android:layout_width="match_parent"
             android:layout_height="52dp"
             android:layout_marginTop="8dp"
-            android:background="@drawable/rounded_corner">
-            <Spinner
-                android:id="@+id/spinnerAssignee"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent" />
-        </FrameLayout>
+            android:background="@drawable/rounded_corner"
+            android:gravity="center_vertical"
+            android:text="(No specific staff)"
+            android:textColor="@color/dark_gray"
+            android:textSize="16sp"
+            android:paddingStart="12dp"
+            android:paddingEnd="36dp"
+            android:drawableEnd="@drawable/ic_arrow_forward"
+            app:drawableTint="@color/dark_green"
+            android:clickable="true"
+            android:focusable="true"
+            android:ellipsize="end"
+            android:maxLines="1" />
 
         <!-- Time -->
         <TextView

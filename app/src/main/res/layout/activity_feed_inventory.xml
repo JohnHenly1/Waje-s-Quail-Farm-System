@@ -413,7 +413,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:fontFamily="sans-serif"
-                android:text="@string/analytics"
+                android:text="@string/report"
                 android:textColor="@color/white"
                 android:textSize="10sp" />
         </LinearLayout>

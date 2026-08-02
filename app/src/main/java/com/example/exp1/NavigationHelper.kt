@@ -22,6 +22,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.animation.AnimationUtils
 import android.widget.AbsListView
+import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.BaseAdapter
 import android.widget.EditText
@@ -29,6 +30,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.ProgressBar
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.view.GravityCompat
@@ -52,7 +54,6 @@ object NavigationHelper {
     fun setupBottomNavigation(activity: Activity) {
         val homeButton = activity.findViewById<LinearLayout>(R.id.homeButton)
         val analyticsButton = activity.findViewById<LinearLayout>(R.id.analyticsButton)
-        val cameraButton = activity.findViewById<LinearLayout>(R.id.CameraButton)
         val scheduleButton = activity.findViewById<LinearLayout>(R.id.scheduleButton)
         val profileButton = activity.findViewById<LinearLayout>(R.id.profileButton)
 
@@ -69,7 +70,6 @@ object NavigationHelper {
 
         applyTouchGlow(homeButton)
         applyTouchGlow(analyticsButton)
-        applyTouchGlow(cameraButton)
         applyTouchGlow(scheduleButton)
         applyTouchGlow(profileButton)
 
@@ -85,9 +85,6 @@ object NavigationHelper {
             }
         }
 
-        cameraButton?.setOnClickListener {
-            navigateTo(activity, EggCountActivity::class.java, "Opening Camera...", currentEmail)
-        }
 
         scheduleButton?.setOnClickListener {
             if (activity !is ScheduleActivity) {
@@ -317,7 +314,9 @@ object NavigationHelper {
     // USER LIST  ("Add User" side-menu entry opens this first)
     // Shows only PENDING ("invited") users — approved/active users don't
     // clutter this screen. Each row has an "Unlock" action that runs the
-    // verification-code procedure for that one person, after confirmation.
+    // verification-code procedure for that one person, and a "Delete"
+    // action to remove the pending profile entirely — both behind their
+    // own confirmation popups.
     // ─────────────────────────────────────────────────────────────────────
 
     private data class PendingUser(
@@ -369,9 +368,32 @@ object NavigationHelper {
         dialog.show()
 
         val items = mutableListOf<PendingUser>()
-        val adapter = PendingUserAdapter(activity, items) { user ->
-            showUnlockConfirmationDialog(activity, ownerEmail, user)
+        lateinit var adapter: PendingUserAdapter
+
+        fun refreshEmptyState() {
+            if (items.isEmpty()) {
+                listView.visibility = View.GONE
+                emptyText.visibility = View.VISIBLE
+            } else {
+                listView.visibility = View.VISIBLE
+                emptyText.visibility = View.GONE
+            }
         }
+
+        adapter = PendingUserAdapter(
+            activity = activity,
+            items = items,
+            onUnlockClicked = { user ->
+                showUnlockConfirmationDialog(activity, ownerEmail, user)
+            },
+            onDeleteClicked = { user ->
+                showDeletePendingUserConfirmationDialog(activity, user) {
+                    items.remove(user)
+                    adapter.notifyDataSetChanged()
+                    refreshEmptyState()
+                }
+            }
+        )
         listView.adapter = adapter
 
         FirebaseFirestore.getInstance().collection("user_access")
@@ -388,25 +410,20 @@ object NavigationHelper {
                         )
                     )
                 }
-                if (items.isEmpty()) {
-                    listView.visibility = View.GONE
-                    emptyText.visibility = View.VISIBLE
-                } else {
-                    listView.visibility = View.VISIBLE
-                    emptyText.visibility = View.GONE
-                    adapter.notifyDataSetChanged()
-                }
+                adapter.notifyDataSetChanged()
+                refreshEmptyState()
             }
             .addOnFailureListener { e ->
                 Toast.makeText(activity, "Could not load users: ${e.message}", Toast.LENGTH_SHORT).show()
             }
     }
 
-    /** Modern, card-style row: initial avatar, name/role/email, pending badge, Unlock action. */
+    /** Modern, card-style row: initial avatar, name/role/email, pending badge, Unlock + Delete actions. */
     private class PendingUserAdapter(
         private val activity: Activity,
         private val items: MutableList<PendingUser>,
-        private val onUnlockClicked: (PendingUser) -> Unit
+        private val onUnlockClicked: (PendingUser) -> Unit,
+        private val onDeleteClicked: (PendingUser) -> Unit
     ) : BaseAdapter() {
 
         private val dp = activity.resources.displayMetrics.density
@@ -473,6 +490,11 @@ object NavigationHelper {
             })
             card.addView(textColumn)
 
+            val actionColumn = LinearLayout(activity).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_HORIZONTAL
+            }
+
             val unlockButton: View = try {
                 MaterialButton(activity).apply {
                     text = "Unlock"
@@ -484,7 +506,19 @@ object NavigationHelper {
                 android.widget.Button(activity).apply { text = "Unlock" }
             }
             unlockButton.setOnClickListener { onUnlockClicked(user) }
-            card.addView(unlockButton)
+            actionColumn.addView(unlockButton)
+
+            val deleteButton = TextView(activity).apply {
+                text = "Delete"
+                setTextColor(Color.parseColor("#D93025"))
+                textSize = 12f
+                gravity = Gravity.CENTER
+                setPadding(0, (8 * dp).toInt(), 0, 0)
+                setOnClickListener { onDeleteClicked(user) }
+            }
+            actionColumn.addView(deleteButton)
+
+            card.addView(actionColumn)
 
             return card
         }
@@ -506,16 +540,183 @@ object NavigationHelper {
     // "Unlock" action in the pending-users list.)
     // ─────────────────────────────────────────────────────────────────────
 
+    /**
+     * ZIP/postal codes for Balanga City and each municipality of Bataan
+     * (PHLPost). Used to auto-fill the postal code field once a city /
+     * municipality is picked in the Add User dialog.
+     */
+    private val bataanPostalCodes: Map<String, String> = mapOf(
+        "Abucay" to "2114",
+        "Bagac" to "2107",
+        "Balanga City" to "2100",
+        "Dinalupihan" to "2110",
+        "Hermosa" to "2111",
+        "Limay" to "2103",
+        "Mariveles" to "2105",
+        "Morong" to "2108",
+        "Orani" to "2112",
+        "Orion" to "2102",
+        "Pilar" to "2101",
+        "Samal" to "2113"
+    )
+
+    /**
+     * Barangays per municipality/city in Bataan, used to populate the
+     * barangay dropdown once a municipality/city is selected. An
+     * "Other (type manually)" option is always appended so a barangay
+     * that isn't listed (or a sitio/purok-level detail) can still be
+     * entered as free text.
+     */
+    private val bataanBarangays: Map<String, List<String>> = mapOf(
+        "Abucay" to listOf(
+            "Bangkal", "Calaylayan", "Capitangan", "Gabon", "Laon",
+            "Mabatang", "Omboy", "Salian", "Wawa"
+        ),
+        "Bagac" to listOf(
+            "Atilano L. Ricardo", "Bagumbayan", "Banawang", "Binuangan", "Binukawan",
+            "Ibaba", "Ibis", "Pag-asa", "Parang", "Paysawan",
+            "Quinawan", "San Antonio", "Saysain", "Tabing-Ilog"
+        ),
+        "Balanga City" to listOf(
+            "Bagong Silang", "Bagumbayan", "Cabog-Cabog", "Camacho", "Cataning",
+            "Central", "Cupang North", "Cupang Proper", "Cupang West", "Dangcol",
+            "Doña Francisca", "Ibayo", "Lote", "Malabia", "Munting Batangas",
+            "Poblacion", "Pto. Rivas Ibaba", "Pto. Rivas Itaas", "San Jose", "Sibacan",
+            "Talisay", "Tanato", "Tenejero", "Tortugas", "Tuyo"
+        ),
+        "Dinalupihan" to listOf(
+            "Aquino", "Bangal", "Bayan-bayanan", "Bonifacio", "Burgos",
+            "Colo", "Daang Bago", "Dalao", "Del Pilar", "Gen. Luna",
+            "Gomez", "Happy Valley", "Jose C. Payumo, Jr.", "Kataasan", "Layac",
+            "Luacan", "Mabini Ext.", "Mabini Proper", "Magsaysay", "Maligaya",
+            "Naparing", "New San Jose", "Old San Jose", "Padre Dandan", "Pag-asa",
+            "Pagalanggang", "Payangan", "Pentor", "Pinulot", "Pita",
+            "Rizal", "Roosevelt", "Roxas", "Saguing", "San Benito",
+            "San Isidro", "San Pablo", "San Ramon", "San Simon", "Santa Isabel",
+            "Santo Niño", "Sapang Balas", "Torres Bugauen", "Tubo-tubo", "Tucop",
+            "Zamora"
+        ),
+        "Hermosa" to listOf(
+            "A. Rivera", "Almacen", "Bacong", "Balsic", "Bamban",
+            "Burgos-Soliman", "Cataning", "Culis", "Daungan", "Judge Roman Cruz Sr.",
+            "Mabiga", "Mabuco", "Maite", "Mambog-Mandama", "Palihan",
+            "Pandatung", "Pulo", "Saba", "Sacrifice Valley", "San Pedro",
+            "Santo Cristo", "Sumalo", "Tipo"
+        ),
+        "Limay" to listOf(
+            "Alangan", "Duale", "Kitang 2 & Luz", "Kitang I", "Lamao",
+            "Landing", "Poblacion", "Reformista", "Saint Francis II", "San Francisco de Asis",
+            "Townsite", "Wawa"
+        ),
+        "Mariveles" to listOf(
+            "Alas-asin", "Alion", "Balon-Anito", "Baseco Country", "Batangas II",
+            "Biaan", "Cabcaben", "Camaya", "Ipag", "Lucanin",
+            "Malaya", "Maligaya", "Mt. View", "Poblacion", "San Carlos",
+            "San Isidro", "Sisiman", "Townsite"
+        ),
+        "Morong" to listOf(
+            "Binaritan", "Mabayo", "Nagbalayong", "Poblacion", "Sabang"
+        ),
+        "Orani" to listOf(
+            "Apollo", "Bagong Paraiso", "Balut", "Bayan", "Calero",
+            "Centro I", "Centro II", "Dona", "Kabalutan", "Kaparangan",
+            "Maria Fe", "Masantol", "Mulawin", "Pag-asa", "Paking-Carbonero",
+            "Palihan", "Pantalan Bago", "Pantalan Luma", "Parang Parang", "Puksuan",
+            "Sibul", "Silahis", "Tagumpay", "Tala", "Talimundoc",
+            "Tapulao", "Tenejero", "Tugatog", "Wawa"
+        ),
+        "Orion" to listOf(
+            "Arellano", "Bagumbayan", "Balagtas", "Balut", "Bantan",
+            "Bilolo", "Calungusan", "Camachile", "Daang Bago", "Daang Bilolo",
+            "Daang Pare", "General Lim", "Kapunitan", "Lati", "Lusungan",
+            "Puting Buhangin", "Sabatan", "San Vicente", "Santa Elena", "Santo Domingo",
+            "Villa Angeles", "Wakas", "Wawa"
+        ),
+        "Pilar" to listOf(
+            "Ala-uli", "Bagumbayan", "Balut I", "Balut II", "Bantan Munti",
+            "Burgos", "Del Rosario", "Diwa", "Landing", "Liyang",
+            "Nagwaling", "Panilao", "Pantingan", "Poblacion", "Rizal",
+            "Santa Rosa", "Wakas North", "Wakas South", "Wawa"
+        ),
+        "Samal" to listOf(
+            "East Calaguiman", "East Daang Bago", "Gugo", "Ibaba", "Imelda",
+            "Lalawigan", "Palili", "San Juan", "San Roque", "Santa Lucia",
+            "Sapa", "Tabing Ilog", "West Calaguiman", "West Daang Bago"
+        )
+    )
+
+    private const val OTHER_BARANGAY_LABEL = "Other (type manually)"
+
     fun showAddUserDialog(activity: Activity, ownerEmail: String) {
         val dialogView = LayoutInflater.from(activity).inflate(R.layout.dialog_invite_user, null)
         val editName = dialogView.findViewById<EditText>(R.id.inviteName)
         val editEmail = dialogView.findViewById<EditText>(R.id.inviteEmail)
         val editBirthday = dialogView.findViewById<EditText>(R.id.inviteBirthday)
         val editStreet = dialogView.findViewById<EditText>(R.id.inviteAddressStreet)
-        val editCity = dialogView.findViewById<EditText>(R.id.inviteAddressCity)
+        val spinnerCity = dialogView.findViewById<Spinner>(R.id.inviteAddressCity)
         val editState = dialogView.findViewById<EditText>(R.id.inviteAddressState)
         val editPostal = dialogView.findViewById<EditText>(R.id.inviteAddressPostal)
+
+        // Address is fixed to Bataan province; City is a dropdown of every
+        // municipality plus the one component city in Bataan.
+        editState.setText("Bataan")
+        editState.isEnabled = false
+        val cityPlaceholder = "Select City / Municipality"
+        val bataanCities = listOf(
+            cityPlaceholder,
+            "Abucay", "Bagac", "Balanga City", "Dinalupihan", "Hermosa",
+            "Limay", "Mariveles", "Morong", "Orani", "Orion", "Pilar", "Samal"
+        )
+        val cityAdapter = ArrayAdapter(activity, android.R.layout.simple_spinner_item, bataanCities)
+        cityAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        spinnerCity.adapter = cityAdapter
         val rbStaff = dialogView.findViewById<android.widget.RadioButton>(R.id.radioInviteStaff)
+
+        // Barangay selector: a dropdown scoped to the selected city, plus a
+        // free-text fallback ("Other") for anything not in the list. Both
+        // views live in the XML layout, right below the city spinner.
+        val spinnerBarangay = dialogView.findViewById<Spinner>(R.id.inviteAddressBarangay)
+        val editBarangayCustom = dialogView.findViewById<EditText>(R.id.inviteAddressBarangayOther)
+
+        fun updateBarangaySpinner(city: String) {
+            val options = mutableListOf("Select Barangay")
+            bataanBarangays[city]?.let { options.addAll(it) }
+            options.add(OTHER_BARANGAY_LABEL)
+            val barangayAdapter = ArrayAdapter(activity, android.R.layout.simple_spinner_item, options)
+            barangayAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            spinnerBarangay.adapter = barangayAdapter
+            spinnerBarangay.setSelection(0)
+            editBarangayCustom.visibility = View.GONE
+            editBarangayCustom.setText("")
+        }
+        updateBarangaySpinner("") // nothing selected yet
+
+        spinnerBarangay.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val selected = parent?.getItemAtPosition(position)?.toString() ?: ""
+                if (selected == OTHER_BARANGAY_LABEL) {
+                    editBarangayCustom.visibility = View.VISIBLE
+                } else {
+                    editBarangayCustom.visibility = View.GONE
+                    editBarangayCustom.setText("")
+                }
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+
+        spinnerCity.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                if (position > 0) {
+                    val cityName = bataanCities[position]
+                    editPostal.setText(bataanPostalCodes[cityName] ?: "")
+                    updateBarangaySpinner(cityName)
+                } else {
+                    editPostal.setText("")
+                    updateBarangaySpinner("")
+                }
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
 
         editName.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -594,9 +795,17 @@ object NavigationHelper {
             val invitedEmail = editEmail.text.toString().trim().lowercase()
             val birthday = editBirthday.text.toString().trim()
             val street = editStreet.text.toString().trim()
-            val city = editCity.text.toString().trim()
-            val state = editState.text.toString().trim()
+            val citySelected = spinnerCity.selectedItemPosition > 0
+            val city = if (citySelected) spinnerCity.selectedItem.toString() else ""
+            val state = editState.text.toString().trim() // always "Bataan"
             val postal = editPostal.text.toString().trim()
+            val barangaySelectedText = spinnerBarangay.selectedItem?.toString() ?: ""
+            val barangaySelected = spinnerBarangay.selectedItemPosition > 0 && barangaySelectedText != OTHER_BARANGAY_LABEL
+            val barangay = when {
+                barangaySelected -> barangaySelectedText
+                barangaySelectedText == OTHER_BARANGAY_LABEL -> editBarangayCustom.text.toString().trim()
+                else -> ""
+            }
             val selectedRole = "staff"
 
             if (name.isEmpty()) {
@@ -620,13 +829,27 @@ object NavigationHelper {
                 Toast.makeText(activity, "User must be at least 18 years old", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            val anyAddress = street.isNotEmpty() || city.isNotEmpty() || state.isNotEmpty() || postal.isNotEmpty()
+            // Province is always "Bataan" now, so it shouldn't be what decides
+            // whether an address was "started" — base that on street/city/barangay/postal.
+            val anyAddress = street.isNotEmpty() || citySelected || postal.isNotEmpty() || barangay.isNotEmpty()
             if (anyAddress) {
-                if (street.isEmpty() || city.isEmpty() || state.isEmpty() || postal.isEmpty()) {
-                    Toast.makeText(activity, "Please fill all address fields or leave them all empty", Toast.LENGTH_SHORT).show()
+                if (street.isEmpty()) {
+                    Toast.makeText(activity, "Please enter the street", Toast.LENGTH_SHORT).show()
                     return@setOnClickListener
                 }
-                val addressError = validateAddress(street, city, state, postal)
+                if (!citySelected) {
+                    Toast.makeText(activity, "Please select a city / municipality", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                if (barangay.isEmpty()) {
+                    Toast.makeText(activity, "Please select or enter the barangay", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                if (postal.isEmpty()) {
+                    Toast.makeText(activity, "Please enter the postal code", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                val addressError = validateAddress(street, barangay, city, state, postal)
                 if (addressError != null) {
                     Toast.makeText(activity, addressError, Toast.LENGTH_SHORT).show()
                     return@setOnClickListener
@@ -638,7 +861,13 @@ object NavigationHelper {
             }
 
             val addressMap = if (anyAddress) {
-                mapOf("street" to street, "city" to city, "state" to state, "postalCode" to postal)
+                mapOf(
+                    "street" to street,
+                    "barangay" to barangay,
+                    "city" to city,
+                    "state" to state,
+                    "postalCode" to postal
+                )
             } else null
 
             // Check whether this email already belongs to an active account.
@@ -671,14 +900,16 @@ object NavigationHelper {
         return null
     }
 
-    private fun validateAddress(street: String, city: String, state: String, postal: String): String? {
+    private fun validateAddress(street: String, barangay: String, city: String, state: String, postal: String): String? {
         if (street.length < 5) return "Street address must be at least 5 characters"
+        if (barangay.length < 2) return "Barangay must be at least 2 characters"
         if (city.length < 2) return "City must be at least 2 characters"
         if (state.length < 2) return "State/Province must be at least 2 characters"
         if (postal.length < 3) return "Postal code must be at least 3 characters"
 
         val invalidChars = "!@#$%^&*()=[]{}|;':\",<>?"
-        if (street.any { it in invalidChars } || city.any { it in invalidChars } ||
+        if (street.any { it in invalidChars } || barangay.any { it in invalidChars } ||
+            city.any { it in invalidChars } ||
             state.any { it in invalidChars } || postal.any { it in invalidChars }) {
             return "Address contains invalid characters"
         }
@@ -809,6 +1040,53 @@ object NavigationHelper {
             }
             .addOnFailureListener { e ->
                 Toast.makeText(activity, "Failed to generate invite code: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // DELETE  (per-row action in the pending-users list — removes the
+    // pending profile entirely, plus any invite code already issued to it.)
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * Confirms before permanently deleting a pending user's profile, since
+     * it isn't easily undone (they'd need to be added again from scratch).
+     */
+    private fun showDeletePendingUserConfirmationDialog(
+        activity: Activity,
+        user: PendingUser,
+        onDeleted: () -> Unit
+    ) {
+        AlertDialog.Builder(activity)
+            .setTitle("Delete ${user.name}?")
+            .setMessage("This permanently removes ${user.name}'s pending profile (${user.email}). If they were already unlocked, their existing invite code will be removed too.\n\nThis can't be undone. Proceed?")
+            .setPositiveButton("Delete") { _, _ ->
+                deletePendingUser(activity, user, onDeleted)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    /**
+     * Deletes the user_access/{email} doc and, best-effort, any invite_codes
+     * docs that were issued to that email. Only ever runs after the owner
+     * explicitly taps Delete and confirms.
+     */
+    private fun deletePendingUser(activity: Activity, user: PendingUser, onDeleted: () -> Unit) {
+        val db = FirebaseFirestore.getInstance()
+        db.collection("user_access").document(user.email).delete()
+            .addOnSuccessListener {
+                db.collection("invite_codes")
+                    .whereEqualTo("invitedEmail", user.email)
+                    .get()
+                    .addOnSuccessListener { docs ->
+                        docs.documents.forEach { it.reference.delete() }
+                    }
+                Toast.makeText(activity, "${user.name} removed.", Toast.LENGTH_SHORT).show()
+                onDeleted()
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(activity, "Failed to remove user: ${e.message}", Toast.LENGTH_LONG).show()
             }
     }
 

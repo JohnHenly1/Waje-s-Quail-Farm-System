@@ -311,10 +311,6 @@ class DashboardActivity : AppCompatActivity() {
     }
 
     private fun setupButtons() {
-        findViewById<LinearLayout?>(R.id.CameraButton)?.setOnClickListener {
-            handleCameraClick()
-        }
-
         findViewById<LinearLayout?>(R.id.analyticsButton)?.setOnClickListener {
             showLoading(getString(R.string.generating_reports)) {
                 startActivity(Intent(this, AnalyticsActivity::class.java).putExtra("username", username))
@@ -353,22 +349,13 @@ class DashboardActivity : AppCompatActivity() {
 
         // Setup AI Smart Tip Shuffle
         val aiCard = findViewById<View>(R.id.aiCard)
-        val recommendationText = findViewById<TextView>(R.id.recommendation_text)
-        val tips = resources.getStringArray(R.array.smart_tips)
+        val tips = resources.getStringArray(R.array.smart_tips).toList()
 
-        fun showRandomTip() {
-            if (tips.isNotEmpty()) {
-                recommendationText?.text = tips[Random.nextInt(tips.size)]
-            }
-        }
+        // remove: showRandomTip(), aiCard random-tip click listener, tips array usage
 
         aiCard?.setOnClickListener {
-            showRandomTip()
-            aiCard.startAnimation(AnimationUtils.loadAnimation(this, R.anim.fade_in))
+            startActivity(Intent(this, ChatBotActivity::class.java).putExtra("username", username))
         }
-
-        // Initial tip
-        showRandomTip()
     }
 
 }

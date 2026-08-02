@@ -596,36 +596,14 @@
                     android:src="@drawable/ic_chart"
                     android:contentDescription="Analytics"
                     app:tint="@color/white" />
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/analytics"
-                    android:textColor="@color/white"
-                    android:textSize="10sp"
-                    android:layout_marginTop="2dp" />
-            </LinearLayout>
 
-            <LinearLayout
-                android:id="@+id/CameraButton"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:background="?attr/selectableItemBackground">
-                <ImageView
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:src="@drawable/ic_camera"
-                    android:contentDescription="Camera"
-                    app:tint="@color/white" />
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/camera"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/Report"
                     android:textColor="@color/white"
-                    android:textSize="10sp"
-                    android:layout_marginTop="2dp" />
+                    android:textSize="10sp" />
             </LinearLayout>
 
             <LinearLayout
