@@ -63,11 +63,6 @@ class FeedInventoryActivity : AppCompatActivity() {
     private var sortOption = sortOptions[0]
     private lateinit var sortSpinner: Spinner
 
-    private val statusOptions = arrayOf("In Stock", "Medium", "Low Stock")
-    private val categoryOptions = arrayOf(
-        "Feed", "Supplements"
-    )
-
     private lateinit var accountManager: AccountManager
     private lateinit var roleManager: RoleManager
     private var feedListener: ListenerRegistration? = null
@@ -353,23 +348,21 @@ class FeedInventoryActivity : AppCompatActivity() {
             else        -> applyBadgeStyle(badge, "#E8F5E9", "#2E7D32")
         }
 
-        // Card tap — staff can update quantity; owner opens full edit dialog
+        // Card tap — any role that can update inventory (owner or staff) opens
+        // the quantity-only dialog. Editing an item's other details (name,
+        // description, unit, etc.) is no longer available from this screen.
         card.setOnClickListener {
             if (item.quantity <= 0L) {
                 showZeroQuantityPopup(item)
-            } else if (roleManager.canEditFarm()) {
-                showAddEditDialog(item, preselectedCategory = item.category)
             } else if (roleManager.canUpdateInventoryQuantity()) {
                 showQuantityUpdateDialog(item)
             }
         }
 
         val editBtn = card.findViewById<View>(R.id.editButton)
-        if (roleManager.canEditFarm()) {
-            editBtn.visibility = View.VISIBLE
-            editBtn.setOnClickListener { showAddEditDialog(item, preselectedCategory = item.category) }
-        } else if (roleManager.canUpdateInventoryQuantity()) {
-            // Staff see the edit button but it opens the quantity-only dialog
+        if (roleManager.canUpdateInventoryQuantity()) {
+            // Owner and staff alike see the edit button; it opens the
+            // quantity-only dialog with +/- stepper controls.
             editBtn.visibility = View.VISIBLE
             editBtn.setOnClickListener { showQuantityUpdateDialog(item) }
         } else {
@@ -396,39 +389,28 @@ class FeedInventoryActivity : AppCompatActivity() {
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // Staff-only: quantity update dialog
-    // Allows staff to change ONLY the stock quantity.  All other fields are
-    // read-only and displayed for context.  The write is performed via a
-    // Firestore transaction so the stock update and audit log are atomic.
+    // Quantity update dialog — the app's only "edit" screen for an existing
+    // feed item, available to every role that can update inventory (owner AND
+    // staff, see [RoleManager.canUpdateInventoryQuantity]). Uses a dedicated,
+    // minimal layout (dialog_edit_quantity.xml) that shows ONLY the item name
+    // (read-only, for context) and the stock quantity with +/- stepper
+    // buttons — no other fields are rendered, so there is nothing else to
+    // edit. The write is performed via a Firestore transaction so the stock
+    // update and audit log are atomic.
     // ──────────────────────────────────────────────────────────────────────────
     private fun showQuantityUpdateDialog(item: FeedItem) {
-        val dialogView = layoutInflater.inflate(R.layout.dialog_add_food, null)
+        val dialogView = layoutInflater.inflate(R.layout.dialog_edit_quantity, null)
 
-        val nameInput     = dialogView.findViewById<EditText>(R.id.foodNameInput)
-        val descInput     = dialogView.findViewById<EditText>(R.id.foodDescInput)
-        val invInput      = dialogView.findViewById<EditText>(R.id.foodInvInput)
-        val locationInput = dialogView.findViewById<EditText>(R.id.foodLocationInput)
         val qtyInput      = dialogView.findViewById<EditText>(R.id.foodQtyInput)
         val qtyLabel      = dialogView.findViewById<TextView>(R.id.foodQtyLabel)
-        val priceInput    = dialogView.findViewById<EditText>(R.id.foodPriceInput)
-        val catSpinner    = dialogView.findViewById<Spinner>(R.id.categorySpinner)
-        val statusSpinner = dialogView.findViewById<Spinner>(R.id.statusSpinner)
-        val existSpinner  = dialogView.findViewById<Spinner>(R.id.existingItemsSpinner)
+        val nameTv        = dialogView.findViewById<TextView>(R.id.qtyItemName)
+        val contextTv     = dialogView.findViewById<TextView>(R.id.qtyItemContext)
 
-        // Hide fields and selectors that staff must not interact with
-        statusSpinner.visibility = View.GONE
-        dialogView.findViewById<TextView>(R.id.statusLabel)?.visibility = View.GONE
-        dialogView.findViewById<View>(R.id.selectItemLabel)?.visibility = View.GONE
-        dialogView.findViewById<View>(R.id.selectItemContainer)?.visibility = View.GONE
-        dialogView.findViewById<View>(R.id.invNumberContainer)?.visibility = View.GONE
+        // Context only — not editable
+        nameTv.text = item.name
+        contextTv.text = "${item.category} • ${item.location}"
 
-        // Pre-fill all fields
-        nameInput.setText(item.name)
-        descInput.setText(item.description)
-        invInput.setText(item.invNumber)
-        locationInput.setText(item.location)
         qtyInput.setText(item.quantity.toString())
-        priceInput.setText(item.unitPrice.toString())
 
         // +/− stepper: faster than typing, and avoids accidentally leaving a 0
         // while restocking by small amounts.
@@ -443,28 +425,14 @@ class FeedInventoryActivity : AppCompatActivity() {
             qtyInput.setText((current + 1).toString())
         }
 
-        val catAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, categoryOptions)
-        catAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        catSpinner.adapter = catAdapter
-        catSpinner.setSelection(categoryOptions.indexOf(item.category).coerceAtLeast(0))
-
         qtyLabel.text = when (item.category) {
             "Feed" -> "Quantity (Sack)"
             "Supplements" -> "Quantity (Bottle)"
             else -> "Quantity"
         }
 
-        // Lock every field except quantity
-        nameInput.isEnabled     = false
-        descInput.isEnabled     = false
-        invInput.isEnabled      = false
-        locationInput.isEnabled = false
-        priceInput.isEnabled    = false
-        catSpinner.isEnabled    = false
-        existSpinner.isEnabled  = false
-
         val dialog = AlertDialog.Builder(this)
-            .setTitle("Update Stock Quantity")
+            .setTitle("Edit Feed Item")
             .setView(dialogView)
             .setPositiveButton("Update", null)
             .setNegativeButton("Cancel", null)
@@ -495,7 +463,7 @@ class FeedInventoryActivity : AppCompatActivity() {
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // Atomic quantity update + audit log  (staff quantity-only edits)
+    // Atomic quantity update + audit log  (owner/staff quantity-only edits)
     // Thin wrapper around [commitFeedChange] with no extra field changes.
     // ──────────────────────────────────────────────────────────────────────────
     private fun commitQuantityUpdate(
@@ -687,11 +655,12 @@ class FeedInventoryActivity : AppCompatActivity() {
     // Zero Quantity Popup
     // ──────────────────────────────────────────────────────────────────────────
     private fun showZeroQuantityPopup(item: FeedItem) {
-        if (roleManager.canEditFarm()) {
+        if (roleManager.canDeleteFeedItem()) {
+            // Owner: can restock (quantity-only) or remove the entry entirely.
             AlertDialog.Builder(this)
                 .setTitle("Out of Stock: ${item.name}")
                 .setMessage("This supply is currently at 0 quantity. Would you like to restock it or delete the entry?")
-                .setPositiveButton("Restock") { _, _ -> showAddEditDialog(item, preselectedCategory = item.category) }
+                .setPositiveButton("Restock") { _, _ -> showQuantityUpdateDialog(item) }
                 .setNegativeButton("Delete") { _, _ -> showDeleteConfirmation(item) }
                 .setNeutralButton("Cancel", null)
                 .show()
@@ -781,26 +750,25 @@ class FeedInventoryActivity : AppCompatActivity() {
                     return@setOnClickListener
                 }
                 dialog.dismiss()
-                showAddEditDialog(item = null, preselectedCategory = cat)
+                showAddEditDialog(preselectedCategory = cat)
             }
         }
         dialog.show()
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // Add / Edit dialog  (owner only)
-    // When called for a new item, [preselectedCategory] carries the value chosen
-    // in showCategorySelectionDialog().  The matching layout is inflated:
+    // Add dialog  (owner only — new items)
+    // NOTE: this dialog is for creating NEW feed/supplement items only. Editing
+    // an existing item's details (name, description, unit, location, price,
+    // etc.) is no longer available anywhere in the app — once an item exists,
+    // only its stock quantity can be changed, via [showQuantityUpdateDialog].
+    // [preselectedCategory] carries the value chosen in showCategorySelectionDialog().
+    // The matching layout is inflated:
     //   Feed        → dialog_add_feed_item.xml       (fixed unit = Sacks)
     //   Supplements → dialog_add_supplement_item.xml (unit selector: Bottle/Box)
-    // Both layouts share the same view IDs for common fields so this single
-    // method handles both paths.
     // ──────────────────────────────────────────────────────────────────────────
-    private fun showAddEditDialog(item: FeedItem?, preselectedCategory: String? = null) {
-        val isEdit = item != null
-
-        // Determine category: for edit use the item's category; for new use the preselected one.
-        val targetCategory = item?.category ?: preselectedCategory ?: "Feed"
+    private fun showAddEditDialog(preselectedCategory: String? = null) {
+        val targetCategory = preselectedCategory ?: "Feed"
 
         // Inflate the category-appropriate layout
         val layoutRes = if (targetCategory == "Supplements")
@@ -827,38 +795,27 @@ class FeedInventoryActivity : AppCompatActivity() {
             spinner.adapter = unitAdapter
         }
 
-        // Hide existing-item selector when editing
-        if (isEdit) {
-            dialogView.findViewById<View>(R.id.selectItemLabel)?.visibility = View.GONE
-            dialogView.findViewById<View>(R.id.selectItemContainer)?.visibility = View.GONE
-        } else {
-            // Populate "select existing" spinner filtered to this category
-            val existSpinner = dialogView.findViewById<Spinner>(R.id.existingItemsSpinner)
-            val sameCatItems = allItems.filter { it.category == targetCategory }
-            val spinnerData  = mutableListOf("--- Create New Item ---")
-            spinnerData.addAll(sameCatItems.map { "${it.name} (${it.location})" })
-            val existAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, spinnerData)
-            existAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-            existSpinner.adapter = existAdapter
+        // Populate "select existing" spinner filtered to this category
+        val existSpinner = dialogView.findViewById<Spinner>(R.id.existingItemsSpinner)
+        val sameCatItems = allItems.filter { it.category == targetCategory }
+        val spinnerData  = mutableListOf("--- Create New Item ---")
+        spinnerData.addAll(sameCatItems.map { "${it.name} (${it.location})" })
+        val existAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, spinnerData)
+        existAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        existSpinner.adapter = existAdapter
 
-            existSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-                override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
-                    if (pos > 0) {
-                        val selected = sameCatItems[pos - 1]
-                        nameInput.setText(selected.name)
-                        descInput.setText(selected.description)
-                        invInput.setText(selected.invNumber)
-                        locationInput.setText(selected.location)
-                        priceInput.setText(selected.unitPrice.toString())
-                        // Set unit spinner to the stored unit if available
-                        unitSpinner?.let { spinner ->
-                            val unitField = selected.location // unit is stored separately – default Bottle
-                            // no-op: unit not stored on existing items prior to this feature
-                        }
-                    }
+        existSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
+                if (pos > 0) {
+                    val selected = sameCatItems[pos - 1]
+                    nameInput.setText(selected.name)
+                    descInput.setText(selected.description)
+                    invInput.setText(selected.invNumber)
+                    locationInput.setText(selected.location)
+                    priceInput.setText(selected.unitPrice.toString())
                 }
-                override fun onNothingSelected(p: AdapterView<*>?) {}
             }
+            override fun onNothingSelected(p: AdapterView<*>?) {}
         }
 
         // Live total-price watcher
@@ -879,28 +836,12 @@ class FeedInventoryActivity : AppCompatActivity() {
         qtyInput.addTextChangedListener(priceWatcher)
         priceInput.addTextChangedListener(priceWatcher)
 
-        // Pre-fill when editing
-        if (isEdit && item != null) {
-            nameInput.setText(item.name)
-            descInput.setText(item.description)
-            invInput.setText(item.invNumber)
-            locationInput.setText(item.location)
-            qtyInput.setText(item.quantity.toString())
-            priceInput.setText(item.unitPrice.toString())
-            totalPriceTv.text = currency.format(item.totalValue)
-        }
-
-        val dialogTitle = when {
-            isEdit && targetCategory == "Supplements" -> "Edit Supplement Item"
-            isEdit -> "Edit Feed Item"
-            targetCategory == "Supplements" -> "Add Supplement Item"
-            else -> "Add Feed Item"
-        }
+        val dialogTitle = if (targetCategory == "Supplements") "Add Supplement Item" else "Add Feed Item"
 
         val dialog = AlertDialog.Builder(this)
             .setTitle(dialogTitle)
             .setView(dialogView)
-            .setPositiveButton(if (isEdit) "Update" else "Add", null)
+            .setPositiveButton("Add", null)
             .setNegativeButton("Cancel", null)
             .create()
 
@@ -948,11 +889,9 @@ class FeedInventoryActivity : AppCompatActivity() {
                 }
 
                 if (matchingItem != null) {
-                    val finalQty = if (isEdit && item?.firestoreId == matchingItem.firestoreId) {
-                        qtyIn
-                    } else {
-                        matchingItem.quantity + qtyIn
-                    }
+                    // Restocking an existing item found via the selector: add the
+                    // entered quantity on top of what's already there.
+                    val finalQty = matchingItem.quantity + qtyIn
                     val finalTotalPrice = finalQty * price
 
                     val fieldUpdates = mapOf<String, Any>(
@@ -968,60 +907,32 @@ class FeedInventoryActivity : AppCompatActivity() {
                         feedDocRef   = feedCol.document(matchingItem.firestoreId),
                         fieldUpdates = fieldUpdates,
                         newQty       = finalQty,
-                        notes        = if (isEdit) "Stock updated" else "Stock restocked",
+                        notes        = "Stock restocked",
                         onSuccess    = {
-                            logHistory(if (isEdit) "UPDATE" else "RESTOCK", matchingItem.name, qtyIn, price, matchingItem.category)
-                            if (isEdit && item != null && item.firestoreId != matchingItem.firestoreId) {
-                                feedCol.document(item.firestoreId).delete()
-                            }
+                            logHistory("RESTOCK", matchingItem.name, qtyIn, price, matchingItem.category)
                             dialog.dismiss()
                         }
                     )
                 } else {
-                    if (isEdit && item != null) {
-                        val fieldUpdates = mapOf<String, Any>(
-                            "name"         to name,
-                            "description"  to desc,
-                            "invNumber"    to inv,
-                            "location"     to location,
-                            "unitPrice"    to price,
-                            "pricePerUnit" to price,
-                            "totalPrice"   to totalPrice,
-                            "unit"         to unit,
-                            "category"     to cat
-                        )
-                        commitFeedChange(
-                            item         = item,
-                            feedDocRef   = feedCol.document(item.firestoreId),
-                            fieldUpdates = fieldUpdates,
-                            newQty       = qtyIn,
-                            notes        = "Stock updated",
-                            onSuccess    = {
-                                logHistory("UPDATE", name, qtyIn, price, cat)
-                                dialog.dismiss()
-                            }
-                        )
-                    } else {
-                        val status = calculateStatus(qtyIn, qtyIn)
-                        val data = hashMapOf<String, Any>(
-                            "name"            to name,
-                            "description"     to desc,
-                            "invNumber"       to inv,
-                            "location"        to location,
-                            "quantity"        to qtyIn,
-                            "initialQuantity" to qtyIn,
-                            "unitPrice"       to price,
-                            "pricePerUnit"    to price,
-                            "totalPrice"      to totalPrice,
-                            "unit"            to unit,
-                            "category"        to cat,
-                            "status"          to status,
-                            "updatedAt"       to FieldValue.serverTimestamp()
-                        )
-                        commitNewFeedItem(data, qtyIn, name, cat) {
-                            logHistory("ADDED", name, qtyIn, price, cat)
-                            dialog.dismiss()
-                        }
+                    val status = calculateStatus(qtyIn, qtyIn)
+                    val data = hashMapOf<String, Any>(
+                        "name"            to name,
+                        "description"     to desc,
+                        "invNumber"       to inv,
+                        "location"        to location,
+                        "quantity"        to qtyIn,
+                        "initialQuantity" to qtyIn,
+                        "unitPrice"       to price,
+                        "pricePerUnit"    to price,
+                        "totalPrice"      to totalPrice,
+                        "unit"            to unit,
+                        "category"        to cat,
+                        "status"          to status,
+                        "updatedAt"       to FieldValue.serverTimestamp()
+                    )
+                    commitNewFeedItem(data, qtyIn, name, cat) {
+                        logHistory("ADDED", name, qtyIn, price, cat)
+                        dialog.dismiss()
                     }
                 }
             }

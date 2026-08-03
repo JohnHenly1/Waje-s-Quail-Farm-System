@@ -90,6 +90,18 @@ class AlertsAdapter : ListAdapter<DisplayAlert, RecyclerView.ViewHolder>(DIFF_CA
                 setupAlertUI(holder, "INVENTORY", status, if (isCritical) "#F44336" else "#FF9800", R.drawable.ic_shopping_bag)
                 holder.titleTv.text = if (isCritical) "Critical Stock Warning" else "Inventory Update"
             }
+            alert.type == "Water Level" -> {
+                val (statusText, colorHex) = when {
+                    alert.message.contains("Emergency", true) -> "EMERGENCY" to "#B71C1C"
+                    alert.message.contains("Critical", true) -> "CRITICAL" to "#F44336"
+                    alert.message.contains("Warning", true) -> "WARNING" to "#FF9800"
+                    alert.message.contains("Notice", true) -> "NOTICE" to "#2196F3"
+                    alert.message.contains("Refilled", true) -> "REFILLED" to "#4CAF50"
+                    else -> "UPDATE" to "#03A9F4"
+                }
+                setupAlertUI(holder, "WATER LEVEL", statusText, colorHex, R.drawable.ic_water_level)
+                holder.titleTv.text = if (statusText == "REFILLED") "Water Tank Refilled" else "Water Level Alert"
+            }
             alert.type == "Schedule" || alert.message.contains("Missed", true) || (alert.type == "Critical" && alert.message.contains("Missed", true)) -> {
                 val isMissed = alert.message.contains("Missed", true)
                 setupAlertUI(holder, "SCHEDULE", if (isMissed) "OVERDUE" else "DUE TODAY", if (isMissed) "#B71C1C" else "#2196F3", R.drawable.ic_calendar)

@@ -91,8 +91,11 @@ class RoleManager(rawRole: String?) {
 
     /**
      * Update the stock quantity of an existing inventory item.
-     * Staff are permitted to adjust quantity only; all other fields remain
-     * restricted via [canEditFarm].
+     * This is the only way to edit an existing feed/supplement item — both
+     * owner and staff may adjust quantity (e.g. via the "-"/"+" stepper on the
+     * Edit Feed Item screen), but neither role can edit an item's other
+     * details (name, description, unit, location, price, etc.) once created;
+     * those are only set at creation time, gated by [canEditFarm].
      */
     fun canUpdateInventoryQuantity(): Boolean = isOwner || isStaff
 

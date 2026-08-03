@@ -26,7 +26,10 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 import com.google.firebase.firestore.FirebaseFirestore
 import java.text.SimpleDateFormat
 import java.util.*
@@ -38,6 +41,8 @@ class AlertsActivity : AppCompatActivity() {
     private var farmAlertsListener: com.google.firebase.firestore.ListenerRegistration? = null
     private var inventoryListener: com.google.firebase.firestore.ListenerRegistration? = null
     private var tasksListener: com.google.firebase.firestore.ListenerRegistration? = null
+    private var waterLevelRef: com.google.firebase.database.DatabaseReference? = null
+    private var waterLevelListener: ValueEventListener? = null
 
     private lateinit var alertsRecyclerView: RecyclerView
     private lateinit var alertsAdapter: AlertsAdapter
@@ -141,6 +146,7 @@ class AlertsActivity : AppCompatActivity() {
             updateAlertsList()
             checkMissedTasks()
             checkInventoryStock()
+            checkWaterLevelStatus()
             Toast.makeText(this, "Refreshed alerts", Toast.LENGTH_SHORT).show()
         }
         NavigationHelper.setupBottomNavigation(this)
@@ -152,6 +158,7 @@ class AlertsActivity : AppCompatActivity() {
             integrityChecksRanThisSession = true
             checkMissedTasks()
             checkInventoryStock()
+            checkWaterLevelStatus()
             // checkEggCountLogs() — Egg Count category removed
         }
     }
@@ -160,7 +167,8 @@ class AlertsActivity : AppCompatActivity() {
         val filters = mapOf(
             "All" to findViewById<TextView>(R.id.filterAll),
             "Inventory" to findViewById<TextView>(R.id.filterInventory),
-            "Schedule" to findViewById<TextView>(R.id.filterSchedule)
+            "Schedule" to findViewById<TextView>(R.id.filterSchedule),
+            "Water Level" to findViewById<TextView>(R.id.filterWaterLevel)
         )
 
         // Hide the Egg Count filter tab
@@ -269,6 +277,46 @@ class AlertsActivity : AppCompatActivity() {
             }
     }
 
+    // Maps a water level percentage to the alert threshold it falls under (if any).
+    // Checked most-severe-first so e.g. 0% resolves to "Emergency", not "Notice".
+    // Returns (thresholdPercent, label, description) or null if between thresholds.
+    private fun resolveWaterLevelAlert(percent: Int): Triple<Int, String, String>? {
+        return when {
+            percent >= 100 -> Triple(100, "Refilled", "Water tank has been successfully refilled to full capacity.")
+            percent <= 0 -> Triple(0, "Emergency", "Water tank is empty. Refill immediately to prevent disruptions.")
+            percent <= 15 -> Triple(15, "Critical", "Water level is critically low. Immediate action is required.")
+            percent <= 25 -> Triple(25, "Warning", "Water level is low. Refill the water tank soon.")
+            percent <= 50 -> Triple(50, "Notice", "Water level is decreasing. Monitor the water supply.")
+            else -> null
+        }
+    }
+
+    private fun raiseWaterLevelAlert(percent: Int) {
+        val (_, label, description) = resolveWaterLevelAlert(percent) ?: return
+        val message = "Water Level $label: $description"
+        // Same day-based dedup used by the other categories, so re-checking on every
+        // screen open / live snapshot doesn't re-post the same threshold repeatedly.
+        if (!wasAlreadyAlertedToday(message)) {
+            FarmRepository.addAlert(message, "Water Level")
+            markAsAlertedToday(message)
+            showLocalNotification("Water Level $label", description)
+        }
+    }
+
+    // One-time check against the Realtime Database, run on launch / manual refresh —
+    // mirrors checkInventoryStock()'s single .get() read.
+    private fun checkWaterLevelStatus() {
+        if (!accountManager.isAlertsEnabled()) return
+
+        FirebaseDatabase.getInstance().getReference("water_level")
+            .get()
+            .addOnSuccessListener { snapshot ->
+                if (!snapshot.exists()) return@addOnSuccessListener
+                val percent = (snapshot.child("percentage").getValue(Long::class.java) ?: return@addOnSuccessListener).toInt()
+                raiseWaterLevelAlert(percent)
+            }
+    }
+
     private fun checkEggCountLogs() {
         if (!accountManager.isEggCountEnabled()) return
 
@@ -368,6 +416,7 @@ class AlertsActivity : AppCompatActivity() {
         // Start live listeners when activity is visible
         startLiveInventoryListener()
         startLiveTasksListener()
+        startLiveWaterLevelListener()
     }
 
     override fun onPause() {
@@ -379,6 +428,8 @@ class AlertsActivity : AppCompatActivity() {
         inventoryListener = null
         tasksListener?.remove()
         tasksListener = null
+        waterLevelRef?.let { ref -> waterLevelListener?.let { ref.removeEventListener(it) } }
+        waterLevelListener = null
     }
 
     private fun scheduleAlertsListUpdate() {
@@ -397,6 +448,7 @@ class AlertsActivity : AppCompatActivity() {
                 when (activeFilter) {
                     "Inventory" -> it.type == "Inventory" || (it.type == "Critical" && it.message.contains("Inventory", true))
                     "Schedule" -> it.type == "Schedule" || (it.type == "Critical" && it.message.contains("Missed", true))
+                    "Water Level" -> it.type == "Water Level"
                     else -> true
                 }
             }
@@ -483,6 +535,29 @@ class AlertsActivity : AppCompatActivity() {
             }
     }
 
+    // Continuously monitors the current water level from the Firebase Realtime
+    // Database (Water Level module) so thresholds are caught as soon as they're
+    // written, not just when this screen happens to be manually refreshed.
+    private fun startLiveWaterLevelListener() {
+        waterLevelRef?.let { ref -> waterLevelListener?.let { ref.removeEventListener(it) } }
+
+        waterLevelRef = FirebaseDatabase.getInstance().getReference("water_level")
+        waterLevelListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (!accountManager.isAlertsEnabled()) return
+                if (!snapshot.exists()) return
+                val percent = snapshot.child("percentage").getValue(Long::class.java)?.toInt() ?: return
+                raiseWaterLevelAlert(percent)
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                // Ignore — this mirrors the other live listeners, which also don't
+                // surface transient Firestore/RTDB read errors to the user here.
+            }
+        }
+        waterLevelRef?.addValueEventListener(waterLevelListener!!)
+    }
+
     // Live snapshot listener for tasks to detect missed tasks immediately
     private fun startLiveTasksListener() {
         tasksListener?.remove()
@@ -530,6 +605,11 @@ class AlertsActivity : AppCompatActivity() {
                 criticalLabel.text = "Overdue Tasks"
                 warningLabel.text = "Pending Today"
                 totalLabel.text = "Scheduled Duty"
+            }
+            "Water Level" -> {
+                criticalLabel.text = "Critical/Empty"
+                warningLabel.text = "Low Level"
+                totalLabel.text = "Water Alerts"
             }
             else -> {
                 criticalLabel.text = "Urgent Issues"
