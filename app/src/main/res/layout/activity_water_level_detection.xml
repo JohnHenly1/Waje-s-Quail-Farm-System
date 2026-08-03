@@ -1,6 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
-<androidx.drawerlayout.widget.DrawerLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.drawerlayout.widget.DrawerLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/drawerLayout"
     android:layout_width="match_parent"
@@ -11,18 +9,17 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="#F9FAFB">
-
-        <!-- Header -->
+        <!--  Header  -->
         <LinearLayout
             android:id="@+id/header"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="@color/dark_green"
             android:orientation="vertical"
-            android:paddingTop="16dp"
-            android:paddingBottom="16dp"
             android:paddingStart="16dp"
+            android:paddingTop="16dp"
             android:paddingEnd="16dp"
+            android:paddingBottom="16dp"
             app:layout_constraintTop_toTopOf="parent">
 
             <LinearLayout
@@ -36,8 +33,8 @@
                     android:layout_width="40dp"
                     android:layout_height="40dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:src="@drawable/ic_arrow_back"
                     android:contentDescription="Back"
+                    android:src="@drawable/ic_arrow_back"
                     app:tint="@color/white" />
 
                 <LinearLayout
@@ -63,35 +60,22 @@
                         android:textColor="#B3FFFFFF"
                         android:textSize="12sp" />
                 </LinearLayout>
-
-                <!-- Simulation Refresh Button -->
-                <ImageButton
-                    android:id="@+id/refreshSimulationBtn"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="Refresh Simulation"
-                    android:src="@android:drawable/ic_popup_sync"
-                    app:tint="@color/white" />
-
             </LinearLayout>
         </LinearLayout>
-
-        <!-- Scrollable content -->
+        <!--  Scrollable content  -->
         <androidx.core.widget.NestedScrollView
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:fillViewport="true"
-            app:layout_constraintTop_toBottomOf="@id/header"
-            app:layout_constraintBottom_toTopOf="@id/bottomNavContainer">
+            app:layout_constraintBottom_toTopOf="@id/bottomNavContainer"
+            app:layout_constraintTop_toBottomOf="@id/header">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp">
-
-                <!-- Main Tank Card -->
+                <!--  Main Tank Card  -->
                 <androidx.cardview.widget.CardView
                     android:id="@+id/tankCard"
                     android:layout_width="match_parent"
@@ -106,14 +90,13 @@
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
                         android:padding="20dp">
-
-                        <!-- Tank header row -->
+                        <!--  Tank header row  -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:layout_marginBottom="16dp"
                             android:gravity="center_vertical"
-                            android:orientation="horizontal"
-                            android:layout_marginBottom="16dp">
+                            android:orientation="horizontal">
 
                             <TextView
                                 android:layout_width="0dp"
@@ -127,107 +110,98 @@
                             <ImageView
                                 android:layout_width="24dp"
                                 android:layout_height="24dp"
-                                android:src="@drawable/ic_water_level"
                                 android:contentDescription="Water"
+                                android:src="@drawable/ic_water_level"
                                 app:tint="@color/white" />
                         </LinearLayout>
-
-                        <!-- Percentage display -->
+                        <!--  Percentage display  -->
                         <TextView
                             android:id="@+id/waterPercentageText"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:layout_marginBottom="4dp"
                             android:text="75%"
                             android:textColor="@color/white"
                             android:textSize="52sp"
-                            android:textStyle="bold"
-                            android:layout_marginBottom="4dp" />
+                            android:textStyle="bold" />
 
                         <TextView
                             android:id="@+id/waterStatusText"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:layout_marginBottom="20dp"
                             android:text="Optimal"
                             android:textColor="#B3FFFFFF"
-                            android:textSize="14sp"
-                            android:layout_marginBottom="20dp" />
-
-                        <!-- Water Level Bar Container -->
+                            android:textSize="14sp" />
+                        <!--  Water Level Bar Container  -->
                         <androidx.cardview.widget.CardView
                             android:layout_width="match_parent"
                             android:layout_height="120dp"
+                            app:cardBackgroundColor="#1A2E1A"
                             app:cardCornerRadius="12dp"
-                            app:cardElevation="0dp"
-                            app:cardBackgroundColor="#1A2E1A">
+                            app:cardElevation="0dp">
 
                             <FrameLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="match_parent">
-
-                                <!-- Scale labels -->
+                                <!--  Scale labels  -->
                                 <LinearLayout
                                     android:layout_width="match_parent"
                                     android:layout_height="match_parent"
                                     android:orientation="vertical"
                                     android:paddingStart="8dp"
-                                    android:paddingEnd="8dp"
                                     android:paddingTop="8dp"
+                                    android:paddingEnd="8dp"
                                     android:paddingBottom="8dp">
 
                                     <TextView
                                         android:layout_width="wrap_content"
                                         android:layout_height="0dp"
                                         android:layout_weight="1"
+                                        android:gravity="top"
                                         android:text="100%"
                                         android:textColor="#80FFFFFF"
-                                        android:textSize="10sp"
-                                        android:gravity="top" />
+                                        android:textSize="10sp" />
 
                                     <TextView
                                         android:layout_width="wrap_content"
                                         android:layout_height="0dp"
                                         android:layout_weight="1"
+                                        android:gravity="center_vertical"
                                         android:text="50%"
                                         android:textColor="#80FFFFFF"
-                                        android:textSize="10sp"
-                                        android:gravity="center_vertical" />
+                                        android:textSize="10sp" />
 
                                     <TextView
                                         android:layout_width="wrap_content"
                                         android:layout_height="0dp"
                                         android:layout_weight="1"
+                                        android:gravity="bottom"
                                         android:text="0%"
                                         android:textColor="#80FFFFFF"
-                                        android:textSize="10sp"
-                                        android:gravity="bottom" />
-
+                                        android:textSize="10sp" />
                                 </LinearLayout>
-
-                                <!-- Water fill visual (bottom portion) -->
+                                <!--  Water fill visual (bottom portion)  -->
                                 <View
                                     android:id="@+id/waterFillView"
                                     android:layout_width="match_parent"
                                     android:layout_height="90dp"
                                     android:layout_gravity="bottom"
-                                    android:background="@drawable/bg_water_fill"
-                                    android:alpha="0.85" />
-
-                                <!-- Water drop icon centered -->
+                                    android:alpha="0.85"
+                                    android:background="@drawable/bg_water_fill" />
+                                <!--  Water drop icon centered  -->
                                 <ImageView
                                     android:layout_width="24dp"
                                     android:layout_height="24dp"
                                     android:layout_gravity="center"
-                                    android:src="@drawable/ic_water_level"
                                     android:contentDescription="Water drop"
+                                    android:src="@drawable/ic_water_level"
                                     app:tint="#5BB5F0" />
-
                             </FrameLayout>
                         </androidx.cardview.widget.CardView>
-
                     </LinearLayout>
                 </androidx.cardview.widget.CardView>
-
-                <!-- Last Updated Info Card -->
+                <!--  Last Updated Info Card  -->
                 <androidx.cardview.widget.CardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -239,9 +213,9 @@
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:padding="16dp"
-                        android:gravity="center_vertical">
+                        android:padding="16dp">
 
                         <View
                             android:layout_width="40dp"
@@ -255,8 +229,8 @@
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
                             android:layout_marginStart="12dp"
+                            android:layout_weight="1"
                             android:orientation="vertical">
 
                             <TextView
@@ -275,8 +249,7 @@
                                 android:textSize="14sp"
                                 android:textStyle="bold" />
                         </LinearLayout>
-
-                        <!-- Live indicator dot -->
+                        <!--  Live indicator dot  -->
                         <View
                             android:id="@+id/liveIndicator"
                             android:layout_width="10dp"
@@ -294,292 +267,48 @@
                             android:textStyle="bold" />
                     </LinearLayout>
                 </androidx.cardview.widget.CardView>
-
-                <!-- Daily Water Usage History -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Daily Water Level History"
-                    android:textColor="@color/black"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    android:layout_marginBottom="8dp"
-                    android:layout_marginStart="4dp" />
-
-                <androidx.cardview.widget.CardView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="16dp"
-                    app:cardBackgroundColor="@color/white"
-                    app:cardCornerRadius="16dp"
-                    app:cardElevation="2dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:padding="16dp">
-
-                        <!-- History rows — Day labels + bar -->
-                        <LinearLayout
-                            android:id="@+id/historyRow1"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical"
-                            android:layout_marginBottom="10dp">
-
-                            <TextView
-                                android:id="@+id/historyDay1"
-                                android:layout_width="40dp"
-                                android:layout_height="wrap_content"
-                                android:text="Mon"
-                                android:textColor="@color/gray"
-                                android:textSize="12sp" />
-
-                            <FrameLayout
-                                android:layout_width="0dp"
-                                android:layout_height="16dp"
-                                android:layout_weight="1"
-                                android:background="@drawable/rounded_corner"
-                                android:backgroundTint="#E8F5E9">
-
-                                <View
-                                    android:id="@+id/historyBar1"
-                                    android:layout_width="0dp"
-                                    android:layout_height="match_parent"
-                                    android:layout_gravity="start"
-                                    android:background="@drawable/rounded_corner"
-                                    android:backgroundTint="@color/dark_green" />
-                            </FrameLayout>
-
-                            <TextView
-                                android:id="@+id/historyPct1"
-                                android:layout_width="40dp"
-                                android:layout_height="wrap_content"
-                                android:text="80%"
-                                android:textColor="@color/dark_green"
-                                android:textSize="12sp"
-                                android:textStyle="bold"
-                                android:gravity="end" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:id="@+id/historyRow2"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical"
-                            android:layout_marginBottom="10dp">
-
-                            <TextView
-                                android:id="@+id/historyDay2"
-                                android:layout_width="40dp"
-                                android:layout_height="wrap_content"
-                                android:text="Tue"
-                                android:textColor="@color/gray"
-                                android:textSize="12sp" />
-
-                            <FrameLayout
-                                android:layout_width="0dp"
-                                android:layout_height="16dp"
-                                android:layout_weight="1"
-                                android:background="@drawable/rounded_corner"
-                                android:backgroundTint="#E8F5E9">
-
-                                <View
-                                    android:id="@+id/historyBar2"
-                                    android:layout_width="0dp"
-                                    android:layout_height="match_parent"
-                                    android:layout_gravity="start"
-                                    android:background="@drawable/rounded_corner"
-                                    android:backgroundTint="@color/dark_green" />
-                            </FrameLayout>
-
-                            <TextView
-                                android:id="@+id/historyPct2"
-                                android:layout_width="40dp"
-                                android:layout_height="wrap_content"
-                                android:text="75%"
-                                android:textColor="@color/dark_green"
-                                android:textSize="12sp"
-                                android:textStyle="bold"
-                                android:gravity="end" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:id="@+id/historyRow3"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical"
-                            android:layout_marginBottom="10dp">
-
-                            <TextView
-                                android:id="@+id/historyDay3"
-                                android:layout_width="40dp"
-                                android:layout_height="wrap_content"
-                                android:text="Wed"
-                                android:textColor="@color/gray"
-                                android:textSize="12sp" />
-
-                            <FrameLayout
-                                android:layout_width="0dp"
-                                android:layout_height="16dp"
-                                android:layout_weight="1"
-                                android:background="@drawable/rounded_corner"
-                                android:backgroundTint="#E8F5E9">
-
-                                <View
-                                    android:id="@+id/historyBar3"
-                                    android:layout_width="0dp"
-                                    android:layout_height="match_parent"
-                                    android:layout_gravity="start"
-                                    android:background="@drawable/rounded_corner"
-                                    android:backgroundTint="@color/dark_green" />
-                            </FrameLayout>
-
-                            <TextView
-                                android:id="@+id/historyPct3"
-                                android:layout_width="40dp"
-                                android:layout_height="wrap_content"
-                                android:text="60%"
-                                android:textColor="@color/dark_green"
-                                android:textSize="12sp"
-                                android:textStyle="bold"
-                                android:gravity="end" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:id="@+id/historyRow4"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical"
-                            android:layout_marginBottom="10dp">
-
-                            <TextView
-                                android:id="@+id/historyDay4"
-                                android:layout_width="40dp"
-                                android:layout_height="wrap_content"
-                                android:text="Thu"
-                                android:textColor="@color/gray"
-                                android:textSize="12sp" />
-
-                            <FrameLayout
-                                android:layout_width="0dp"
-                                android:layout_height="16dp"
-                                android:layout_weight="1"
-                                android:background="@drawable/rounded_corner"
-                                android:backgroundTint="#E8F5E9">
-
-                                <View
-                                    android:id="@+id/historyBar4"
-                                    android:layout_width="0dp"
-                                    android:layout_height="match_parent"
-                                    android:layout_gravity="start"
-                                    android:background="@drawable/rounded_corner"
-                                    android:backgroundTint="@color/dark_green" />
-                            </FrameLayout>
-
-                            <TextView
-                                android:id="@+id/historyPct4"
-                                android:layout_width="40dp"
-                                android:layout_height="wrap_content"
-                                android:text="85%"
-                                android:textColor="@color/dark_green"
-                                android:textSize="12sp"
-                                android:textStyle="bold"
-                                android:gravity="end" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:id="@+id/historyRow5"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical">
-
-                            <TextView
-                                android:id="@+id/historyDay5"
-                                android:layout_width="40dp"
-                                android:layout_height="wrap_content"
-                                android:text="Fri"
-                                android:textColor="@color/gray"
-                                android:textSize="12sp" />
-
-                            <FrameLayout
-                                android:layout_width="0dp"
-                                android:layout_height="16dp"
-                                android:layout_weight="1"
-                                android:background="@drawable/rounded_corner"
-                                android:backgroundTint="#E8F5E9">
-
-                                <View
-                                    android:id="@+id/historyBar5"
-                                    android:layout_width="0dp"
-                                    android:layout_height="match_parent"
-                                    android:layout_gravity="start"
-                                    android:background="@drawable/rounded_corner"
-                                    android:backgroundTint="@color/dark_green" />
-                            </FrameLayout>
-
-                            <TextView
-                                android:id="@+id/historyPct5"
-                                android:layout_width="40dp"
-                                android:layout_height="wrap_content"
-                                android:text="75%"
-                                android:textColor="@color/dark_green"
-                                android:textSize="12sp"
-                                android:textStyle="bold"
-                                android:gravity="end" />
-                        </LinearLayout>
-
-                    </LinearLayout>
-                </androidx.cardview.widget.CardView>
-
-                <!-- Bottom spacer -->
+                <!--  Bottom spacer  -->
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="8dp" />
-
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
-
-        <!-- Bottom Navigation Bar -->
+        <!--  Bottom Navigation Bar  -->
         <LinearLayout
             android:id="@+id/bottomNavContainer"
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:background="@color/dark_green"
-            android:orientation="horizontal"
-            android:gravity="center"
             android:baselineAligned="false"
+            android:gravity="center"
+            android:orientation="horizontal"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent">
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent">
 
             <LinearLayout
                 android:id="@+id/homeButton"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:orientation="vertical"
+                android:background="?attr/selectableItemBackground"
                 android:gravity="center"
-                android:background="?attr/selectableItemBackground">
+                android:orientation="vertical">
+
                 <ImageView
                     android:layout_width="22dp"
                     android:layout_height="24dp"
-                    android:src="@drawable/ic_home"
                     android:contentDescription="Home"
+                    android:src="@drawable/ic_home"
                     app:tint="@color/white" />
+
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
                     android:text="@string/home"
                     android:textColor="@color/white"
-                    android:textSize="10sp"
-                    android:layout_marginTop="2dp" />
+                    android:textSize="10sp" />
             </LinearLayout>
 
             <LinearLayout
@@ -587,14 +316,15 @@
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:orientation="vertical"
+                android:background="?attr/selectableItemBackground"
                 android:gravity="center"
-                android:background="?attr/selectableItemBackground">
+                android:orientation="vertical">
+
                 <ImageView
                     android:layout_width="22dp"
                     android:layout_height="24dp"
-                    android:src="@drawable/ic_chart"
                     android:contentDescription="Analytics"
+                    android:src="@drawable/ic_chart"
                     app:tint="@color/white" />
 
                 <TextView
@@ -611,22 +341,24 @@
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:orientation="vertical"
+                android:background="?attr/selectableItemBackground"
                 android:gravity="center"
-                android:background="?attr/selectableItemBackground">
+                android:orientation="vertical">
+
                 <ImageView
                     android:layout_width="24dp"
                     android:layout_height="24dp"
-                    android:src="@drawable/ic_schedule"
                     android:contentDescription="Schedule"
+                    android:src="@drawable/ic_schedule"
                     app:tint="@color/white" />
+
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
                     android:text="@string/schedule"
                     android:textColor="@color/white"
-                    android:textSize="10sp"
-                    android:layout_marginTop="2dp" />
+                    android:textSize="10sp" />
             </LinearLayout>
 
             <LinearLayout
@@ -634,26 +366,25 @@
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:orientation="vertical"
+                android:background="?attr/selectableItemBackground"
                 android:gravity="center"
-                android:background="?attr/selectableItemBackground">
+                android:orientation="vertical">
+
                 <ImageView
                     android:layout_width="24dp"
                     android:layout_height="24dp"
-                    android:src="@drawable/ic_profile"
                     android:contentDescription="Profile"
+                    android:src="@drawable/ic_profile"
                     app:tint="@color/white" />
+
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
                     android:text="@string/profile"
                     android:textColor="@color/white"
-                    android:textSize="10sp"
-                    android:layout_marginTop="2dp" />
+                    android:textSize="10sp" />
             </LinearLayout>
-
         </LinearLayout>
-
     </androidx.constraintlayout.widget.ConstraintLayout>
-
 </androidx.drawerlayout.widget.DrawerLayout>
