@@ -486,7 +486,9 @@ class FeedInventoryActivity : AppCompatActivity() {
     // Atomic feed update + audit log  (shared by staff quantity edits and owner
     // restocks/edits).  [fieldUpdates] carries any owner-only fields (name,
     // description, invNumber, location, unitPrice, category); quantity,
-    // initialQuantity, status, and updatedAt are always recomputed here.
+    // initialQuantity, and updatedAt are always recomputed here. `status` is
+    // never touched by this function — the website is the single source of
+    // truth for status, so Android reads it but does not overwrite it here.
     // Uses a Firestore transaction so the stock write and the audit entry
     // always succeed or fail together. No audit entry is written when the
     // quantity is unchanged. Negative stock is rejected before any write.
@@ -513,7 +515,6 @@ class FeedInventoryActivity : AppCompatActivity() {
         val auditDocRef = auditCol.document()   // auto-id
 
         val newInitialQty = if (newQty > item.initialQuantity) newQty else item.initialQuantity
-        val newStatus     = calculateStatus(newQty, newInitialQty)
 
         db.runTransaction { transaction ->
             // Read the current document to guard against concurrent edits
@@ -525,11 +526,13 @@ class FeedInventoryActivity : AppCompatActivity() {
                 throw Exception("Item was modified concurrently. Please try again.")
             }
 
-            // Write 1: update stock quantity/status plus any owner-edited fields
+            // Write 1: update stock quantity plus any owner-edited fields.
+            // Status is intentionally NOT recomputed/overwritten here — the
+            // website is the single source of truth for `status`, so an
+            // Android quantity edit must not clobber it.
             val stockUpdate = fieldUpdates.toMutableMap()
             stockUpdate["quantity"]        = newQty
             stockUpdate["initialQuantity"] = newInitialQty
-            stockUpdate["status"]          = newStatus
             stockUpdate["updatedAt"]       = FieldValue.serverTimestamp()
             transaction.update(feedDocRef, stockUpdate)
 
@@ -613,39 +616,38 @@ class FeedInventoryActivity : AppCompatActivity() {
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // Atomic delete: remove feed item + closing audit entry (batch write).
+    // Atomic delete: remove feed item from Firestore, then record it in the
+    // shared "activity_logs" collection under the Inventory module so it shows
+    // up in the web Activity Logs' "Deleted" section (regardless of whether the
+    // item's stock quantity was zero at the time). This replaces the old
+    // approach of writing a "deduct to zero" entry to inventory_history, which
+    // the website surfaced as an "Updated" event instead of a "Deleted" one.
     // ──────────────────────────────────────────────────────────────────────────
     private fun commitFeedDelete(item: FeedItem, onSuccess: () -> Unit) {
-        val uid        = auth.currentUser?.uid ?: "unknown"
-        val editorName = accountManager.getCurrentUsername() ?: "User"
-        val editorRole = roleManager.role
+        val editorName  = accountManager.getCurrentUsername() ?: "User"
+        val editorEmail = accountManager.getEmail(editorName) ?: ""
+        val editorRole  = roleManager.role
 
-        val feedDocRef  = feedCol.document(item.firestoreId)
-        val auditDocRef = auditCol.document()
+        val feedDocRef = feedCol.document(item.firestoreId)
 
-        val batch = db.batch()
-        batch.delete(feedDocRef)
-
-        if (item.quantity != 0L) {
-            val auditEntry = mapOf(
-                "productId"       to item.firestoreId,
-                "productName"     to item.name,
-                "category"        to item.category,
-                "action"          to "deduct",
-                "quantityBefore"  to item.quantity,
-                "quantityChanged" to -item.quantity,
-                "quantityAfter"   to 0L,
-                "editedByUid"     to uid,
-                "editedByName"    to editorName,
-                "editedByRole"    to editorRole,
-                "timestamp"       to FieldValue.serverTimestamp(),
-                "notes"           to "Item deleted"
-            )
-            batch.set(auditDocRef, auditEntry)
-        }
-
-        batch.commit()
-            .addOnSuccessListener { onSuccess() }
+        feedDocRef.delete()
+            .addOnSuccessListener {
+                FarmRepository.logDeletion(
+                    module = "Inventory",
+                    message = "$editorName deleted ${item.name} from inventory",
+                    userName = editorName,
+                    userEmail = editorEmail,
+                    role = editorRole,
+                    details = "Removed item: ${item.name} (${item.category})",
+                    metadata = mapOf(
+                        "itemId" to item.firestoreId,
+                        "itemName" to item.name,
+                        "category" to item.category,
+                        "quantityAtDeletion" to item.quantity
+                    )
+                )
+                onSuccess()
+            }
             .addOnFailureListener { e ->
                 Toast.makeText(this, "Delete failed: ${e.message}", Toast.LENGTH_SHORT).show()
             }

@@ -27,6 +27,13 @@ object FarmRepository {
     private val feedCol   get() = sharedDoc.collection("feed")
     private val alertsCol get() = sharedDoc.collection("alert")
 
+    // Top-level "activity_logs" collection — same collection the website writes
+    // to (see quail-web/src/services/activityService.js:logActivity). Writing
+    // here directly (instead of into a module-specific sub-collection that the
+    // website has to translate) is what lets a deletion made on either platform
+    // show up immediately in the web Activity Logs "Deleted" section.
+    private val activityLogsCol get() = db.collection("activity_logs")
+
     //  Farm Stats----------------------------------------------------------------------------------
 
     fun saveFarmStats(totalBirds: Int, activeCages: Int, onDone: ((Exception?) -> Unit)? = null) {
@@ -242,6 +249,129 @@ object FarmRepository {
                     .addOnFailureListener { e -> onDone?.invoke(e) }
             }
             .addOnFailureListener { e -> onDone?.invoke(e) }
+    }
+
+    // -- Activity Logs -----------------------------------------------------------------------------
+    //
+    // Field names intentionally mirror activityService.js's logActivity() on
+    // the website so both platforms write compatible documents into the same
+    // "activity_logs" collection.
+    //
+    // logDeletion (below) covers every deletion made from the Android app,
+    // grouped by [module]:
+    //   "Inventory"  → deleted inventory records (feed/supplements)
+    //   "Staff"      → deleted staff accounts (formerly labeled "Accounts")
+    //   "Schedules"  → deleted scheduled tasks
+    //
+    // logLogin / logLogout / logStaffCreated / logStaffUpdated cover
+    // authentication events and staff-account create/update, so those show
+    // up in the web Activity Logs the same way the "Deleted" ones already do.
+
+    private const val DEVICE_LABEL = "Mobile Application"
+
+    fun logLogin(userName: String, userEmail: String, role: String, onDone: ((Exception?) -> Unit)? = null) {
+        activityLogsCol.add(mapOf(
+            "type"      to "login",
+            "message"   to "$userName logged in",
+            "userName"  to userName,
+            "userEmail" to userEmail,
+            "role"      to role,
+            "device"    to DEVICE_LABEL,
+            "timestamp" to FieldValue.serverTimestamp()
+        )).addOnSuccessListener { onDone?.invoke(null) }
+            .addOnFailureListener { e -> onDone?.invoke(e) }
+    }
+
+    fun logLogout(userName: String, userEmail: String, role: String, onDone: ((Exception?) -> Unit)? = null) {
+        activityLogsCol.add(mapOf(
+            "type"      to "logout",
+            "message"   to "$userName logged out",
+            "userName"  to userName,
+            "userEmail" to userEmail,
+            "role"      to role,
+            "device"    to DEVICE_LABEL,
+            "timestamp" to FieldValue.serverTimestamp()
+        )).addOnSuccessListener { onDone?.invoke(null) }
+            .addOnFailureListener { e -> onDone?.invoke(e) }
+    }
+
+    fun logStaffCreated(
+        actorName: String,
+        actorEmail: String,
+        actorRole: String,
+        targetName: String,
+        targetEmail: String,
+        onDone: ((Exception?) -> Unit)? = null
+    ) {
+        activityLogsCol.add(mapOf(
+            "type"            to "create",
+            "module"          to "Staff",
+            "message"         to "$actorName created a new staff account: $targetName ($targetEmail)",
+            "userName"        to actorName,
+            "userEmail"       to actorEmail,
+            "role"            to actorRole,
+            "targetUserName"  to targetName,
+            "targetUserEmail" to targetEmail,
+            "device"          to DEVICE_LABEL,
+            "timestamp"       to FieldValue.serverTimestamp()
+        )).addOnSuccessListener { onDone?.invoke(null) }
+            .addOnFailureListener { e -> onDone?.invoke(e) }
+    }
+
+    fun logStaffUpdated(
+        actorName: String,
+        actorEmail: String,
+        actorRole: String,
+        targetName: String,
+        targetEmail: String,
+        details: String = "",
+        onDone: ((Exception?) -> Unit)? = null
+    ) {
+        activityLogsCol.add(mapOf(
+            "type"            to "update",
+            "module"          to "Staff",
+            "message"         to "$actorName updated staff account: $targetName ($targetEmail)",
+            "userName"        to actorName,
+            "userEmail"       to actorEmail,
+            "role"            to actorRole,
+            "targetUserName"  to targetName,
+            "targetUserEmail" to targetEmail,
+            "details"         to details,
+            "device"          to DEVICE_LABEL,
+            "timestamp"       to FieldValue.serverTimestamp()
+        )).addOnSuccessListener { onDone?.invoke(null) }
+            .addOnFailureListener { e -> onDone?.invoke(e) }
+    }
+
+    fun logDeletion(
+        module: String,
+        message: String,
+        userName: String,
+        userEmail: String = "",
+        role: String = "",
+        details: String = "",
+        metadata: Map<String, Any?>? = null,
+        onDone: ((Exception?) -> Unit)? = null
+    ) {
+        val entry = mutableMapOf<String, Any>(
+            "type"      to "delete",
+            "module"    to module,
+            "message"   to message,
+            "userName"  to userName,
+            "userEmail" to userEmail,
+            "role"      to role,
+            "details"   to details,
+            "device"    to DEVICE_LABEL,
+            "timestamp" to FieldValue.serverTimestamp()
+        )
+        if (metadata != null) entry["metadata"] = metadata
+
+        activityLogsCol.add(entry)
+            .addOnSuccessListener { onDone?.invoke(null) }
+            .addOnFailureListener { e ->
+                // Deletion logging should never block the deletion itself.
+                onDone?.invoke(e)
+            }
     }
 
     /**

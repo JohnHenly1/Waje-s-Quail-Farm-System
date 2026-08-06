@@ -203,6 +203,10 @@ public class ProfileActivity extends AppCompatActivity {
         View logoutButton = findViewById(R.id.logoutButton);
         if (logoutButton != null) {
             logoutButton.setOnClickListener(v -> {
+                String name = userNameTv.getText() != null ? userNameTv.getText().toString() : currentEmail;
+                String role = accountManager.getRole(currentEmail);
+                FarmRepository.INSTANCE.logLogout(name, currentEmail, role, null);
+
                 accountManager.clearSession();
                 Intent intent = new Intent(ProfileActivity.this, MainActivity.class);
                 intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
@@ -1010,6 +1014,18 @@ public class ProfileActivity extends AppCompatActivity {
                                 .setPositiveButton("Remove", (d, w) ->
                                         FirebaseFirestore.getInstance().collection("user_access").document(email).delete()
                                                 .addOnSuccessListener(a -> {
+                                                    String actorName = userNameTv.getText() != null ? userNameTv.getText().toString() : currentEmail;
+                                                    String actorRole = accountManager.getRole(currentEmail);
+                                                    FarmRepository.INSTANCE.logDeletion(
+                                                            "Staff",
+                                                            actorName + " deleted staff account: " + email,
+                                                            actorName,
+                                                            currentEmail,
+                                                            actorRole,
+                                                            "Removed approved staff account " + email,
+                                                            null,
+                                                            null
+                                                    );
                                                     Toast.makeText(this, getString(R.string.user_removed), Toast.LENGTH_SHORT).show();
                                                     dialog.dismiss();
                                                     showUserListDialog();
@@ -1161,6 +1177,18 @@ public class ProfileActivity extends AppCompatActivity {
                                 .setMessage(getString(R.string.confirm_reject_msg, name))
                                 .setPositiveButton(getString(R.string.reject), (d, w) ->
                                         doc.getReference().delete().addOnSuccessListener(a -> {
+                                            String actorName = userNameTv.getText() != null ? userNameTv.getText().toString() : currentEmail;
+                                            String actorRole = accountManager.getRole(currentEmail);
+                                            FarmRepository.INSTANCE.logDeletion(
+                                                    "Staff",
+                                                    actorName + " rejected access request: " + name + " (" + email + ")",
+                                                    actorName,
+                                                    currentEmail,
+                                                    actorRole,
+                                                    "Rejected pending access request for " + email,
+                                                    null,
+                                                    null
+                                            );
                                             Toast.makeText(this, getString(R.string.request_rejected), Toast.LENGTH_SHORT).show();
                                             dialog.dismiss();
                                             showPendingRequestsDialog();
@@ -1176,38 +1204,51 @@ public class ProfileActivity extends AppCompatActivity {
                             update.put("approvedAt", com.google.firebase.firestore.FieldValue.serverTimestamp());
 
                             doc.getReference().update(update)
-                                    .addOnSuccessListener(a -> new AlertDialog.Builder(this)
-                                            .setTitle(getString(R.string.request_approved))
-                                            .setMessage(getString(R.string.verification_code_msg, name, code))
-                                            .setPositiveButton(R.string.send_approval_email, (d, w) -> {
-                                                String emailBody = "Hello " + name + ",\n\n" +
-                                                        "Congratulations! Your request for access has been APPROVED.\n\n" +
-                                                        "Your 6-digit verification code is: " + code + "\n\n" +
-                                                        "Best regards,\nQuail Farm Management System";
+                                    .addOnSuccessListener(a -> {
+                                        String actorName = userNameTv.getText() != null ? userNameTv.getText().toString() : currentEmail;
+                                        String actorRole = accountManager.getRole(currentEmail);
+                                        FarmRepository.INSTANCE.logStaffUpdated(
+                                                actorName,
+                                                currentEmail,
+                                                actorRole,
+                                                name,
+                                                email,
+                                                "Approved access request",
+                                                null
+                                        );
+                                        new AlertDialog.Builder(this)
+                                                .setTitle(getString(R.string.request_approved))
+                                                .setMessage(getString(R.string.verification_code_msg, name, code))
+                                                .setPositiveButton(R.string.send_approval_email, (d, w) -> {
+                                                    String emailBody = "Hello " + name + ",\n\n" +
+                                                            "Congratulations! Your request for access has been APPROVED.\n\n" +
+                                                            "Your 6-digit verification code is: " + code + "\n\n" +
+                                                            "Best regards,\nQuail Farm Management System";
 
-                                                Intent intent = new Intent(Intent.ACTION_SEND);
-                                                intent.setType("message/rfc822");
-                                                intent.putExtra(Intent.EXTRA_EMAIL, new String[]{email});
-                                                intent.putExtra(Intent.EXTRA_CC, new String[]{currentEmail});
-                                                intent.putExtra(Intent.EXTRA_SUBJECT, "Quail Farm Access Approved - Code: " + code);
-                                                intent.putExtra(Intent.EXTRA_TEXT, emailBody);
-                                                intent.setPackage("com.google.android.gm");
-                                                try {
-                                                    startActivity(intent);
-                                                } catch (Exception ex) {
-                                                    intent.setPackage(null);
-                                                    startActivity(Intent.createChooser(intent, "Send Email"));
-                                                }
-                                                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                                                    Intent intent = new Intent(Intent.ACTION_SEND);
+                                                    intent.setType("message/rfc822");
+                                                    intent.putExtra(Intent.EXTRA_EMAIL, new String[]{email});
+                                                    intent.putExtra(Intent.EXTRA_CC, new String[]{currentEmail});
+                                                    intent.putExtra(Intent.EXTRA_SUBJECT, "Quail Farm Access Approved - Code: " + code);
+                                                    intent.putExtra(Intent.EXTRA_TEXT, emailBody);
+                                                    intent.setPackage("com.google.android.gm");
+                                                    try {
+                                                        startActivity(intent);
+                                                    } catch (Exception ex) {
+                                                        intent.setPackage(null);
+                                                        startActivity(Intent.createChooser(intent, "Send Email"));
+                                                    }
+                                                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                                                        dialog.dismiss();
+                                                        showPendingRequestsDialog();
+                                                    }, 2000);
+                                                })
+                                                .setNegativeButton(R.string.close, (d, w) -> {
                                                     dialog.dismiss();
                                                     showPendingRequestsDialog();
-                                                }, 2000);
-                                            })
-                                            .setNegativeButton(R.string.close, (d, w) -> {
-                                                dialog.dismiss();
-                                                showPendingRequestsDialog();
-                                            })
-                                            .show());
+                                                })
+                                                .show();
+                                    });
                         });
                         container.addView(row);
                     }

@@ -642,6 +642,8 @@ class MainActivity : AppCompatActivity() {
                 .set(mapOf("email" to email, "role" to role, "status" to "approved"))
         }
 
+        FarmRepository.logLogin(name, email, role)
+
         startActivity(Intent(this, DashboardActivity::class.java).putExtra("username", email))
         finish()
     }

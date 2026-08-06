@@ -104,6 +104,7 @@ public class ScheduleActivity extends AppCompatActivity {
     private String currentUserEmail;
     private ListenerRegistration tasksListener;
     private RoleManager roleManager;
+    private AccountManager accountManager;
 
     // Caches email -> full name for the "Assigned To" identifier on each task
     // card. Populated lazily from the existing user_access collection (same
@@ -177,7 +178,7 @@ public class ScheduleActivity extends AppCompatActivity {
             currentUserEmail = "default_user";
         }
 
-        AccountManager accountManager = new AccountManager(this);
+        accountManager = new AccountManager(this);
         roleManager = new RoleManager(accountManager.getCurrentRole());
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
@@ -396,6 +397,31 @@ public class ScheduleActivity extends AppCompatActivity {
     }
     // ───────────────────────────────────────────────────────────────────────
 
+    // ───────────────────────────────────────────────────────────────────────
+    // Activity Logs — Deleted / Schedules
+    // Records every schedule deletion (single, recurring series, or bulk) into
+    // the shared "activity_logs" collection so it appears under the "Deleted"
+    // section's "Schedules" category in the web Activity Logs, alongside
+    // Inventory and Staff deletions. Logging never blocks the deletion itself.
+    // ───────────────────────────────────────────────────────────────────────
+    private void logScheduleDeletion(String message, String details, java.util.Map<String, Object> metadata) {
+        String actorName  = accountManager != null ? accountManager.getCurrentUsername() : null;
+        if (actorName == null || actorName.isEmpty()) actorName = currentUserEmail;
+        String actorEmail = accountManager != null && actorName != null ? accountManager.getEmail(actorName) : null;
+        String actorRole  = accountManager != null && actorName != null ? accountManager.getRole(actorName) : "";
+
+        FarmRepository.INSTANCE.logDeletion(
+                "Schedules",
+                message,
+                actorName != null ? actorName : "User",
+                actorEmail != null ? actorEmail : "",
+                actorRole != null ? actorRole : "",
+                details,
+                metadata,
+                null
+        );
+    }
+
     private void deleteTaskFromFirestore(Task task) {
         if (task.firestoreId == null) return;
         cancelNotification(task); // cancel alarm & dismiss any live notification
@@ -403,6 +429,17 @@ public class ScheduleActivity extends AppCompatActivity {
                 db.collection("farm_data").document("shared")
                         .collection("tasks").document(task.firestoreId)
                         .delete()
+                        .addOnSuccessListener(unused -> {
+                            java.util.Map<String, Object> metadata = new HashMap<>();
+                            metadata.put("taskId", task.firestoreId);
+                            metadata.put("taskTitle", task.title);
+                            String actor = accountManager != null ? accountManager.getCurrentUsername() : null;
+                            logScheduleDeletion(
+                                    (actor != null ? actor : "Someone") + " deleted scheduled task \"" + task.title + "\"",
+                                    "Removed schedule: " + task.title,
+                                    metadata
+                            );
+                        })
                         .addOnFailureListener(e ->
                                 Toast.makeText(this, getString(R.string.error_deleting, e.getMessage()), Toast.LENGTH_SHORT).show())
         );
@@ -416,6 +453,7 @@ public class ScheduleActivity extends AppCompatActivity {
                         .get()
                         .addOnSuccessListener(querySnapshot -> {
                             com.google.firebase.firestore.WriteBatch batch = db.batch();
+                            int count = 0;
                             for (QueryDocumentSnapshot doc : querySnapshot) {
                                 // Reconstruct a minimal Task so we can cancel each alarm.
                                 try {
@@ -434,10 +472,23 @@ public class ScheduleActivity extends AppCompatActivity {
                                     cancelNotification(t);
                                 } catch (Exception ignored) { }
                                 batch.delete(doc.getReference());
+                                count++;
                             }
+                            final int deletedCount = count;
                             batch.commit()
-                                    .addOnSuccessListener(unused ->
-                                            Toast.makeText(this, getString(R.string.all_recurring_deleted), Toast.LENGTH_SHORT).show())
+                                    .addOnSuccessListener(unused -> {
+                                        Toast.makeText(this, getString(R.string.all_recurring_deleted), Toast.LENGTH_SHORT).show();
+                                        java.util.Map<String, Object> metadata = new HashMap<>();
+                                        metadata.put("recurrenceGroupId", task.recurrenceGroupId);
+                                        metadata.put("taskTitle", task.title);
+                                        metadata.put("count", deletedCount);
+                                        String actor = accountManager != null ? accountManager.getCurrentUsername() : null;
+                                        logScheduleDeletion(
+                                                (actor != null ? actor : "Someone") + " deleted the recurring series \"" + task.title + "\" (" + deletedCount + " tasks)",
+                                                "Removed recurring schedule series: " + task.title,
+                                                metadata
+                                        );
+                                    })
                                     .addOnFailureListener(e ->
                                             Toast.makeText(this, getString(R.string.error_deleting, e.getMessage()), Toast.LENGTH_SHORT).show());
                         })
@@ -457,8 +508,17 @@ public class ScheduleActivity extends AppCompatActivity {
                 }
             }
             batch.commit()
-                    .addOnSuccessListener(unused ->
-                            Toast.makeText(this, getString(R.string.selected_schedules_deleted), Toast.LENGTH_SHORT).show())
+                    .addOnSuccessListener(unused -> {
+                        Toast.makeText(this, getString(R.string.selected_schedules_deleted), Toast.LENGTH_SHORT).show();
+                        java.util.Map<String, Object> metadata = new HashMap<>();
+                        metadata.put("count", tasksToDelete.size());
+                        String actor = accountManager != null ? accountManager.getCurrentUsername() : null;
+                        logScheduleDeletion(
+                                (actor != null ? actor : "Someone") + " deleted " + tasksToDelete.size() + " scheduled task(s)",
+                                "Bulk-deleted schedules",
+                                metadata
+                        );
+                    })
                     .addOnFailureListener(e ->
                             Toast.makeText(this, getString(R.string.error_deleting_tasks, e.getMessage()), Toast.LENGTH_SHORT).show());
         });

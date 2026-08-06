@@ -203,6 +203,7 @@ object NavigationHelper {
         val accountManager = AccountManager(activity)
         val currentEmail = accountManager.getCurrentUsername()
         val currentRole = accountManager.getRole(currentEmail ?: "")
+        var currentName = currentEmail ?: "User"
 
         // Hide Add User if role is staff. NOTE: the menu item id is left as
         // "nav_invite_user" to avoid requiring a menu XML id change, but its
@@ -222,6 +223,7 @@ object NavigationHelper {
                 .addOnSuccessListener { doc ->
                     if (doc.exists()) {
                         val name = doc.getString("name") ?: "User"
+                        currentName = name
                         val photoUrl = doc.getString("profilePic") ?: ""
                         updateDrawerHeader(navigationView, name, photoUrl, activity)
                     }
@@ -256,6 +258,7 @@ object NavigationHelper {
                     showHelpSupportDialog(activity)
                 }
                 R.id.nav_logout -> {
+                    FarmRepository.logLogout(currentName, currentEmail ?: "", currentRole)
                     accountManager.clearSession()
                     val intent = Intent(activity, MainActivity::class.java)
                     intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -387,7 +390,7 @@ object NavigationHelper {
                 showUnlockConfirmationDialog(activity, ownerEmail, user)
             },
             onDeleteClicked = { user ->
-                showDeletePendingUserConfirmationDialog(activity, user) {
+                showDeletePendingUserConfirmationDialog(activity, ownerEmail, user) {
                     items.remove(user)
                     adapter.notifyDataSetChanged()
                     refreshEmptyState()
@@ -978,6 +981,7 @@ object NavigationHelper {
         db.collection("user_access").document(invitedEmail)
             .set(prefillData, SetOptions.merge())
             .addOnSuccessListener {
+                FarmRepository.logStaffCreated(ownerEmail, ownerEmail, "owner", name, invitedEmail)
                 Toast.makeText(
                     activity,
                     "$name added as pending. Open Farm Users and tap Unlock when you're ready to send their setup code.",
@@ -1054,6 +1058,7 @@ object NavigationHelper {
      */
     private fun showDeletePendingUserConfirmationDialog(
         activity: Activity,
+        ownerEmail: String,
         user: PendingUser,
         onDeleted: () -> Unit
     ) {
@@ -1061,7 +1066,7 @@ object NavigationHelper {
             .setTitle("Delete ${user.name}?")
             .setMessage("This permanently removes ${user.name}'s pending profile (${user.email}). If they were already unlocked, their existing invite code will be removed too.\n\nThis can't be undone. Proceed?")
             .setPositiveButton("Delete") { _, _ ->
-                deletePendingUser(activity, user, onDeleted)
+                deletePendingUser(activity, ownerEmail, user, onDeleted)
             }
             .setNegativeButton("Cancel", null)
             .show()
@@ -1072,10 +1077,19 @@ object NavigationHelper {
      * docs that were issued to that email. Only ever runs after the owner
      * explicitly taps Delete and confirms.
      */
-    private fun deletePendingUser(activity: Activity, user: PendingUser, onDeleted: () -> Unit) {
+    private fun deletePendingUser(activity: Activity, ownerEmail: String, user: PendingUser, onDeleted: () -> Unit) {
         val db = FirebaseFirestore.getInstance()
         db.collection("user_access").document(user.email).delete()
             .addOnSuccessListener {
+                FarmRepository.logDeletion(
+                    module = "Staff",
+                    message = "$ownerEmail deleted staff account: ${user.name} (${user.email})",
+                    userName = ownerEmail,
+                    userEmail = ownerEmail,
+                    role = "owner",
+                    details = "Removed pending staff account for ${user.email}"
+                )
+
                 db.collection("invite_codes")
                     .whereEqualTo("invitedEmail", user.email)
                     .get()
