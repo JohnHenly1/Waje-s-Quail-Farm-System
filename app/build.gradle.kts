@@ -48,20 +48,20 @@ android {
 dependencies {
     // Firebase BoM - Manages versions for Firebase libraries
     implementation(platform("com.google.firebase:firebase-bom:34.16.0"))
-    
+
     // Firebase dependencies using version catalog
     implementation(libs.firebase.auth)
     implementation(libs.firebase.database)
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.storage)
-    
+
     // Other Firebase libraries
     implementation("com.google.firebase:firebase-ai")
 
     // Google Play Services & Other Libraries
     implementation("com.google.android.gms:play-services-auth:20.7.0")
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.17.3")
-    
+
     // CameraX
     implementation("androidx.camera:camera-core:1.4.1")
     implementation("androidx.camera:camera-camera2:1.4.1")
@@ -71,6 +71,10 @@ dependencies {
     // AndroidX & UI
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
+    // ProcessLifecycleOwner — lets us detect when the *whole app* (not just
+    // one Activity) leaves the foreground, so we can record an automatic
+    // Logout when the user exits/closes the app without pressing Logout.
+    implementation("androidx.lifecycle:lifecycle-process:2.8.7")
     implementation(libs.material)
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)

@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.res.Configuration
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
+import androidx.lifecycle.ProcessLifecycleOwner
 import com.google.firebase.auth.FirebaseAuth
 import java.util.Locale
 
@@ -30,6 +31,14 @@ class WajeApplication : Application() {
                     android.util.Log.e("WajeApplication", "Anonymous sign-in failed: ${e.message}")
                 }
         }
+        // ───────────────────────────────────────────────────────────────────
+
+        // ── Automatic Logout tracking ────────────────────────────────────
+        // Observes the whole app's foreground/background state so a Logout
+        // activity is recorded when the user exits/closes the app, even if
+        // they never press the in-app Logout button. See AppSessionTracker
+        // for how this stays duplicate-free with manual logout.
+        ProcessLifecycleOwner.get().lifecycle.addObserver(AppSessionTracker(this))
         // ───────────────────────────────────────────────────────────────────
 
         val accountManager = AccountManager(this)

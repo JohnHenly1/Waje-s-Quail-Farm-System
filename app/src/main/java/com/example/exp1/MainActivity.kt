@@ -633,6 +633,7 @@ class MainActivity : AppCompatActivity() {
 
         accountManager.registerAccount(email, email, password, role)
         accountManager.saveCurrentSession(email)
+        accountManager.updateCachedName(email, name)
 
         val uid = FirebaseAuth.getInstance().currentUser?.uid
         if (uid != null) {

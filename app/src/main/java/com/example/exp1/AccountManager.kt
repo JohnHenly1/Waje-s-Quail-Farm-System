@@ -19,11 +19,11 @@ class AccountManager(context: Context) {
             putString("${username}_password", password)
             putString("${username}_role", role)
             putString("${username}_registered", "true")
-            
+
             val usernames = getAllUsernames().toMutableSet()
             usernames.add(username)
             putStringSet("all_usernames_list", usernames)
-            
+
             putString("email_${email}", username)
             apply()
         }
@@ -53,6 +53,17 @@ class AccountManager(context: Context) {
 
     fun getRole(username: String): String =
         sharedPreferences.getString("${username}_role", "staff") ?: "staff"
+
+    // Cached display name (mirrored from Firestore user_access.name at
+    // login), so background code — like AppSessionTracker's automatic
+    // logout logging — can log a friendly name without an extra Firestore
+    // read.
+    fun updateCachedName(username: String, name: String) {
+        sharedPreferences.edit().putString("${username}_name", name).apply()
+    }
+
+    fun getCachedName(username: String): String =
+        sharedPreferences.getString("${username}_name", username) ?: username
 
     fun getCurrentRole(): String {
         val username = getCurrentUsername() ?: return "staff"

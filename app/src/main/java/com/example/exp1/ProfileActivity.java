@@ -273,6 +273,7 @@ public class ProfileActivity extends AppCompatActivity {
                             userNameTv.setText(name);
                             profileInitialTv.setText(
                                     String.valueOf(name.charAt(0)).toUpperCase());
+                            accountManager.updateCachedName(currentEmail, name);
                         }
                         userEmailTv.setText(currentEmail);
 

@@ -1436,6 +1436,37 @@ public class ScheduleActivity extends AppCompatActivity {
         return getString(R.string.status_missed);
     }
 
+    // ───────────────────────────────────────────────────────────────────────
+    // Activity Logs — Updated / Tasks
+    // Records an owner extending a MISSED task's deadline (Manager Override
+    // → "Reset to Ongoing") into the shared "activity_logs" collection so it
+    // appears under the web Activity Logs "Updated → Tasks" sub-filter. This
+    // dialog is only reachable when roleManager.canEditFarm() (owner-only)
+    // AND the task is already missed, so no extra role check is needed here.
+    // Logging never blocks the status update.
+    // ───────────────────────────────────────────────────────────────────────
+    private void logTaskExtension(Task task) {
+        String actorName = accountManager != null ? accountManager.getCurrentUsername() : null;
+        if (actorName == null || actorName.isEmpty()) actorName = currentUserEmail;
+        String actorEmail = accountManager != null && actorName != null ? accountManager.getEmail(actorName) : null;
+        String actorRole = accountManager != null && actorName != null ? accountManager.getRole(actorName) : "owner";
+
+        java.util.Map<String, Object> metadata = new HashMap<>();
+        metadata.put("taskId", task.firestoreId);
+        metadata.put("taskTitle", task.title);
+        metadata.put("extensionMinutes", task.extensionMinutes);
+
+        FarmRepository.INSTANCE.logTaskUpdated(
+                actorName != null ? actorName : "Owner",
+                actorEmail != null ? actorEmail : "",
+                actorRole != null ? actorRole : "owner",
+                (actorName != null ? actorName : "Owner") + " extended missed task \"" + task.title + "\" by 1 hour",
+                "New total extension: " + task.extensionMinutes + " min",
+                metadata,
+                null
+        );
+    }
+
     private void showStatusUpdateDialog(Task task) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Update Task Status");
@@ -1682,6 +1713,7 @@ public class ScheduleActivity extends AppCompatActivity {
                     task.extensionMinutes += 60; // Add an hour to make it ongoing again
                     task.status = getString(R.string.status_ongoing);
                     updateTaskStatus(task);
+                    logTaskExtension(task);
                     Toast.makeText(this, "Task reset to Ongoing (1 hour added)", Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("Cancel", null)

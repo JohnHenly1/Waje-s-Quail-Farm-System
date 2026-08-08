@@ -343,6 +343,38 @@ object FarmRepository {
             .addOnFailureListener { e -> onDone?.invoke(e) }
     }
 
+    // Covers task edits made from the app — currently the "Request 30min
+    // Extension" action in ScheduleActivity.showStatusUpdateDialog(), fired
+    // when an owner extends a task's deadline. Mirrors logStaffUpdated's
+    // shape (type "update") but tagged module "Tasks" so it sorts into the
+    // web Activity Logs "Updated → Tasks" sub-filter.
+    fun logTaskUpdated(
+        actorName: String,
+        actorEmail: String,
+        actorRole: String,
+        message: String,
+        details: String = "",
+        metadata: Map<String, Any?>? = null,
+        onDone: ((Exception?) -> Unit)? = null
+    ) {
+        val entry = mutableMapOf<String, Any>(
+            "type"      to "update",
+            "module"    to "Tasks",
+            "message"   to message,
+            "userName"  to actorName,
+            "userEmail" to actorEmail,
+            "role"      to actorRole,
+            "details"   to details,
+            "device"    to DEVICE_LABEL,
+            "timestamp" to FieldValue.serverTimestamp()
+        )
+        if (metadata != null) entry["metadata"] = metadata
+
+        activityLogsCol.add(entry)
+            .addOnSuccessListener { onDone?.invoke(null) }
+            .addOnFailureListener { e -> onDone?.invoke(e) }
+    }
+
     fun logDeletion(
         module: String,
         message: String,
