@@ -8,6 +8,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.RectF;
 import android.graphics.pdf.PdfDocument;
 import android.net.ConnectivityManager;
 import android.net.Network;
@@ -111,6 +112,13 @@ public class AnalyticsActivity extends AppCompatActivity {
     private static final int COLOR_GRADE_B = Color.parseColor("#7C3AED");
     private static final int COLOR_GRADE_C = Color.parseColor("#F4B400");
     private static final int COLOR_NO_DATA = Color.parseColor("#D1D5DB");
+
+    // Size (in px) of the pie chart bitmap embedded in PDF/PNG/JPEG report exports.
+    // Bumped up from the old 400x420 so the chart reads clearly on export/print,
+    // and kept separate from the on-screen dashboard chart entirely (see
+    // createPieChartBitmap — it's hand-drawn, not routed through a PieChart view).
+    private static final int REPORT_CHART_WIDTH = 480;
+    private static final int REPORT_CHART_HEIGHT = 560;
 
     // Helper class to hold multi-grade data
     static class DailyEggData {
@@ -616,7 +624,7 @@ public class AnalyticsActivity extends AppCompatActivity {
         int gradeAPct = filteredTotal > 0 ? (filteredA * 100 / filteredTotal) : 0;
         gradeAPercentText.setText(String.format(Locale.getDefault(), "%d%%", gradeAPct));
 
-        // ---- Update Pie Chart ----
+        // ---- Update Pie Chart (on-screen dashboard — still MPAndroidChart, unchanged) ----
         // Build entries and colors TOGETHER so a color always stays attached to its grade,
         // even when one or more grades are zero and get skipped from the slice list.
         List<PieEntry> entries = new ArrayList<>();
@@ -760,82 +768,122 @@ public class AnalyticsActivity extends AppCompatActivity {
     }
 
     /**
-     * Renders an offscreen PieChart matching the report's grade totals (using the same brand
-     * colors as the on-screen dashboard) and returns it as a Bitmap so it can be embedded into
-     * both the PDF and PNG/JPEG report exports.
+     * Renders the grade-distribution pie chart used in PDF/PNG/JPEG report exports.
+     *
+     * IMPORTANT: this is drawn by hand directly onto the Canvas (arcs + lines + text) instead
+     * of instantiating a real MPAndroidChart PieChart view and calling draw() on it. The old
+     * approach worked on most devices but was unreliable on others: an MPAndroidChart PieChart
+     * that's never attached to a window depends on Android view-system internals (measure/layout
+     * callbacks, the legend's own word-wrap logic, text-scale/density handling, Utils.init state)
+     * that don't always behave the same off-screen across OEM skins, densities and chart-library
+     * versions — which is exactly the kind of thing that shows up as "the pie chart just doesn't
+     * render" on some devices while working fine on others. Drawing the slices ourselves removes
+     * that dependency entirely: given the same a/b/c inputs, this always produces the same output,
+     * on every device, every time. It's also easy to make bigger (see REPORT_CHART_WIDTH/HEIGHT).
      */
     private Bitmap createPieChartBitmap(int a, int b, int c, int widthPx, int heightPx) {
         try {
-            PieChart chart = new PieChart(this);
-            chart.setUsePercentValues(true);
-            chart.getDescription().setEnabled(false);
-            chart.getLegend().setEnabled(true);
-            chart.getLegend().setTextSize(11f);
-            chart.getLegend().setFormSize(10f);
-            // MPAndroidChart's legend does NOT wrap by default — if all entries don't fit on
-            // one row it silently drops whichever one overflows instead of wrapping to a new
-            // line. That's what was making "Grade C" disappear from the report's legend.
-            chart.getLegend().setWordWrapEnabled(true);
-            chart.setDrawHoleEnabled(true);
-            chart.setHoleColor(Color.WHITE);
-            chart.setEntryLabelColor(Color.BLACK);
-            chart.setDrawEntryLabels(false);
-            // Room around the pie for the outside percentage labels + leader lines below.
-            chart.setExtraOffsets(24, 12, 24, 12);
-            // Keep every slice at least this wide so two small/near-equal grades don't
-            // collapse into each other and squish their labels together — same as
-            // the on-screen dashboard chart.
-            chart.setMinAngleForSlices(18f);
-
-            List<PieEntry> entries = new ArrayList<>();
-            List<Integer> colors = new ArrayList<>();
-            int total = a + b + c;
-
-            if (total > 0) {
-                if (a > 0) { entries.add(new PieEntry(a, "Grade A")); colors.add(COLOR_GRADE_A); }
-                if (b > 0) { entries.add(new PieEntry(b, "Grade B")); colors.add(COLOR_GRADE_B); }
-                if (c > 0) { entries.add(new PieEntry(c, "Grade C")); colors.add(COLOR_GRADE_C); }
-            } else {
-                entries.add(new PieEntry(1, "No Data"));
-                colors.add(COLOR_NO_DATA);
-            }
-
-            PieDataSet dataSet = new PieDataSet(entries, "");
-            dataSet.setColors(colors);
-            dataSet.setSliceSpace(3f);
-            dataSet.setValueTextColor(Color.BLACK);
-            dataSet.setValueTextSize(11f);
-
-            // --- Straight leader lines pointing at each slice, same as the dashboard chart ---
-            // This is what keeps small-percentage labels legible instead of overlapping/squishing.
-            dataSet.setValueLinePart1OffsetPercentage(80f);
-            dataSet.setValueLinePart1Length(0.5f);
-            dataSet.setValueLinePart2Length(0.3f);
-            dataSet.setValueLineWidth(1.5f);
-            dataSet.setUsingSliceColorAsValueLineColor(true);
-            dataSet.setXValuePosition(PieDataSet.ValuePosition.OUTSIDE_SLICE);
-            dataSet.setYValuePosition(PieDataSet.ValuePosition.OUTSIDE_SLICE);
-
-            PieData pieData = new PieData(dataSet);
-            if (total > 0) {
-                pieData.setValueFormatter(new PercentFormatter(chart));
-            } else {
-                pieData.setValueFormatter(new ValueFormatter() {
-                    @Override public String getPieLabel(float value, PieEntry entry) { return ""; }
-                });
-            }
-            pieData.setValueTextSize(11f);
-            chart.setData(pieData);
-
-            int widthSpec = View.MeasureSpec.makeMeasureSpec(widthPx, View.MeasureSpec.EXACTLY);
-            int heightSpec = View.MeasureSpec.makeMeasureSpec(heightPx, View.MeasureSpec.EXACTLY);
-            chart.measure(widthSpec, heightSpec);
-            chart.layout(0, 0, widthPx, heightPx);
-
             Bitmap bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888);
             Canvas canvas = new Canvas(bitmap);
             canvas.drawColor(Color.WHITE);
-            chart.draw(canvas);
+
+            int total = a + b + c;
+
+            // Slice list — falls back to a single gray "No Data" slice when there's nothing
+            // to show, matching the on-screen dashboard's placeholder behavior.
+            List<String> labels = new ArrayList<>();
+            List<Integer> values = new ArrayList<>();
+            List<Integer> sliceColors = new ArrayList<>();
+            if (total > 0) {
+                if (a > 0) { labels.add("Grade A"); values.add(a); sliceColors.add(COLOR_GRADE_A); }
+                if (b > 0) { labels.add("Grade B"); values.add(b); sliceColors.add(COLOR_GRADE_B); }
+                if (c > 0) { labels.add("Grade C"); values.add(c); sliceColors.add(COLOR_GRADE_C); }
+            } else {
+                labels.add("No Data"); values.add(1); sliceColors.add(COLOR_NO_DATA);
+            }
+            int sliceTotal = 0;
+            for (int v : values) sliceTotal += v;
+
+            // Reserve a legend band at the bottom; the pie itself occupies the area above it.
+            float legendHeight = 74f;
+            float chartAreaHeight = heightPx - legendHeight;
+            float centerX = widthPx / 2f;
+            float centerY = chartAreaHeight / 2f;
+            // Generous margin (0.30 instead of ~0.45) so the outside % labels and their leader
+            // lines always have room and never get clipped at the bitmap edge.
+            float radius = Math.min(widthPx, chartAreaHeight) * 0.30f;
+
+            RectF oval = new RectF(centerX - radius, centerY - radius, centerX + radius, centerY + radius);
+
+            Paint slicePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            Paint linePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            linePaint.setStyle(Paint.Style.STROKE);
+            linePaint.setStrokeWidth(2f);
+            Paint labelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            labelPaint.setColor(Color.BLACK);
+            labelPaint.setTextSize(22f);
+            labelPaint.setFakeBoldText(true);
+
+            float startAngle = -90f; // 12 o'clock
+            for (int i = 0; i < values.size(); i++) {
+                float sweep = (values.get(i) / (float) sliceTotal) * 360f;
+
+                slicePaint.setColor(sliceColors.get(i));
+                canvas.drawArc(oval, startAngle, sweep, true, slicePaint);
+
+                // Outside percentage label with a short radial leader line at the slice's
+                // midpoint angle, so labels stay legible even for thin slices.
+                float midAngleRad = (float) Math.toRadians(startAngle + sweep / 2f);
+                float lineStartX = centerX + (float) Math.cos(midAngleRad) * radius;
+                float lineStartY = centerY + (float) Math.sin(midAngleRad) * radius;
+                float lineEndX = centerX + (float) Math.cos(midAngleRad) * (radius + 30f);
+                float lineEndY = centerY + (float) Math.sin(midAngleRad) * (radius + 30f);
+
+                linePaint.setColor(sliceColors.get(i));
+                canvas.drawLine(lineStartX, lineStartY, lineEndX, lineEndY, linePaint);
+
+                if (total > 0) {
+                    int pct = Math.round((values.get(i) / (float) sliceTotal) * 100f);
+                    String label = pct + "%";
+                    float textWidth = labelPaint.measureText(label);
+                    float textX = lineEndX >= centerX ? lineEndX + 6f : lineEndX - textWidth - 6f;
+                    canvas.drawText(label, textX, lineEndY + 8f, labelPaint);
+                }
+
+                startAngle += sweep;
+            }
+
+            // White donut hole in the middle, matching the on-screen chart's style.
+            Paint holePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            holePaint.setColor(Color.WHITE);
+            canvas.drawCircle(centerX, centerY, radius * 0.55f, holePaint);
+
+            // Centered legend row along the bottom band.
+            Paint legendTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            legendTextPaint.setColor(Color.BLACK);
+            legendTextPaint.setTextSize(20f);
+            float boxSize = 18f;
+            float gapAfterBox = 8f;
+            float gapBetweenItems = 26f;
+
+            float totalLegendWidth = 0f;
+            for (String label : labels) {
+                totalLegendWidth += boxSize + gapAfterBox + legendTextPaint.measureText(label) + gapBetweenItems;
+            }
+            totalLegendWidth -= gapBetweenItems;
+
+            float legendX = centerX - totalLegendWidth / 2f;
+            float legendBaselineY = chartAreaHeight + legendHeight / 2f + 7f;
+
+            Paint boxPaint = new Paint();
+            for (int i = 0; i < labels.size(); i++) {
+                boxPaint.setColor(sliceColors.get(i));
+                canvas.drawRect(legendX, legendBaselineY - boxSize, legendX + boxSize, legendBaselineY, boxPaint);
+                legendX += boxSize + gapAfterBox;
+                canvas.drawText(labels.get(i), legendX, legendBaselineY, legendTextPaint);
+                legendX += legendTextPaint.measureText(labels.get(i)) + gapBetweenItems;
+            }
+
             return bitmap;
         } catch (Exception e) {
             return null;
@@ -880,10 +928,15 @@ public class AnalyticsActivity extends AppCompatActivity {
 
             // --- Grade distribution pie chart ---
             drawSection(canvas, "Grade Distribution", y); y += 20;
-            Bitmap chartBitmap = createPieChartBitmap(a, b, c, 400, 420);
+            Bitmap chartBitmap = createPieChartBitmap(a, b, c, REPORT_CHART_WIDTH, REPORT_CHART_HEIGHT);
+            float chartLeft = (595 - REPORT_CHART_WIDTH) / 2f;
             if (chartBitmap != null) {
-                float chartLeft = (595 - 400) / 2f;
                 canvas.drawBitmap(chartBitmap, chartLeft, y, null);
+            } else {
+                // Should be effectively unreachable now that the chart is hand-drawn, but keep a
+                // visible fallback instead of silently leaving a blank gap on the report.
+                Paint fallback = new Paint(); fallback.setColor(Color.GRAY); fallback.setTextSize(14f);
+                canvas.drawText("Chart unavailable", chartLeft, y + 30, fallback);
             }
 
             document.finishPage(page);
@@ -911,7 +964,9 @@ public class AnalyticsActivity extends AppCompatActivity {
      */
     private void exportImageReport(int total, int a, int b, int c, String periodLabel, Bitmap.CompressFormat format, String ext, String mimeType) {
         try {
-            int width = 595, height = 800;
+            // Height increased (800 -> 870) to comfortably fit the larger REPORT_CHART_HEIGHT
+            // pie chart below the summary rows without clipping it.
+            int width = 595, height = 870;
             Bitmap reportBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
             Canvas canvas = new Canvas(reportBitmap);
 
@@ -943,10 +998,13 @@ public class AnalyticsActivity extends AppCompatActivity {
             drawRow(canvas, "Grade C (Reject)", String.valueOf(c), y); y += 40;
 
             drawSection(canvas, "Grade Distribution", y); y += 20;
-            Bitmap chartBitmap = createPieChartBitmap(a, b, c, 400, 420);
+            Bitmap chartBitmap = createPieChartBitmap(a, b, c, REPORT_CHART_WIDTH, REPORT_CHART_HEIGHT);
+            float chartLeft = (width - REPORT_CHART_WIDTH) / 2f;
             if (chartBitmap != null) {
-                float chartLeft = (width - 400) / 2f;
                 canvas.drawBitmap(chartBitmap, chartLeft, y, null);
+            } else {
+                Paint fallback = new Paint(); fallback.setColor(Color.GRAY); fallback.setTextSize(14f);
+                canvas.drawText("Chart unavailable", chartLeft, y + 30, fallback);
             }
 
             // JPEG has no alpha channel — flatten onto white before compressing so

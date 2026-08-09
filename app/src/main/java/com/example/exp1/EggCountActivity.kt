@@ -1,6 +1,8 @@
 package com.example.exp1
 
 import android.Manifest
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
 import android.app.DatePickerDialog
 import android.content.ContentValues
 import android.content.pm.PackageManager
@@ -87,6 +89,11 @@ class EggCountActivity : AppCompatActivity() {
     private lateinit var gradeARow: View
     private lateinit var gradeBRow: View
     private lateinit var gradeCRow: View
+
+    // ── Frozen/picked photo preview + scanning animation ─────────────────────
+    private lateinit var frozenPreviewImage: ImageView
+    private lateinit var scanLineView: View
+    private var scanAnimator: ObjectAnimator? = null
 
     // ── Live time update ──────────────────────────────────────────────────────
     private val handler = Handler(Looper.getMainLooper())
@@ -175,6 +182,9 @@ class EggCountActivity : AppCompatActivity() {
         gradeARow     = findViewById(R.id.gradeARow)
         gradeBRow     = findViewById(R.id.gradeBRow)
         gradeCRow     = findViewById(R.id.gradeCRow)
+
+        frozenPreviewImage = findViewById(R.id.frozenPreviewImage)
+        scanLineView        = findViewById(R.id.scanLineView)
     }
 
     private fun wireListeners() {
@@ -299,6 +309,8 @@ class EggCountActivity : AppCompatActivity() {
             isLiveMode = true
             liveScanLabel.text = "● LIVE SCAN"
             frozenOverlay.visibility = View.GONE
+            frozenPreviewImage.visibility = View.GONE
+            stopScanAnimation()
             bindCamera()
         } else {
             requestCameraPermission.launch(Manifest.permission.CAMERA)
@@ -313,6 +325,8 @@ class EggCountActivity : AppCompatActivity() {
         analyzing.set(false)
         overlayView.setResults(emptyList())
         frozenOverlay.visibility = View.VISIBLE
+        frozenPreviewImage.visibility = View.GONE
+        stopScanAnimation()
         liveScanLabel.text = "● CAMERA OFF"
         captureBtn.visibility = View.VISIBLE
         retakeBtn.visibility  = View.GONE
@@ -405,14 +419,20 @@ class EggCountActivity : AppCompatActivity() {
     private fun freezeAndAnalyze(bmp: Bitmap, saveToGallery: Boolean = false) {
         isLiveMode = false
         frozenOverlay.visibility = View.VISIBLE
+        frozenPreviewImage.setImageBitmap(bmp)
+        frozenPreviewImage.visibility = View.VISIBLE
         liveScanLabel.text = "● ANALYZING"
         captureBtn.visibility = View.GONE
         retakeBtn.visibility  = View.VISIBLE
         modeSwitchBtn.text    = "↩ Live Mode"
 
+        startScanAnimation()
+
         cameraExecutor.execute {
             val results = runDetection(bmp)
             runOnUiThread {
+                stopScanAnimation()
+
                 gradeA = 0; gradeB = 0; gradeC = 0; countedBoxes.clear()
                 for (det in results) when (det.label) {
                     "Quail_Egg_Grade_A" -> gradeA++
@@ -445,6 +465,8 @@ class EggCountActivity : AppCompatActivity() {
     private fun resumeLive() {
         isLiveMode = true
         frozenOverlay.visibility = View.GONE
+        frozenPreviewImage.visibility = View.GONE
+        stopScanAnimation()
         overlayView.setResults(emptyList())
         liveScanLabel.text    = "● LIVE SCAN"
         captureBtn.visibility = View.VISIBLE
@@ -454,6 +476,34 @@ class EggCountActivity : AppCompatActivity() {
         saveBtn.isEnabled = true
         saveBtn.visibility = View.GONE
         resetCounts()
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Scanning animation (played while YOLO is analyzing a frozen/picked photo)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private fun startScanAnimation() {
+        scanLineView.visibility = View.VISIBLE
+        scanLineView.translationY = 0f
+        scanLineView.post {
+            val parent = scanLineView.parent as? View
+            val parentHeight = parent?.height?.toFloat() ?: 0f
+            scanAnimator?.cancel()
+            scanAnimator = ObjectAnimator.ofFloat(
+                scanLineView, View.TRANSLATION_Y, 0f, parentHeight
+            ).apply {
+                duration = 1200
+                repeatCount = ValueAnimator.INFINITE
+                repeatMode = ValueAnimator.RESTART
+                start()
+            }
+        }
+    }
+
+    private fun stopScanAnimation() {
+        scanAnimator?.cancel()
+        scanAnimator = null
+        scanLineView.visibility = View.GONE
     }
 
     // ─────────────────────────────────────────────────────────────────────────

@@ -19,10 +19,14 @@
                 <FrameLayout android:layout_width="match_parent" android:layout_height="300dp">
                     <!--    Live camera preview    -->
                     <androidx.camera.view.PreviewView android:id="@+id/cameraPreview" android:layout_width="match_parent" android:layout_height="match_parent"/>
+                    <!--    Frozen/picked photo preview — shown instead of live feed while a captured or gallery-picked image is being analyzed/reviewed    -->
+                    <ImageView android:id="@+id/frozenPreviewImage" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="centerCrop" android:visibility="gone" android:contentDescription="Captured or selected egg photo"/>
                     <!--    Dim overlay when frame is frozen    -->
                     <View android:id="@+id/frozenOverlay" android:layout_width="match_parent" android:layout_height="match_parent" android:background="#55000000" android:visibility="gone"/>
                     <!--    Bounding-box overlay    -->
                     <com.example.exp1.DetectionOverlayView android:id="@+id/detectionOverlay" android:layout_width="match_parent" android:layout_height="match_parent"/>
+                    <!--    Scanning sweep line — animated while YOLO analyzes a frozen/picked photo    -->
+                    <View android:id="@+id/scanLineView" android:layout_width="match_parent" android:layout_height="3dp" android:layout_gravity="top" android:background="#00E676" android:visibility="gone"/>
                     <!--    LIVE / ANALYZING / CAPTURED badge (top-left)    -->
                     <TextView android:id="@+id/liveScanLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="top|start" android:layout_margin="10dp" android:background="@drawable/rounded_dark_green" android:paddingHorizontal="10dp" android:paddingVertical="5dp" android:text="● LIVE SCAN" android:textColor="@color/white" android:textSize="11sp" android:textStyle="bold"/>
                 </FrameLayout>
@@ -57,7 +61,7 @@
                         <!--   Grade A row (tappable)   -->
                         <LinearLayout android:id="@+id/gradeARow" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="6dp" android:background="@drawable/bg_grade_row_a" android:clickable="true" android:focusable="true" android:gravity="center_vertical" android:orientation="horizontal" android:paddingHorizontal="6dp" android:paddingVertical="6dp" android:contentDescription="View Grade A details">
                             <View android:layout_width="8dp" android:layout_height="8dp" android:layout_marginEnd="8dp" android:background="#2E7D32"/>
-                            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Grade A" android:textColor="@color/black" android:textSize="12sp" android:textStyle="bold"/>
+                            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Grade A" android:textColor="@color/stats_green_end" android:textSize="12sp" android:textStyle="bold"/>
                             <!--   gradeADesc: shows "Normal" — referenced in Kotlin   -->
                             <TextView android:id="@+id/gradeADesc" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginEnd="8dp" android:text="Normal" android:textColor="@color/dark_gray" android:textSize="10sp" android:textStyle="italic"/>
                             <TextView android:id="@+id/gradeAValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textColor="#2E7D32" android:textSize="15sp" android:textStyle="bold"/>
@@ -68,7 +72,7 @@
                         <!--   Grade B row (tappable)   -->
                         <LinearLayout android:id="@+id/gradeBRow" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="6dp" android:background="@drawable/bg_grade_row_b" android:clickable="true" android:focusable="true" android:gravity="center_vertical" android:orientation="horizontal" android:paddingHorizontal="6dp" android:paddingVertical="6dp" android:contentDescription="View Grade B details">
                             <View android:layout_width="8dp" android:layout_height="8dp" android:layout_marginEnd="8dp" android:background="#F57F17"/>
-                            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Grade B" android:textColor="@color/black" android:textSize="12sp" android:textStyle="bold"/>
+                            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Grade B" android:textColor="@color/orange" android:textSize="12sp" android:textStyle="bold"/>
                             <!--   gradeBDesc: shows "Cracked" — referenced in Kotlin   -->
                             <TextView android:id="@+id/gradeBDesc" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginEnd="8dp" android:text="Cracked" android:textColor="@color/dark_gray" android:textSize="10sp" android:textStyle="italic"/>
                             <TextView android:id="@+id/gradeBValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textColor="#F57F17" android:textSize="15sp" android:textStyle="bold"/>
@@ -79,7 +83,7 @@
                         <!--   Grade C row (tappable)   -->
                         <LinearLayout android:id="@+id/gradeCRow" android:layout_width="match_parent" android:layout_height="wrap_content" android:background="@drawable/bg_grade_row_c" android:clickable="true" android:focusable="true" android:gravity="center_vertical" android:orientation="horizontal" android:paddingHorizontal="6dp" android:paddingVertical="6dp" android:contentDescription="View Grade C details">
                             <View android:layout_width="8dp" android:layout_height="8dp" android:layout_marginEnd="8dp" android:background="#C62828"/>
-                            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Grade C" android:textColor="@color/black" android:textSize="12sp" android:textStyle="bold"/>
+                            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Grade C" android:textColor="@color/red" android:textSize="12sp" android:textStyle="bold"/>
                             <!--   gradeCDesc: shows "Reject" — referenced in Kotlin   -->
                             <TextView android:id="@+id/gradeCDesc" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginEnd="8dp" android:text="Reject" android:textColor="@color/dark_gray" android:textSize="10sp" android:textStyle="italic"/>
                             <TextView android:id="@+id/gradeCValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textColor="#C62828" android:textSize="15sp" android:textStyle="bold"/>
