@@ -57,8 +57,6 @@ import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
-import com.google.firebase.storage.FirebaseStorage;
-import com.google.firebase.storage.StorageReference;
 
 import java.io.File;
 import java.text.ParseException;
@@ -523,6 +521,25 @@ public class ScheduleActivity extends AppCompatActivity {
                             Toast.makeText(this, getString(R.string.error_deleting_tasks, e.getMessage()), Toast.LENGTH_SHORT).show());
         });
     }
+    private ArrayAdapter<String> createBlackTextAdapter(String[] items) {
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, items) {
+            @Override
+            public View getView(int position, View convertView, ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                if (view instanceof TextView) ((TextView) view).setTextColor(Color.BLACK);
+                return view;
+            }
+
+            @Override
+            public View getDropDownView(int position, View convertView, ViewGroup parent) {
+                View view = super.getDropDownView(position, convertView, parent);
+                if (view instanceof TextView) ((TextView) view).setTextColor(Color.BLACK);
+                return view;
+            }
+        };
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        return adapter;
+    }
 
     private void showAddScheduleDialog() {
         View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_add_schedule, null);
@@ -545,16 +562,13 @@ public class ScheduleActivity extends AppCompatActivity {
         TextView    txtPatternSuggestion = dialogView.findViewById(R.id.txtPatternSuggestion);
 
         String[] categories = getResources().getStringArray(R.array.task_categories);
-        ArrayAdapter<String> catAdapter = new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_item, categories);
-        catAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        ArrayAdapter<String> catAdapter = createBlackTextAdapter(categories);
         spinnerCategory.setAdapter(catAdapter);
 
         // Populate work window spinner with friendly labels and corresponding minute values
         final String[] workWindowLabels = new String[]{"30 minutes","45 minutes","60 minutes","75 minutes","90 minutes","105 minutes","120 minutes"};
         final int[] workWindowValues = new int[]{30,45,60,75,90,105,120};
-        ArrayAdapter<String> wwAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, workWindowLabels);
-        wwAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        ArrayAdapter<String> wwAdapter = createBlackTextAdapter(workWindowLabels);
         spinnerWorkWindow.setAdapter(wwAdapter);
         // Set initial selection to match category default and update when category changes
         int defaultMinutes = getDefaultWorkWindow(spinnerCategory.getSelectedItem().toString());
@@ -1361,7 +1375,7 @@ public class ScheduleActivity extends AppCompatActivity {
 
                 taskView.setOnClickListener(v -> {
                     if (isDone) {
-                        Toast.makeText(this, "Task already completed", Toast.LENGTH_SHORT).show();
+                        showDoneProofViewerDialog(task);
                         return;
                     }
                     if (isMissed) {
@@ -1612,32 +1626,35 @@ public class ScheduleActivity extends AppCompatActivity {
                 .setCancelable(false)
                 .show();
     }
+    /** Compresses the captured proof photo and encodes it for storage directly in Firestore (no Firebase Storage / billing required). */
+    private String compressImageToBase64(Uri imageUri) throws Exception {
+        android.graphics.Bitmap bitmap = android.provider.MediaStore.Images.Media
+                .getBitmap(getContentResolver(), imageUri);
+        int maxDim = 600;
+        float scale = Math.min((float) maxDim / bitmap.getWidth(), (float) maxDim / bitmap.getHeight());
+        android.graphics.Bitmap resized = android.graphics.Bitmap.createScaledBitmap(
+                bitmap, (int) (bitmap.getWidth() * scale), (int) (bitmap.getHeight() * scale), true);
 
-    /** Uploads the proof photo to Firebase Storage, then writes status + proof fields to Firestore. */
+        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+        resized.compress(android.graphics.Bitmap.CompressFormat.JPEG, 50, baos);
+        byte[] bytes = baos.toByteArray();
+        return android.util.Base64.encodeToString(bytes, android.util.Base64.DEFAULT);
+    }
+    /** Compresses the proof photo and writes status + proof fields to Firestore directly (no Storage upload). */
     private void uploadProofImageAndFinalize(Task task, String comment, Uri imageUri, AlertDialog progress) {
         if (task.firestoreId == null) {
             progress.dismiss();
             Toast.makeText(this, "This task has no ID and cannot be updated", Toast.LENGTH_SHORT).show();
             return;
         }
-
-        StorageReference storageRef = FirebaseStorage.getInstance().getReference()
-                .child("task_proofs")
-                .child(task.firestoreId + "_" + System.currentTimeMillis() + ".jpg");
-
-        storageRef.putFile(imageUri)
-                .addOnSuccessListener(taskSnapshot -> storageRef.getDownloadUrl()
-                        .addOnSuccessListener(downloadUri -> markTaskDoneInFirestore(task, comment, downloadUri.toString(), progress))
-                        .addOnFailureListener(e -> {
-                            progress.dismiss();
-                            Toast.makeText(this, "Failed to retrieve proof photo URL: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                        }))
-                .addOnFailureListener(e -> {
-                    progress.dismiss();
-                    Toast.makeText(this, "Failed to upload proof photo: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                });
+        try {
+            String base64Image = compressImageToBase64(imageUri);
+            markTaskDoneInFirestore(task, comment, base64Image, progress);
+        } catch (Exception e) {
+            progress.dismiss();
+            Toast.makeText(this, "Failed to process proof photo: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
     }
-
     /** Only reachable once a comment and an uploaded photo URL both exist. */
     private void markTaskDoneInFirestore(Task task, String comment, String imageUrl, AlertDialog progress) {
         task.status = getString(R.string.status_done);
@@ -1727,6 +1744,105 @@ public class ScheduleActivity extends AppCompatActivity {
                     Toast.makeText(this, "Task reset to Ongoing (1 hour added)", Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("Cancel", null)
+                .show();
+    }
+    /** Shows the comment + photo submitted as proof when a task was marked Done. */
+    private void showDoneProofViewerDialog(Task task) {
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        int pad = dpToPx(20);
+        container.setPadding(pad, pad, pad, pad);
+
+        // Force white background with a green border, regardless of app/system theme.
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setColor(Color.WHITE);
+        bg.setCornerRadius(dpToPx(12));
+        bg.setStroke(dpToPx(2), Color.parseColor("#16A34A")); // green edge
+        container.setBackground(bg);
+
+
+        TextView commentLabel = new TextView(this);
+        commentLabel.setText("Comment");
+        commentLabel.setTypeface(null, Typeface.BOLD);
+        commentLabel.setTextSize(14);
+        commentLabel.setTextColor(Color.parseColor("#111827"));
+        container.addView(commentLabel);
+
+        TextView commentTv = new TextView(this);
+        commentTv.setText((task.doneComment != null && !task.doneComment.isEmpty()) ? task.doneComment : "(No comment provided)");
+        commentTv.setTextColor(Color.parseColor("#374151"));
+        commentTv.setTextSize(14);
+        LinearLayout.LayoutParams commentParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        commentParams.setMargins(0, dpToPx(4), 0, dpToPx(16));
+        commentTv.setLayoutParams(commentParams);
+        container.addView(commentTv);
+
+        TextView photoLabel = new TextView(this);
+        photoLabel.setText("Photo");
+        photoLabel.setTypeface(null, Typeface.BOLD);
+        photoLabel.setTextSize(14);
+        photoLabel.setTextColor(Color.parseColor("#111827"));
+        container.addView(photoLabel);
+
+        ImageView photoView = new ImageView(this);
+        LinearLayout.LayoutParams photoParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(240));
+        photoParams.setMargins(0, dpToPx(8), 0, 0);
+        photoView.setLayoutParams(photoParams);
+        photoView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        photoView.setBackgroundColor(Color.parseColor("#F3F4F6"));
+        container.addView(photoView);
+
+        if (task.doneImageUrl == null || task.doneImageUrl.isEmpty()) {
+            photoView.setVisibility(View.GONE);
+            TextView noPhoto = new TextView(this);
+            noPhoto.setText("(No photo attached)");
+            noPhoto.setTextColor(Color.parseColor("#9CA3AF"));
+            noPhoto.setTextSize(13);
+            LinearLayout.LayoutParams npParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            npParams.setMargins(0, dpToPx(8), 0, 0);
+            noPhoto.setLayoutParams(npParams);
+            container.addView(noPhoto);
+        } else if (task.doneImageUrl.startsWith("http")) {
+            // Legacy proof photos saved as a Firebase Storage URL before the Base64 switch.
+            // No image-loading library is wired in, so offer to open it instead of embedding it.
+            photoView.setVisibility(View.GONE);
+            TextView linkTv = new TextView(this);
+            linkTv.setText("Open photo link");
+            linkTv.setTextColor(Color.parseColor("#2563EB"));
+            linkTv.setTextSize(14);
+            linkTv.setPaintFlags(linkTv.getPaintFlags() | android.graphics.Paint.UNDERLINE_TEXT_FLAG);
+            linkTv.setOnClickListener(v -> {
+                try {
+                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(task.doneImageUrl)));
+                } catch (Exception e) {
+                    Toast.makeText(this, "Could not open photo link", Toast.LENGTH_SHORT).show();
+                }
+            });
+            container.addView(linkTv);
+        } else {
+            try {
+                byte[] decoded = android.util.Base64.decode(task.doneImageUrl, android.util.Base64.DEFAULT);
+                android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeByteArray(decoded, 0, decoded.length);
+                if (bmp != null) {
+                    photoView.setImageBitmap(bmp);
+                } else {
+                    photoView.setVisibility(View.GONE);
+                }
+            } catch (Exception e) {
+                photoView.setVisibility(View.GONE);
+            }
+        }
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(container);
+
+        new AlertDialog.Builder(this)
+                .setTitle("Completion proof — " + task.title)
+                .setView(scroll)
+                .setPositiveButton(getString(R.string.close), null)
                 .show();
     }
 

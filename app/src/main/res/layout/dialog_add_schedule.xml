@@ -43,6 +43,7 @@
             android:textSize="14sp"
             android:textStyle="bold" />
 
+        <!-- Task Title -->
         <EditText
             android:id="@+id/editTaskTitle"
             android:layout_width="match_parent"
@@ -52,6 +53,8 @@
             android:hint="e.g., Morning Feeding"
             android:inputType="text"
             android:padding="12dp"
+            android:textColor="@color/black"
+            android:textColorHint="@color/black"
             android:textSize="16sp" />
 
         <!-- Category -->
@@ -91,18 +94,18 @@
             android:layout_height="52dp"
             android:layout_marginTop="8dp"
             android:background="@drawable/rounded_corner"
+            android:clickable="true"
+            android:drawableEnd="@drawable/ic_arrow_forward"
+            android:ellipsize="end"
+            android:focusable="true"
             android:gravity="center_vertical"
-            android:text="(No specific staff)"
-            android:textColor="@color/dark_gray"
-            android:textSize="16sp"
+            android:maxLines="1"
             android:paddingStart="12dp"
             android:paddingEnd="36dp"
-            android:drawableEnd="@drawable/ic_arrow_forward"
-            app:drawableTint="@color/dark_green"
-            android:clickable="true"
-            android:focusable="true"
-            android:ellipsize="end"
-            android:maxLines="1" />
+            android:text="(No specific staff)"
+            android:textColor="@color/black"
+            android:textSize="16sp"
+            app:drawableTint="@color/dark_green" />
 
         <!-- Time -->
         <TextView
@@ -114,6 +117,7 @@
             android:textSize="14sp"
             android:textStyle="bold" />
 
+        <!-- Time -->
         <TextView
             android:id="@+id/textTime"
             android:layout_width="match_parent"
@@ -122,6 +126,8 @@
             android:background="@drawable/rounded_corner"
             android:gravity="center_vertical"
             android:hint="Select time"
+            android:textColor="@color/black"
+            android:textColorHint="@color/dark_gray"
             android:paddingStart="12dp"
             android:textSize="16sp" />
 
