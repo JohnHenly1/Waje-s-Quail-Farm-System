@@ -205,7 +205,7 @@ public class ProfileActivity extends AppCompatActivity {
             logoutButton.setOnClickListener(v -> {
                 String name = userNameTv.getText() != null ? userNameTv.getText().toString() : currentEmail;
                 String role = accountManager.getRole(currentEmail);
-                FarmRepository.INSTANCE.logLogout(name, currentEmail, role, null);
+                FarmRepository.INSTANCE.logLogout(name, currentEmail, role, "manual", null);
 
                 accountManager.clearSession();
                 Intent intent = new Intent(ProfileActivity.this, MainActivity.class);

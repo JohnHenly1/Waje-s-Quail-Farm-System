@@ -934,6 +934,28 @@ class FeedInventoryActivity : AppCompatActivity() {
                     )
                     commitNewFeedItem(data, qtyIn, name, cat) {
                         logHistory("ADDED", name, qtyIn, price, cat)
+
+                        // New product created — always record a Created →
+                        // Inventory entry, regardless of starting quantity
+                        // (unlike the inventory_history audit trail above,
+                        // which only tracks quantity *changes*).
+                        val editorName  = accountManager.getCurrentUsername() ?: "User"
+                        val editorEmail = accountManager.getEmail(editorName) ?: ""
+                        val editorRole  = roleManager.role
+                        FarmRepository.logInventoryCreated(
+                            actorName = editorName,
+                            actorEmail = editorEmail,
+                            actorRole = editorRole,
+                            productName = name,
+                            category = cat,
+                            metadata = mapOf(
+                                "itemName" to name,
+                                "category" to cat,
+                                "initialQuantity" to qtyIn,
+                                "unitPrice" to price
+                            )
+                        )
+
                         dialog.dismiss()
                     }
                 }

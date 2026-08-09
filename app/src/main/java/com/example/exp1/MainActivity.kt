@@ -113,6 +113,8 @@ class MainActivity : AppCompatActivity() {
         btnOffline.setOnClickListener {
             if (currentEmail != null) {
                 val role = accountManager.getRole(currentEmail)
+                // Offline mode reuses the locally cached session — not a
+                // fresh authentication, so isNewLogin stays false (default).
                 enterApp("User", currentEmail, role, "cached", false)
             }
         }
@@ -509,7 +511,9 @@ class MainActivity : AppCompatActivity() {
             }
 
             if (entered == correctPass) {
-                enterApp(name, email, role, entered, true)
+                // Real credential verification succeeded — this is a
+                // genuine authentication event, so record it as a Login.
+                enterApp(name, email, role, entered, true, isNewLogin = true)
                 dialog.dismiss()
             } else {
                 passwordInputLayout.error = "Incorrect Password"
@@ -595,6 +599,12 @@ class MainActivity : AppCompatActivity() {
 
                         if (setupDone) {
                             statusText.text = "Welcome, $name!"
+                            // Reached only for an existing cached session
+                            // (startLivePendingCheck is called with
+                            // email != null, i.e. the app was reopened while
+                            // already authenticated) — not a fresh
+                            // credential check, so isNewLogin stays false
+                            // (default) and no Login entry is written.
                             handler.postDelayed({ enterApp(name, email, role, password, true) }, 600)
                         } else {
                             loadingLayout.visibility = View.GONE
@@ -624,7 +634,33 @@ class MainActivity : AppCompatActivity() {
         recreate()
     }
 
-    private fun enterApp(name: String, email: String, role: String, password: String, showToast: Boolean) {
+    // ─────────────────────────────────────────────────────────────────────────
+    // enterApp — the single choke point that transitions from the login
+    // screen into DashboardActivity.
+    //
+    // [isNewLogin] distinguishes a genuine authentication event from a
+    // silent session resume:
+    //   - true  = the user just verified their password in the dialog above
+    //             (Verify & Login button). This is a real "Login" event and
+    //             is recorded in Activity Logs.
+    //   - false = the app is simply re-entering an already-active session —
+    //             either the cached-session auto-check in
+    //             startLivePendingCheck() (fires every time the app is
+    //             reopened while a session is still valid) or the Offline
+    //             Mode button (uses the locally cached password, no server
+    //             round-trip). Neither of these is a fresh authentication,
+    //             so no Login entry is written, per the Activity Logs spec:
+    //             opening/reopening the app while already authenticated
+    //             should never create a new Login record.
+    // ─────────────────────────────────────────────────────────────────────────
+    private fun enterApp(
+        name: String,
+        email: String,
+        role: String,
+        password: String,
+        showToast: Boolean,
+        isNewLogin: Boolean = false
+    ) {
         if (networkCallback != null) {
             try { cm.unregisterNetworkCallback(networkCallback!!) } catch (_: Exception) {}
         }
@@ -643,7 +679,9 @@ class MainActivity : AppCompatActivity() {
                 .set(mapOf("email" to email, "role" to role, "status" to "approved"))
         }
 
-        FarmRepository.logLogin(name, email, role)
+        if (isNewLogin) {
+            FarmRepository.logLogin(name, email, role)
+        }
 
         startActivity(Intent(this, DashboardActivity::class.java).putExtra("username", email))
         finish()

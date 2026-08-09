@@ -282,15 +282,16 @@ object FarmRepository {
             .addOnFailureListener { e -> onDone?.invoke(e) }
     }
 
-    fun logLogout(userName: String, userEmail: String, role: String, onDone: ((Exception?) -> Unit)? = null) {
+    fun logLogout(userName: String, userEmail: String, role: String, logoutType: String, onDone: ((Exception?) -> Unit)? = null) {
         activityLogsCol.add(mapOf(
-            "type"      to "logout",
-            "message"   to "$userName logged out",
-            "userName"  to userName,
-            "userEmail" to userEmail,
-            "role"      to role,
-            "device"    to DEVICE_LABEL,
-            "timestamp" to FieldValue.serverTimestamp()
+            "type"       to "logout",
+            "message"    to "$userName logged out",
+            "userName"   to userName,
+            "userEmail"  to userEmail,
+            "role"       to role,
+            "device"     to DEVICE_LABEL,
+            "logoutType" to logoutType,
+            "timestamp"  to FieldValue.serverTimestamp()
         )).addOnSuccessListener { onDone?.invoke(null) }
             .addOnFailureListener { e -> onDone?.invoke(e) }
     }
@@ -303,9 +304,13 @@ object FarmRepository {
         targetEmail: String,
         onDone: ((Exception?) -> Unit)? = null
     ) {
+        // Tagged module "Account" (not "Staff") so this lands in the web
+        // Activity Logs' "Created → Account" sub-filter. Deletions/updates
+        // of staff accounts still use module "Staff" — only the Created
+        // category groups staff-account creation under "Account".
         activityLogsCol.add(mapOf(
             "type"            to "create",
-            "module"          to "Staff",
+            "module"          to "Account",
             "message"         to "$actorName created a new staff account: $targetName ($targetEmail)",
             "userName"        to actorName,
             "userEmail"       to actorEmail,
@@ -315,6 +320,39 @@ object FarmRepository {
             "device"          to DEVICE_LABEL,
             "timestamp"       to FieldValue.serverTimestamp()
         )).addOnSuccessListener { onDone?.invoke(null) }
+            .addOnFailureListener { e -> onDone?.invoke(e) }
+    }
+
+    // Fires when a brand-new inventory product (feed/supplement) is added —
+    // see FeedInventoryActivity.commitNewFeedItem. Tagged module "Inventory"
+    // so it lands in the web Activity Logs' "Created → Inventory" sub-filter.
+    // This is distinct from inventory_history (the quantity-change audit
+    // trail, surfaced by the website as "Updated → Inventory"): creating a
+    // product is logged here regardless of its starting quantity.
+    fun logInventoryCreated(
+        actorName: String,
+        actorEmail: String,
+        actorRole: String,
+        productName: String,
+        category: String,
+        metadata: Map<String, Any?>? = null,
+        onDone: ((Exception?) -> Unit)? = null
+    ) {
+        val entry = mutableMapOf<String, Any>(
+            "type"      to "create",
+            "module"    to "Inventory",
+            "message"   to "$actorName added a new inventory product: $productName",
+            "userName"  to actorName,
+            "userEmail" to actorEmail,
+            "role"      to actorRole,
+            "details"   to "Added product: $productName ($category)",
+            "device"    to DEVICE_LABEL,
+            "timestamp" to FieldValue.serverTimestamp()
+        )
+        if (metadata != null) entry["metadata"] = metadata
+
+        activityLogsCol.add(entry)
+            .addOnSuccessListener { onDone?.invoke(null) }
             .addOnFailureListener { e -> onDone?.invoke(e) }
     }
 

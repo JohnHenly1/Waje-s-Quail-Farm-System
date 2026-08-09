@@ -258,7 +258,7 @@ object NavigationHelper {
                     showHelpSupportDialog(activity)
                 }
                 R.id.nav_logout -> {
-                    FarmRepository.logLogout(currentName, currentEmail ?: "", currentRole)
+                    FarmRepository.logLogout(currentName, currentEmail ?: "", currentRole, "manual")
                     accountManager.clearSession()
                     val intent = Intent(activity, MainActivity::class.java)
                     intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK

@@ -1438,29 +1438,38 @@ public class ScheduleActivity extends AppCompatActivity {
 
     // ───────────────────────────────────────────────────────────────────────
     // Activity Logs — Updated / Tasks
-    // Records an owner extending a MISSED task's deadline (Manager Override
-    // → "Reset to Ongoing") into the shared "activity_logs" collection so it
-    // appears under the web Activity Logs "Updated → Tasks" sub-filter. This
-    // dialog is only reachable when roleManager.canEditFarm() (owner-only)
-    // AND the task is already missed, so no extra role check is needed here.
-    // Logging never blocks the status update.
+    // Records a task deadline extension into the shared "activity_logs"
+    // collection so it appears under the web Activity Logs "Updated → Tasks"
+    // sub-filter. Covers BOTH extension paths in this Activity:
+    //   - "Request 30min Extension" (showStatusUpdateDialog) — available to
+    //     anyone who can act on an Ongoing task, not owner-gated.
+    //   - "Manager Override → Reset to Ongoing" (showManagerOverrideDialog) —
+    //     owner-only, only reachable once a task is already Missed.
+    // The actor's actual role is recorded on every entry either way, so staff
+    // vs. owner extensions are distinguishable in the audit trail even though
+    // both funnel through this same logger. Logging never blocks the update.
     // ───────────────────────────────────────────────────────────────────────
-    private void logTaskExtension(Task task) {
+    private void logTaskExtension(Task task, int minutesAdded, String reason) {
         String actorName = accountManager != null ? accountManager.getCurrentUsername() : null;
         if (actorName == null || actorName.isEmpty()) actorName = currentUserEmail;
         String actorEmail = accountManager != null && actorName != null ? accountManager.getEmail(actorName) : null;
-        String actorRole = accountManager != null && actorName != null ? accountManager.getRole(actorName) : "owner";
+        String actorRole = accountManager != null && actorName != null ? accountManager.getRole(actorName) : "staff";
 
         java.util.Map<String, Object> metadata = new HashMap<>();
         metadata.put("taskId", task.firestoreId);
         metadata.put("taskTitle", task.title);
         metadata.put("extensionMinutes", task.extensionMinutes);
+        metadata.put("minutesAdded", minutesAdded);
+
+        String durationLabel = minutesAdded >= 60
+                ? (minutesAdded / 60) + " hour" + (minutesAdded / 60 == 1 ? "" : "s")
+                : minutesAdded + " min";
 
         FarmRepository.INSTANCE.logTaskUpdated(
-                actorName != null ? actorName : "Owner",
+                actorName != null ? actorName : "Someone",
                 actorEmail != null ? actorEmail : "",
-                actorRole != null ? actorRole : "owner",
-                (actorName != null ? actorName : "Owner") + " extended missed task \"" + task.title + "\" by 1 hour",
+                actorRole != null ? actorRole : "staff",
+                (actorName != null ? actorName : "Someone") + " extended " + reason + " task \"" + task.title + "\" by " + durationLabel,
                 "New total extension: " + task.extensionMinutes + " min",
                 metadata,
                 null
@@ -1480,6 +1489,7 @@ public class ScheduleActivity extends AppCompatActivity {
             } else {
                 task.extensionMinutes += 30;
                 updateTaskStatus(task);
+                logTaskExtension(task, 30, "ongoing");
                 Toast.makeText(this, "Extension granted. New deadline updated.", Toast.LENGTH_SHORT).show();
             }
         });
@@ -1713,7 +1723,7 @@ public class ScheduleActivity extends AppCompatActivity {
                     task.extensionMinutes += 60; // Add an hour to make it ongoing again
                     task.status = getString(R.string.status_ongoing);
                     updateTaskStatus(task);
-                    logTaskExtension(task);
+                    logTaskExtension(task, 60, "missed");
                     Toast.makeText(this, "Task reset to Ongoing (1 hour added)", Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("Cancel", null)

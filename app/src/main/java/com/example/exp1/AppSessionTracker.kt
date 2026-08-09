@@ -22,15 +22,19 @@ import androidx.lifecycle.LifecycleOwner
  *
  * A short grace period is used before the logout is actually written: if the
  * user comes right back (e.g. they briefly glanced at a notification) the
- * pending write is cancelled, so momentary interruptions don't spam the
+ * pending write is canceled, so momentary interruptions don't spam the
  * Activity Logs.
  *
  * Duplicate-avoidance: manual logout (ProfileActivity's Logout button)
  * already calls FarmRepository.logLogout() and clears the session itself
  * (AccountManager.clearSession()) before the app is ever backgrounded. By the
- * time onStop fires afterwards, getCurrentUsername() is already null, so the
+ * time onStop fires afterward, getCurrentUsername() is already null, so the
  * grace-period check below finds no active session and writes nothing —
  * guaranteeing a Logout is recorded at most once per login session.
+ *
+ * The write below is tagged logoutType = "automatic" (vs. "manual" for the
+ * Profile screen's Logout button) so the Activity Logs can distinguish the
+ * two if needed.
  *
  * Reopening the app after being fully exited is unaffected by this class:
  * that flow is still entirely driven by MainActivity's existing
@@ -65,7 +69,7 @@ class AppSessionTracker(context: Context) : DefaultLifecycleObserver {
             if (accountManager.getCurrentUsername() == email) {
                 val role = accountManager.getRole(email)
                 val name = accountManager.getCachedName(email)
-                FarmRepository.logLogout(name, email, role)
+                FarmRepository.logLogout(name, email, role, "automatic")
             }
         }
         pendingLogoutRunnable = runnable
