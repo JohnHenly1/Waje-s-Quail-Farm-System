@@ -48,6 +48,16 @@ class MainActivity : AppCompatActivity() {
     private lateinit var loadingIcon: View
     private lateinit var noInternetSection: View
     private lateinit var btnOffline: Button
+    private lateinit var maintenanceSection: View
+    private lateinit var maintenanceMessageText: TextView
+
+    private var maintenanceListener: ListenerRegistration? = null
+    // Guards registerNetworkSensor()/startEntrySequence() from firing twice —
+    // once when maintenance is confirmed off on the first snapshot, and
+    // again if a later snapshot also reports it off (e.g. the doc just
+    // hadn't changed). Only the transition into "not under maintenance"
+    // should ever proceed past the gate.
+    private var proceedingPastMaintenanceGate = false
 
     private val GOOGLE_SIGN_IN_REQUEST = 9001
 
@@ -92,6 +102,8 @@ class MainActivity : AppCompatActivity() {
         loadingIcon = findViewById(R.id.loadingIcon)
         noInternetSection = findViewById(R.id.noInternetSection)
         btnOffline = findViewById(R.id.btnOfflineMode)
+        maintenanceSection = findViewById(R.id.maintenanceSection)
+        maintenanceMessageText = findViewById(R.id.maintenanceMessageText)
 
         loginUIContainer.visibility = View.GONE
         loadingLayout.visibility = View.VISIBLE
@@ -119,7 +131,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        registerNetworkSensor(currentEmail)
+        checkMaintenanceThenProceed(currentEmail)
 
         // GOOGLE LOGIN BUTTON WITH MULTI-ACCOUNT PICKER
         findViewById<View>(R.id.Btn).setOnClickListener {
@@ -418,6 +430,72 @@ class MainActivity : AppCompatActivity() {
 
 
     // ─────────────────────────────────────────────────────────────────────────
+    // Maintenance gate
+    //
+    // Reads system_settings/app_status live (a real-time listener, not a
+    // one-time get, so the app recovers on its own the moment the owner
+    // flips maintenanceMode back off — no restart needed). This runs before
+    // registerNetworkSensor()/startEntrySequence(), so it's the single choke
+    // point blocking entry into the login flow.
+    //
+    // Written by the website's App Settings page (services/appSettings.js);
+    // requires no new Firestore rules — system_settings already allows
+    // read: isAuthed(), write: isOwner(), which anonymous sign-in in
+    // WajeApplication.onCreate() already satisfies.
+    //
+    // Scope: this only gates *entering* the app from this login screen. It
+    // does not force-close a session that's already inside DashboardActivity
+    // if maintenance mode gets turned on mid-session — the same pattern most
+    // apps use, so an in-progress task isn't yanked away. If a "kick active
+    // sessions out immediately" behavior is wanted too, that would need a
+    // similar listener added in DashboardActivity.
+    // ─────────────────────────────────────────────────────────────────────────
+    private fun checkMaintenanceThenProceed(email: String?) {
+        maintenanceListener?.remove()
+
+        maintenanceListener = FirebaseFirestore.getInstance()
+            .collection("system_settings")
+            .document("app_status")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    // Can't confirm maintenance status (offline, rules
+                    // issue, etc.) — fail open rather than locking everyone
+                    // out over a transient read error.
+                    proceedPastMaintenanceGate(email)
+                    return@addSnapshotListener
+                }
+
+                val maintenanceMode = snapshot?.getBoolean("maintenanceMode") ?: false
+
+                if (maintenanceMode) {
+                    proceedingPastMaintenanceGate = false
+                    handler.removeCallbacksAndMessages(null)
+                    loadingIcon.clearAnimation()
+                    progressBar.visibility = View.GONE
+                    percentageText.visibility = View.GONE
+                    noInternetSection.visibility = View.GONE
+                    statusText.text = ""
+                    val message = snapshot?.getString("message")
+                    maintenanceMessageText.text = if (!message.isNullOrBlank()) {
+                        message
+                    } else {
+                        "We're making some updates to the farm management system. Please check back shortly."
+                    }
+                    maintenanceSection.visibility = View.VISIBLE
+                } else {
+                    maintenanceSection.visibility = View.GONE
+                    proceedPastMaintenanceGate(email)
+                }
+            }
+    }
+
+    private fun proceedPastMaintenanceGate(email: String?) {
+        if (proceedingPastMaintenanceGate) return
+        proceedingPastMaintenanceGate = true
+        registerNetworkSensor(email)
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // Network
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -692,6 +770,7 @@ class MainActivity : AppCompatActivity() {
             try { cm.unregisterNetworkCallback(networkCallback!!) } catch (_: Exception) {}
         }
         firestoreListener?.remove()
+        maintenanceListener?.remove()
         super.onDestroy()
     }
 }

@@ -1,23 +1,22 @@
 <resources>
-    <!-- Header Nav -->
+    <!--  Header Nav  -->
     <string name="app_name">Waje\'s Quail Farm</string>
     <string name="Report">Report</string>
     <string name="schedule_dashboard">Schedule</string>
     <string name="profile_dashboard">Profile</string>
     <string name="AddBtn">Add</string>
-
-    <!-- Dashboard strings -->
+    <!--  Dashboard strings  -->
     <string name="menu">Menu</string>
     <string name="notifications">Notifications</string>
     <string name="welcome_message">Hi, User!</string>
     <string name="welcome_message_dynamic">Hi, %1$s!</string>
     <string name="welcome_back">Welcome Back!</string>
-    <string name="generating_reports">Generating Reports&#8230;</string>
-    <string name="fetching_tasks">Fetching Tasks&#8230;</string>
-    <string name="checking_inventory">Checking Inventory&#8230;</string>
-    <string name="loading_egg_records">Loading Egg Records&#8230;</string>
-    <string name="reading_sensors">Reading Sensors&#8230;</string>
-    <string name="syncing_farm_stats">Syncing Farm Stats&#8230;</string>
+    <string name="generating_reports">Generating Reports…</string>
+    <string name="fetching_tasks">Fetching Tasks…</string>
+    <string name="checking_inventory">Checking Inventory…</string>
+    <string name="loading_egg_records">Loading Egg Records…</string>
+    <string name="reading_sensors">Reading Sensors…</string>
+    <string name="syncing_farm_stats">Syncing Farm Stats…</string>
     <string name="photo_saved">Photo saved!</string>
     <string name="camera_permission_required">Camera permission is required</string>
     <string name="no_camera_app">No camera app found</string>
@@ -27,15 +26,13 @@
     <string name="total_today">Total today</string>
     <string name="remaining">Remaining</string>
     <string name="zero">0</string>
-
-    <!-- AI Recommendation -->
+    <!--  AI Recommendation  -->
     <string name="ai_recommendation">Ask Quail Assistant</string>
     <string name="recommendation_text">Get instant answers about your flock</string>
-
     <string-array name="smart_tips">
         <item>Morning Feeding: Quails are most active in the morning. Ensure feed troughs are topped up by 7 AM.</item>
         <item>Water Check: Check water levels every 4 hours. Dehydration reduces egg production significantly.</item>
-        <item>Lighting Tip: 14&#8211;16 hours of light per day is optimal for consistent egg laying.</item>
+        <item>Lighting Tip: 14–16 hours of light per day is optimal for consistent egg laying.</item>
         <item>Airflow: Good ventilation is key to preventing ammonia buildup from droppings.</item>
         <item>Egg Collection: Collect eggs at least twice daily to prevent breakage or pecking behavior.</item>
         <item>Stress Management: Keep noise low around the cages. Sudden loud noises can stop quails from laying for days.</item>
@@ -54,27 +51,23 @@
         <item>Dust Bathing: Provide a box of dry sand; quails love dust baths to stay clean and mite-free.</item>
         <item>Culling: Regularly identify and remove non-performing or sick birds to protect the flock.</item>
     </string-array>
-
-    <!-- Shortcuts -->
+    <!--  Shortcuts  -->
     <string name="feed_inventory">Inventory</string>
     <string name="egg_count">Egg Count</string>
     <string name="report">Report</string>
     <string name="tasks">Tasks</string>
-
-    <!-- Quick Stats -->
+    <!--  Quick Stats  -->
     <string name="total_eggs_today">Total Eggs Today</string>
     <string name="eggs_count">0</string>
     <string name="feed_remaining">Inventory Remaining</string>
     <string name="feed_weight">0</string>
     <string name="kg_unit">kg</string>
-
-    <!-- Footer Nav -->
+    <!--  Footer Nav  -->
     <string name="home">Home</string>
     <string name="analytics">Analytics</string>
     <string name="schedule">Schedule</string>
     <string name="profile">Profile</string>
-
-    <!-- Alerts Screen -->
+    <!--  Alerts Screen  -->
     <string name="alerts_notifications">Alerts &amp; Notifications</string>
     <string name="back">Back</string>
     <string name="settings">Settings</string>
@@ -83,8 +76,7 @@
     <string name="total">Total</string>
     <string name="all_notifications">All Notifications</string>
     <string name="mark_all_read">Mark All as Read</string>
-
-    <!-- Schedule Strings -->
+    <!--  Schedule Strings  -->
     <string name="Monday">Mon</string>
     <string name="Tuesday">Tue</string>
     <string name="Wednesday">Wed</string>
@@ -92,7 +84,6 @@
     <string name="Friday">Fri</string>
     <string name="Saturday">Sat</string>
     <string name="Sunday">Sun</string>
-
     <string name="textSchedule">Today\'s Schedule:</string>
     <string name="task1">Morning\'s Feed</string>
     <string name="textSchedule3">Schedule:</string>
@@ -101,8 +92,7 @@
     <string name="bulk_delete">Bulk Delete</string>
     <string name="delete_selected_tasks">Delete Selected Tasks</string>
     <string name="no_tasks_selected">No tasks selected</string>
-
-    <!-- Profile Strings -->
+    <!--  Profile Strings  -->
     <string name="manage_account">Manage your account</string>
     <string name="user_initial">J</string>
     <string name="user_name">James Anderson</string>
@@ -128,8 +118,7 @@
     <string name="water_level">Water Level</string>
     <string name="previous">Previous</string>
     <string name="next">Next</string>
-
-    <!-- Login & Registration -->
+    <!--  Login & Registration  -->
     <string name="login_title">Log In</string>
     <string name="continue_with_google">Continue With Google</string>
     <string name="register_account">Register Account</string>
@@ -152,9 +141,8 @@
     <string name="verify_email_msg" translatable="false">Please enter your email to verify your account.</string>
     <string name="email_not_found" translatable="false">Email not found in our records</string>
     <string name="password_updated_success" translatable="false">Password updated successfully!</string>
-
-    <!-- Profile Dialog Strings -->
-    <string name="syncing_profile">Syncing Profile&#8230;</string>
+    <!--  Profile Dialog Strings  -->
+    <string name="syncing_profile">Syncing Profile…</string>
     <string name="detected_eggs">Detected %1$d eggs!</string>
     <string name="error_loading_farm_data">Error loading farm data</string>
     <string name="edit_name">Edit Name</string>
@@ -193,8 +181,7 @@
     <string name="wipe_everything">Wipe Everything</string>
     <string name="confirm_wipe">WARNING: This will delete all users, all farm data, and reset the system. Proceed?</string>
     <string name="wipe">WIPE</string>
-
-    <!-- Schedule Dialogs & Messages -->
+    <!--  Schedule Dialogs & Messages  -->
     <string name="failed_to_load_tasks">Failed to load tasks: %1$s</string>
     <string name="error_updating_status">Error updating status: %1$s</string>
     <string name="error_deleting">Error deleting: %1$s</string>
@@ -209,9 +196,12 @@
     <string name="add_new_task">Add New Task</string>
     <string name="please_select_date">Please select at least one date</string>
     <string name="confirm_and_save">Confirm &amp; Save</string>
-    <string name="scheduling_tasks">Scheduling tasks&#8230; please wait</string>
+    <string name="scheduling_tasks">Scheduling tasks… please wait</string>
     <string name="tasks_scheduled">%1$d tasks scheduled!</string>
     <string name="assigned_to_format">Assigned To: %1$s</string>
+    <string name="assigned_by_format">Assigned by: %1$s</string>
+    <string name="status_owner_fallback">Owner</string>
+    <string name="unnamed_staff">Unnamed Staff</string>
     <string name="delete_task_title">Delete Task</string>
     <string name="delete_task_msg">Are you sure you want to delete this task?</string>
     <string name="delete_recurring_title">Delete Recurring Task</string>
@@ -226,7 +216,6 @@
     <string name="task_reminder_msg">It\'s time for %1$s</string>
     <string name="server_time">Server Time</string>
     <string name="_2024_05_20_08_30_pm">2024/05/20 08:30 PM</string>
-
     <string name="recur_once">Once</string>
     <string name="recur_custom">Custom</string>
     <string name="recur_weekdays">Weekdays</string>
@@ -236,12 +225,10 @@
     <string name="recur_yearly_weekends">Yearly Weekends</string>
     <string name="recur_yearly">Yearly</string>
     <string name="recur_every_days">Every %1$d days</string>
-
     <string name="status_pending">Pending</string>
     <string name="status_ongoing">Ongoing</string>
     <string name="status_done">Done</string>
     <string name="status_missed" translatable="false">MISSED</string>
-
     <string-array name="task_categories">
         <item>Feeding</item>
         <item>Watering</item>
@@ -250,7 +237,6 @@
         <item>Lighting</item>
         <item>Health Check</item>
     </string-array>
-
     <string name="task_title_empty">Title cannot be empty</string>
     <string name="no_tasks_to_delete">No tasks to delete</string>
     <string name="days_unit">Days</string>
@@ -264,7 +250,6 @@
     <string name="weekends">Weekends</string>
     <string name="weekdays">Weekdays</string>
     <string name="confirm">Confirm</string>
-
     <string-array name="month_names">
         <item>January</item>
         <item>February</item>
@@ -279,8 +264,7 @@
         <item>November</item>
         <item>December</item>
     </string-array>
-
-    <!-- Additional Profile Strings -->
+    <!--  Additional Profile Strings  -->
     <string name="data_collection_policy_title">Data Collection Policy</string>
     <string name="data_usage_purpose_title">Data Usage Purpose</string>
     <string name="data_retention_title">Data Retention</string>
@@ -294,16 +278,16 @@
     <string name="access_security_title">Access Security</string>
     <string name="monitoring_compliance_title">Monitoring &amp; Compliance</string>
     <string name="db_monitor_title">Real-Time Database Monitor</string>
-    <string name="db_connection_checking">Connection: Checking&#8230;</string>
+    <string name="db_connection_checking">Connection: Checking…</string>
     <string name="db_connection_online">Connection: Online</string>
     <string name="db_connection_offline">Connection: Offline</string>
-    <string name="db_users_loading">Approved Users: Loading&#8230;</string>
-    <string name="db_pending_loading">Pending Requests: Loading&#8230;</string>
+    <string name="db_users_loading">Approved Users: Loading…</string>
+    <string name="db_pending_loading">Pending Requests: Loading…</string>
     <string name="db_users_count">Approved Users: %1$d</string>
     <string name="db_pending_count">Pending Requests: %1$d</string>
     <string name="db_last_update">Last Update: %1$s</string>
-    <string name="db_importing">Importing data from backup&#8230;</string>
-    <string name="db_exporting">Exporting farm records to CSV&#8230;</string>
+    <string name="db_importing">Importing data from backup…</string>
+    <string name="db_exporting">Exporting farm records to CSV…</string>
     <string name="db_delete_confirm">Are you sure? This deletes only the farm records but keeps user accounts.</string>
     <string name="db_deleted">Database Deleted</string>
     <string name="birthday_updated">Birthday updated to %1$s</string>
@@ -316,21 +300,18 @@
     <string name="fill_all_address">Please fill all address fields</string>
     <string name="location_updated">Location updated successfully</string>
     <string name="location_update_failed">Failed to update location</string>
-    <!-- backup owner role removed -->
+    <!--  backup owner role removed  -->
     <string name="max_staff_hint">Max Farm Staff</string>
     <string name="verification_code_msg">Verification Code for %1$s: %2$s</string>
     <string name="send_approval_email">Send Approval &amp; Code via Gmail</string>
-
     <string name="role_label">Role: %1$s</string>
     <string name="reject_request">Reject Request</string>
     <string name="confirm_reject_msg">Are you sure you want to reject the request from %1$s?</string>
     <string name="request_rejected">Request rejected</string>
     <string name="reject">Reject</string>
-
-    <!-- Percent Placeholder -->
+    <!--  Percent Placeholder  -->
     <string name="percent_placeholder">%1$d%%</string>
-
-    <!-- Additional Database Monitor Strings -->
+    <!--  Additional Database Monitor Strings  -->
     <string name="no_active_invite_codes">No active invite codes.</string>
     <string name="invite_code_placeholder">Code: %1$s (%2$s)</string>
     <string name="role_display_placeholder">Role: %1$s</string>
@@ -340,25 +321,23 @@
     <string name="export_db">Export Database</string>
     <string name="delete_db">Delete Database</string>
     <string name="wipe_everything_label">Wipe Everything</string>
-    <string name="total_tasks_loading">Total Tasks: Loading&#8230;</string>
-    <string name="active_invite_codes_loading">Active Invite Codes: Loading&#8230;</string>
+    <string name="total_tasks_loading">Total Tasks: Loading…</string>
+    <string name="active_invite_codes_loading">Active Invite Codes: Loading…</string>
     <string name="approved_users_error">Approved Users: Error</string>
     <string name="pending_requests_error">Pending Requests: Error</string>
     <string name="total_tasks_count_placeholder">Total Tasks: %1$d</string>
     <string name="active_invite_codes_count_placeholder">Active Invite Codes: %1$d</string>
     <string name="farm_stats_explorer_title">Farm Stats Explorer</string>
-    <string name="fetching_stats_placeholder">Fetching stats&#8230;</string>
+    <string name="fetching_stats_placeholder">Fetching stats…</string>
     <string name="farm_stats_display_format">Birds: %1$d\nCages: %2$d\nStart Date: %3$s</string>
     <string name="reset_stats_btn">Reset Stats to Zero</string>
     <string name="no_farm_stats_found">No farm stats found.</string>
     <string name="delete_database_title">Delete Database</string>
-
-    <!-- Analytics Strings -->
+    <!--  Analytics Strings  -->
     <string name="performance_excellent">Excellent Performance!</string>
     <string name="performance_stable">Stable Production</string>
     <string name="performance_alert">Production Alert</string>
-
-    <!-- New Profile Activity Strings -->
+    <!--  New Profile Activity Strings  -->
     <string name="profile_image">Profile Image</string>
     <string name="birds_icon">Birds Icon</string>
     <string name="cages_icon">Cages Icon</string>
@@ -368,8 +347,7 @@
     <string name="admin_group_label">FARM ADMIN</string>
     <string name="user_access_list">User Access List</string>
     <string name="generate_invite_code">Generate Invite Code</string>
-
-    <!-- Setup Account Strings -->
+    <!--  Setup Account Strings  -->
     <string name="setup_profile_title">Complete Your Profile</string>
     <string name="full_name_hint">Full Name</string>
     <string name="birthday_hint">Birthday (MM/DD/YYYY)</string>
@@ -378,5 +356,4 @@
     <string name="finish_registration">Finish Registration</string>
     <string name="profile_picture_desc">Profile Picture</string>
     <string name="your_address_header">Your Address</string>
-
 </resources>

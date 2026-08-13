@@ -110,6 +110,39 @@
                 </LinearLayout>
             </LinearLayout>
 
+            <!-- Maintenance Section — shown instead of the login form while
+                 system_settings/app_status.maintenanceMode is true. See
+                 MainActivity.checkMaintenanceThenProceed(). -->
+            <LinearLayout
+                android:id="@+id/maintenanceSection"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:visibility="gone"
+                android:layout_marginTop="16dp">
+
+                <TextView
+                    android:id="@+id/maintenanceTitleText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Under Maintenance"
+                    android:textColor="@color/dark_green"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:fontFamily="sans-serif-medium" />
+
+                <TextView
+                    android:id="@+id/maintenanceMessageText"
+                    android:layout_width="240dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="We're making some updates to the farm management system. Please check back shortly."
+                    android:textColor="@color/dark_gray"
+                    android:textSize="13sp"
+                    android:gravity="center" />
+            </LinearLayout>
+
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 </LinearLayout>

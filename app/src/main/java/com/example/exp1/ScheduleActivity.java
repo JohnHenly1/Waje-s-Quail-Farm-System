@@ -10,7 +10,10 @@ import android.app.TimePickerDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.graphics.Matrix;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Build;
@@ -18,6 +21,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.InputType;
+import android.util.Base64;
 import android.view.GestureDetector;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -58,9 +62,11 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.concurrent.Executors;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -119,9 +125,27 @@ public class ScheduleActivity extends AppCompatActivity {
     // of completion. These hold the in-flight state for whichever task is
     // currently going through that flow.
     private ActivityResultLauncher<Uri> takePictureLauncher;
+    // Requests CAMERA at runtime specifically for the proof-photo capture below.
+    // Declaring android.permission.CAMERA in the manifest (needed for the egg
+    // detection feature) means ANY camera capture intent — including this
+    // implicit ACTION_IMAGE_CAPTURE one — requires the runtime grant first,
+    // or it silently fails/crashes. This was missing, which is why "Take
+    // Photo" in Mark as Done didn't work.
+    private ActivityResultLauncher<String> proofCameraPermissionLauncher;
     private Uri pendingProofImageUri;
+    // The actual on-disk File backing pendingProofImageUri. Uploads read from this
+    // directly (see uploadProofImageAndFinalize) instead of re-opening the content://
+    // Uri through the ContentResolver/FileProvider layer, which is what was producing
+    // the "Object does not exist at location" Firebase Storage error even when the
+    // file was genuinely present and non-empty.
+    private File pendingProofImageFile;
     private ImageView proofImagePreview;
     private Task pendingDoneTask;
+    // Proof photos are stored as Base64 directly on the task document (no Firebase
+    // Storage bucket involved), so they're downscaled/compressed to stay well under
+    // Firestore's 1 MiB per-document limit, leaving headroom for the rest of the fields.
+    private static final int PROOF_IMAGE_MAX_DIMENSION = 1024; // px, longest side
+    private static final int PROOF_IMAGE_MAX_BYTES = 600_000;  // raw JPEG bytes, pre-Base64
 
     private String[] monthNames;
     private Handler autoUpdateHandler = new Handler();
@@ -145,12 +169,32 @@ public class ScheduleActivity extends AppCompatActivity {
         // Registered here (must happen before STARTED) so the "Take Photo" proof
         // step in the Mark-as-Done flow can launch the camera and receive the result.
         takePictureLauncher = registerForActivityResult(new ActivityResultContracts.TakePicture(), success -> {
-            if (success && pendingProofImageUri != null && proofImagePreview != null) {
+            // Some OEM camera apps (notably MIUI) report success=true via RESULT_OK
+            // without actually having written any bytes to the target Uri. Trusting
+            // "success" alone leaves pendingProofImageUri pointing at a file that
+            // doesn't exist, which later surfaces as a cryptic Firebase Storage
+            // "Object does not exist at location" error deep in the upload flow.
+            // Verify the file really has content *here*, right after capture, so we
+            // can fail fast with an actionable message instead.
+            if (success && pendingProofImageUri != null && proofImagePreview != null
+                    && proofFileHasContent(pendingProofImageUri)) {
                 proofImagePreview.setImageURI(pendingProofImageUri);
                 proofImagePreview.setVisibility(View.VISIBLE);
             } else {
                 pendingProofImageUri = null;
-                Toast.makeText(this, "Photo capture failed or was cancelled", Toast.LENGTH_SHORT).show();
+                pendingProofImageFile = null;
+                Toast.makeText(this, "Photo capture failed or was cancelled. Please try taking the photo again.", Toast.LENGTH_LONG).show();
+            }
+        });
+
+        // Also registered here (must happen before STARTED). Only ever triggers the
+        // camera launch on an explicit grant; a denial leaves the proof dialog open
+        // with a clear message instead of silently doing nothing.
+        proofCameraPermissionLauncher = registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
+            if (granted) {
+                launchProofCamera();
+            } else {
+                Toast.makeText(this, "Camera permission is required to take the completion photo", Toast.LENGTH_SHORT).show();
             }
         });
 
@@ -259,7 +303,11 @@ public class ScheduleActivity extends AppCompatActivity {
         updateCalendarUI();
         setupSwipeGestures();
         listenToTasks();
-        if (roleManager.isOwner()) cleanupOldTaskHistory();
+        cleanupOldProofPhotoCache();
+        if (roleManager.isOwner()) {
+            cleanupOldTaskHistory();
+            cleanupOldProofPhotos();
+        }
     }
 
 
@@ -308,6 +356,7 @@ public class ScheduleActivity extends AppCompatActivity {
                             task.extensionMinutes = doc.getLong("extensionMinutes") != null ? doc.getLong("extensionMinutes").intValue() : 0;
                             task.workWindowMinutes = doc.getLong("workWindowMinutes") != null ? doc.getLong("workWindowMinutes").intValue() : 60;
                             task.assignedTo = parseAssignedTo(doc.get("assignedTo"));
+                            task.assignedBy = doc.getString("assignedBy");
                             task.doneComment = doc.getString("doneComment");
                             task.doneImageUrl = doc.getString("doneImageUrl");
                             taskList.add(task);
@@ -359,6 +408,7 @@ public class ScheduleActivity extends AppCompatActivity {
         data.put("recurrence",         task.recurrence);
         data.put("recurrenceGroupId",  task.recurrenceGroupId);
         data.put("assignedTo",         task.assignedTo != null ? task.assignedTo : new ArrayList<String>());
+        data.put("assignedBy",         task.assignedBy != null ? task.assignedBy : "");
         data.put("extensionMinutes",   task.extensionMinutes);
         data.put("workWindowMinutes",  task.workWindowMinutes);
         data.put("createdAt", com.google.firebase.firestore.FieldValue.serverTimestamp());
@@ -521,25 +571,6 @@ public class ScheduleActivity extends AppCompatActivity {
                             Toast.makeText(this, getString(R.string.error_deleting_tasks, e.getMessage()), Toast.LENGTH_SHORT).show());
         });
     }
-    private ArrayAdapter<String> createBlackTextAdapter(String[] items) {
-        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, items) {
-            @Override
-            public View getView(int position, View convertView, ViewGroup parent) {
-                View view = super.getView(position, convertView, parent);
-                if (view instanceof TextView) ((TextView) view).setTextColor(Color.BLACK);
-                return view;
-            }
-
-            @Override
-            public View getDropDownView(int position, View convertView, ViewGroup parent) {
-                View view = super.getDropDownView(position, convertView, parent);
-                if (view instanceof TextView) ((TextView) view).setTextColor(Color.BLACK);
-                return view;
-            }
-        };
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        return adapter;
-    }
 
     private void showAddScheduleDialog() {
         View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_add_schedule, null);
@@ -562,13 +593,16 @@ public class ScheduleActivity extends AppCompatActivity {
         TextView    txtPatternSuggestion = dialogView.findViewById(R.id.txtPatternSuggestion);
 
         String[] categories = getResources().getStringArray(R.array.task_categories);
-        ArrayAdapter<String> catAdapter = createBlackTextAdapter(categories);
+        ArrayAdapter<String> catAdapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item, categories);
+        catAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerCategory.setAdapter(catAdapter);
 
         // Populate work window spinner with friendly labels and corresponding minute values
         final String[] workWindowLabels = new String[]{"30 minutes","45 minutes","60 minutes","75 minutes","90 minutes","105 minutes","120 minutes"};
         final int[] workWindowValues = new int[]{30,45,60,75,90,105,120};
-        ArrayAdapter<String> wwAdapter = createBlackTextAdapter(workWindowLabels);
+        ArrayAdapter<String> wwAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, workWindowLabels);
+        wwAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerWorkWindow.setAdapter(wwAdapter);
         // Set initial selection to match category default and update when category changes
         int defaultMinutes = getDefaultWorkWindow(spinnerCategory.getSelectedItem().toString());
@@ -924,10 +958,7 @@ public class ScheduleActivity extends AppCompatActivity {
             List<String> names = new ArrayList<>();
             for (String email : selectedAssigneeEmails) {
                 int idx = assigneeEmails.indexOf(email);
-                String display = (idx >= 0) ? assigneeDisplay.get(idx) : email;
-                // strip the "(email)" suffix for a cleaner chip-style summary
-                int parenIdx = display.indexOf(" (");
-                names.add(parenIdx > 0 ? display.substring(0, parenIdx) : display);
+                names.add((idx >= 0) ? assigneeDisplay.get(idx) : getString(R.string.unnamed_staff));
             }
             String summary = selectedAssigneeEmails.size() + " staff selected: " + android.text.TextUtils.join(", ", names);
             assigneeSelector.setText(summary);
@@ -983,7 +1014,7 @@ public class ScheduleActivity extends AppCompatActivity {
                         String name = doc.getString("name");
                         if (email == null) continue;
                         assigneeEmails.add(email);
-                        assigneeDisplay.add((name != null && !name.isEmpty()) ? name + " (" + email + ")" : email);
+                        assigneeDisplay.add((name != null && !name.isEmpty()) ? name : getString(R.string.unnamed_staff));
                     }
                     refreshAssigneeLabel.run();
                 })
@@ -1047,6 +1078,7 @@ public class ScheduleActivity extends AppCompatActivity {
                                             selectedRecurrence[0], groupId);
                                     t.workWindowMinutes = window;
                                     t.assignedTo = new ArrayList<>(selectedAssigneeEmails);
+                                    t.assignedBy = currentUserEmail;
 
                                     batch.set(ref, buildTaskMap(t));
                                     scheduleNotification(t, selHour[0], selMinute[0]);
@@ -1344,12 +1376,47 @@ public class ScheduleActivity extends AppCompatActivity {
                 TextView assignedToTv = taskView.findViewById(R.id.taskAssignedTo);
                 View statusIndicator = taskView.findViewById(R.id.statusIndicator);
                 ImageButton deleteBtn = taskView.findViewById(R.id.deleteTaskBtn);
+                View deleteBtnCard = taskView.findViewById(R.id.deleteBtnCard);
+                ImageView iconView = taskView.findViewById(R.id.taskIcon);
+                View iconContainer = taskView.findViewById(R.id.taskIconContainer);
+                TextView statusPill = taskView.findViewById(R.id.statusPill);
+                View assignedByRow = taskView.findViewById(R.id.assignedByRow);
+                TextView assignedByTv = taskView.findViewById(R.id.taskAssignedBy);
 
                 titleTv.setText(task.title);
                 categoryTv.setText(task.category);
                 timeTv.setText(task.time);
                 if (recurrenceTv != null) recurrenceTv.setText(task.recurrence != null ? task.recurrence : RECUR_ONCE);
-                if (assignedToTv != null) assignedToTv.setText(getString(R.string.assigned_to_format, resolveAssignedToLabel(task)));
+
+                // Assigned-to chip: green when assigned to specific staff, neutral gray
+                // when the task is owner-only (no staff assigned).
+                boolean hasAssignee = task.assignedTo != null && !task.assignedTo.isEmpty();
+                if (assignedToTv != null) {
+                    assignedToTv.setText(resolveAssignedToLabel(task));
+                    assignedToTv.setBackgroundResource(hasAssignee ? R.drawable.bg_chip_staff : R.drawable.bg_chip_neutral);
+                    assignedToTv.setTextColor(Color.parseColor(hasAssignee ? "#16A34A" : "#374151"));
+                }
+
+                // Assigned-by row: lets staff see which owner assigned them the task.
+                if (assignedByRow != null && assignedByTv != null) {
+                    if (!roleManager.isOwner() && task.assignedBy != null && !task.assignedBy.trim().isEmpty()) {
+                        assignedByRow.setVisibility(View.VISIBLE);
+                        assignedByTv.setText(getString(R.string.assigned_by_format, resolveAssignedByLabel(task)));
+                    } else {
+                        assignedByRow.setVisibility(View.GONE);
+                    }
+                }
+
+                // Category icon + tint (purely cosmetic grouping, matches card redesign).
+                if (iconView != null && iconContainer != null) {
+                    int[] iconStyle = getCategoryIconStyle(task.category);
+                    iconView.setImageResource(iconStyle[0]);
+                    iconView.setColorFilter(iconStyle[1]);
+                    android.graphics.drawable.GradientDrawable circleBg = new android.graphics.drawable.GradientDrawable();
+                    circleBg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+                    circleBg.setColor(iconStyle[2]);
+                    iconContainer.setBackground(circleBg);
+                }
 
                 boolean isDone = getString(R.string.status_done).equals(task.status);
                 boolean isOngoing = getString(R.string.status_ongoing).equals(task.status);
@@ -1357,25 +1424,40 @@ public class ScheduleActivity extends AppCompatActivity {
 
                 if (isOngoing || isMissed) {
                     deadlineTv.setVisibility(View.VISIBLE);
-                    deadlineTv.setText("| Deadline: " + calculateDeadlineTime(task));
+                    deadlineTv.setText("Deadline: " + calculateDeadlineTime(task));
                 } else {
                     deadlineTv.setVisibility(View.GONE);
                 }
 
+                // Status pill: light background + matching darker text, mirrors the
+                // reference design's "Done" pill instead of the old plain color bar.
+                if (statusIndicator != null) statusIndicator.setVisibility(View.GONE);
+                if (statusPill != null) {
+                    String pillBg, pillText, pillLabel;
+                    if (isMissed) {
+                        pillBg = "#FEE2E2"; pillText = "#DC2626"; pillLabel = getString(R.string.status_missed);
+                    } else if (isDone) {
+                        pillBg = "#DCFCE7"; pillText = "#16A34A"; pillLabel = getString(R.string.status_done);
+                    } else if (isOngoing) {
+                        pillBg = "#DBEAFE"; pillText = "#2563EB"; pillLabel = getString(R.string.status_ongoing);
+                    } else {
+                        pillBg = "#FFEDD5"; pillText = "#EA580C"; pillLabel = getString(R.string.status_pending);
+                    }
+                    android.graphics.drawable.GradientDrawable pillBgDrawable = new android.graphics.drawable.GradientDrawable();
+                    pillBgDrawable.setColor(Color.parseColor(pillBg));
+                    pillBgDrawable.setCornerRadius(20f);
+                    statusPill.setBackground(pillBgDrawable);
+                    statusPill.setTextColor(Color.parseColor(pillText));
+                    statusPill.setText(pillLabel);
+                }
+
                 if (isMissed) {
-                    statusIndicator.setBackgroundColor(Color.parseColor("#DC2626"));
                     titleTv.setText(task.title + " (MISSED)");
-                } else if (isDone) {
-                    statusIndicator.setBackgroundResource(R.drawable.bg_status_done);
-                } else if (isOngoing) {
-                    statusIndicator.setBackgroundResource(R.drawable.bg_status_ongoing);
-                } else {
-                    statusIndicator.setBackgroundResource(R.drawable.bg_status_pending);
                 }
 
                 taskView.setOnClickListener(v -> {
                     if (isDone) {
-                        showDoneProofViewerDialog(task);
+                        Toast.makeText(this, "Task already completed", Toast.LENGTH_SHORT).show();
                         return;
                     }
                     if (isMissed) {
@@ -1395,8 +1477,10 @@ public class ScheduleActivity extends AppCompatActivity {
                     showStatusUpdateDialog(task);
                 });
 
-                deleteBtn.setVisibility(roleManager.canDeleteTask() ? View.VISIBLE : View.GONE);
-                if (roleManager.canDeleteTask()) {
+                boolean canDelete = roleManager.canDeleteTask();
+                deleteBtn.setVisibility(canDelete ? View.VISIBLE : View.GONE);
+                if (deleteBtnCard != null) deleteBtnCard.setVisibility(canDelete ? View.VISIBLE : View.GONE);
+                if (canDelete) {
                     deleteBtn.setOnClickListener(v -> showDeleteOptions(task));
                 }
 
@@ -1519,6 +1603,7 @@ public class ScheduleActivity extends AppCompatActivity {
     private void showMarkDoneProofDialog(Task task) {
         pendingDoneTask = task;
         pendingProofImageUri = null;
+        pendingProofImageFile = null;
 
         LinearLayout container = new LinearLayout(this);
         container.setOrientation(LinearLayout.VERTICAL);
@@ -1571,13 +1656,12 @@ public class ScheduleActivity extends AppCompatActivity {
         proofImagePreview = preview;
 
         takePhotoBtn.setOnClickListener(v -> {
-            Uri uri = createProofImageUri();
-            if (uri == null) {
-                Toast.makeText(this, "Could not prepare camera storage for the proof photo", Toast.LENGTH_SHORT).show();
-                return;
+            if (checkSelfPermission(android.Manifest.permission.CAMERA)
+                    == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                launchProofCamera();
+            } else {
+                proofCameraPermissionLauncher.launch(android.Manifest.permission.CAMERA);
             }
-            pendingProofImageUri = uri;
-            takePictureLauncher.launch(uri);
         });
 
         ScrollView scroll = new ScrollView(this);
@@ -1589,6 +1673,7 @@ public class ScheduleActivity extends AppCompatActivity {
                 .setPositiveButton("Continue", null) // overridden below so it can block on validation
                 .setNegativeButton("Cancel", (d, w) -> {
                     pendingProofImageUri = null;
+                    pendingProofImageFile = null;
                     proofImagePreview = null;
                 })
                 .create();
@@ -1626,36 +1711,115 @@ public class ScheduleActivity extends AppCompatActivity {
                 .setCancelable(false)
                 .show();
     }
-    /** Compresses the captured proof photo and encodes it for storage directly in Firestore (no Firebase Storage / billing required). */
-    private String compressImageToBase64(Uri imageUri) throws Exception {
-        android.graphics.Bitmap bitmap = android.provider.MediaStore.Images.Media
-                .getBitmap(getContentResolver(), imageUri);
-        int maxDim = 600;
-        float scale = Math.min((float) maxDim / bitmap.getWidth(), (float) maxDim / bitmap.getHeight());
-        android.graphics.Bitmap resized = android.graphics.Bitmap.createScaledBitmap(
-                bitmap, (int) (bitmap.getWidth() * scale), (int) (bitmap.getHeight() * scale), true);
 
-        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
-        resized.compress(android.graphics.Bitmap.CompressFormat.JPEG, 50, baos);
-        byte[] bytes = baos.toByteArray();
-        return android.util.Base64.encodeToString(bytes, android.util.Base64.DEFAULT);
-    }
-    /** Compresses the proof photo and writes status + proof fields to Firestore directly (no Storage upload). */
+    /** Compresses the proof photo to a Bitmap and writes it (as Base64) plus status + proof fields to Firestore. */
     private void uploadProofImageAndFinalize(Task task, String comment, Uri imageUri, AlertDialog progress) {
         if (task.firestoreId == null) {
             progress.dismiss();
             Toast.makeText(this, "This task has no ID and cannot be updated", Toast.LENGTH_SHORT).show();
             return;
         }
-        try {
-            String base64Image = compressImageToBase64(imageUri);
-            markTaskDoneInFirestore(task, comment, base64Image, progress);
-        } catch (Exception e) {
+
+        // Defense-in-depth: re-check right before encoding. The cache file can vanish
+        // between capture and this point (low-storage cache eviction, the OS killing
+        // the process while the camera app was in front, etc.).
+        if (!proofFileHasContent(imageUri)) {
             progress.dismiss();
-            Toast.makeText(this, "Failed to process proof photo: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "The proof photo is no longer available. Please retake the photo and try again.", Toast.LENGTH_LONG).show();
+            pendingProofImageUri = null;
+            pendingProofImageFile = null;
+            showMarkDoneProofDialog(task);
+            return;
+        }
+
+        final File proofFile = pendingProofImageFile;
+
+        // Decoding + downscaling + JPEG compression can take real time on a full-size
+        // camera photo, so do it off the main thread and hop back for the Firestore
+        // write. This stores the photo directly as Base64 in the task document — no
+        // Firebase Storage bucket required.
+        Executors.newSingleThreadExecutor().execute(() -> {
+            String base64Image;
+            try {
+                base64Image = encodeProofPhotoAsBase64(proofFile);
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    progress.dismiss();
+                    Toast.makeText(this, "Failed to process proof photo: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
+                return;
+            }
+            runOnUiThread(() -> markTaskDoneInFirestore(task, comment, base64Image, progress));
+        });
+    }
+
+    /**
+     * Downscales the proof photo (longest side capped at PROOF_IMAGE_MAX_DIMENSION),
+     * corrects orientation from EXIF, and JPEG-compresses it, backing off quality until
+     * the encoded Base64 string comfortably fits inside a single Firestore document
+     * (1 MiB total document limit, so a wide margin is left for the other task fields).
+     */
+    private String encodeProofPhotoAsBase64(File file) throws java.io.IOException {
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        BitmapFactory.decodeFile(file.getAbsolutePath(), bounds);
+
+        int sampleSize = 1;
+        while ((bounds.outWidth / sampleSize) > PROOF_IMAGE_MAX_DIMENSION
+                || (bounds.outHeight / sampleSize) > PROOF_IMAGE_MAX_DIMENSION) {
+            sampleSize *= 2;
+        }
+
+        BitmapFactory.Options decodeOptions = new BitmapFactory.Options();
+        decodeOptions.inSampleSize = sampleSize;
+        Bitmap bitmap = BitmapFactory.decodeFile(file.getAbsolutePath(), decodeOptions);
+        if (bitmap == null) throw new java.io.IOException("Could not decode the captured photo");
+
+        int rotationDegrees = readExifRotationDegrees(file);
+        if (rotationDegrees != 0) {
+            Matrix matrix = new Matrix();
+            matrix.postRotate(rotationDegrees);
+            Bitmap rotated = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
+            bitmap.recycle();
+            bitmap = rotated;
+        }
+
+        int quality = 85;
+        byte[] jpegBytes;
+        while (true) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out);
+            jpegBytes = out.toByteArray();
+            if (jpegBytes.length <= PROOF_IMAGE_MAX_BYTES || quality <= 25) break;
+            quality -= 15;
+        }
+        bitmap.recycle();
+
+        if (jpegBytes.length > PROOF_IMAGE_MAX_BYTES) {
+            throw new java.io.IOException("Photo is too large to save even after compression");
+        }
+
+        return Base64.encodeToString(jpegBytes, Base64.NO_WRAP);
+    }
+
+    /** Reads the EXIF rotation on the captured file so the saved photo isn't sideways. */
+    private int readExifRotationDegrees(File file) {
+        try {
+            android.media.ExifInterface exif = new android.media.ExifInterface(file.getAbsolutePath());
+            int orientation = exif.getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION,
+                    android.media.ExifInterface.ORIENTATION_NORMAL);
+            switch (orientation) {
+                case android.media.ExifInterface.ORIENTATION_ROTATE_90: return 90;
+                case android.media.ExifInterface.ORIENTATION_ROTATE_180: return 180;
+                case android.media.ExifInterface.ORIENTATION_ROTATE_270: return 270;
+                default: return 0;
+            }
+        } catch (Exception e) {
+            return 0;
         }
     }
-    /** Only reachable once a comment and an uploaded photo URL both exist. */
+
+    /** Only reachable once a comment and an encoded photo both exist. */
     private void markTaskDoneInFirestore(Task task, String comment, String imageUrl, AlertDialog progress) {
         task.status = getString(R.string.status_done);
         task.doneComment = comment;
@@ -1682,6 +1846,7 @@ public class ScheduleActivity extends AppCompatActivity {
                     Toast.makeText(this, "Task completed!", Toast.LENGTH_SHORT).show();
                     pendingDoneTask = null;
                     pendingProofImageUri = null;
+                    pendingProofImageFile = null;
                     proofImagePreview = null;
                 })
                 .addOnFailureListener(e -> {
@@ -1690,16 +1855,71 @@ public class ScheduleActivity extends AppCompatActivity {
                 });
     }
 
-    /** Creates a fresh cache file + content:// Uri (via FileProvider) for the camera to write the proof photo into. */
-    private Uri createProofImageUri() {
+    /** Creates the proof image Uri and starts the camera capture. Only call once CAMERA permission is confirmed granted. */
+    private void launchProofCamera() {
+        File file = newProofImageFile();
+        if (file == null) {
+            Toast.makeText(this, "Could not prepare camera storage for the proof photo", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Uri uri;
+        try {
+            uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", file);
+        } catch (Exception e) {
+            Toast.makeText(this, "Could not prepare camera storage for the proof photo", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        // Some OEM camera apps (MIUI/Xiaomi in particular) don't reliably honor the
+        // implicit grant that ActivityResultContracts.TakePicture() adds to the
+        // capture Intent, and silently no-op the write to our content:// Uri while
+        // still returning RESULT_OK. Explicitly granting write (and read, for the
+        // preview) permission to every app that can actually handle the capture
+        // intent is the standard workaround for that class of device bug.
+        grantProofUriPermissionToCameraApps(uri);
+        pendingProofImageUri = uri;
+        pendingProofImageFile = file;
+        takePictureLauncher.launch(uri);
+    }
+
+    /** Explicitly grants URI permissions to camera apps that can handle image capture. */
+    private void grantProofUriPermissionToCameraApps(Uri uri) {
+        Intent captureIntent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
+        java.util.List<android.content.pm.ResolveInfo> resolveInfoList =
+                getPackageManager().queryIntentActivities(captureIntent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);
+        for (android.content.pm.ResolveInfo resolveInfo : resolveInfoList) {
+            String packageName = resolveInfo.activityInfo.packageName;
+            grantUriPermission(packageName, uri,
+                    Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        }
+    }
+
+    /**
+     * Returns true only if the content behind {@code uri} actually exists and has
+     * at least one byte, i.e. the camera app really wrote a photo to it. Used to
+     * catch the "RESULT_OK but nothing was written" failure mode some OEM camera
+     * apps exhibit, before it turns into a confusing Firebase Storage error.
+     */
+    private boolean proofFileHasContent(Uri uri) {
+        // Prefer checking the on-disk File directly when we have it — it's the same
+        // path the upload itself now reads from, so this check and the actual upload
+        // can never disagree about whether the photo is really there.
+        if (pendingProofImageFile != null) {
+            return pendingProofImageFile.exists() && pendingProofImageFile.length() > 0;
+        }
+        if (uri == null) return false;
+        try (android.content.res.AssetFileDescriptor afd = getContentResolver().openAssetFileDescriptor(uri, "r")) {
+            return afd != null && afd.getLength() != 0; // getLength() == 0 for genuinely empty files; UNKNOWN_LENGTH (-1) still counts as "has content"
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** Creates a fresh, empty cache file for the camera to write the proof photo into. */
+    private File newProofImageFile() {
         try {
             File dir = new File(getCacheDir(), "proof_photos");
             if (!dir.exists()) dir.mkdirs();
-            File file = new File(dir, "proof_" + System.currentTimeMillis() + ".jpg");
-            // NOTE: requires a <provider> entry for "${applicationId}.fileprovider" in
-            // AndroidManifest.xml (with a matching res/xml/file_paths.xml exposing the
-            // cache directory) — the same FileProvider setup CameraHelper already relies on.
-            return FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", file);
+            return new File(dir, "proof_" + System.currentTimeMillis() + ".jpg");
         } catch (Exception e) {
             return null;
         }
@@ -1744,105 +1964,6 @@ public class ScheduleActivity extends AppCompatActivity {
                     Toast.makeText(this, "Task reset to Ongoing (1 hour added)", Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("Cancel", null)
-                .show();
-    }
-    /** Shows the comment + photo submitted as proof when a task was marked Done. */
-    private void showDoneProofViewerDialog(Task task) {
-        LinearLayout container = new LinearLayout(this);
-        container.setOrientation(LinearLayout.VERTICAL);
-        int pad = dpToPx(20);
-        container.setPadding(pad, pad, pad, pad);
-
-        // Force white background with a green border, regardless of app/system theme.
-        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
-        bg.setColor(Color.WHITE);
-        bg.setCornerRadius(dpToPx(12));
-        bg.setStroke(dpToPx(2), Color.parseColor("#16A34A")); // green edge
-        container.setBackground(bg);
-
-
-        TextView commentLabel = new TextView(this);
-        commentLabel.setText("Comment");
-        commentLabel.setTypeface(null, Typeface.BOLD);
-        commentLabel.setTextSize(14);
-        commentLabel.setTextColor(Color.parseColor("#111827"));
-        container.addView(commentLabel);
-
-        TextView commentTv = new TextView(this);
-        commentTv.setText((task.doneComment != null && !task.doneComment.isEmpty()) ? task.doneComment : "(No comment provided)");
-        commentTv.setTextColor(Color.parseColor("#374151"));
-        commentTv.setTextSize(14);
-        LinearLayout.LayoutParams commentParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        commentParams.setMargins(0, dpToPx(4), 0, dpToPx(16));
-        commentTv.setLayoutParams(commentParams);
-        container.addView(commentTv);
-
-        TextView photoLabel = new TextView(this);
-        photoLabel.setText("Photo");
-        photoLabel.setTypeface(null, Typeface.BOLD);
-        photoLabel.setTextSize(14);
-        photoLabel.setTextColor(Color.parseColor("#111827"));
-        container.addView(photoLabel);
-
-        ImageView photoView = new ImageView(this);
-        LinearLayout.LayoutParams photoParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(240));
-        photoParams.setMargins(0, dpToPx(8), 0, 0);
-        photoView.setLayoutParams(photoParams);
-        photoView.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        photoView.setBackgroundColor(Color.parseColor("#F3F4F6"));
-        container.addView(photoView);
-
-        if (task.doneImageUrl == null || task.doneImageUrl.isEmpty()) {
-            photoView.setVisibility(View.GONE);
-            TextView noPhoto = new TextView(this);
-            noPhoto.setText("(No photo attached)");
-            noPhoto.setTextColor(Color.parseColor("#9CA3AF"));
-            noPhoto.setTextSize(13);
-            LinearLayout.LayoutParams npParams = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            npParams.setMargins(0, dpToPx(8), 0, 0);
-            noPhoto.setLayoutParams(npParams);
-            container.addView(noPhoto);
-        } else if (task.doneImageUrl.startsWith("http")) {
-            // Legacy proof photos saved as a Firebase Storage URL before the Base64 switch.
-            // No image-loading library is wired in, so offer to open it instead of embedding it.
-            photoView.setVisibility(View.GONE);
-            TextView linkTv = new TextView(this);
-            linkTv.setText("Open photo link");
-            linkTv.setTextColor(Color.parseColor("#2563EB"));
-            linkTv.setTextSize(14);
-            linkTv.setPaintFlags(linkTv.getPaintFlags() | android.graphics.Paint.UNDERLINE_TEXT_FLAG);
-            linkTv.setOnClickListener(v -> {
-                try {
-                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(task.doneImageUrl)));
-                } catch (Exception e) {
-                    Toast.makeText(this, "Could not open photo link", Toast.LENGTH_SHORT).show();
-                }
-            });
-            container.addView(linkTv);
-        } else {
-            try {
-                byte[] decoded = android.util.Base64.decode(task.doneImageUrl, android.util.Base64.DEFAULT);
-                android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeByteArray(decoded, 0, decoded.length);
-                if (bmp != null) {
-                    photoView.setImageBitmap(bmp);
-                } else {
-                    photoView.setVisibility(View.GONE);
-                }
-            } catch (Exception e) {
-                photoView.setVisibility(View.GONE);
-            }
-        }
-
-        ScrollView scroll = new ScrollView(this);
-        scroll.addView(container);
-
-        new AlertDialog.Builder(this)
-                .setTitle("Completion proof — " + task.title)
-                .setView(scroll)
-                .setPositiveButton(getString(R.string.close), null)
                 .show();
     }
 
@@ -1973,6 +2094,53 @@ public class ScheduleActivity extends AppCompatActivity {
         return labels.isEmpty() ? "Owner" : android.text.TextUtils.join(", ", labels);
     }
 
+    // ── Assigned By identifier ──────────────────────────────────────────────
+    // Resolves task.assignedBy (the email of the owner who created the task)
+    // to a display name, using the same user_access lookup + cache as
+    // resolveAssignedToLabel above. Lets staff see who assigned them a task.
+    private String resolveAssignedByLabel(Task task) {
+        if (task.assignedBy == null || task.assignedBy.trim().isEmpty()) return getString(R.string.status_owner_fallback);
+        String email = task.assignedBy.trim();
+        String cached = staffNameCache.get(email);
+        if (cached != null) return cached;
+
+        staffNameCache.put(email, email); // show email until the async lookup below resolves
+        db.collection("user_access").document(email).get()
+                .addOnSuccessListener(doc -> {
+                    String name = doc.getString("name");
+                    staffNameCache.put(email, (name != null && !name.isEmpty()) ? name : email);
+                    updateTasksUI();
+                })
+                .addOnFailureListener(e -> staffNameCache.put(email, email));
+        return email;
+    }
+
+    // ── Category icon styling ───────────────────────────────────────────────
+    // Purely cosmetic: gives each task category its own icon + color accent on
+    // the redesigned schedule card, matching the reference design's colored
+    // icon circle. Returns {iconResId, iconTintColor, circleBackgroundColor}.
+    private int[] getCategoryIconStyle(String category) {
+        String c = category != null ? category.trim() : "";
+        int icon;
+        String tint, bg;
+        if (c.equalsIgnoreCase("Watering")) {
+            icon = R.drawable.ic_water_level;   tint = "#0284C7"; bg = "#E0F2FE";
+        } else if (c.equalsIgnoreCase("Feeding")) {
+            icon = R.drawable.ic_shopping_bag;  tint = "#EA580C"; bg = "#FFEDD5";
+        } else if (c.equalsIgnoreCase("Cleaning")) {
+            icon = R.drawable.ic_check_circle;  tint = "#059669"; bg = "#D1FAE5";
+        } else if (c.equalsIgnoreCase("Egg Collection")) {
+            icon = R.drawable.lc_egg;           tint = "#D97706"; bg = "#FEF3C7";
+        } else if (c.equalsIgnoreCase("Lighting")) {
+            icon = R.drawable.ic_alert_circle;  tint = "#7C3AED"; bg = "#EDE9FE";
+        } else if (c.equalsIgnoreCase("Health Check")) {
+            icon = R.drawable.ic_alert_triangle; tint = "#DC2626"; bg = "#FEE2E2";
+        } else {
+            icon = R.drawable.ic_calendar;      tint = "#6B7280"; bg = "#F3F4F6";
+        }
+        return new int[]{icon, Color.parseColor(tint), Color.parseColor(bg)};
+    }
+
     // ── Owner task history ────────────────────────────────────────────────
     // Logs Done / Ongoing / Missed status changes for the owner's reference.
     // Mirrors the existing farm_data/shared/feed_history sibling structure —
@@ -2026,6 +2194,75 @@ public class ScheduleActivity extends AppCompatActivity {
                             for (QueryDocumentSnapshot doc : snapshots) batch.delete(doc.getReference());
                             batch.commit();
                         }));
+    }
+
+    // ── Local proof-photo cache cleanup (weekly) ────────────────────────────
+    // Camera captures land in getCacheDir()/proof_photos before being Base64-
+    // encoded into Firestore (see encodeProofPhotoAsBase64); nothing deleted
+    // them afterward, so they'd otherwise accumulate on-device forever. Runs
+    // on every launch and removes any capture older than a week — by then
+    // it's already been uploaded (or the flow was abandoned), so the local
+    // copy is no longer needed. Per-device cache, so no owner check needed.
+    private void cleanupOldProofPhotoCache() {
+        File dir = new File(getCacheDir(), "proof_photos");
+        File[] files = dir.listFiles();
+        if (files == null) return;
+        long weekAgoMillis = System.currentTimeMillis() - (7L * 24 * 60 * 60 * 1000);
+        for (File f : files) {
+            if (f.lastModified() < weekAgoMillis) f.delete();
+        }
+    }
+
+    // ── Cloud proof-photo cleanup (weekly) ───────────────────────────────────
+    // Proof photos are stored as Base64 directly on the task doc (and copied
+    // into task_history — see logTaskHistory), which adds up fast. Once a
+    // completed task's proof photo is more than a week old, this clears just
+    // the image field — the comment, who/when it was done, and the task or
+    // history entry itself are untouched. Runs on the same cadence and owner
+    // gate as cleanupOldTaskHistory, and only ever removes the (by then no
+    // longer useful) photo blob, never the record itself.
+    private void cleanupOldProofPhotos() {
+        Calendar weekAgo = Calendar.getInstance();
+        weekAgo.add(Calendar.DAY_OF_YEAR, -7);
+        com.google.firebase.Timestamp cutoff = new com.google.firebase.Timestamp(weekAgo.getTime());
+
+        ensureAuthThenRun(() -> {
+            db.collection("farm_data").document("shared")
+                    .collection("tasks")
+                    .whereLessThan("doneAt", cutoff)
+                    .get()
+                    .addOnSuccessListener(snapshots -> {
+                        if (snapshots.isEmpty()) return;
+                        com.google.firebase.firestore.WriteBatch batch = db.batch();
+                        boolean[] hasWrites = {false};
+                        for (QueryDocumentSnapshot doc : snapshots) {
+                            String img = doc.getString("doneImageUrl");
+                            if (img != null && !img.isEmpty()) {
+                                batch.update(doc.getReference(), "doneImageUrl", com.google.firebase.firestore.FieldValue.delete());
+                                hasWrites[0] = true;
+                            }
+                        }
+                        if (hasWrites[0]) batch.commit();
+                    });
+
+            db.collection("farm_data").document("shared")
+                    .collection("task_history")
+                    .whereLessThan("timestamp", cutoff)
+                    .get()
+                    .addOnSuccessListener(snapshots -> {
+                        if (snapshots.isEmpty()) return;
+                        com.google.firebase.firestore.WriteBatch batch = db.batch();
+                        boolean[] hasWrites = {false};
+                        for (QueryDocumentSnapshot doc : snapshots) {
+                            String img = doc.getString("proofImageUrl");
+                            if (img != null && !img.isEmpty()) {
+                                batch.update(doc.getReference(), "proofImageUrl", com.google.firebase.firestore.FieldValue.delete());
+                                hasWrites[0] = true;
+                            }
+                        }
+                        if (hasWrites[0]) batch.commit();
+                    });
+        });
     }
 
     private void showFullCalendar() {
@@ -2207,10 +2444,11 @@ public class ScheduleActivity extends AppCompatActivity {
         String recurrence;
         String recurrenceGroupId;
         List<String> assignedTo = new ArrayList<>(); // emails of assigned staff; empty = owner-only visible
+        String assignedBy;    // email of the owner who created/assigned this task
         int extensionMinutes = 0;
         int workWindowMinutes = 60; // default
         String doneComment;   // required comment proof, set only when marked Done via the proof flow
-        String doneImageUrl;  // Firebase Storage download URL of the required proof photo
+        String doneImageUrl;  // Base64-encoded JPEG of the required proof photo (stored directly on the task doc, not Firebase Storage)
 
         Task(String firestoreId, String title, String category, String time, String status, int year, int month, int day, String recurrence, String recurrenceGroupId) {
             this.firestoreId = firestoreId;

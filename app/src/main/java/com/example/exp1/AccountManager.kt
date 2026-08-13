@@ -55,9 +55,8 @@ class AccountManager(context: Context) {
         sharedPreferences.getString("${username}_role", "staff") ?: "staff"
 
     // Cached display name (mirrored from Firestore user_access.name at
-    // login), so background code — like AppSessionTracker's automatic
-    // logout logging — can log a friendly name without an extra Firestore
-    // read.
+    // login), so screens can show/log a friendly name without an extra
+    // Firestore read.
     fun updateCachedName(username: String, name: String) {
         sharedPreferences.edit().putString("${username}_name", name).apply()
     }
