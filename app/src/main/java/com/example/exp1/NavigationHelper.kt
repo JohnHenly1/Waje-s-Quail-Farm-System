@@ -1142,11 +1142,57 @@ object NavigationHelper {
                     conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
                 }
 
+                // Always logged, regardless of outcome — right now this is
+                // the ONLY place the raw Apps Script response is visible
+                // anywhere, since it's otherwise read and then discarded.
+                // Check Logcat (tag "InviteEmail") when an invite doesn't
+                // arrive even though the app reported success.
+                android.util.Log.d("InviteEmail", "Apps Script response ($responseCode): $responseText")
+
+                // Apps Script web apps deployed with "Execute as: Me" will
+                // very often return HTTP 200 even when something inside the
+                // script failed (e.g. MailApp.sendEmail() throwing because
+                // Gmail's daily send quota was hit, or the script's own
+                // try/catch swallowing the error and returning a JSON body
+                // instead of a non-200 status). Relying on responseCode
+                // alone means a genuinely failed send gets reported to the
+                // owner as "Invite email sent" — which is exactly the "the
+                // app says sent but nothing arrives" symptom. Parse the body
+                // too, and treat any explicit failure signal in it as a
+                // failure regardless of the HTTP status.
+                val scriptError: String? = if (responseText.isNotBlank()) {
+                    try {
+                        val json = JSONObject(responseText)
+                        when {
+                            json.optBoolean("success", true).not() ->
+                                json.optString("error", "The invite service reported a failure.")
+                            json.has("error") ->
+                                json.optString("error")
+                            json.optBoolean("ok", true).not() ->
+                                json.optString("message", "The invite service reported a failure.")
+                            else -> null
+                        }
+                    } catch (_: Exception) {
+                        // Not JSON (e.g. an Apps Script HTML error page) —
+                        // if the HTTP status already looked fine but the
+                        // body isn't the JSON success response we expect,
+                        // don't guess at its meaning; fall through to the
+                        // responseCode-based check below.
+                        null
+                    }
+                } else null
+
                 Handler(Looper.getMainLooper()).post {
                     if (responseCode != 200) {
                         Toast.makeText(
                             activity,
                             "User saved, but the email failed to send (code $responseCode).",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    } else if (scriptError != null) {
+                        Toast.makeText(
+                            activity,
+                            "User saved, but the email failed to send: $scriptError",
                             Toast.LENGTH_LONG
                         ).show()
                     } else {
@@ -1158,6 +1204,7 @@ object NavigationHelper {
                     }
                 }
             } catch (e: Exception) {
+                android.util.Log.e("InviteEmail", "Failed to reach Apps Script endpoint", e)
                 Handler(Looper.getMainLooper()).post {
                     Toast.makeText(
                         activity,
@@ -1171,7 +1218,12 @@ object NavigationHelper {
 
     private fun showCodeResultDialog(activity: Activity, code: String, email: String, role: String) {
         val roleDisplayName = RoleManager.displayName(role)
-        val message = "An invite email has been automatically sent to $email.\n\nCode: $code\nRole: $roleDisplayName\n\nIt will expire in 24 hours.\n\nTheir name, birthday and address are already saved — they'll only be asked to set a password."
+        // Phrased as in-progress, not already-done: this dialog is shown
+        // right after kicking off sendInviteEmailViaAppsScript() on a
+        // background thread, not after it actually finishes — the real
+        // outcome (sent / failed, with the specific reason) arrives moments
+        // later as the toast from that function.
+        val message = "Sending an invite email to $email now — a toast will confirm once it's done.\n\nCode: $code\nRole: $roleDisplayName\n\nIt will expire in 24 hours.\n\nTheir name, birthday and address are already saved — they'll only be asked to set a password."
         AlertDialog.Builder(activity)
             .setTitle("User Unlocked")
             .setMessage(message)

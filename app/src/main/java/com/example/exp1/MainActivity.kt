@@ -467,26 +467,68 @@ class MainActivity : AppCompatActivity() {
 
                 val maintenanceMode = snapshot?.getBoolean("maintenanceMode") ?: false
 
-                if (maintenanceMode) {
-                    proceedingPastMaintenanceGate = false
-                    handler.removeCallbacksAndMessages(null)
-                    loadingIcon.clearAnimation()
-                    progressBar.visibility = View.GONE
-                    percentageText.visibility = View.GONE
-                    noInternetSection.visibility = View.GONE
-                    statusText.text = ""
-                    val message = snapshot?.getString("message")
-                    maintenanceMessageText.text = if (!message.isNullOrBlank()) {
-                        message
-                    } else {
-                        "We're making some updates to the farm management system. Please check back shortly."
-                    }
-                    maintenanceSection.visibility = View.VISIBLE
-                } else {
+                if (!maintenanceMode) {
                     maintenanceSection.visibility = View.GONE
                     proceedPastMaintenanceGate(email)
+                    return@addSnapshotListener
                 }
+
+                val message = snapshot?.getString("message")
+                val resolvedMessage = if (!message.isNullOrBlank()) {
+                    message
+                } else {
+                    "We're making some updates to the farm management system. Please check back shortly."
+                }
+
+                // The owner is exempt from the login block — but role isn't
+                // known yet at this point in the entry flow (this runs
+                // before startEntrySequence/enterApp, which is where role
+                // normally gets fetched). Read it fresh from user_access
+                // rather than trusting AccountManager's locally-cached copy,
+                // since this decision gates entry into the app entirely.
+                // user_access read is allowed for any authenticated
+                // (including anonymous) user — see firestore.rules.
+                if (email.isNullOrBlank()) {
+                    showMaintenanceBlockedUi(resolvedMessage)
+                    return@addSnapshotListener
+                }
+
+                FirebaseFirestore.getInstance()
+                    .collection("user_access")
+                    .document(email)
+                    .get()
+                    .addOnSuccessListener { doc ->
+                        val role = doc.getString("role")
+                        if (RoleManager(role).isOwner) {
+                            // Bypass — MaintenanceGuard shows the persistent
+                            // "under maintenance" banner once this session
+                            // reaches DashboardActivity (and everywhere else
+                            // the owner navigates to while it's still on).
+                            maintenanceSection.visibility = View.GONE
+                            proceedPastMaintenanceGate(email)
+                        } else {
+                            showMaintenanceBlockedUi(resolvedMessage)
+                        }
+                    }
+                    .addOnFailureListener {
+                        // Can't confirm role — fail closed (block), since
+                        // this is the security-relevant direction for an
+                        // unknown/failed lookup.
+                        showMaintenanceBlockedUi(resolvedMessage)
+                    }
             }
+    }
+
+    private fun showMaintenanceBlockedUi(message: String) {
+        proceedingPastMaintenanceGate = false
+        handler.removeCallbacksAndMessages(null)
+        loadingIcon.clearAnimation()
+        progressBar.visibility = View.GONE
+        percentageText.visibility = View.GONE
+        noInternetSection.visibility = View.GONE
+        statusText.text = ""
+        maintenanceMessageText.text = message
+        maintenanceSection.visibility = View.VISIBLE
     }
 
     private fun proceedPastMaintenanceGate(email: String?) {

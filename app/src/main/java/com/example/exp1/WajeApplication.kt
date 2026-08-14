@@ -32,6 +32,11 @@ class WajeApplication : Application() {
         }
         // ───────────────────────────────────────────────────────────────────
 
+        // Watches system_settings/app_status app-wide and force-logs-out +
+        // redirects whoever's using the app the moment maintenance mode is
+        // turned on. See MaintenanceGuard for details.
+        MaintenanceGuard.start(this)
+
         val accountManager = AccountManager(this)
         val selectedLang = accountManager.getSelectedLanguage()
 

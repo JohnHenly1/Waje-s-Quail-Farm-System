@@ -34,6 +34,18 @@ object FarmRepository {
     // show up immediately in the web Activity Logs "Deleted" section.
     private val activityLogsCol get() = db.collection("activity_logs")
 
+    // Defense-in-depth for MaintenanceGuard: guards functional-module writes
+    // (tasks/feed/alerts) so nothing goes through in the brief window between
+    // maintenanceMode flipping on and the force-logout redirect actually
+    // reaching the screen. Deliberately NOT applied to logLogin/logLogout/
+    // log*(...) below — those are audit writes, including the "maintenance"
+    // logout entry MaintenanceGuard itself writes, which needs to go through.
+    private fun blockedByMaintenance(onDone: ((Exception?) -> Unit)?): Boolean {
+        if (!MaintenanceGuard.isUnderMaintenance) return false
+        onDone?.invoke(Exception("This action is unavailable while the app is under maintenance."))
+        return true
+    }
+
     //  Farm Stats----------------------------------------------------------------------------------
 
     fun saveFarmStats(totalBirds: Int, activeCages: Int, onDone: ((Exception?) -> Unit)? = null) {
@@ -90,12 +102,14 @@ object FarmRepository {
     }
 
     fun addTask(taskData: Map<String, Any>, onDone: ((Exception?) -> Unit)? = null) {
+        if (blockedByMaintenance(onDone)) return
         tasksCol.add(taskData)
             .addOnSuccessListener { onDone?.invoke(null) }
             .addOnFailureListener { e -> onDone?.invoke(e) }
     }
 
     fun updateTaskStatus(firestoreId: String, newStatus: String, extensionMinutes: Int = 0, onDone: ((Exception?) -> Unit)? = null) {
+        if (blockedByMaintenance(onDone)) return
         val update = mapOf(
             "status" to newStatus,
             "extensionMinutes" to extensionMinutes,
@@ -110,12 +124,14 @@ object FarmRepository {
     }
 
     fun deleteTask(firestoreId: String, onDone: ((Exception?) -> Unit)? = null) {
+        if (blockedByMaintenance(onDone)) return
         tasksCol.document(firestoreId).delete()
             .addOnSuccessListener { onDone?.invoke(null) }
             .addOnFailureListener { e -> onDone?.invoke(e) }
     }
 
     fun deleteTasksByGroupId(groupId: String, onDone: ((Exception?) -> Unit)? = null) {
+        if (blockedByMaintenance(onDone)) return
         tasksCol.whereEqualTo("recurrenceGroupId", groupId).get()
             .addOnSuccessListener { snap ->
                 val batch = db.batch()
@@ -128,6 +144,7 @@ object FarmRepository {
     }
 
     fun batchAddTasks(taskDataList: List<Map<String, Any>>, onDone: ((Exception?) -> Unit)? = null) {
+        if (blockedByMaintenance(onDone)) return
         val batch = db.batch()
         for (data in taskDataList) batch.set(tasksCol.document(), data)
         batch.commit()
@@ -136,6 +153,7 @@ object FarmRepository {
     }
 
     fun batchDeleteTasks(firestoreIds: List<String>, onDone: ((Exception?) -> Unit)? = null) {
+        if (blockedByMaintenance(onDone)) return
         val batch = db.batch()
         for (id in firestoreIds) batch.delete(tasksCol.document(id))
         batch.commit()
@@ -157,6 +175,7 @@ object FarmRepository {
     }
 
     fun addFeedItem(name: String, status: String, onDone: ((Exception?) -> Unit)? = null) {
+        if (blockedByMaintenance(onDone)) return
         feedCol.add(mapOf(
             "name"      to name,
             "status"    to status,
@@ -166,6 +185,7 @@ object FarmRepository {
     }
 
     fun updateFeedItem(firestoreId: String, name: String, status: String, onDone: ((Exception?) -> Unit)? = null) {
+        if (blockedByMaintenance(onDone)) return
         feedCol.document(firestoreId).set(
             mapOf(
                 "name"      to name,
@@ -178,6 +198,7 @@ object FarmRepository {
     }
     // Firestore update for staff (status only)
     fun updateFeedStatus(firestoreId: String, status: String, onDone: ((Exception?) -> Unit)? = null) {
+        if (blockedByMaintenance(onDone)) return
         feedCol.document(firestoreId)
             .update("status", status, "updatedAt", FieldValue.serverTimestamp())
             .addOnSuccessListener { onDone?.invoke(null) }
@@ -185,6 +206,7 @@ object FarmRepository {
     }
 
     fun deleteFeedItem(firestoreId: String, onDone: ((Exception?) -> Unit)? = null) {
+        if (blockedByMaintenance(onDone)) return
         feedCol.document(firestoreId).delete()
             .addOnSuccessListener { onDone?.invoke(null) }
             .addOnFailureListener { e -> onDone?.invoke(e) }
@@ -193,6 +215,7 @@ object FarmRepository {
     // -- Shared Alerts ----------------------------------------------------------------------------
 
     fun addAlert(message: String, type: String, onDone: ((Exception?) -> Unit)? = null) {
+        if (blockedByMaintenance(onDone)) return
         // DEDUP STRATEGY: Use a deterministic document ID derived from message + date.
         // .set() with the same ID is idempotent — writing the same alert twice just
         // overwrites the same Firestore document instead of creating a new one.
@@ -228,6 +251,7 @@ object FarmRepository {
     }
 
     fun markAllAlertsRead(onDone: ((Exception?) -> Unit)? = null) {
+        if (blockedByMaintenance(onDone)) return
         alertsCol.whereEqualTo("isRead", false).get()
             .addOnSuccessListener { snap ->
                 val batch = db.batch()
@@ -240,6 +264,7 @@ object FarmRepository {
     }
 
     fun clearAllAlerts(onDone: ((Exception?) -> Unit)? = null) {
+        if (blockedByMaintenance(onDone)) return
         alertsCol.get()
             .addOnSuccessListener { snap ->
                 val batch = db.batch()
@@ -451,6 +476,7 @@ object FarmRepository {
      * to catch both "Task Reminder: X (category)" and "Missed Task: X" variants.
      */
     fun deleteAlertByMessage(message: String, onDone: ((Exception?) -> Unit)? = null) {
+        if (blockedByMaintenance(onDone)) return
         val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
             .format(java.util.Date())
         val safeMsg = message.replace(Regex("[^a-zA-Z0-9_-]"), "_").take(80)
