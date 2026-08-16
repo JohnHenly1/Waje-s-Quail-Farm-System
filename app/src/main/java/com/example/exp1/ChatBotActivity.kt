@@ -52,10 +52,11 @@ class ChatBotActivity : AppCompatActivity() {
 
     private var currentConversationId: String = UUID.randomUUID().toString()
 
+    // Flash-Lite first = fastest default. Order here also drives the picker menu order.
     private val availableModels = listOf(
+        AiModelOption("gemini-3.1-flash-lite", "3.1 Flash-Lite (Fastest)"),
         AiModelOption("gemini-3.5-flash", "3.5 Flash"),
         AiModelOption("gemini-3-flash", "3 Flash"),
-        AiModelOption("gemini-3.1-flash-lite", "3.1 Flash-Lite"),
         AiModelOption("gemini-2.5-flash", "2.5 Flash (legacy)")
     )
     private var currentModelId = availableModels.first().id
@@ -104,7 +105,6 @@ class ChatBotActivity : AppCompatActivity() {
             android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
         )
 
-        // Same edge-to-edge inset handling as the dashboard
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
@@ -138,7 +138,6 @@ class ChatBotActivity : AppCompatActivity() {
 
         backBtn.setOnClickListener { finish() }
 
-        // Resume the most recently active conversation, or start fresh
         val lastId = prefs.getString("current_conversation_id", null)
         val allConvos = loadAllConversations()
         val resumeConvo = allConvos.find { it.id == lastId }
@@ -160,19 +159,10 @@ class ChatBotActivity : AppCompatActivity() {
             hideSuggestedQuestions()
             addMessage(text, isUser = true)
             input.text.clear()
-            typingLayout.visibility = View.VISIBLE
             recyclerView.scrollToPosition(messages.size - 1)
 
             lifecycleScope.launch {
-                try {
-                    val response = chatSession.sendMessage(text)
-                    val reply = response.text ?: "Sorry, I couldn't come up with an answer for that."
-                    addMessage(reply, isUser = false)
-                } catch (e: Exception) {
-                    addMessage("Oops, something went wrong: ${e.localizedMessage}", isUser = false)
-                } finally {
-                    typingLayout.visibility = View.GONE
-                }
+                streamReply(text)
             }
         }
 
@@ -187,6 +177,55 @@ class ChatBotActivity : AppCompatActivity() {
         }
     }
 
+    // ---------- Streaming reply ----------
+
+    private suspend fun streamReply(text: String) {
+        typingLayout.visibility = View.VISIBLE
+
+        var botMessageIndex = -1
+        var accumulated = ""
+
+        try {
+            chatSession.sendMessageStream(text).collect { chunk ->
+                val piece = chunk.text ?: return@collect
+
+                if (botMessageIndex == -1) {
+                    // First chunk arrived — hide the typing dots, insert the live bubble
+                    typingLayout.visibility = View.GONE
+                    messages.add(ChatMessage(piece, isUser = false))
+                    botMessageIndex = messages.size - 1
+                    accumulated = piece
+                    adapter.notifyItemInserted(botMessageIndex)
+                } else {
+                    accumulated += piece
+                    messages[botMessageIndex] = ChatMessage(accumulated, isUser = false)
+                    adapter.notifyItemChanged(botMessageIndex)
+                }
+                recyclerView.scrollToPosition(messages.size - 1)
+            }
+
+            if (botMessageIndex == -1) {
+                addMessage("Sorry, I couldn't come up with an answer for that.", isUser = false)
+            } else {
+                // First user message may become the title — keep that logic intact
+                if (conversationTitleText.text == "Quail Assistant" && messages.isNotEmpty()) {
+                    val firstUserMsg = messages.firstOrNull { it.isUser }
+                    if (firstUserMsg != null) conversationTitleText.text = firstUserMsg.text.take(40)
+                }
+                persistCurrentConversation()
+            }
+        } catch (e: Exception) {
+            typingLayout.visibility = View.GONE
+            if (botMessageIndex == -1) {
+                addMessage("Oops, something went wrong: ${e.localizedMessage}", isUser = false)
+            } else {
+                persistCurrentConversation()
+            }
+        } finally {
+            typingLayout.visibility = View.GONE
+        }
+    }
+
     // ---------- Model handling ----------
 
     private fun labelFor(modelId: String) =
@@ -198,7 +237,11 @@ class ChatBotActivity : AppCompatActivity() {
                 modelName = currentModelId,
                 systemInstruction = content { text(systemPrompt) }
             )
-        val historyContent: List<Content> = history.map { msg ->
+        // Only replay the most recent turns — keeps requests fast as conversations grow.
+        // Full history still displays on-screen and stays saved; this only trims what's
+        // sent to the model on each call.
+        val trimmedHistory = history.takeLast(12)
+        val historyContent: List<Content> = trimmedHistory.map { msg ->
             content(role = if (msg.isUser) "user" else "model") { text(msg.text) }
         }
         chatSession = generativeModel.startChat(history = historyContent)
@@ -364,19 +407,10 @@ class ChatBotActivity : AppCompatActivity() {
 
     private fun sendSuggested(question: String) {
         addMessage(question, isUser = true)
-        typingLayout.visibility = View.VISIBLE
         recyclerView.scrollToPosition(messages.size - 1)
 
         lifecycleScope.launch {
-            try {
-                val response = chatSession.sendMessage(question)
-                val reply = response.text ?: "Sorry, I couldn't come up with an answer for that."
-                addMessage(reply, isUser = false)
-            } catch (e: Exception) {
-                addMessage("Oops, something went wrong: ${e.localizedMessage}", isUser = false)
-            } finally {
-                typingLayout.visibility = View.GONE
-            }
+            streamReply(question)
         }
     }
 
@@ -387,7 +421,6 @@ class ChatBotActivity : AppCompatActivity() {
         adapter.notifyItemInserted(messages.size - 1)
         recyclerView.scrollToPosition(messages.size - 1)
 
-        // First real user message becomes the conversation's title
         if (isUser && conversationTitleText.text == "Quail Assistant") {
             conversationTitleText.text = text.take(40)
         }
@@ -455,14 +488,9 @@ class ChatBotActivity : AppCompatActivity() {
                 messages.removeAt(position)
                 adapter.notifyItemRemoved(position)
 
-                // Rebuild the model's memory without the deleted message,
-                // so it doesn't reference something no longer shown
                 startSession(messages)
-
                 persistCurrentConversation()
 
-                // If that was the last message, the conversation is now empty —
-                // bring back the greeting + suggestion chips
                 if (messages.isEmpty()) {
                     addMessage(
                         "Hi! I'm your Quail Assistant 🐣 Ask me anything about your quail eggs or flock.",

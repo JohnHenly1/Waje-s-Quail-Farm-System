@@ -52,6 +52,7 @@
                     android:textStyle="bold"
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintEnd_toStartOf="@id/newChatButton"
+                    app:layout_constraintStart_toEndOf="@id/backButton"
                     app:layout_constraintTop_toTopOf="parent" />
 
                 <ImageButton
@@ -77,40 +78,10 @@
                     android:scaleType="centerInside"
                     android:padding="9dp"
                     app:layout_constraintBottom_toBottomOf="parent"
-                    app:layout_constraintEnd_toStartOf="@id/modelSelectorButton"
+                    app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintTop_toTopOf="parent"
                     app:srcCompat="@drawable/ic_history"
                     app:tint="@color/white" />
-
-                <LinearLayout
-                    android:id="@+id/modelSelectorButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="32dp"
-                    android:layout_marginEnd="8dp"
-                    android:background="@drawable/bg_model_selector"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="10dp"
-                    app:layout_constraintBottom_toBottomOf="parent"
-                    app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintTop_toTopOf="parent">
-
-                    <TextView
-                        android:id="@+id/modelSelectorText"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:fontFamily="sans-serif-medium"
-                        android:text="3.5 Flash"
-                        android:textColor="@color/white"
-                        android:textSize="12sp" />
-
-                    <ImageView
-                        android:layout_width="14dp"
-                        android:layout_height="14dp"
-                        android:layout_marginStart="4dp"
-                        app:srcCompat="@drawable/ic_dropdown"
-                        app:tint="@color/white" />
-                </LinearLayout>
             </androidx.constraintlayout.widget.ConstraintLayout>
         </androidx.appcompat.widget.Toolbar>
     </com.google.android.material.appbar.AppBarLayout>
@@ -173,6 +144,7 @@
         app:layout_constraintStart_toStartOf="parent"
         tools:visibility="visible" />
 
+    <!-- Input bar: model selector · text field · send button -->
     <LinearLayout
         android:id="@+id/inputBar"
         android:layout_width="0dp"
@@ -186,6 +158,37 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
+
+        <LinearLayout
+            android:id="@+id/modelSelectorButton"
+            android:layout_width="wrap_content"
+            android:layout_height="34dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/bg_model_selector_light"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="10dp">
+
+            <TextView
+                android:id="@+id/modelSelectorText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="0"
+                android:maxWidth="90dp"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:fontFamily="sans-serif-medium"
+                android:text="3.5 Flash"
+                android:textColor="@color/dark_green"
+                android:textSize="11sp" />
+
+            <ImageView
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:layout_marginStart="4dp"
+                app:srcCompat="@drawable/ic_dropdown"
+                app:tint="@color/dark_green" />
+        </LinearLayout>
 
         <EditText
             android:id="@+id/chatInput"

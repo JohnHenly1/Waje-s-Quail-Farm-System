@@ -18,6 +18,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.widget.*
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
@@ -40,6 +41,11 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 class EggCountActivity : AppCompatActivity() {
+
+    // ── Capture modes ───────────────────────────────────────────────────────
+    private enum class CaptureMode { SINGLE, BATCH }
+    private var captureMode = CaptureMode.SINGLE
+    private var batchShotCount = 0
 
     // ── Week navigation ───────────────────────────────────────────────────────
     private var weekOffset = 0
@@ -82,7 +88,9 @@ class EggCountActivity : AppCompatActivity() {
     private lateinit var statusBanner: TextView
     private lateinit var captureBtn: Button
     private lateinit var retakeBtn: Button
+    private lateinit var discardBtn: Button
     private lateinit var modeSwitchBtn: Button
+    private lateinit var captureModeToggleBtn: Button
     private lateinit var frozenOverlay: View
     private lateinit var saveBtn: Button
     private lateinit var liveTimeText: TextView
@@ -114,12 +122,12 @@ class EggCountActivity : AppCompatActivity() {
         else toast("Camera permission required to scan eggs")
     }
 
-    private val pickImageLauncher = registerForActivityResult(
-        ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri ?: return@registerForActivityResult
-        val bmp = uriToBitmap(uri) ?: return@registerForActivityResult
-        freezeAndAnalyze(bmp)
+    // Multi-select photo picker — replaces the old single-image GetContent launcher.
+    private val pickMultipleImagesLauncher = registerForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(MAX_BATCH_PICK)
+    ) { uris: List<Uri> ->
+        if (uris.isEmpty()) return@registerForActivityResult
+        processPickedBatch(uris)
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -175,7 +183,9 @@ class EggCountActivity : AppCompatActivity() {
         statusBanner  = findViewById(R.id.statusBanner)
         captureBtn    = findViewById(R.id.captureBtn)
         retakeBtn     = findViewById(R.id.retakeBtn)
+        discardBtn    = findViewById(R.id.discardBtn)
         modeSwitchBtn = findViewById(R.id.modeSwitchBtn)
+        captureModeToggleBtn = findViewById(R.id.captureModeToggleBtn)
         frozenOverlay = findViewById(R.id.frozenOverlay)
         saveBtn       = findViewById(R.id.saveCollectionBtn)
         liveTimeText  = findViewById(R.id.liveTimeText)
@@ -192,11 +202,21 @@ class EggCountActivity : AppCompatActivity() {
         findViewById<View>(R.id.refreshButton).setOnClickListener { resetCounts() }
 
         captureBtn.setOnClickListener    { captureFrame() }
-        retakeBtn.setOnClickListener     { resumeLive()   }
+        // Retake: discard just the frozen shot on screen, but keep any running
+        // batch total that was already accumulated, and go back to live so the
+        // next shot can be taken right away.
+        retakeBtn.setOnClickListener     { resumeLiveKeepCounts() }
+        // Discard: throw away everything captured so far (including the whole
+        // in-progress batch) and go back to a clean live view.
+        discardBtn.setOnClickListener    { discardCapture() }
         modeSwitchBtn.setOnClickListener {
-            if (isLiveMode) pickImageLauncher.launch("image/*")
-            else resumeLive()
+            if (isLiveMode) {
+                pickMultipleImagesLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                )
+            } else resumeLive()
         }
+        captureModeToggleBtn.setOnClickListener { toggleCaptureMode() }
 
         saveBtn.setOnClickListener { saveCollectionToDatabase() }
 
@@ -226,6 +246,36 @@ class EggCountActivity : AppCompatActivity() {
                 lastTapTime = now
             }
         }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Capture mode toggle (Single vs Batch)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private fun toggleCaptureMode() {
+        // Don't allow switching modes mid-batch with uncommitted shots —
+        // force the user to save or explicitly discard first.
+        if (captureMode == CaptureMode.BATCH && batchShotCount > 0) {
+            toast("Save or discard the current batch before switching modes")
+            return
+        }
+
+        captureMode = if (captureMode == CaptureMode.SINGLE) CaptureMode.BATCH else CaptureMode.SINGLE
+        captureModeToggleBtn.text =
+            if (captureMode == CaptureMode.BATCH) "Mode: Batch" else "Mode: Single"
+        captureBtn.text =
+            if (captureMode == CaptureMode.BATCH) "Capture (+)" else "Capture"
+
+        batchShotCount = 0
+        resetCounts()
+        updateBatchLabel()
+        toast(if (captureMode == CaptureMode.BATCH) "Batch capture ON" else "Batch capture OFF")
+    }
+
+    private fun updateBatchLabel() {
+        if (!isLiveMode) return
+        liveScanLabel.text = if (captureMode == CaptureMode.BATCH)
+            "● LIVE — batch: $batchShotCount shot(s)" else "● LIVE SCAN"
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -307,7 +357,8 @@ class EggCountActivity : AppCompatActivity() {
             == PackageManager.PERMISSION_GRANTED
         ) {
             isLiveMode = true
-            liveScanLabel.text = "● LIVE SCAN"
+            overlayView.setImageSize(0, 0) // back to naive 1:1 mapping for the live camera feed
+            updateBatchLabel()
             frozenOverlay.visibility = View.GONE
             frozenPreviewImage.visibility = View.GONE
             stopScanAnimation()
@@ -323,15 +374,22 @@ class EggCountActivity : AppCompatActivity() {
         imageCapture = null
         isLiveMode = false
         analyzing.set(false)
+        overlayView.setImageSize(0, 0)
         overlayView.setResults(emptyList())
+        // Camera is fully off — go solid black rather than the translucent dim
+        // used when reviewing a frozen/captured shot, so it's obvious there's
+        // no feed instead of looking like a frozen/stuck frame.
+        frozenOverlay.setBackgroundColor(Color.BLACK)
         frozenOverlay.visibility = View.VISIBLE
         frozenPreviewImage.visibility = View.GONE
         stopScanAnimation()
         liveScanLabel.text = "● CAMERA OFF"
         captureBtn.visibility = View.VISIBLE
         retakeBtn.visibility  = View.GONE
+        discardBtn.visibility = View.GONE
         modeSwitchBtn.text    = "Pick Photo"
         saveBtn.visibility    = View.GONE
+        batchShotCount = 0
         resetCounts()
         showBanner("Camera stopped — tap preview to restart", isError = false, autoHide = true)
         toast("Double-tap detected — camera off")
@@ -375,6 +433,13 @@ class EggCountActivity : AppCompatActivity() {
 
     // ─────────────────────────────────────────────────────────────────────────
     //  Live frame processing
+    //  Both SINGLE and BATCH modes run live detection and draw the bounding
+    //  boxes on the preview in real time. The difference is what happens with
+    //  the results:
+    //   - SINGLE mode auto-accumulates them continuously (via IoU dedup).
+    //   - BATCH mode only DISPLAYS the live boxes as a framing aid — counts
+    //     are still only added on an explicit capture tap, so the two
+    //     accumulation paths never fight each other.
     // ─────────────────────────────────────────────────────────────────────────
 
     private fun onLiveFrame(proxy: ImageProxy) {
@@ -385,13 +450,13 @@ class EggCountActivity : AppCompatActivity() {
         val results = runDetection(bmp)
         runOnUiThread {
             overlayView.setResults(results)
-            if (isLiveMode) addNewEggs(results)
+            if (isLiveMode && captureMode == CaptureMode.SINGLE) addNewEggs(results)
             analyzing.set(false)
         }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  Capture a single frame and analyze it
+    //  Capture a single frame and analyze it (used by both Single & Batch modes)
     // ─────────────────────────────────────────────────────────────────────────
 
     private fun captureFrame() {
@@ -416,14 +481,32 @@ class EggCountActivity : AppCompatActivity() {
         })
     }
 
+    /**
+     * Analyzes a single captured/picked bitmap.
+     *
+     * Both SINGLE and BATCH modes now freeze the camera, run the scanning
+     * animation, and land on the frozen shot with its detection boxes drawn
+     * on top — the same "freeze, scan, show boxes" flow used for gallery
+     * picks in [processPickedBatch]. The camera stays paused until the user
+     * taps Retake (keep the batch total, take another shot), Discard (throw
+     * everything away), or Save.
+     *
+     * SINGLE mode: counts are reset before adding this shot's results.
+     * BATCH mode: this shot's results are ADDED to the running totals.
+     */
     private fun freezeAndAnalyze(bmp: Bitmap, saveToGallery: Boolean = false) {
         isLiveMode = false
+        frozenOverlay.setBackgroundColor(FROZEN_DIM_COLOR)
         frozenOverlay.visibility = View.VISIBLE
         frozenPreviewImage.setImageBitmap(bmp)
         frozenPreviewImage.visibility = View.VISIBLE
+        // Tell the overlay the true source bitmap size so boxes line up correctly
+        // with the centerCrop-scaled preview image instead of a naive 1:1 mapping.
+        overlayView.setImageSize(bmp.width, bmp.height)
         liveScanLabel.text = "● ANALYZING"
         captureBtn.visibility = View.GONE
         retakeBtn.visibility  = View.VISIBLE
+        discardBtn.visibility = View.VISIBLE
         modeSwitchBtn.text    = "↩ Live Mode"
 
         startScanAnimation()
@@ -433,7 +516,9 @@ class EggCountActivity : AppCompatActivity() {
             runOnUiThread {
                 stopScanAnimation()
 
-                gradeA = 0; gradeB = 0; gradeC = 0; countedBoxes.clear()
+                if (captureMode == CaptureMode.SINGLE) {
+                    gradeA = 0; gradeB = 0; gradeC = 0; countedBoxes.clear()
+                }
                 for (det in results) when (det.label) {
                     "Quail_Egg_Grade_A" -> gradeA++
                     "Quail_Egg_Grade_B" -> gradeB++
@@ -441,41 +526,148 @@ class EggCountActivity : AppCompatActivity() {
                 }
                 overlayView.setResults(results)
                 updateCountUI()
+                if (saveToGallery) trySaveToGallery(bmp)
 
                 val total = gradeA + gradeB + gradeC
-                liveScanLabel.text = "● CAPTURED"
                 captureBtn.isEnabled = true
                 saveBtn.visibility = View.VISIBLE
 
-                showBanner(
-                    if (detector != null)
-                        "Found $total egg(s) — " +
-                                "A:$gradeA Normal · B:$gradeB Cracked · C:$gradeC Reject\n" +
-                                "Tap 'Save Collection' to record."
-                    else
-                        "Detection disabled — model error. See banner above.",
-                    isError = detector == null,
-                    autoHide = detector != null
-                )
-                if (saveToGallery) trySaveToGallery(bmp)
+                when (captureMode) {
+                    CaptureMode.SINGLE -> {
+                        liveScanLabel.text = "● CAPTURED"
+                        showBanner(
+                            if (detector != null)
+                                "Found $total egg(s) — " +
+                                        "A:$gradeA Normal · B:$gradeB Cracked · C:$gradeC Reject\n" +
+                                        "Save, Retake, or Discard."
+                            else
+                                "Detection disabled — model error. See banner above.",
+                            isError = detector == null,
+                            autoHide = detector != null
+                        )
+                    }
+                    CaptureMode.BATCH -> {
+                        batchShotCount++
+                        // Stay frozen on this shot (boxes drawn, scan finished) instead
+                        // of jumping straight back to live — the user reviews it, then
+                        // taps Retake to continue capturing the next egg/group, Save to
+                        // commit the batch, or Discard to throw the whole batch away.
+                        liveScanLabel.text = "● SHOT #$batchShotCount CAPTURED"
+                        showBanner(
+                            "Shot #$batchShotCount added — running total: $total " +
+                                    "(A:$gradeA · B:$gradeB · C:$gradeC).\n" +
+                                    "Retake to capture the next shot, Save to commit, or Discard to cancel the batch.",
+                            isError = false, autoHide = false
+                        )
+                    }
+                }
             }
         }
     }
 
+    /** Discard: throws away everything captured so far (current shot and, in
+     * batch mode, the whole running total) and returns to a clean live view. */
+    private fun discardCapture() {
+        val hadBatch = captureMode == CaptureMode.BATCH && batchShotCount > 0
+        resumeLive()
+        showBanner(
+            if (hadBatch) "Batch discarded" else "Discarded",
+            isError = false, autoHide = true
+        )
+        toast("Discarded")
+    }
+
+    /** Full reset: discards the current shot (Single) or the whole in-progress batch (Batch). */
     private fun resumeLive() {
         isLiveMode = true
         frozenOverlay.visibility = View.GONE
         frozenPreviewImage.visibility = View.GONE
+        overlayView.setImageSize(0, 0) // back to naive 1:1 mapping for the live camera feed
         stopScanAnimation()
         overlayView.setResults(emptyList())
-        liveScanLabel.text    = "● LIVE SCAN"
         captureBtn.visibility = View.VISIBLE
+        captureBtn.isEnabled  = true
         retakeBtn.visibility  = View.GONE
+        discardBtn.visibility = View.GONE
         modeSwitchBtn.text    = "Pick Photo"
-        saveBtn.text      = "Save Collection"
-        saveBtn.isEnabled = true
-        saveBtn.visibility = View.GONE
+        saveBtn.visibility    = View.GONE
+        batchShotCount = 0
         resetCounts()
+        updateBatchLabel()
+    }
+
+    /** Used after a successful shot — returns to live preview while keeping the
+     * running totals intact (batch mode continues; single mode's totals get
+     * overwritten by the next capture anyway). */
+    private fun resumeLiveKeepCounts() {
+        isLiveMode = true
+        frozenOverlay.visibility = View.GONE
+        frozenPreviewImage.visibility = View.GONE
+        overlayView.setImageSize(0, 0) // back to naive 1:1 mapping for the live camera feed
+        overlayView.setResults(emptyList())
+        updateBatchLabel()
+        captureBtn.visibility = View.VISIBLE
+        captureBtn.isEnabled  = true
+        retakeBtn.visibility  = View.GONE
+        discardBtn.visibility = View.GONE
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Multi-select "Pick Photo" — batch-analyzes several gallery images at once
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private fun processPickedBatch(uris: List<Uri>) {
+        isLiveMode = false
+        frozenOverlay.setBackgroundColor(FROZEN_DIM_COLOR)
+        frozenOverlay.visibility = View.VISIBLE
+        frozenPreviewImage.visibility = View.VISIBLE
+        captureBtn.visibility = View.GONE
+        retakeBtn.visibility  = View.VISIBLE
+        discardBtn.visibility = View.VISIBLE
+        modeSwitchBtn.text    = "↩ Live Mode"
+        liveScanLabel.text    = "● ANALYZING BATCH (0/${uris.size})"
+
+        gradeA = 0; gradeB = 0; gradeC = 0; countedBoxes.clear()
+        overlayView.setResults(emptyList()) // clear any stale boxes from a previous run
+
+        startScanAnimation()
+
+        cameraExecutor.execute {
+            var processed = 0
+            uris.forEach { uri ->
+                val bmp = uriToBitmap(uri)
+                if (bmp != null) {
+                    val results = runDetection(bmp)
+                    for (det in results) when (det.label) {
+                        "Quail_Egg_Grade_A" -> gradeA++
+                        "Quail_Egg_Grade_B" -> gradeB++
+                        "Quail_Egg_Grade_C" -> gradeC++
+                    }
+                    processed++
+                    runOnUiThread {
+                        frozenPreviewImage.setImageBitmap(bmp)
+                        // Each picked photo can have a different resolution/aspect ratio,
+                        // so refresh the overlay's source size + boxes per photo.
+                        overlayView.setImageSize(bmp.width, bmp.height)
+                        overlayView.setResults(results)
+                        liveScanLabel.text = "● ANALYZING BATCH ($processed/${uris.size})"
+                        updateCountUI()
+                    }
+                }
+            }
+            runOnUiThread {
+                stopScanAnimation()
+                val total = gradeA + gradeB + gradeC
+                liveScanLabel.text = "● BATCH DONE — $processed photo(s)"
+                saveBtn.visibility = View.VISIBLE
+                showBanner(
+                    "Batch scanned $processed photo(s), $total egg(s) — " +
+                            "A:$gradeA Normal · B:$gradeB Cracked · C:$gradeC Reject\n" +
+                            "Save to commit, or Discard to cancel.",
+                    isError = false, autoHide = true
+                )
+            }
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -552,6 +744,8 @@ class EggCountActivity : AppCompatActivity() {
                     )
                     saveBtn.text = "✓ Saved"
                     saveBtn.isEnabled = false
+                    batchShotCount = 0
+                    updateBatchLabel()
                     toast("Collection updated!")
                 }
                 .addOnFailureListener { e ->
@@ -747,6 +941,9 @@ class EggCountActivity : AppCompatActivity() {
         updateWeekLabel()
         populateCollectionLog(collectionRecords)
         saveBtn.visibility = View.GONE
+        discardBtn.visibility = View.GONE
+        captureModeToggleBtn.text =
+            if (captureMode == CaptureMode.BATCH) "Mode: Batch" else "Mode: Single"
     }
 
     private fun updateWeekLabel() {
@@ -815,5 +1012,7 @@ class EggCountActivity : AppCompatActivity() {
     companion object {
         private const val TAG       = "EggCountActivity"
         private const val IOU_DEDUP = 0.4f
+        private const val MAX_BATCH_PICK = 20
+        private val FROZEN_DIM_COLOR = Color.parseColor("#55000000")
     }
 }

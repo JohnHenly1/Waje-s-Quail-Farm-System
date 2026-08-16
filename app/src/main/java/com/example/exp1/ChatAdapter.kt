@@ -26,7 +26,13 @@ class ChatAdapter(
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         val messageView = holder.itemView.findViewById<TextView>(R.id.messageText)
-        messageView.text = messages[position].text
+        val message = messages[position]
+
+        messageView.text = if (message.isUser) {
+            message.text
+        } else {
+            MarkdownFormatter.toSpannable(message.text)
+        }
 
         messageView.setOnLongClickListener {
             onLongPress(holder.adapterPosition)
