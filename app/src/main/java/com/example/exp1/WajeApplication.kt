@@ -37,6 +37,12 @@ class WajeApplication : Application() {
         // turned on. See MaintenanceGuard for details.
         MaintenanceGuard.start(this)
 
+        // Watches inventory stock, overdue tasks, and water level app-wide so
+        // alerts + system notifications fire as soon as they happen, instead
+        // of only when a staff member has the Notifications screen open. See
+        // AlertsMonitor for details.
+        AlertsMonitor.start(this)
+
         val accountManager = AccountManager(this)
         val selectedLang = accountManager.getSelectedLanguage()
 

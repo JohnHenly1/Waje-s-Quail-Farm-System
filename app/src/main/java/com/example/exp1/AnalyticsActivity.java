@@ -707,7 +707,7 @@ public class AnalyticsActivity extends AppCompatActivity {
             gradeCProgress.setProgress(0);
         }
 
-        totalProductionLabel.setText(String.format(Locale.getDefault(), "Total Eggs : %d", filteredTotal));
+        totalProductionLabel.setText(String.format(Locale.getDefault(), "Total No. of Eggs : %d", filteredTotal));
 
         // Update Stats Labels
         if (filteredTotal > 0) {
@@ -734,7 +734,7 @@ public class AnalyticsActivity extends AppCompatActivity {
                         "Generated: %s\n" +
                         "Period: %s\n\n" +
                         " EGG PRODUCTION\n" +
-                        "Total Eggs Collected: %d\n" +
+                        "Total No. of Eggs Collected: %d\n" +
                         "Grade A: %d\n" +
                         "Grade B: %d\n" +
                         "Grade C: %d", ts, periodLabel, total, a, b, c);
@@ -921,7 +921,7 @@ public class AnalyticsActivity extends AppCompatActivity {
 
             int y = 125;
             drawSection(canvas, "Production Summary (" + currentFilter + ")", y); y += 30;
-            drawRow(canvas, "Total Eggs Collected", String.valueOf(total), y); y += 20;
+            drawRow(canvas, "Total No. of Eggs Collected", String.valueOf(total), y); y += 20;
             drawRow(canvas, "Grade A (Normal)", String.valueOf(a), y); y += 20;
             drawRow(canvas, "Grade B (Cracked)", String.valueOf(b), y); y += 20;
             drawRow(canvas, "Grade C (Reject)", String.valueOf(c), y); y += 40;
@@ -992,7 +992,7 @@ public class AnalyticsActivity extends AppCompatActivity {
 
             int y = 125;
             drawSection(canvas, "Production Summary (" + currentFilter + ")", y); y += 30;
-            drawRow(canvas, "Total Eggs Collected", String.valueOf(total), y); y += 20;
+            drawRow(canvas, "Total No. of Eggs Collected", String.valueOf(total), y); y += 20;
             drawRow(canvas, "Grade A (Normal)", String.valueOf(a), y); y += 20;
             drawRow(canvas, "Grade B (Cracked)", String.valueOf(b), y); y += 20;
             drawRow(canvas, "Grade C (Reject)", String.valueOf(c), y); y += 40;

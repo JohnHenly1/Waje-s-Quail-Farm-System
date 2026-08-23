@@ -828,7 +828,11 @@ object NavigationHelper {
                 Toast.makeText(activity, "Please enter a valid email address", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            if (birthday.isNotEmpty() && !isAtLeast18(birthday)) {
+            if (birthday.isEmpty()) {
+                Toast.makeText(activity, "Please enter the user's birthday", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            if (!isAtLeast18(birthday)) {
                 Toast.makeText(activity, "User must be at least 18 years old", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
