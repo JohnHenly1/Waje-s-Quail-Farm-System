@@ -80,6 +80,7 @@ class MainActivity : AppCompatActivity() {
         googleSignInClient = GoogleSignIn.getClient(this, gso)
 
         val editLoginEmail = findViewById<EditText>(R.id.editLoginEmail)
+        editLoginEmail.setTextColor(android.graphics.Color.BLACK)
 
         editLoginEmail.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}

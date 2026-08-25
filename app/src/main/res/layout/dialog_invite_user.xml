@@ -1,9 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@color/white"
-    android:maxHeight="520dp">
+    android:maxHeight="520dp"
+    android:background="@color/white">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -14,16 +15,16 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="24dp"
+            android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:layout_marginBottom="24dp">
 
             <ImageView
                 android:layout_width="32dp"
                 android:layout_height="32dp"
-                android:contentDescription="Add User Icon"
                 android:src="@drawable/ic_users"
-                app:tint="@color/dark_green" />
+                app:tint="@color/dark_green"
+                android:contentDescription="Add User Icon" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -48,12 +49,13 @@
             android:layout_width="match_parent"
             android:layout_height="52dp"
             android:layout_marginTop="8dp"
-            android:layout_marginBottom="20dp"
             android:background="@drawable/rounded_corner"
             android:hint="Enter full name"
             android:inputType="textPersonName"
             android:padding="12dp"
-            android:textSize="16sp" />
+            android:textSize="16sp"
+            android:textColor="#000000"
+            android:layout_marginBottom="20dp" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -68,12 +70,13 @@
             android:layout_width="match_parent"
             android:layout_height="52dp"
             android:layout_marginTop="8dp"
-            android:layout_marginBottom="20dp"
             android:background="@drawable/rounded_corner"
             android:hint="Enter recipient email"
             android:inputType="textEmailAddress"
             android:padding="12dp"
-            android:textSize="16sp" />
+            android:textSize="16sp"
+            android:textColor="#000000"
+            android:layout_marginBottom="20dp" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -88,13 +91,14 @@
             android:layout_width="match_parent"
             android:layout_height="52dp"
             android:layout_marginTop="8dp"
-            android:layout_marginBottom="20dp"
             android:background="@drawable/rounded_corner"
-            android:clickable="true"
-            android:focusable="false"
             android:hint="MM/DD/YYYY"
+            android:focusable="false"
+            android:clickable="true"
             android:padding="12dp"
-            android:textSize="16sp" />
+            android:textSize="16sp"
+            android:textColor="#000000"
+            android:layout_marginBottom="20dp" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -109,94 +113,98 @@
             android:id="@+id/inviteAddressStreet"
             android:layout_width="match_parent"
             android:layout_height="52dp"
-            android:layout_marginBottom="10dp"
             android:background="@drawable/rounded_corner"
             android:hint="Street"
             android:inputType="textPostalAddress"
             android:padding="12dp"
-            android:textSize="16sp" />
+            android:textSize="16sp"
+            android:textColor="#000000"
+            android:layout_marginBottom="10dp" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="4dp"
             android:text="City / Municipality"
             android:textColor="@color/dark_green"
-            android:textSize="12sp" />
+            android:textSize="12sp"
+            android:layout_marginBottom="4dp" />
 
         <Spinner
             android:id="@+id/inviteAddressCity"
             android:layout_width="match_parent"
             android:layout_height="52dp"
-            android:layout_marginBottom="10dp"
             android:background="@drawable/rounded_corner"
             android:paddingStart="12dp"
             android:paddingEnd="12dp"
-            android:spinnerMode="dropdown" />
+            android:spinnerMode="dropdown"
+            android:layout_marginBottom="10dp" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="4dp"
             android:text="Barangay"
             android:textColor="@color/dark_green"
-            android:textSize="12sp" />
+            android:textSize="12sp"
+            android:layout_marginBottom="4dp" />
 
         <Spinner
             android:id="@+id/inviteAddressBarangay"
             android:layout_width="match_parent"
             android:layout_height="52dp"
-            android:layout_marginBottom="10dp"
             android:background="@drawable/rounded_corner"
             android:paddingStart="12dp"
             android:paddingEnd="12dp"
-            android:spinnerMode="dropdown" />
-        <!--  Shown only when "Other (type manually)" is picked above, or before
-                     a City / Municipality has been selected yet.  -->
+            android:spinnerMode="dropdown"
+            android:layout_marginBottom="10dp" />
+
+        <!-- Shown only when "Other (type manually)" is picked above, or before
+             a City / Municipality has been selected yet. -->
         <EditText
             android:id="@+id/inviteAddressBarangayOther"
             android:layout_width="match_parent"
             android:layout_height="52dp"
-            android:layout_marginBottom="10dp"
             android:background="@drawable/rounded_corner"
             android:hint="Enter barangay name"
             android:inputType="textPostalAddress"
             android:padding="12dp"
             android:textSize="16sp"
-            android:visibility="gone" />
+            android:textColor="#000000"
+            android:visibility="gone"
+            android:layout_marginBottom="10dp" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="4dp"
             android:text="Province"
             android:textColor="@color/dark_green"
-            android:textSize="12sp" />
+            android:textSize="12sp"
+            android:layout_marginBottom="4dp" />
 
         <EditText
             android:id="@+id/inviteAddressState"
             android:layout_width="match_parent"
             android:layout_height="52dp"
-            android:layout_marginBottom="10dp"
             android:background="@drawable/rounded_corner"
+            android:text="Bataan"
             android:enabled="false"
             android:focusable="false"
             android:inputType="text"
             android:padding="12dp"
-            android:text="Bataan"
-            android:textColor="@color/dark_green"
-            android:textSize="16sp" />
+            android:textSize="16sp"
+            android:textColor="#000000"
+            android:layout_marginBottom="10dp" />
 
         <EditText
             android:id="@+id/inviteAddressPostal"
             android:layout_width="match_parent"
             android:layout_height="52dp"
-            android:layout_marginBottom="20dp"
             android:background="@drawable/rounded_corner"
             android:hint="Postal Code"
             android:inputType="text"
             android:padding="12dp"
-            android:textSize="16sp" />
+            android:textSize="16sp"
+            android:textColor="#000000"
+            android:layout_marginBottom="20dp" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -217,18 +225,20 @@
                 android:id="@+id/radioInviteStaff"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:buttonTint="@color/dark_green"
+                android:text="Staff"
                 android:checked="true"
-                android:text="Staff" />
+                android:textColor="#000000"
+                android:buttonTint="@color/dark_green"/>
         </RadioGroup>
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:alpha="0.7"
             android:text="The new user will set their own password when they open their invite. Everything above is filled in by you."
             android:textColor="@color/dark_green"
+            android:alpha="0.7"
             android:textSize="12sp" />
+
     </LinearLayout>
 </ScrollView>

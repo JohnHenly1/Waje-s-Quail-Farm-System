@@ -575,6 +575,35 @@ public class ScheduleActivity extends AppCompatActivity {
     private void showAddScheduleDialog() {
         View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_add_schedule, null);
 
+        androidx.core.widget.NestedScrollView addScheduleScroll = dialogView.findViewById(R.id.addScheduleScrollView);
+        final Runnable[] pendingScrollRestore = new Runnable[1];
+
+    // Call captureScroll() right before showing any DatePickerDialog, then
+    // call restoreScroll() at the end of that dialog's callback.
+        java.util.function.Supplier<Integer> captureScroll = () ->
+                addScheduleScroll != null ? addScheduleScroll.getScrollY() : 0;
+
+        java.util.function.Consumer<Integer> restoreScroll = (savedY) -> {
+            if (addScheduleScroll == null) return;
+            // Double-post: the DatePickerDialog's own dismiss-triggered focus
+            // restoration happens asynchronously and can arrive after a single
+            // post(), undoing a single-post restore. Posting twice guarantees
+            // ours runs last.
+            addScheduleScroll.post(() -> addScheduleScroll.post(() ->
+                    addScheduleScroll.scrollTo(0, savedY)));
+        };
+        final Runnable clearInputFocus = () -> {
+            View focused = dialogView.findFocus();
+            if (focused != null) {
+                focused.clearFocus();
+                android.view.inputmethod.InputMethodManager imm =
+                        (android.view.inputmethod.InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (imm != null) {
+                    imm.hideSoftInputFromWindow(focused.getWindowToken(), 0);
+                }
+            }
+            dialogView.requestFocus(); // parks focus on a neutral container instead of an input field
+        };
         EditText    editTaskTitle        = dialogView.findViewById(R.id.editTaskTitle);
         Spinner     spinnerCategory      = dialogView.findViewById(R.id.spinnerCategory);
         TextView    textTime             = dialogView.findViewById(R.id.textTime);
@@ -592,17 +621,39 @@ public class ScheduleActivity extends AppCompatActivity {
         TextView    txtSummary           = dialogView.findViewById(R.id.txtScheduleSummary);
         TextView    txtPatternSuggestion = dialogView.findViewById(R.id.txtPatternSuggestion);
 
+// ── PASTE THE TAP-OUTSIDE-TO-DISMISS-KEYBOARD BLOCK HERE ──
+        addScheduleScroll.setOnTouchListener((v, event) -> {
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                View focused = dialogView.findFocus();
+                if (focused instanceof EditText) {
+                    int[] location = new int[2];
+                    focused.getLocationOnScreen(location);
+                    float x = event.getRawX(), y = event.getRawY();
+                    android.graphics.Rect rect = new android.graphics.Rect(
+                            location[0], location[1],
+                            location[0] + focused.getWidth(), location[1] + focused.getHeight());
+                    if (!rect.contains((int) x, (int) y)) {
+                        focused.clearFocus();
+                        android.view.inputmethod.InputMethodManager imm =
+                                (android.view.inputmethod.InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                        if (imm != null) imm.hideSoftInputFromWindow(focused.getWindowToken(), 0);
+                    }
+                }
+            }
+            return false;
+        });
+
         String[] categories = getResources().getStringArray(R.array.task_categories);
         ArrayAdapter<String> catAdapter = new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_item, categories);
-        catAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                R.layout.spinner_item_black, categories);
+        catAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item_black);
         spinnerCategory.setAdapter(catAdapter);
 
         // Populate work window spinner with friendly labels and corresponding minute values
         final String[] workWindowLabels = new String[]{"30 minutes","45 minutes","60 minutes","75 minutes","90 minutes","105 minutes","120 minutes"};
         final int[] workWindowValues = new int[]{30,45,60,75,90,105,120};
-        ArrayAdapter<String> wwAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, workWindowLabels);
-        wwAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        ArrayAdapter<String> wwAdapter = new ArrayAdapter<>(this, R.layout.spinner_item_black, workWindowLabels);
+        wwAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item_black);
         spinnerWorkWindow.setAdapter(wwAdapter);
         // Set initial selection to match category default and update when category changes
         int defaultMinutes = getDefaultWorkWindow(spinnerCategory.getSelectedItem().toString());
@@ -692,6 +743,8 @@ public class ScheduleActivity extends AppCompatActivity {
         Runnable updateGrid = new Runnable() {
             @Override
             public void run() {
+                final int savedScrollY = addScheduleScroll != null ? addScheduleScroll.getScrollY() : 0;
+
                 calendarGrid.removeAllViews();
                 txtCurrentMonth.setText(new SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(viewCalendar.getTime()));
                 txtSummary.setText(getString(R.string.total_dates_selected, selectedDates.size()));
@@ -770,6 +823,9 @@ public class ScheduleActivity extends AppCompatActivity {
                                 selectedRecurrence[0] = selectedDates.size() > 1 ? getString(R.string.recur_custom) : RECUR_ONCE;
                             }
                             run();
+                            if (addScheduleScroll != null) {
+                                addScheduleScroll.post(() -> addScheduleScroll.scrollTo(0, savedScrollY));
+                            }
                         });
                     }
                     calendarGrid.addView(tv);
@@ -779,6 +835,8 @@ public class ScheduleActivity extends AppCompatActivity {
 
         btnWeekdays.setOnClickListener(v -> {
             selectedRecurrence[0] = getString(R.string.recur_weekdays);
+            clearInputFocus.run();
+            final int savedY = captureScroll.get();
             DatePickerDialog dp = new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
                 Calendar cal = Calendar.getInstance();
                 cal.set(year, month, 1, 0, 0, 0);
@@ -793,8 +851,8 @@ public class ScheduleActivity extends AppCompatActivity {
                     }
                 }
                 updateGrid.run();
+                restoreScroll.accept(savedY);
             }, viewCalendar.get(Calendar.YEAR), viewCalendar.get(Calendar.MONTH), 1);
-            // Prevent selecting dates before today
             Calendar min = Calendar.getInstance();
             min.set(Calendar.HOUR_OF_DAY, 0); min.set(Calendar.MINUTE, 0); min.set(Calendar.SECOND, 0); min.set(Calendar.MILLISECOND, 0);
             dp.getDatePicker().setMinDate(min.getTimeInMillis());
@@ -803,6 +861,8 @@ public class ScheduleActivity extends AppCompatActivity {
 
         btnWeekends.setOnClickListener(v -> {
             selectedRecurrence[0] = getString(R.string.recur_weekends);
+            clearInputFocus.run();
+            final int savedY = captureScroll.get();
             DatePickerDialog dp = new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
                 Calendar cal = Calendar.getInstance();
                 cal.set(year, month, 1, 0, 0, 0);
@@ -817,6 +877,7 @@ public class ScheduleActivity extends AppCompatActivity {
                     }
                 }
                 updateGrid.run();
+                restoreScroll.accept(savedY);
             }, viewCalendar.get(Calendar.YEAR), viewCalendar.get(Calendar.MONTH), 1);
             Calendar min2 = Calendar.getInstance();
             min2.set(Calendar.HOUR_OF_DAY, 0); min2.set(Calendar.MINUTE, 0); min2.set(Calendar.SECOND, 0); min2.set(Calendar.MILLISECOND, 0);
@@ -826,6 +887,8 @@ public class ScheduleActivity extends AppCompatActivity {
 
         btnFullMonth.setOnClickListener(v -> {
             selectedRecurrence[0] = getString(R.string.recur_monthly);
+            clearInputFocus.run();
+            final int savedY = captureScroll.get();
             DatePickerDialog dp = new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
                 Calendar cal = Calendar.getInstance();
                 cal.set(year, month, 1, 0, 0, 0);
@@ -837,6 +900,7 @@ public class ScheduleActivity extends AppCompatActivity {
                     if (!selectedDates.contains(key)) selectedDates.add(key);
                 }
                 updateGrid.run();
+                restoreScroll.accept(savedY);
             }, viewCalendar.get(Calendar.YEAR), viewCalendar.get(Calendar.MONTH), 1);
             Calendar min3 = Calendar.getInstance();
             min3.set(Calendar.HOUR_OF_DAY, 0); min3.set(Calendar.MINUTE, 0); min3.set(Calendar.SECOND, 0); min3.set(Calendar.MILLISECOND, 0);
@@ -845,6 +909,8 @@ public class ScheduleActivity extends AppCompatActivity {
         });
 
         btnFullYear.setOnClickListener(v -> {
+            clearInputFocus.run();
+            final int savedY = captureScroll.get();
             View yearDialogView = LayoutInflater.from(this).inflate(R.layout.dialog_year_range, null);
             TextView textStartDate = yearDialogView.findViewById(R.id.textStartDate);
             TextView textEndDate = yearDialogView.findViewById(R.id.textEndDate);
@@ -860,6 +926,7 @@ public class ScheduleActivity extends AppCompatActivity {
             textEndDate.setText(df.format(endCal.getTime()));
 
             textStartDate.setOnClickListener(vStart -> {
+                clearInputFocus.run();
                 DatePickerDialog dpStart = new DatePickerDialog(this, (view, year, month, day) -> {
                     startCal.set(year, month, day);
                     textStartDate.setText(df.format(startCal.getTime()));
@@ -871,6 +938,7 @@ public class ScheduleActivity extends AppCompatActivity {
             });
 
             textEndDate.setOnClickListener(vEnd -> {
+                clearInputFocus.run();
                 DatePickerDialog dpEnd = new DatePickerDialog(this, (view, year, month, day) -> {
                     endCal.set(year, month, day);
                     textEndDate.setText(df.format(endCal.getTime()));
@@ -912,13 +980,21 @@ public class ScheduleActivity extends AppCompatActivity {
                                 cal.add(Calendar.DAY_OF_MONTH, 1);
                             }
                             updateGrid.run();
+                            restoreScroll.accept(savedY);
                         } catch (Exception e) { Toast.makeText(this, getString(R.string.invalid_year), Toast.LENGTH_SHORT).show(); }
                     })
                     .setNegativeButton(getString(R.string.cancel), null)
                     .show();
         });
 
-        btnClearSelection.setOnClickListener(v -> { selectedDates.clear(); selectedRecurrence[0] = RECUR_ONCE; updateGrid.run(); });
+        btnClearSelection.setOnClickListener(v -> {
+            clearInputFocus.run();
+            final int savedY = captureScroll.get();
+            selectedDates.clear();
+            selectedRecurrence[0] = RECUR_ONCE;
+            updateGrid.run();
+            restoreScroll.accept(savedY);
+        });
 
         txtPatternSuggestion.setOnClickListener(v -> {
             if (selectedDates.size() < 2) return;
@@ -2423,7 +2499,8 @@ public class ScheduleActivity extends AppCompatActivity {
         tv.setGravity(Gravity.CENTER);
         tv.setPadding(0, 20, 0, 20);
         tv.setClickable(true);
-        tv.setFocusable(true);
+        tv.setFocusable(false);
+        tv.setFocusableInTouchMode(false);
         tv.setTextColor(Color.BLACK);
         GridLayout.LayoutParams p = new GridLayout.LayoutParams();
         p.width = 0; p.height = GridLayout.LayoutParams.WRAP_CONTENT;

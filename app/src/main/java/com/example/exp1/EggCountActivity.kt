@@ -506,6 +506,7 @@ class EggCountActivity : AppCompatActivity() {
         liveScanLabel.text = "● ANALYZING"
         captureBtn.visibility = View.GONE
         retakeBtn.visibility  = View.VISIBLE
+        retakeBtn.text        = if (captureMode == CaptureMode.BATCH) "Capture More" else "Retake"
         discardBtn.visibility = View.VISIBLE
         modeSwitchBtn.text    = "↩ Live Mode"
 
@@ -623,6 +624,7 @@ class EggCountActivity : AppCompatActivity() {
         frozenPreviewImage.visibility = View.VISIBLE
         captureBtn.visibility = View.GONE
         retakeBtn.visibility  = View.VISIBLE
+        retakeBtn.text        = "Capture More"   // gallery batch picks are always multi-shot
         discardBtn.visibility = View.VISIBLE
         modeSwitchBtn.text    = "↩ Live Mode"
         liveScanLabel.text    = "● ANALYZING BATCH (0/${uris.size})"

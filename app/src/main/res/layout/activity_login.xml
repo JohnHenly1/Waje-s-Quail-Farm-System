@@ -49,6 +49,7 @@
                 android:hint="@string/enter_approved_email_hint"
                 android:inputType="textEmailAddress"
                 android:padding="16dp"
+                android:textColor="#000000"
                 android:textColorHint="#996B8E23" />
 
             <com.google.android.material.button.MaterialButton
