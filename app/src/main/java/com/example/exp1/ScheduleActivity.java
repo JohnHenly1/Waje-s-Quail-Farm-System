@@ -1539,8 +1539,8 @@ public class ScheduleActivity extends AppCompatActivity {
     // Records a task deadline extension into the shared "activity_logs"
     // collection so it appears under the web Activity Logs "Updated → Tasks"
     // sub-filter. Covers BOTH extension paths in this Activity:
-    //   - "Request 30min Extension" (showStatusUpdateDialog) — available to
-    //     anyone who can act on an Ongoing task, not owner-gated.
+    //   - "Request 30min Extension" (showStatusUpdateDialog) — owner-only;
+    //     staff only see "Mark as Done" for an Ongoing task.
     //   - "Manager Override → Reset to Ongoing" (showManagerOverrideDialog) —
     //     owner-only, only reachable once a task is already Missed.
     // The actor's actual role is recorded on every entry either way, so staff
@@ -1578,13 +1578,17 @@ public class ScheduleActivity extends AppCompatActivity {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Update Task Status");
 
-        String[] options = {"Mark as Done", "Request 30min Extension"};
+        // Extending the deadline is owner-only; staff only get "Mark as Done".
+        boolean canExtend = roleManager.isOwner();
+        String[] options = canExtend
+                ? new String[]{"Mark as Done", "Request 30min Extension"}
+                : new String[]{"Mark as Done"};
         builder.setItems(options, (dialog, which) -> {
             if (which == 0) {
                 // Marking Done now requires proof (comment + photo) before anything
                 // is written, followed by an explicit confirmation step.
                 showMarkDoneProofDialog(task);
-            } else {
+            } else if (canExtend) {
                 task.extensionMinutes += 30;
                 updateTaskStatus(task);
                 logTaskExtension(task, 30, "ongoing");

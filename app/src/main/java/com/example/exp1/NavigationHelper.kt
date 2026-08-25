@@ -1124,8 +1124,12 @@ object NavigationHelper {
                 conn.requestMethod = "POST"
                 conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
                 conn.doOutput = true
-                conn.connectTimeout = 10000
-                conn.readTimeout = 10000
+                // Apps Script cold-starts can take well over 10s to respond even
+                // though MailApp.sendEmail() already went through — a short
+                // timeout here was firing a false "email failed to send" toast
+                // for invites that actually arrived. Give it more room.
+                conn.connectTimeout = 25000
+                conn.readTimeout = 25000
 
                 val payload = JSONObject().apply {
                     put("secret", secret)
@@ -1206,6 +1210,18 @@ object NavigationHelper {
                             Toast.LENGTH_SHORT
                         ).show()
                     }
+                }
+            } catch (e: java.net.SocketTimeoutException) {
+                // The send may well have completed on the Apps Script side —
+                // Gmail/Apps Script can still be processing after our socket
+                // gives up — so don't tell the owner it failed outright.
+                android.util.Log.e("InviteEmail", "Timed out waiting for Apps Script response", e)
+                Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(
+                        activity,
+                        "User saved. Taking longer than expected to confirm the invite email. It may still arrive please check with $email before resending.",
+                        Toast.LENGTH_LONG
+                    ).show()
                 }
             } catch (e: Exception) {
                 android.util.Log.e("InviteEmail", "Failed to reach Apps Script endpoint", e)

@@ -646,8 +646,12 @@ public class ProfileActivity extends AppCompatActivity {
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
                 conn.setDoOutput(true);
-                conn.setConnectTimeout(10000);
-                conn.setReadTimeout(10000);
+                // Apps Script cold-starts can take well over 10s to respond even
+                // though the email itself sends fine — a short timeout here was
+                // firing a false "Network error" toast after the send had
+                // already succeeded server-side. Give it more room.
+                conn.setConnectTimeout(25000);
+                conn.setReadTimeout(25000);
 
                 JSONObject payload = new JSONObject();
                 payload.put("secret", SCRIPT_SECRET);
@@ -666,6 +670,13 @@ public class ProfileActivity extends AppCompatActivity {
                             "Failed to send verification code. Please try again.",
                             Toast.LENGTH_LONG).show());
                 }
+            } catch (java.net.SocketTimeoutException e) {
+                // The request may well have completed on the Apps Script side —
+                // Gmail/Apps Script can still be processing after our socket
+                // gives up — so don't tell the user it failed outright.
+                runOnUiThread(() -> Toast.makeText(this,
+                        "Taking longer than expected to confirm — the code may still arrive. Check your inbox before requesting a new one.",
+                        Toast.LENGTH_LONG).show());
             } catch (Exception e) {
                 runOnUiThread(() -> Toast.makeText(this,
                         "Network error sending code: " + e.getMessage(),
