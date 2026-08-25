@@ -1116,12 +1116,19 @@ public class ScheduleActivity extends AppCompatActivity {
             if (selectedDates.isEmpty()) { Toast.makeText(this, getString(R.string.please_select_date), Toast.LENGTH_SHORT).show(); return; }
 
             View previewView = LayoutInflater.from(this).inflate(R.layout.dialog_schedule_preview, null);
+
+        // Force a white background + dark text regardless of system dark mode.
+        // The layout's default colors come from theme attrs, which flip in dark
+        // mode; setting them explicitly here overrides that for this dialog only.
+            previewView.setBackgroundColor(Color.WHITE);
+            forceLightPreviewColors(previewView);
+
             ((TextView) previewView.findViewById(R.id.previewTitle)).setText(title);
             ((TextView) previewView.findViewById(R.id.previewCategory)).setText(category);
             ((TextView) previewView.findViewById(R.id.previewTime)).setText(selectedTime[0]);
             ((TextView) previewView.findViewById(R.id.previewTotalDates)).setText(selectedDates.size() + " " + getString(R.string.days_unit) + " (" + selectedRecurrence[0] + ")");
 
-            new AlertDialog.Builder(this)
+            AlertDialog previewDialog = new AlertDialog.Builder(this)
                     .setView(previewView)
                     .setPositiveButton(getString(R.string.confirm_and_save), (dConfirm, wConfirm) -> {
                         String groupId = UUID.randomUUID().toString();
@@ -1175,7 +1182,14 @@ public class ScheduleActivity extends AppCompatActivity {
                         });
                     })
                     .setNegativeButton(getString(R.string.back), null)
-                    .show();
+                    .create();
+
+                    previewDialog.show();
+                // AlertDialog's own window background also follows the system theme in dark
+                // mode (a dark panel behind/around previewView); force that white too.
+                    if (previewDialog.getWindow() != null) {
+                        previewDialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.WHITE));
+                    }
         });
     }
 
@@ -2009,7 +2023,20 @@ public class ScheduleActivity extends AppCompatActivity {
         float density = getResources().getDisplayMetrics().density;
         return (int) (dp * density);
     }
-
+    /** Recursively forces dark text on every TextView inside the schedule preview,
+     *  so it stays readable against the white background forced above, even
+     *  when the layout's text colors come from a dark-mode theme attr. */
+    private void forceLightPreviewColors(View view) {
+        if (view instanceof TextView) {
+            ((TextView) view).setTextColor(Color.parseColor("#111827"));
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                forceLightPreviewColors(group.getChildAt(i));
+            }
+        }
+    }
     private void showManagerWorkWindowDialog(Task task) {
         EditText input = new EditText(this);
         input.setInputType(InputType.TYPE_CLASS_NUMBER);

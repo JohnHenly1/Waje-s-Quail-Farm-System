@@ -56,6 +56,7 @@
                 android:layout_height="wrap_content"
                 android:hint="@string/full_name_hint"
                 android:inputType="textPersonName"
+                android:textColor="@color/black"
                 android:imeOptions="actionNext"/>
         </com.google.android.material.textfield.TextInputLayout>
 
@@ -99,6 +100,7 @@
                 android:layout_height="wrap_content"
                 android:hint="@string/street_address_hint"
                 android:inputType="textPostalAddress"
+                android:textColor="@color/black"
                 android:imeOptions="actionNext"/>
         </com.google.android.material.textfield.TextInputLayout>
 
@@ -122,6 +124,7 @@
                     android:layout_height="wrap_content"
                     android:hint="@string/city_hint"
                     android:inputType="text"
+                    android:textColor="@color/black"
                     android:imeOptions="actionNext"/>
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -137,6 +140,7 @@
                     android:layout_height="wrap_content"
                     android:hint="@string/state_province_hint"
                     android:inputType="text"
+                    android:textColor="@color/black"
                     android:imeOptions="actionNext"/>
             </com.google.android.material.textfield.TextInputLayout>
         </LinearLayout>
@@ -154,6 +158,7 @@
                 android:layout_height="wrap_content"
                 android:hint="@string/postal_code_hint"
                 android:inputType="text"
+                android:textColor="@color/black"
                 android:imeOptions="actionNext"/>
         </com.google.android.material.textfield.TextInputLayout>
 
@@ -174,6 +179,7 @@
                 android:layout_height="wrap_content"
                 android:hint="@string/create_password_hint"
                 android:inputType="textPassword"
+                android:textColor="@color/black"
                 android:imeOptions="actionNext"/>
         </com.google.android.material.textfield.TextInputLayout>
 
@@ -193,6 +199,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="@string/confirm_password_hint"
+                android:textColor="@color/black"
                 android:inputType="textPassword"
                 android:imeOptions="actionDone"/>
         </com.google.android.material.textfield.TextInputLayout>

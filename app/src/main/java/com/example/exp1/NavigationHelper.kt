@@ -3,6 +3,7 @@ package com.example.exp1
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.DatePickerDialog
+import android.app.Dialog
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
@@ -535,6 +536,36 @@ object NavigationHelper {
             android.widget.Button(activity).apply { text = label }
         }
     }
+    /**
+     * Tapping anywhere in the dialog outside the currently focused EditText
+     * dismisses the keyboard and clears focus from that field. Taps that
+     * land inside an EditText/Spinner are consumed by that view and never
+     * reach this listener, so normal typing/selecting is unaffected.
+     *
+     * IMPORTANT: takes the Dialog itself (not the host Activity) to check
+     * focus. A Dialog has its own separate Window from the Activity, so
+     * activity.currentFocus never sees a view focused inside the dialog —
+     * it always returns null/wrong-view for dialog content, which is why
+     * this previously did nothing when tapping outside a field.
+     */
+    private fun dismissKeyboardOnOutsideTouch(dialog: Dialog, rootView: View) {
+        rootView.setOnTouchListener { v, event ->
+            if (event.action == MotionEvent.ACTION_DOWN) {
+                val focused = dialog.currentFocus
+                if (focused is EditText) {
+                    val outRect = android.graphics.Rect()
+                    focused.getGlobalVisibleRect(outRect)
+                    if (!outRect.contains(event.rawX.toInt(), event.rawY.toInt())) {
+                        focused.clearFocus()
+                        val imm = v.context.getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+                        imm.hideSoftInputFromWindow(focused.windowToken, 0)
+                    }
+                }
+            }
+            v.performClick()
+            false
+        }
+    }
 
     /**
      * ArrayAdapter using custom row layouts (R.layout.spinner_item_black /
@@ -683,13 +714,29 @@ object NavigationHelper {
             .forEach { it.setTextColor(Color.BLACK) }
 
         // Full Name: hard-block digits (and any other disallowed symbol) at
-        // the keystroke level, instead of only flagging them after the fact
-        // via the TextWatcher error below. Letters, spaces, commas, periods,
-        // underscores, hyphens and apostrophes are still allowed.
-        val nameAllowedRegex = Regex("^[A-Za-z._,\\s'-]*$")
+// the keystroke level, instead of only flagging them after the fact
+// via the TextWatcher error below. Only letters, spaces, hyphens and
+// commas are allowed — no numbers, no other special characters.
+        val nameAllowedRegex = Regex("^[A-Za-z\\s,-]*$")
+        var lastInvalidNameWarningAt = 0L
         editName.filters = editName.filters + android.text.InputFilter { source, start, end, _, _, _ ->
             val piece = source.subSequence(start, end)
-            if (nameAllowedRegex.matches(piece)) null else ""
+            if (nameAllowedRegex.matches(piece)) {
+                null
+            } else {
+                // Throttle so holding an invalid key (or pasting a bad string)
+                // doesn't stack multiple dialogs on top of each other.
+                val now = System.currentTimeMillis()
+                if (now - lastInvalidNameWarningAt > 800) {
+                    lastInvalidNameWarningAt = now
+                    AlertDialog.Builder(activity)
+                        .setTitle("Invalid Character")
+                        .setMessage("Full name can only contain letters, spaces, hyphens (-) and commas (,). Numbers and other special characters are not allowed.")
+                        .setPositiveButton("OK", null)
+                        .show()
+                }
+                ""
+            }
         }
 
         // Address is fixed to Bataan province; City is a dropdown of every
@@ -817,6 +864,9 @@ object NavigationHelper {
         val dialog = builder.create()
         dialog.show()
 
+// Tap anywhere in the dialog outside an active input to dismiss the keyboard.
+        dismissKeyboardOnOutsideTouch(dialog, dialogView)
+
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             val name = editName.text.toString().trim()
             val invitedEmail = editEmail.text.toString().trim().lowercase()
@@ -924,9 +974,9 @@ object NavigationHelper {
     private fun getNameValidationError(name: String): String? {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return null
-        val nameRegex = Regex("^[A-Za-z._,\\s'-]+$")
+        val nameRegex = Regex("^[A-Za-z\\s,-]+$")
         if (!nameRegex.matches(trimmed)) {
-            return "Name may contain letters, spaces, commas, periods, underscores, hyphens and apostrophes (no digits or other symbols)"
+            return "Name may contain only letters, spaces, hyphens and commas (no digits or other symbols)"
         }
         return null
     }

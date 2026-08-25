@@ -176,6 +176,34 @@ class ChatBotActivity : AppCompatActivity() {
             }
         }
     }
+// ---------- Tap outside to dismiss keyboard ----------
+
+    /**
+     * Dispatches every touch through here first. If the chat input has focus
+     * and the user taps down somewhere outside its bounds, clear focus and
+     * hide the keyboard — but let the touch continue on to its normal target
+     * (button clicks, RecyclerView scrolling, etc. still work as usual).
+     */
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        if (ev.action == android.view.MotionEvent.ACTION_DOWN) {
+            val focused = currentFocus
+            if (focused is EditText) {
+                val location = IntArray(2)
+                focused.getLocationOnScreen(location)
+                val rect = android.graphics.Rect(
+                    location[0], location[1],
+                    location[0] + focused.width, location[1] + focused.height
+                )
+                if (!rect.contains(ev.rawX.toInt(), ev.rawY.toInt())) {
+                    focused.clearFocus()
+                    val imm = getSystemService(Context.INPUT_METHOD_SERVICE)
+                            as android.view.inputmethod.InputMethodManager
+                    imm.hideSoftInputFromWindow(focused.windowToken, 0)
+                }
+            }
+        }
+        return super.dispatchTouchEvent(ev)
+    }
 
     // ---------- Streaming reply ----------
 

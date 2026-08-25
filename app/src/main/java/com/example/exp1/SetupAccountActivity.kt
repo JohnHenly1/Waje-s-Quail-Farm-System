@@ -73,6 +73,13 @@ class SetupAccountActivity : AppCompatActivity() {
         btnComplete = findViewById(R.id.btnCompleteSetup)
         scrollView = findViewById(R.id.setupScrollView)
 
+        // Force black input text regardless of theme/night-mode, in case the XML
+        // textColor ever gets missed or overridden.
+        listOf(
+            editName, editBirthday, editAddressStreet, editAddressCity,
+            editAddressState, editAddressPostal, editPassword, editPasswordConfirm
+        ).forEach { it.setTextColor(android.graphics.Color.BLACK) }
+
         // Ensure keyboard doesn't block input fields by scrolling them into view on focus
         val focusScrollListener = View.OnFocusChangeListener { v, hasFocus ->
             if (hasFocus) {
@@ -276,6 +283,27 @@ class SetupAccountActivity : AppCompatActivity() {
         }
 
         loadOwnerPrefilledInfoIfAny()
+    }
+    /**
+     * Tapping anywhere outside the currently focused EditText dismisses the
+     * keyboard and clears focus from that field. Taps on another EditText
+     * still work normally — this only intercepts taps that land outside
+     * every focusable input.
+     */
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        if (ev.action == android.view.MotionEvent.ACTION_DOWN) {
+            val focused = currentFocus
+            if (focused is EditText) {
+                val outRect = Rect()
+                focused.getGlobalVisibleRect(outRect)
+                if (!outRect.contains(ev.rawX.toInt(), ev.rawY.toInt())) {
+                    focused.clearFocus()
+                    val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+                    imm.hideSoftInputFromWindow(focused.windowToken, 0)
+                }
+            }
+        }
+        return super.dispatchTouchEvent(ev)
     }
 
     /**
