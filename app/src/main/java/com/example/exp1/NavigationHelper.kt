@@ -536,6 +536,21 @@ object NavigationHelper {
         }
     }
 
+    /**
+     * ArrayAdapter using custom row layouts (R.layout.spinner_item_black /
+     * R.layout.spinner_dropdown_item_black) that hard-code a white row
+     * background with black text. This avoids the earlier issue where
+     * forcing only the text color to black left the dropdown's highlighted
+     * row using the theme's (dark) selection background, making the black
+     * text unreadable — only the font color changes, the dropdown box
+     * styling itself is untouched.
+     */
+    private fun blackTextArrayAdapter(context: Context, items: List<String>): ArrayAdapter<String> {
+        val adapter = ArrayAdapter(context, R.layout.spinner_item_black, items)
+        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item_black)
+        return adapter
+    }
+
     // ─────────────────────────────────────────────────────────────────────
     // ADD USER  (owner fills in the new person's info; this ONLY saves the
     // pre-fill profile with status "invited". No verification code is
@@ -659,6 +674,23 @@ object NavigationHelper {
         val spinnerCity = dialogView.findViewById<Spinner>(R.id.inviteAddressCity)
         val editState = dialogView.findViewById<EditText>(R.id.inviteAddressState)
         val editPostal = dialogView.findViewById<EditText>(R.id.inviteAddressPostal)
+        val spinnerBarangay = dialogView.findViewById<Spinner>(R.id.inviteAddressBarangay)
+        val editBarangayCustom = dialogView.findViewById<EditText>(R.id.inviteAddressBarangayOther)
+
+        // Force black text on every text input and dropdown in this dialog,
+        // regardless of theme / night mode / whatever the XML currently sets.
+        listOf(editName, editEmail, editBirthday, editStreet, editState, editPostal, editBarangayCustom)
+            .forEach { it.setTextColor(Color.BLACK) }
+
+        // Full Name: hard-block digits (and any other disallowed symbol) at
+        // the keystroke level, instead of only flagging them after the fact
+        // via the TextWatcher error below. Letters, spaces, commas, periods,
+        // underscores, hyphens and apostrophes are still allowed.
+        val nameAllowedRegex = Regex("^[A-Za-z._,\\s'-]*$")
+        editName.filters = editName.filters + android.text.InputFilter { source, start, end, _, _, _ ->
+            val piece = source.subSequence(start, end)
+            if (nameAllowedRegex.matches(piece)) null else ""
+        }
 
         // Address is fixed to Bataan province; City is a dropdown of every
         // municipality plus the one component city in Bataan.
@@ -670,23 +702,15 @@ object NavigationHelper {
             "Abucay", "Bagac", "Balanga City", "Dinalupihan", "Hermosa",
             "Limay", "Mariveles", "Morong", "Orani", "Orion", "Pilar", "Samal"
         )
-        val cityAdapter = ArrayAdapter(activity, android.R.layout.simple_spinner_item, bataanCities)
-        cityAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        val cityAdapter = blackTextArrayAdapter(activity, bataanCities)
         spinnerCity.adapter = cityAdapter
         val rbStaff = dialogView.findViewById<android.widget.RadioButton>(R.id.radioInviteStaff)
-
-        // Barangay selector: a dropdown scoped to the selected city, plus a
-        // free-text fallback ("Other") for anything not in the list. Both
-        // views live in the XML layout, right below the city spinner.
-        val spinnerBarangay = dialogView.findViewById<Spinner>(R.id.inviteAddressBarangay)
-        val editBarangayCustom = dialogView.findViewById<EditText>(R.id.inviteAddressBarangayOther)
 
         fun updateBarangaySpinner(city: String) {
             val options = mutableListOf("Select Barangay")
             bataanBarangays[city]?.let { options.addAll(it) }
             options.add(OTHER_BARANGAY_LABEL)
-            val barangayAdapter = ArrayAdapter(activity, android.R.layout.simple_spinner_item, options)
-            barangayAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            val barangayAdapter = blackTextArrayAdapter(activity, options)
             spinnerBarangay.adapter = barangayAdapter
             spinnerBarangay.setSelection(0)
             editBarangayCustom.visibility = View.GONE

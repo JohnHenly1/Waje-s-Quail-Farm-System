@@ -80,7 +80,7 @@ public class ProfileActivity extends AppCompatActivity {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private ListenerRegistration userProfileListener;
 
-    private static final String SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx-_H4Jy4KTuZQSPTMCxTAIKIAJxGMAaIzGF-uKB0m05YLWb1Flgdor-wGD-ieOym_0/exec";
+    private static final String SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx-_H4Jy4KTuZQSPTMCxTAIKIAJxGMAaIzGF-uKB0m05YLWb1Flgdor-wGD-ieOym_0/exec" ;
     private static final String SCRIPT_SECRET = "Red0455";
 
     @Override
@@ -682,6 +682,7 @@ public class ProfileActivity extends AppCompatActivity {
         codeInput.setHint("Enter 6-digit code");
         codeInput.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
         codeInput.setPadding(50, 40, 50, 40);
+        codeInput.setTextColor(android.graphics.Color.BLACK);
 
         AlertDialog codeDialog = new AlertDialog.Builder(this)
                 .setTitle("Verify Your Identity")
@@ -1109,11 +1110,9 @@ public class ProfileActivity extends AppCompatActivity {
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(40, 40, 40, 40);
 
-        EditText editBackupLimit = new EditText(this);
-        layout.addView(editBackupLimit);
-
         EditText editStaffLimit = new EditText(this);
         editStaffLimit.setHint(R.string.max_staff_hint);
+        editStaffLimit.setTextColor(android.graphics.Color.BLACK);
         layout.addView(editStaffLimit);
 
         FirebaseFirestore.getInstance().collection("system_settings").document("role_limits").get()
@@ -1310,6 +1309,7 @@ public class ProfileActivity extends AppCompatActivity {
         streetEt.setHint(R.string.street_address_hint);
         streetEt.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
         streetEt.setBackgroundResource(R.drawable.rounded_corner);
+        streetEt.setTextColor(android.graphics.Color.BLACK);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 200);
         params.bottomMargin = 12;
@@ -1327,6 +1327,7 @@ public class ProfileActivity extends AppCompatActivity {
         cityEt.setHint(R.string.city_hint);
         cityEt.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
         cityEt.setBackgroundResource(R.drawable.rounded_corner);
+        cityEt.setTextColor(android.graphics.Color.BLACK);
         LinearLayout.LayoutParams cityParams = new LinearLayout.LayoutParams(0, 200);
         cityParams.weight = 1;
         cityParams.rightMargin = 8;
@@ -1338,6 +1339,7 @@ public class ProfileActivity extends AppCompatActivity {
         stateEt.setHint(R.string.state_province_hint);
         stateEt.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
         stateEt.setBackgroundResource(R.drawable.rounded_corner);
+        stateEt.setTextColor(android.graphics.Color.BLACK);
         LinearLayout.LayoutParams stateParams = new LinearLayout.LayoutParams(0, 200);
         stateParams.weight = 1;
         stateEt.setLayoutParams(stateParams);
@@ -1349,6 +1351,7 @@ public class ProfileActivity extends AppCompatActivity {
         postalEt.setHint(R.string.postal_code_hint);
         postalEt.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
         postalEt.setBackgroundResource(R.drawable.rounded_corner);
+        postalEt.setTextColor(android.graphics.Color.BLACK);
         LinearLayout.LayoutParams postalParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 200);
         postalParams.topMargin = 12;
