@@ -447,7 +447,7 @@
                             android:layout_height="wrap_content"
                             android:layout_gravity="center"
                             android:layout_marginTop="10dp"
-                            android:text="Total Eggs : 0"
+                            android:text="no. of eggs : 0"
                             android:textColor="#111827"
                             android:textSize="12sp"
                             android:textStyle="bold"/>

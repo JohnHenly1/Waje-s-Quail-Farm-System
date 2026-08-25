@@ -7,8 +7,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.os.Build
@@ -26,11 +24,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
-import com.google.firebase.firestore.FirebaseFirestore
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -39,10 +33,6 @@ class AlertsActivity : AppCompatActivity() {
     private lateinit var accountManager: AccountManager
     private lateinit var roleManager: RoleManager
     private var farmAlertsListener: com.google.firebase.firestore.ListenerRegistration? = null
-    private var inventoryListener: com.google.firebase.firestore.ListenerRegistration? = null
-    private var tasksListener: com.google.firebase.firestore.ListenerRegistration? = null
-    private var waterLevelRef: com.google.firebase.database.DatabaseReference? = null
-    private var waterLevelListener: ValueEventListener? = null
 
     private lateinit var alertsRecyclerView: RecyclerView
     private lateinit var alertsAdapter: AlertsAdapter
@@ -56,11 +46,6 @@ class AlertsActivity : AppCompatActivity() {
     private var activeFilter = "All"
 
     companion object {
-        // Per-session flag: run integrity checks only once per app launch, not on every
-        // screen open. Firestore-side dedup in FarmRepository.addAlert() is the real
-        // guard; this just avoids unnecessary network queries on repeated visits.
-        private var integrityChecksRanThisSession = false
-
         // Cloud alert history can grow unbounded. Rendering every single alert ever
         // recorded is what actually caused the lag/crash with "too many notifications" —
         // there's no functional need to show more than the most recent ones at once.
@@ -141,26 +126,16 @@ class AlertsActivity : AppCompatActivity() {
 
         setupFilters()
         updateAlertsList()
-        // Refresh button to manually force re-checks
+        // Refresh button just re-renders the current alert list from
+        // GlobalData/cloud — the underlying detection (inventory, tasks,
+        // water level) now runs continuously in AlertsMonitor (started from
+        // WajeApplication), not just while this screen is open, so there's
+        // nothing left to manually re-trigger here.
         findViewById<View>(R.id.refreshButton)?.setOnClickListener {
             updateAlertsList()
-            checkMissedTasks()
-            checkInventoryStock()
-            checkWaterLevelStatus()
             Toast.makeText(this, "Refreshed alerts", Toast.LENGTH_SHORT).show()
         }
         NavigationHelper.setupBottomNavigation(this)
-
-        // Data integrity checks — guarded by session flag so they only run once
-        // per app launch. FarmRepository.addAlert() also does Firestore-side dedup
-        // as the authoritative guard against cross-device duplicates.
-        if (!integrityChecksRanThisSession) {
-            integrityChecksRanThisSession = true
-            checkMissedTasks()
-            checkInventoryStock()
-            checkWaterLevelStatus()
-            // checkEggCountLogs() — Egg Count category removed
-        }
     }
 
     private fun setupFilters() {
@@ -199,7 +174,9 @@ class AlertsActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.filterEggCount)?.visibility = View.GONE
     }
 
-    // Tracker to prevent auto-alerts from reappearing on the same day once cleared
+    // Tracker to prevent auto-alerts from reappearing on the same day once cleared.
+    // Same SharedPreferences file/keys AlertsMonitor uses, so an alert already
+    // raised there today stays deduped here too (used by checkEggCountLogs()).
     private fun wasAlreadyAlertedToday(message: String): Boolean {
         val prefs = getSharedPreferences("auto_alerts_tracker", Context.MODE_PRIVATE)
         val today = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date())
@@ -210,111 +187,6 @@ class AlertsActivity : AppCompatActivity() {
         val prefs = getSharedPreferences("auto_alerts_tracker", Context.MODE_PRIVATE)
         val today = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date())
         prefs.edit().putString(message, today).apply()
-    }
-
-    private fun checkMissedTasks() {
-        if (!accountManager.isScheduleEnabled()) return
-
-        val now = Calendar.getInstance()
-
-        FirebaseFirestore.getInstance().collection("farm_data")
-            .document("shared").collection("tasks")
-            .whereEqualTo("status", "Pending")
-            .get()
-            .addOnSuccessListener { snapshots ->
-                for (doc in snapshots) {
-                    val year  = doc.getLong("year")?.toInt()  ?: 0
-                    val month = doc.getLong("month")?.toInt() ?: 0
-                    val day   = doc.getLong("day")?.toInt()   ?: 0
-                    val title = doc.getString("title") ?: "Task"
-
-                    val taskDate = Calendar.getInstance()
-                    taskDate.set(year, month, day, 23, 59)
-
-                    if (taskDate.before(now)) {
-                        val message = "Missed Task: $title was scheduled for ${day}/${month + 1}/${year}"
-                        // wasAlreadyAlertedToday uses a local SharedPrefs key per device
-                        // to prevent re-adding the same alert every time the screen opens.
-                        // This is the primary dedup gate; GlobalData.addAlert has a secondary
-                        // same-day dedup as a safety net.
-                        if (!wasAlreadyAlertedToday(message)) {
-                            FarmRepository.addAlert(message, "Critical")
-                            markAsAlertedToday(message)
-                        }
-                    }
-                }
-            }
-    }
-
-    private fun checkInventoryStock() {
-        if (!accountManager.isAlertsEnabled()) return
-
-        FirebaseFirestore.getInstance().collection("farm_data")
-            .document("shared").collection("feed")
-            .get()
-            .addOnSuccessListener { snapshots ->
-                for (doc in snapshots) {
-                    val qty  = doc.getLong("quantity") ?: 0L
-                    val name = doc.getString("name") ?: "Item"
-
-                    if (qty == 0L) {
-                        val message = "Inventory Alert: $name is STOCK DEPLETED"
-                        if (!wasAlreadyAlertedToday(message)) {
-                            FarmRepository.addAlert(message, "Critical")
-                            markAsAlertedToday(message)
-                        }
-                    } else {
-                        val status = doc.getString("status") ?: ""
-                        if (status == "Low Stock" || status == "Medium") {
-                            val message = "Inventory Alert: $name is currently $status"
-                            if (!wasAlreadyAlertedToday(message)) {
-                                FarmRepository.addAlert(message, "Inventory")
-                                markAsAlertedToday(message)
-                            }
-                        }
-                    }
-                }
-            }
-    }
-
-    // Maps a water level percentage to the alert threshold it falls under (if any).
-    // Checked most-severe-first so e.g. 0% resolves to "Emergency", not "Notice".
-    // Returns (thresholdPercent, label, description) or null if between thresholds.
-    private fun resolveWaterLevelAlert(percent: Int): Triple<Int, String, String>? {
-        return when {
-            percent >= 100 -> Triple(100, "Refilled", "Water tank has been successfully refilled to full capacity.")
-            percent <= 0 -> Triple(0, "Emergency", "Water tank is empty. Refill immediately to prevent disruptions.")
-            percent <= 15 -> Triple(15, "Critical", "Water level is critically low. Immediate action is required.")
-            percent <= 25 -> Triple(25, "Warning", "Water level is low. Refill the water tank soon.")
-            percent <= 50 -> Triple(50, "Notice", "Water level is decreasing. Monitor the water supply.")
-            else -> null
-        }
-    }
-
-    private fun raiseWaterLevelAlert(percent: Int) {
-        val (_, label, description) = resolveWaterLevelAlert(percent) ?: return
-        val message = "Water Level $label: $description"
-        // Same day-based dedup used by the other categories, so re-checking on every
-        // screen open / live snapshot doesn't re-post the same threshold repeatedly.
-        if (!wasAlreadyAlertedToday(message)) {
-            FarmRepository.addAlert(message, "Water Level")
-            markAsAlertedToday(message)
-            showLocalNotification("Water Level $label", description)
-        }
-    }
-
-    // One-time check against the Realtime Database, run on launch / manual refresh —
-    // mirrors checkInventoryStock()'s single .get() read.
-    private fun checkWaterLevelStatus() {
-        if (!accountManager.isAlertsEnabled()) return
-
-        FirebaseDatabase.getInstance().getReference("water_level")
-            .get()
-            .addOnSuccessListener { snapshot ->
-                if (!snapshot.exists()) return@addOnSuccessListener
-                val percent = (snapshot.child("percentage").getValue(Long::class.java) ?: return@addOnSuccessListener).toInt()
-                raiseWaterLevelAlert(percent)
-            }
     }
 
     private fun checkEggCountLogs() {
@@ -412,11 +284,9 @@ class AlertsActivity : AppCompatActivity() {
             // used to trigger a full list rebuild for each one individually.
             scheduleAlertsListUpdate()
         }
-
-        // Start live listeners when activity is visible
-        startLiveInventoryListener()
-        startLiveTasksListener()
-        startLiveWaterLevelListener()
+        // Inventory / task / water-level detection now runs continuously in
+        // AlertsMonitor (started once from WajeApplication), not per-Activity —
+        // nothing to start here beyond the alerts-list listener above.
     }
 
     override fun onPause() {
@@ -424,12 +294,6 @@ class AlertsActivity : AppCompatActivity() {
         uiHandler.removeCallbacks(pendingListUpdate)
         farmAlertsListener?.remove()
         farmAlertsListener = null
-        inventoryListener?.remove()
-        inventoryListener = null
-        tasksListener?.remove()
-        tasksListener = null
-        waterLevelRef?.let { ref -> waterLevelListener?.let { ref.removeEventListener(it) } }
-        waterLevelListener = null
     }
 
     private fun scheduleAlertsListUpdate() {
@@ -499,97 +363,6 @@ class AlertsActivity : AppCompatActivity() {
         alertsAdapter.submitList(displayList)
     }
 
-    // Live snapshot listener for feed/inventory updates while activity runs
-    private fun startLiveInventoryListener() {
-        // remove existing to avoid duplicates
-        inventoryListener?.remove()
-        inventoryListener = FirebaseFirestore.getInstance()
-            .collection("farm_data").document("shared").collection("feed")
-            .addSnapshotListener { snapshots, e ->
-                if (e != null || snapshots == null) return@addSnapshotListener
-                for (dc in snapshots.documentChanges) {
-                    val doc = dc.document
-                    val qty = doc.getLong("quantity") ?: 0L
-                    val name = doc.getString("name") ?: "Item"
-                    if (dc.type == com.google.firebase.firestore.DocumentChange.Type.ADDED || dc.type == com.google.firebase.firestore.DocumentChange.Type.MODIFIED) {
-                        if (qty == 0L) {
-                            val message = "Inventory Alert: $name is STOCK DEPLETED"
-                            if (!wasAlreadyAlertedToday(message)) {
-                                FarmRepository.addAlert(message, "Critical")
-                                markAsAlertedToday(message)
-                                showLocalNotification("Inventory Alert", message)
-                            }
-                        } else {
-                            val status = doc.getString("status") ?: ""
-                            if (status == "Low Stock" || status == "Medium") {
-                                val message = "Inventory Alert: $name is currently $status"
-                                if (!wasAlreadyAlertedToday(message)) {
-                                    FarmRepository.addAlert(message, "Inventory")
-                                    markAsAlertedToday(message)
-                                    showLocalNotification("Inventory Update", message)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-    }
-
-    // Continuously monitors the current water level from the Firebase Realtime
-    // Database (Water Level module) so thresholds are caught as soon as they're
-    // written, not just when this screen happens to be manually refreshed.
-    private fun startLiveWaterLevelListener() {
-        waterLevelRef?.let { ref -> waterLevelListener?.let { ref.removeEventListener(it) } }
-
-        waterLevelRef = FirebaseDatabase.getInstance().getReference("water_level")
-        waterLevelListener = object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                if (!accountManager.isAlertsEnabled()) return
-                if (!snapshot.exists()) return
-                val percent = snapshot.child("percentage").getValue(Long::class.java)?.toInt() ?: return
-                raiseWaterLevelAlert(percent)
-            }
-
-            override fun onCancelled(error: DatabaseError) {
-                // Ignore — this mirrors the other live listeners, which also don't
-                // surface transient Firestore/RTDB read errors to the user here.
-            }
-        }
-        waterLevelRef?.addValueEventListener(waterLevelListener!!)
-    }
-
-    // Live snapshot listener for tasks to detect missed tasks immediately
-    private fun startLiveTasksListener() {
-        tasksListener?.remove()
-        tasksListener = FirebaseFirestore.getInstance()
-            .collection("farm_data").document("shared").collection("tasks")
-            .whereEqualTo("status", "Pending")
-            .addSnapshotListener { snapshots, e ->
-                if (e != null || snapshots == null) return@addSnapshotListener
-                val now = Calendar.getInstance()
-                for (doc in snapshots.documents) {
-                    val year  = doc.getLong("year")?.toInt()  ?: 0
-                    val month = doc.getLong("month")?.toInt() ?: 0
-                    val day   = doc.getLong("day")?.toInt()   ?: 0
-                    val title = doc.getString("title") ?: "Task"
-
-                    val taskDate = Calendar.getInstance()
-                    val hour = doc.getLong("hour")?.toInt() ?: 23
-                    val minute = doc.getLong("minute")?.toInt() ?: 59
-                    taskDate.set(year, month, day, hour, minute)
-
-                    if (taskDate.before(now)) {
-                        val message = "Missed Task: $title was scheduled for ${day}/${month + 1}/${year}"
-                        if (!wasAlreadyAlertedToday(message)) {
-                            FarmRepository.addAlert(message, "Critical")
-                            markAsAlertedToday(message)
-                            showLocalNotification("Missed Task", message)
-                        }
-                    }
-                }
-            }
-    }
-
     private fun updateSummaryLabels() {
         val criticalLabel = findViewById<TextView>(R.id.criticalLabel)
         val warningLabel = findViewById<TextView>(R.id.warningLabel)
@@ -644,44 +417,6 @@ class AlertsActivity : AppCompatActivity() {
             if (timeInMillis <= System.currentTimeMillis()) add(Calendar.DAY_OF_YEAR, 1)
         }
         alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, calendar.timeInMillis, pendingIntent)
-    }
-
-    // Show a local system notification immediately when an alert is added
-    private fun showLocalNotification(title: String, message: String) {
-        val channelId = "alerts_channel"
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                channelId,
-                "Farm Alerts",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Important farm alerts: inventory, schedule, system"
-                enableLights(true)
-                enableVibration(true)
-                setLockscreenVisibility(android.app.Notification.VISIBILITY_PUBLIC)
-            }
-            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            nm.createNotificationChannel(channel)
-        }
-
-        val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-        }
-        val pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-
-        val builder = NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(R.drawable.ic_notifications)
-            .setContentTitle(title)
-            .setContentText(message)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setAutoCancel(true)
-            .setContentIntent(pendingIntent)
-
-        try {
-            NotificationManagerCompat.from(this).notify(message.hashCode(), builder.build())
-        } catch (e: SecurityException) {
-            e.printStackTrace()
-        }
     }
 
     private fun cancelEggCountNotification() {
