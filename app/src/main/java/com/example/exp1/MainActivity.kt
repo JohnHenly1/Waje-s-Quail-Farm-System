@@ -196,6 +196,14 @@ class MainActivity : AppCompatActivity() {
                     return@addOnSuccessListener
                 }
 
+                // Deactivated accounts (isActive == false) are locked out of
+                // the mobile app entirely, even if their setup was already
+                // completed and their password is known/cached.
+                if (doc.getBoolean("isActive") == false) {
+                    showAccountInactiveDialog()
+                    return@addOnSuccessListener
+                }
+
                 val password = doc.getString("password") ?: ""
                 val name = doc.getString("name") ?: email
                 val role = doc.getString("role") ?: "staff"
@@ -596,6 +604,14 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
+    private fun showAccountInactiveDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Account Inactive")
+            .setMessage("This account has been deactivated by the farm owner and cannot access the mobile application. Please contact the farm owner to reactivate it.")
+            .setPositiveButton("OK", null)
+            .show()
+    }
+
     private fun showPasswordDialog(email: String, correctPass: String, name: String, role: String) {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_password_entry, null)
         val editPassword = dialogView.findViewById<EditText>(R.id.editLoginPassword)
@@ -714,8 +730,15 @@ class MainActivity : AppCompatActivity() {
                     val role     = snapshot.getString("role") ?: "staff"
                     val name     = snapshot.getString("name") ?: email
                     val password = snapshot.getString("password") ?: ""
+                    val isActive = snapshot.getBoolean("isActive")
 
-                    if (status == "approved") {
+                    if (isActive == false) {
+                        // Deactivated mid-session (or between app opens) —
+                        // clear the cached session and kick back to login
+                        // instead of letting a reopen slip past the gate.
+                        Toast.makeText(this, "Your account has been deactivated. Contact the farm owner.", Toast.LENGTH_LONG).show()
+                        stopCheckingAndClear()
+                    } else if (status == "approved") {
                         val setupDone = snapshot.getBoolean("setupCompleted") ?: false
 
                         if (setupDone) {

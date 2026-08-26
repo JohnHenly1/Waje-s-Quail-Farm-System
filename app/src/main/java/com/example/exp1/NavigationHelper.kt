@@ -325,7 +325,8 @@ object NavigationHelper {
     private data class PendingUser(
         val email: String,
         val name: String,
-        val role: String
+        val role: String,
+        val isActive: Boolean
     )
 
     fun showUserListDialog(activity: Activity, ownerEmail: String) {
@@ -358,7 +359,7 @@ object NavigationHelper {
         root.addView(emptyText)
 
         val dialog = AlertDialog.Builder(activity)
-            .setTitle("Farm Users — Pending")
+            .setTitle("Farm Staff Pending Account")
             .setView(root)
             .setNegativeButton("Close", null)
             .create()
@@ -386,8 +387,25 @@ object NavigationHelper {
         adapter = PendingUserAdapter(
             activity = activity,
             items = items,
-            onUnlockClicked = { user ->
-                showUnlockConfirmationDialog(activity, ownerEmail, user)
+            onActivateClicked = { user ->
+                showUnlockConfirmationDialog(activity, ownerEmail, user) {
+                    user.let {
+                        val idx = items.indexOf(it)
+                        if (idx != -1) {
+                            items[idx] = it.copy(isActive = true)
+                            adapter.notifyDataSetChanged()
+                        }
+                    }
+                }
+            },
+            onDeactivateClicked = { user ->
+                showDeactivateConfirmationDialog(activity, ownerEmail, user) {
+                    val idx = items.indexOf(user)
+                    if (idx != -1) {
+                        items[idx] = user.copy(isActive = false)
+                        adapter.notifyDataSetChanged()
+                    }
+                }
             },
             onDeleteClicked = { user ->
                 showDeletePendingUserConfirmationDialog(activity, ownerEmail, user) {
@@ -409,7 +427,8 @@ object NavigationHelper {
                         PendingUser(
                             email = doc.id,
                             name = doc.getString("name") ?: doc.id,
-                            role = doc.getString("role") ?: "staff"
+                            role = doc.getString("role") ?: "staff",
+                            isActive = doc.getBoolean("isActive") ?: false
                         )
                     )
                 }
@@ -421,11 +440,12 @@ object NavigationHelper {
             }
     }
 
-    /** Modern, card-style row: initial avatar, name/role/email, pending badge, Unlock + Delete actions. */
+    /** Modern, card-style row: initial avatar, name/role/email, active/inactive badge, Activate/Deactivate + Delete actions. */
     private class PendingUserAdapter(
         private val activity: Activity,
         private val items: MutableList<PendingUser>,
-        private val onUnlockClicked: (PendingUser) -> Unit,
+        private val onActivateClicked: (PendingUser) -> Unit,
+        private val onDeactivateClicked: (PendingUser) -> Unit,
         private val onDeleteClicked: (PendingUser) -> Unit
     ) : BaseAdapter() {
 
@@ -487,8 +507,8 @@ object NavigationHelper {
                 textSize = 12.5f
             })
             textColumn.addView(TextView(activity).apply {
-                text = "Pending — not unlocked yet"
-                setTextColor(Color.parseColor("#C08A00"))
+                text = if (user.isActive) "Active — can access the app" else "Inactive — locked out of the app"
+                setTextColor(if (user.isActive) Color.parseColor("#1E8E3E") else Color.parseColor("#C08A00"))
                 textSize = 11.5f
             })
             card.addView(textColumn)
@@ -498,18 +518,22 @@ object NavigationHelper {
                 gravity = Gravity.CENTER_HORIZONTAL
             }
 
-            val unlockButton: View = try {
+            val toggleButton: View = try {
                 MaterialButton(activity).apply {
-                    text = "Unlock"
+                    text = if (user.isActive) "Deactivate" else "Activate"
                     textSize = 12f
                     cornerRadius = (14 * dp).toInt()
                     setPadding((12 * dp).toInt(), 0, (12 * dp).toInt(), 0)
                 }
             } catch (e: Throwable) {
-                android.widget.Button(activity).apply { text = "Unlock" }
+                android.widget.Button(activity).apply {
+                    text = if (user.isActive) "Deactivate" else "Activate"
+                }
             }
-            unlockButton.setOnClickListener { onUnlockClicked(user) }
-            actionColumn.addView(unlockButton)
+            toggleButton.setOnClickListener {
+                if (user.isActive) onDeactivateClicked(user) else onActivateClicked(user)
+            }
+            actionColumn.addView(toggleButton)
 
             val deleteButton = TextView(activity).apply {
                 text = "Delete"
@@ -999,6 +1023,7 @@ object NavigationHelper {
             "email" to invitedEmail,
             "role" to selectedRole,
             "status" to "invited",
+            "isActive" to false,
             "setupCompleted" to false,
             "invitedBy" to ownerEmail,
             "invitedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
@@ -1031,12 +1056,41 @@ object NavigationHelper {
      * Confirms before running the verification-code procedure, since it
      * immediately emails the user and isn't easily undone.
      */
-    private fun showUnlockConfirmationDialog(activity: Activity, ownerEmail: String, user: PendingUser) {
+    private fun showUnlockConfirmationDialog(activity: Activity, ownerEmail: String, user: PendingUser, onActivated: () -> Unit) {
         AlertDialog.Builder(activity)
-            .setTitle("Unlock ${user.name}?")
-            .setMessage("This will generate a verification code and email it to ${user.email} so they can set up their account.\n\nProceed?")
-            .setPositiveButton("Unlock") { _, _ ->
-                unlockAndSendVerificationCode(activity, FirebaseFirestore.getInstance(), ownerEmail, user.email, user.role)
+            .setTitle("Activate ${user.name}?")
+            .setMessage("This will generate a verification code and email it to ${user.email} so they can set up their account. Their account will be marked Active and able to access the mobile app once set up.\n\nProceed?")
+            .setPositiveButton("Activate") { _, _ ->
+                unlockAndSendVerificationCode(activity, FirebaseFirestore.getInstance(), ownerEmail, user.email, user.role, onActivated)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    /**
+     * Confirms before flipping an already-activated pending account back to
+     * Inactive. This revokes their ability to access the mobile app without
+     * deleting their saved profile.
+     */
+    private fun showDeactivateConfirmationDialog(activity: Activity, ownerEmail: String, user: PendingUser, onDeactivated: () -> Unit) {
+        AlertDialog.Builder(activity)
+            .setTitle("Deactivate ${user.name}?")
+            .setMessage("${user.name} (${user.email}) will no longer be able to access the mobile application until reactivated.\n\nProceed?")
+            .setPositiveButton("Deactivate") { _, _ ->
+                FirebaseFirestore.getInstance().collection("user_access").document(user.email)
+                    .update("isActive", false)
+                    .addOnSuccessListener {
+                        FarmRepository.logStaffUpdated(
+                            ownerEmail, ownerEmail, "owner",
+                            user.name, user.email,
+                            details = "Deactivated staff account for ${user.email}"
+                        )
+                        Toast.makeText(activity, "${user.name} is now Inactive.", Toast.LENGTH_SHORT).show()
+                        onDeactivated()
+                    }
+                    .addOnFailureListener { e ->
+                        Toast.makeText(activity, "Failed to deactivate user: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
             }
             .setNegativeButton("Cancel", null)
             .show()
@@ -1044,15 +1098,17 @@ object NavigationHelper {
 
     /**
      * The actual verification-code procedure: generates a one-time code,
-     * stores it, and emails it to the pending user. Only ever runs after
-     * the owner explicitly taps Unlock and confirms.
+     * stores it, marks the account isActive=true, and emails the code to
+     * the pending user. Only ever runs after the owner explicitly taps
+     * Activate and confirms.
      */
     private fun unlockAndSendVerificationCode(
         activity: Activity,
         db: FirebaseFirestore,
         ownerEmail: String,
         invitedEmail: String,
-        role: String
+        role: String,
+        onActivated: () -> Unit
     ) {
         val expirationTime = System.currentTimeMillis() + (24 * 60 * 60 * 1000)
         val code = "%06d".format(Random.nextInt(1000000))
@@ -1067,6 +1123,11 @@ object NavigationHelper {
                 "expiresAt" to expirationTime
             ))
             .addOnSuccessListener {
+                db.collection("user_access").document(invitedEmail)
+                    .update("isActive", true)
+                    .addOnCompleteListener {
+                        onActivated()
+                    }
                 sendInviteEmailViaAppsScript(activity, invitedEmail, code, role)
                 showCodeResultDialog(activity, code, invitedEmail, role)
             }
