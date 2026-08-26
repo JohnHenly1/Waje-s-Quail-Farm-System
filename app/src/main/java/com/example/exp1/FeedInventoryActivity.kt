@@ -115,7 +115,35 @@ class FeedInventoryActivity : AppCompatActivity() {
         super.onDestroy()
         feedListener?.remove()
     }
-
+// ──────────────────────────────────────────────────────────────────────────
+// Tap outside to dismiss keyboard
+// ──────────────────────────────────────────────────────────────────────────
+    /**
+     * Dispatches every touch through here first. If a focused EditText exists
+     * (e.g. inside an open AlertDialog like the quantity/search/add dialogs)
+     * and the user taps down outside its bounds, clear focus and hide the
+     * keyboard — the touch still continues on to its normal target afterward.
+     */
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        if (ev.action == android.view.MotionEvent.ACTION_DOWN) {
+            val focused = currentFocus
+            if (focused is EditText) {
+                val location = IntArray(2)
+                focused.getLocationOnScreen(location)
+                val rect = android.graphics.Rect(
+                    location[0], location[1],
+                    location[0] + focused.width, location[1] + focused.height
+                )
+                if (!rect.contains(ev.rawX.toInt(), ev.rawY.toInt())) {
+                    focused.clearFocus()
+                    val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE)
+                            as android.view.inputmethod.InputMethodManager
+                    imm.hideSoftInputFromWindow(focused.windowToken, 0)
+                }
+            }
+        }
+        return super.dispatchTouchEvent(ev)
+    }
     // ──────────────────────────────────────────────────────────────────────────
     // View binding
     // ──────────────────────────────────────────────────────────────────────────
@@ -387,7 +415,28 @@ class FeedInventoryActivity : AppCompatActivity() {
         badge.background = bg
         badge.setTextColor(android.graphics.Color.parseColor(textHex))
     }
-
+    // ──────────────────────────────────────────────────────────────────────────
+    // Tap outside to dismiss keyboard (dialog-scoped)
+    // ──────────────────────────────────────────────────────────────────────────
+    private fun dismissKeyboardOnOutsideTouch(dialog: AlertDialog, rootView: View) {
+        rootView.setOnTouchListener { v, event ->
+            if (event.action == android.view.MotionEvent.ACTION_DOWN) {
+                val focused = dialog.currentFocus
+                if (focused is EditText) {
+                    val outRect = android.graphics.Rect()
+                    focused.getGlobalVisibleRect(outRect)
+                    if (!outRect.contains(event.rawX.toInt(), event.rawY.toInt())) {
+                        focused.clearFocus()
+                        val imm = v.context.getSystemService(android.content.Context.INPUT_METHOD_SERVICE)
+                                as android.view.inputmethod.InputMethodManager
+                        imm.hideSoftInputFromWindow(focused.windowToken, 0)
+                    }
+                }
+            }
+            v.performClick()
+            false
+        }
+    }
     // ──────────────────────────────────────────────────────────────────────────
     // Quantity update dialog — the app's only "edit" screen for an existing
     // feed item, available to every role that can update inventory (owner AND
@@ -846,6 +895,8 @@ class FeedInventoryActivity : AppCompatActivity() {
             .setPositiveButton("Add", null)
             .setNegativeButton("Cancel", null)
             .create()
+
+        dismissKeyboardOnOutsideTouch(dialog, dialogView)
 
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {

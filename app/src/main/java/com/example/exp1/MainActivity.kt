@@ -3,6 +3,7 @@ package com.example.exp1
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.graphics.Rect
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -146,6 +147,27 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.btnManualLogin).setOnClickListener { handleManualLogin() }
         findViewById<View>(R.id.btnRegister).setOnClickListener { startActivity(Intent(this, RegisterActivity::class.java)) }
         findViewById<View>(R.id.btnForgotPassword).setOnClickListener { showForgotPasswordDialog() }
+    }
+    /**
+     * Tapping anywhere outside the currently focused EditText dismisses the
+     * keyboard and clears focus from that field. Taps on another EditText
+     * still work normally — this only intercepts taps that land outside
+     * every focusable input.
+     */
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        if (ev.action == android.view.MotionEvent.ACTION_DOWN) {
+            val focused = currentFocus
+            if (focused is EditText) {
+                val outRect = Rect()
+                focused.getGlobalVisibleRect(outRect)
+                if (!outRect.contains(ev.rawX.toInt(), ev.rawY.toInt())) {
+                    focused.clearFocus()
+                    val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+                    imm.hideSoftInputFromWindow(focused.windowToken, 0)
+                }
+            }
+        }
+        return super.dispatchTouchEvent(ev)
     }
 
 
