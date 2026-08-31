@@ -40,10 +40,10 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:gravity="center"
-                android:text="Analytics"
+                android:text="Report"
                 android:textColor="@android:color/white"
                 android:textSize="22sp"
-                android:textStyle="bold"/>
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/serverTimeLabel"
@@ -207,9 +207,9 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Total Eggs"
+                            android:text="Total no.of Eggs"
                             android:textColor="@android:color/white"
-                            android:textSize="11sp"/>
+                            android:textSize="11sp" />
 
                     </LinearLayout>
 
@@ -686,10 +686,10 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
-                        android:text="Farm Analytics Report"
+                        android:text="Farm Report"
                         android:textColor="@android:color/white"
                         android:textSize="18sp"
-                        android:textStyle="bold"/>
+                        android:textStyle="bold" />
 
                     <TextView
                         android:layout_width="wrap_content"

@@ -76,6 +76,7 @@ dependencies {
     // Logout when the user exits/closes the app without pressing Logout.
     implementation("androidx.lifecycle:lifecycle-process:2.8.7")
     implementation(libs.material)
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
     implementation(libs.mpandroidchart)

@@ -2,6 +2,8 @@ package com.example.exp1;
 
 import android.annotation.SuppressLint;
 import android.app.AlarmManager;
+import android.widget.HorizontalScrollView;
+import android.widget.FrameLayout;
 import android.app.DatePickerDialog;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -95,7 +97,8 @@ public class ScheduleActivity extends AppCompatActivity {
     private GestureDetector gestureDetector;
 
     private LinearLayout tasksContainer;
-    private TextView doneCount, ongoingCount, pendingCount;
+
+    private TextView doneCount, ongoingCount, pendingCount, missedCount;
     private List<Task> taskList = new ArrayList<>();
     // Filter buttons
     private Button filterAssignedBtn, filterMissingBtn, filterDoneBtn;
@@ -132,13 +135,14 @@ public class ScheduleActivity extends AppCompatActivity {
     // or it silently fails/crashes. This was missing, which is why "Take
     // Photo" in Mark as Done didn't work.
     private ActivityResultLauncher<String> proofCameraPermissionLauncher;
-    private Uri pendingProofImageUri;
-    // The actual on-disk File backing pendingProofImageUri. Uploads read from this
-    // directly (see uploadProofImageAndFinalize) instead of re-opening the content://
-    // Uri through the ContentResolver/FileProvider layer, which is what was producing
-    // the "Object does not exist at location" Firebase Storage error even when the
-    // file was genuinely present and non-empty.
-    private File pendingProofImageFile;
+    private ActivityResultLauncher<String> pickImageLauncher;   // ← NEW
+    // Multiple photos are now supported as completion proof. Each captured/picked
+// photo is copied into cache as a File immediately, so the list only ever
+// holds files that actually exist on disk.
+    private final List<File> pendingProofImageFiles = new ArrayList<>();
+    private Uri currentCaptureUri;   // target Uri for the in-flight camera capture only
+    private File currentCaptureFile; // matching File for the in-flight camera capture only
+    private LinearLayout proofThumbnailContainer; // holds the thumbnail row while the proof dialog is open
     private ImageView proofImagePreview;
     private Task pendingDoneTask;
     // Proof photos are stored as Base64 directly on the task document (no Firebase
@@ -169,22 +173,14 @@ public class ScheduleActivity extends AppCompatActivity {
         // Registered here (must happen before STARTED) so the "Take Photo" proof
         // step in the Mark-as-Done flow can launch the camera and receive the result.
         takePictureLauncher = registerForActivityResult(new ActivityResultContracts.TakePicture(), success -> {
-            // Some OEM camera apps (notably MIUI) report success=true via RESULT_OK
-            // without actually having written any bytes to the target Uri. Trusting
-            // "success" alone leaves pendingProofImageUri pointing at a file that
-            // doesn't exist, which later surfaces as a cryptic Firebase Storage
-            // "Object does not exist at location" error deep in the upload flow.
-            // Verify the file really has content *here*, right after capture, so we
-            // can fail fast with an actionable message instead.
-            if (success && pendingProofImageUri != null && proofImagePreview != null
-                    && proofFileHasContent(pendingProofImageUri)) {
-                proofImagePreview.setImageURI(pendingProofImageUri);
-                proofImagePreview.setVisibility(View.VISIBLE);
+            if (success && currentCaptureFile != null && currentCaptureFile.exists() && currentCaptureFile.length() > 0) {
+                pendingProofImageFiles.add(currentCaptureFile);
+                refreshProofThumbnails();
             } else {
-                pendingProofImageUri = null;
-                pendingProofImageFile = null;
                 Toast.makeText(this, "Photo capture failed or was cancelled. Please try taking the photo again.", Toast.LENGTH_LONG).show();
             }
+            currentCaptureUri = null;
+            currentCaptureFile = null;
         });
 
         // Also registered here (must happen before STARTED). Only ever triggers the
@@ -196,6 +192,13 @@ public class ScheduleActivity extends AppCompatActivity {
             } else {
                 Toast.makeText(this, "Camera permission is required to take the completion photo", Toast.LENGTH_SHORT).show();
             }
+        });
+        // Lets the user attach an existing JPG/PNG from their gallery as completion
+        // proof instead of only being able to use the camera. Validates the mime
+        // type in handlePickedProofImage() before accepting the file.
+        pickImageLauncher = registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
+            if (uri == null) return; // user backed out of the picker
+            handlePickedProofImage(uri);
         });
 
         cameraHelper = new CameraHelper(this, (uri, results) -> {
@@ -240,6 +243,7 @@ public class ScheduleActivity extends AppCompatActivity {
         doneCount      = findViewById(R.id.doneCount);
         ongoingCount   = findViewById(R.id.ongoingCount);
         pendingCount   = findViewById(R.id.pendingCount);
+        missedCount    = findViewById(R.id.missedCount);
 
         dayTextViews = new TextView[]{
                 findViewById(R.id.day1), findViewById(R.id.day2), findViewById(R.id.day3),
@@ -277,7 +281,14 @@ public class ScheduleActivity extends AppCompatActivity {
         }
 
         findViewById(R.id.seeCalendarBtn).setOnClickListener(v -> showFullCalendar());
-        findViewById(R.id.bulkDeleteBtn).setOnClickListener(v -> showBulkDeleteDialog());
+        // Bulk delete is an owner-only action; staff never see the entry point.
+        View bulkDeleteBtn = findViewById(R.id.bulkDeleteBtn);
+        if (roleManager.isOwner()) {
+            bulkDeleteBtn.setVisibility(View.VISIBLE);
+            bulkDeleteBtn.setOnClickListener(v -> showBulkDeleteDialog());
+        } else {
+            bulkDeleteBtn.setVisibility(View.GONE);
+        }
         findViewById(R.id.taskDetailsBtn).setOnClickListener(v -> showAllTaskDetails());
 
         // Setup filter buttons (Assigned / Missing / Done)
@@ -358,7 +369,10 @@ public class ScheduleActivity extends AppCompatActivity {
                             task.assignedTo = parseAssignedTo(doc.get("assignedTo"));
                             task.assignedBy = doc.getString("assignedBy");
                             task.doneComment = doc.getString("doneComment");
-                            task.doneImageUrl = doc.getString("doneImageUrl");
+                            task.doneImageUrls = parseAssignedTo(doc.get("doneImageUrls")); // reuses the same List<String>-normalizing helper
+                            task.pendingRescheduleMinutes = doc.getLong("pendingRescheduleMinutes") != null ? doc.getLong("pendingRescheduleMinutes").intValue() : 0;
+                            task.pendingRescheduleReason = doc.getString("pendingRescheduleReason");
+                            task.pendingRescheduleRequestedBy = doc.getString("pendingRescheduleRequestedBy");
                             taskList.add(task);
                         }
                     }
@@ -1217,6 +1231,7 @@ public class ScheduleActivity extends AppCompatActivity {
     }
 
     private void showBulkDeleteDialog() {
+        if (!roleManager.isOwner()) return; // safety net — bulk delete is owner-only
         if (taskList.isEmpty()) { Toast.makeText(this, getString(R.string.no_tasks_to_delete), Toast.LENGTH_SHORT).show(); return; }
 
         Map<String, List<Task>> groups = new LinkedHashMap<>();
@@ -1226,11 +1241,34 @@ public class ScheduleActivity extends AppCompatActivity {
             if (!groups.containsKey(key)) groups.put(key, new ArrayList<>());
             groups.get(key).add(task);
         }
-
         List<String> groupKeys = new ArrayList<>(groups.keySet());
+
         LinearLayout container = new LinearLayout(this);
         container.setOrientation(LinearLayout.VERTICAL);
-        container.setPadding(24, 24, 24, 24);
+        container.setBackgroundColor(Color.WHITE);
+        int pad = dpToPx(20);
+        container.setPadding(pad, dpToPx(18), pad, dpToPx(6));
+
+        TextView titleTv = new TextView(this);
+        titleTv.setText(getString(R.string.select_schedules_delete));
+        titleTv.setTextColor(Color.parseColor("#111827"));
+        titleTv.setTextSize(18);
+        titleTv.setTypeface(null, Typeface.BOLD);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        titleParams.setMargins(0, 0, 0, dpToPx(4));
+        titleTv.setLayoutParams(titleParams);
+        container.addView(titleTv);
+
+        TextView subTitleTv = new TextView(this);
+        subTitleTv.setText("Tap a card or its checkbox to select");
+        subTitleTv.setTextColor(Color.parseColor("#6B7280"));
+        subTitleTv.setTextSize(12.5f);
+        LinearLayout.LayoutParams subParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        subParams.setMargins(0, 0, 0, dpToPx(14));
+        subTitleTv.setLayoutParams(subParams);
+        container.addView(subTitleTv);
 
         Map<String, CheckBox> checkBoxes = new HashMap<>();
 
@@ -1238,33 +1276,115 @@ public class ScheduleActivity extends AppCompatActivity {
             List<Task> groupTasks = groups.get(key);
             Task first = groupTasks.get(0);
 
-            View itemView = getLayoutInflater().inflate(R.layout.item_bulk_delete, container, false);
-            CheckBox cb = itemView.findViewById(R.id.checkDelete);
-            TextView title = itemView.findViewById(R.id.bulkTaskTitle);
-            TextView info = itemView.findViewById(R.id.bulkTaskInfo);
-            TextView time = itemView.findViewById(R.id.bulkTaskTime);
-            View indicator = itemView.findViewById(R.id.bulkStatusIndicator);
+            LinearLayout card = new LinearLayout(this);
+            card.setOrientation(LinearLayout.HORIZONTAL);
+            card.setGravity(Gravity.CENTER_VERTICAL);
+            int cardPad = dpToPx(12);
+            card.setPadding(cardPad, cardPad, cardPad, cardPad);
+            android.graphics.drawable.GradientDrawable cardBg = new android.graphics.drawable.GradientDrawable();
+            cardBg.setColor(Color.parseColor("#F0FDF4")); // light green tint
+            cardBg.setCornerRadius(dpToPx(14));
+            cardBg.setStroke(dpToPx(1), Color.parseColor("#DCFCE7"));
+            card.setBackground(cardBg);
+            card.setClickable(true);
+            card.setFocusable(true);
+            LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            cardParams.setMargins(0, 0, 0, dpToPx(12));
+            card.setLayoutParams(cardParams);
 
-            title.setText(first.title);
-            String infoText = first.category + " | " + (groupTasks.size() > 1 ? groupTasks.size() + " " + getString(R.string.days_unit) : first.day + " " + monthNames[first.month]);
-            info.setText(infoText);
-            time.setText(first.time);
+            CheckBox cb = new CheckBox(this);
+            cb.setButtonTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#16A34A")));
+            LinearLayout.LayoutParams cbParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            cbParams.setMargins(0, 0, dpToPx(10), 0);
+            cb.setLayoutParams(cbParams);
+            cb.setClickable(false); // parent card handles the tap; avoids double toggle
+            card.addView(cb);
 
-            if (getString(R.string.status_done).equals(first.status)) indicator.setBackgroundResource(R.drawable.bg_status_done);
-            else if (getString(R.string.status_ongoing).equals(first.status)) indicator.setBackgroundResource(R.drawable.bg_status_ongoing);
-            else indicator.setBackgroundResource(R.drawable.bg_status_pending);
+            LinearLayout textCol = new LinearLayout(this);
+            textCol.setOrientation(LinearLayout.VERTICAL);
+            textCol.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+            TextView titleRow = new TextView(this);
+            titleRow.setText(first.title);
+            titleRow.setTextColor(Color.parseColor("#111827"));
+            titleRow.setTextSize(15);
+            titleRow.setTypeface(null, Typeface.BOLD);
+            textCol.addView(titleRow);
+
+            TextView infoRow = new TextView(this);
+            String infoText = first.category + "  ·  "
+                    + (groupTasks.size() > 1
+                    ? groupTasks.size() + " " + getString(R.string.days_unit)
+                    : first.day + " " + monthNames[first.month])
+                    + "  ·  " + first.time;
+            infoRow.setText(infoText);
+            infoRow.setTextColor(Color.parseColor("#6B7280"));
+            infoRow.setTextSize(12.5f);
+            LinearLayout.LayoutParams infoParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            infoParams.setMargins(0, dpToPx(2), 0, 0);
+            infoRow.setLayoutParams(infoParams);
+            textCol.addView(infoRow);
+
+            // NEW: Assigned To / Assigned By
+            TextView assignRow = new TextView(this);
+            String assignedToLabel = resolveAssignedToLabel(first);
+            boolean hasAssignedBy = first.assignedBy != null && !first.assignedBy.trim().isEmpty();
+            String assignedByLabel = hasAssignedBy ? resolveAssignedByLabel(first) : null;
+            String assignText = "To: " + assignedToLabel + (assignedByLabel != null ? "   ·   By: " + assignedByLabel : "");
+            assignRow.setText(assignText);
+            assignRow.setTextColor(Color.parseColor("#16A34A"));
+            assignRow.setTextSize(11.5f);
+            assignRow.setTypeface(null, Typeface.BOLD);
+            LinearLayout.LayoutParams assignParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            assignParams.setMargins(0, dpToPx(4), 0, 0);
+            assignRow.setLayoutParams(assignParams);
+            textCol.addView(assignRow);
+
+            card.addView(textCol);
+
+            // Status pill, right-aligned
+            TextView statusPill = new TextView(this);
+            String pillBg, pillText, pillLabel;
+            if (getString(R.string.status_done).equals(first.status)) {
+                pillBg = "#DCFCE7"; pillText = "#16A34A"; pillLabel = getString(R.string.status_done);
+            } else if (getString(R.string.status_ongoing).equals(first.status)) {
+                pillBg = "#DBEAFE"; pillText = "#2563EB"; pillLabel = getString(R.string.status_ongoing);
+            } else if (getString(R.string.status_missed).equals(first.status)) {
+                pillBg = "#FEE2E2"; pillText = "#DC2626"; pillLabel = getString(R.string.status_missed);
+            } else {
+                pillBg = "#FFEDD5"; pillText = "#EA580C"; pillLabel = getString(R.string.status_pending);
+            }
+            android.graphics.drawable.GradientDrawable pillBgDrawable = new android.graphics.drawable.GradientDrawable();
+            pillBgDrawable.setColor(Color.parseColor(pillBg));
+            pillBgDrawable.setCornerRadius(dpToPx(20));
+            statusPill.setBackground(pillBgDrawable);
+            statusPill.setTextColor(Color.parseColor(pillText));
+            statusPill.setText(pillLabel);
+            statusPill.setTextSize(11);
+            statusPill.setTypeface(null, Typeface.BOLD);
+            statusPill.setPadding(dpToPx(10), dpToPx(4), dpToPx(10), dpToPx(4));
+            LinearLayout.LayoutParams pillParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            pillParams.setMargins(dpToPx(8), 0, 0, 0);
+            statusPill.setLayoutParams(pillParams);
+            card.addView(statusPill);
 
             checkBoxes.put(key, cb);
-            container.addView(itemView);
+            card.setOnClickListener(v -> cb.setChecked(!cb.isChecked()));
+
+            container.addView(card);
         }
 
         ScrollView scrollView = new ScrollView(this);
         scrollView.addView(container);
 
-        new AlertDialog.Builder(this)
-                .setTitle(getString(R.string.select_schedules_delete))
+        AlertDialog dialog = new AlertDialog.Builder(this)
                 .setView(scrollView)
-                .setPositiveButton(getString(R.string.delete), (dialog, which) -> {
+                .setPositiveButton(getString(R.string.delete), (dlg, which) -> {
                     List<Task> toDelete = new ArrayList<>();
                     for (Map.Entry<String, CheckBox> entry : checkBoxes.entrySet()) {
                         if (entry.getValue().isChecked()) {
@@ -1274,68 +1394,217 @@ public class ScheduleActivity extends AppCompatActivity {
                     if (!toDelete.isEmpty()) bulkDeleteFromFirestore(toDelete);
                 })
                 .setNegativeButton(getString(R.string.cancel), null)
-                .show();
+                .create();
+        dialog.show();
+
+        if (dialog.getWindow() != null) {
+            android.graphics.drawable.GradientDrawable windowBg = new android.graphics.drawable.GradientDrawable();
+            windowBg.setColor(Color.WHITE);
+            windowBg.setCornerRadius(dpToPx(20));
+            dialog.getWindow().setBackgroundDrawable(windowBg);
+        }
+        Button deleteBtn = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+        Button cancelBtn = dialog.getButton(AlertDialog.BUTTON_NEGATIVE);
+        if (deleteBtn != null) {
+            deleteBtn.setTextColor(Color.parseColor("#DC2626"));
+            deleteBtn.setAllCaps(false);
+            deleteBtn.setTypeface(null, Typeface.BOLD);
+        }
+        if (cancelBtn != null) {
+            cancelBtn.setTextColor(Color.parseColor("#6B7280"));
+            cancelBtn.setAllCaps(false);
+        }
     }
 
     private void showAllTaskDetails() {
         if (taskList.isEmpty()) { Toast.makeText(this, getString(R.string.no_tasks_assigned), Toast.LENGTH_SHORT).show(); return; }
-        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_all_task_details, null);
-        LinearLayout container = dialogView.findViewById(R.id.allTasksContainer);
+
+        // Owner sees every task; staff only see tasks assigned to them —
+        // same visibility rule already applied in updateTasksUI().
+        boolean isOwner = roleManager.isOwner();
+        List<Task> visibleTasks = new ArrayList<>();
+        for (Task task : taskList) {
+            if (isOwner) {
+                visibleTasks.add(task);
+                continue;
+            }
+            boolean assignedToMe = false;
+            if (task.assignedTo != null) {
+                for (String email : task.assignedTo) {
+                    if (email != null && email.equalsIgnoreCase(currentUserEmail)) { assignedToMe = true; break; }
+                }
+            }
+            if (assignedToMe) visibleTasks.add(task);
+        }
+
+        if (visibleTasks.isEmpty()) { Toast.makeText(this, getString(R.string.no_tasks_assigned), Toast.LENGTH_SHORT).show(); return; }
 
         Map<String, List<Task>> groups = new LinkedHashMap<>();
-        for (Task task : taskList) {
+        for (Task task : visibleTasks) {
             String key = task.recurrenceGroupId;
-            if (key == null || key.isEmpty()) {
-                key = "SINGLE_" + task.firestoreId;
-            }
-            if (!groups.containsKey(key)) {
-                groups.put(key, new ArrayList<>());
-            }
+            if (key == null || key.isEmpty()) key = "SINGLE_" + task.firestoreId;
+            if (!groups.containsKey(key)) groups.put(key, new ArrayList<>());
             groups.get(key).add(task);
         }
+
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setBackgroundColor(Color.WHITE);
+        int pad = dpToPx(20);
+        container.setPadding(pad, dpToPx(18), pad, dpToPx(6));
+
+        TextView titleTv = new TextView(this);
+        titleTv.setText(getString(R.string.all_assigned_tasks));
+        titleTv.setTextColor(Color.parseColor("#111827"));
+        titleTv.setTextSize(18);
+        titleTv.setTypeface(null, Typeface.BOLD);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        titleParams.setMargins(0, 0, 0, dpToPx(14));
+        titleTv.setLayoutParams(titleParams);
+        container.addView(titleTv);
 
         int idCounter = 1;
         for (Map.Entry<String, List<Task>> entry : groups.entrySet()) {
             List<Task> groupTasks = entry.getValue();
             if (groupTasks.isEmpty()) continue;
-
             Task first = groupTasks.get(0);
-            View rowView = getLayoutInflater().inflate(R.layout.item_task_all_details, container, false);
 
-            TextView idTv = rowView.findViewById(R.id.rowId);
-            View statusIndicator = rowView.findViewById(R.id.rowStatusIndicator);
-            TextView titleTv = rowView.findViewById(R.id.rowTitle);
-            TextView categoryTv = rowView.findViewById(R.id.rowCategory);
-            TextView dateInfoTv = rowView.findViewById(R.id.rowDateInfo);
-            TextView timeTv = rowView.findViewById(R.id.rowTime);
-            TextView statusTextTv = rowView.findViewById(R.id.rowStatusText);
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            int rowPad = dpToPx(12);
+            row.setPadding(rowPad, rowPad, rowPad, rowPad);
+            android.graphics.drawable.GradientDrawable rowBg = new android.graphics.drawable.GradientDrawable();
+            rowBg.setColor(Color.parseColor("#F0FDF4")); // light green tint
+            rowBg.setCornerRadius(dpToPx(14));
+            rowBg.setStroke(dpToPx(1), Color.parseColor("#DCFCE7"));
+            row.setBackground(rowBg);
+            row.setClickable(true);
+            row.setFocusable(true);
+            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            rowParams.setMargins(0, 0, 0, dpToPx(12));
+            row.setLayoutParams(rowParams);
 
+            // Numbered badge
+            TextView idTv = new TextView(this);
             idTv.setText(String.valueOf(idCounter++));
-            idTv.setOnClickListener(v -> showTaskGroupDetailsDialog(groupTasks));
+            idTv.setTextColor(Color.parseColor("#16A34A"));
+            idTv.setTypeface(null, Typeface.BOLD);
+            idTv.setTextSize(13);
+            idTv.setGravity(Gravity.CENTER);
+            int badgeSize = dpToPx(28);
+            LinearLayout.LayoutParams idParams = new LinearLayout.LayoutParams(badgeSize, badgeSize);
+            idParams.setMargins(0, 0, dpToPx(12), 0);
+            idTv.setLayoutParams(idParams);
+            android.graphics.drawable.GradientDrawable idBg = new android.graphics.drawable.GradientDrawable();
+            idBg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            idBg.setColor(Color.parseColor("#DCFCE7"));
+            idTv.setBackground(idBg);
+            row.addView(idTv);
 
-            titleTv.setText(first.title);
-            categoryTv.setText(first.category);
-            timeTv.setText(first.time);
-            statusTextTv.setText(first.status);
+            LinearLayout textCol = new LinearLayout(this);
+            textCol.setOrientation(LinearLayout.VERTICAL);
+            textCol.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-            if (groupTasks.size() > 1) {
-                dateInfoTv.setText(first.recurrence + " " + first.category + " (" + groupTasks.size() + " " + getString(R.string.days_unit) + ")");
+            TextView titleRow = new TextView(this);
+            titleRow.setText(first.title);
+            titleRow.setTextColor(Color.parseColor("#111827"));
+            titleRow.setTextSize(15);
+            titleRow.setTypeface(null, Typeface.BOLD);
+            textCol.addView(titleRow);
+
+            TextView infoRow = new TextView(this);
+            String dateInfo = groupTasks.size() > 1
+                    ? first.recurrence + " " + first.category + " (" + groupTasks.size() + " " + getString(R.string.days_unit) + ")"
+                    : first.day + " " + monthNames[first.month] + " " + first.year + " (" + first.category + ")";
+            infoRow.setText(dateInfo + "  ·  " + first.time);
+            infoRow.setTextColor(Color.parseColor("#6B7280"));
+            infoRow.setTextSize(12.5f);
+            LinearLayout.LayoutParams infoParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            infoParams.setMargins(0, dpToPx(2), 0, 0);
+            infoRow.setLayoutParams(infoParams);
+            textCol.addView(infoRow);
+
+            // NEW: Assigned To / Assigned By
+            TextView assignRow = new TextView(this);
+            String assignedToLabel = resolveAssignedToLabel(first);
+            boolean hasAssignedBy = first.assignedBy != null && !first.assignedBy.trim().isEmpty();
+            String assignedByLabel = hasAssignedBy ? resolveAssignedByLabel(first) : null;
+            String assignText = "To: " + assignedToLabel + (assignedByLabel != null ? "   ·   By: " + assignedByLabel : "");
+            assignRow.setText(assignText);
+            assignRow.setTextColor(Color.parseColor("#16A34A"));
+            assignRow.setTextSize(11.5f);
+            assignRow.setTypeface(null, Typeface.BOLD);
+            LinearLayout.LayoutParams assignParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            assignParams.setMargins(0, dpToPx(4), 0, 0);
+            assignRow.setLayoutParams(assignParams);
+            textCol.addView(assignRow);
+
+            row.addView(textCol);
+
+            // Status pill
+            TextView statusPill = new TextView(this);
+            String pillBg, pillText, pillLabel;
+            if (getString(R.string.status_done).equals(first.status)) {
+                pillBg = "#DCFCE7"; pillText = "#16A34A"; pillLabel = getString(R.string.status_done);
+            } else if (getString(R.string.status_ongoing).equals(first.status)) {
+                pillBg = "#DBEAFE"; pillText = "#2563EB"; pillLabel = getString(R.string.status_ongoing);
+            } else if (getString(R.string.status_missed).equals(first.status)) {
+                pillBg = "#FEE2E2"; pillText = "#DC2626"; pillLabel = getString(R.string.status_missed);
             } else {
-                dateInfoTv.setText(first.day + " " + monthNames[first.month] + " " + first.year + " (" + first.category + ")");
+                pillBg = "#FFEDD5"; pillText = "#EA580C"; pillLabel = getString(R.string.status_pending);
             }
+            android.graphics.drawable.GradientDrawable pillBgDrawable = new android.graphics.drawable.GradientDrawable();
+            pillBgDrawable.setColor(Color.parseColor(pillBg));
+            pillBgDrawable.setCornerRadius(dpToPx(20));
+            statusPill.setBackground(pillBgDrawable);
+            statusPill.setTextColor(Color.parseColor(pillText));
+            statusPill.setText(pillLabel);
+            statusPill.setTextSize(11);
+            statusPill.setTypeface(null, Typeface.BOLD);
+            statusPill.setPadding(dpToPx(10), dpToPx(4), dpToPx(10), dpToPx(4));
+            LinearLayout.LayoutParams pillParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            pillParams.setMargins(dpToPx(8), 0, dpToPx(6), 0);
+            statusPill.setLayoutParams(pillParams);
+            row.addView(statusPill);
 
-            if (getString(R.string.status_done).equals(first.status)) statusIndicator.setBackgroundResource(R.drawable.bg_status_done);
-            else if (getString(R.string.status_ongoing).equals(first.status)) statusIndicator.setBackgroundResource(R.drawable.bg_status_ongoing);
-            else statusIndicator.setBackgroundResource(R.drawable.bg_status_pending);
+            TextView chevron = new TextView(this);
+            chevron.setText("›");
+            chevron.setTextSize(20);
+            chevron.setTextColor(Color.parseColor("#9CA3AF"));
+            row.addView(chevron);
 
-            container.addView(rowView);
+            row.setOnClickListener(v -> showTaskGroupDetailsDialog(groupTasks));
+
+            container.addView(row);
         }
 
-        new AlertDialog.Builder(this)
-                .setTitle(getString(R.string.all_assigned_tasks))
-                .setView(dialogView)
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(container);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(scroll)
                 .setPositiveButton(getString(R.string.close), null)
-                .show();
+                .create();
+        dialog.show();
+
+        if (dialog.getWindow() != null) {
+            android.graphics.drawable.GradientDrawable windowBg = new android.graphics.drawable.GradientDrawable();
+            windowBg.setColor(Color.WHITE);
+            windowBg.setCornerRadius(dpToPx(20));
+            dialog.getWindow().setBackgroundDrawable(windowBg);
+        }
+        Button closeBtn = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+        if (closeBtn != null) {
+            closeBtn.setTextColor(Color.parseColor("#16A34A"));
+            closeBtn.setAllCaps(false);
+            closeBtn.setTypeface(null, Typeface.BOLD);
+        }
     }
 
     private void showTaskGroupDetailsDialog(List<Task> tasks) {
@@ -1344,61 +1613,126 @@ public class ScheduleActivity extends AppCompatActivity {
             if (a.month != b.month) return a.month - b.month;
             return a.day - b.day;
         });
-
-        View view = LayoutInflater.from(this).inflate(R.layout.dialog_task_group_details, null);
-        TextView titleTv = view.findViewById(R.id.detailTaskTitle);
-        TextView categoryTv = view.findViewById(R.id.detailTaskCategory);
-        TextView timeTv = view.findViewById(R.id.detailTaskTime);
-        LinearLayout datesContainer = view.findViewById(R.id.datesContainer);
-
         Task first = tasks.get(0);
+
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setBackgroundColor(Color.WHITE);
+        int pad = dpToPx(20);
+        container.setPadding(pad, dpToPx(18), pad, dpToPx(10));
+
+        TextView titleTv = new TextView(this);
         titleTv.setText(first.title);
-        categoryTv.setText(getString(R.string.task_category_label, first.category));
-        timeTv.setText(getString(R.string.task_time_label, first.time));
+        titleTv.setTextColor(Color.parseColor("#111827"));
+        titleTv.setTextSize(19);
+        titleTv.setTypeface(null, Typeface.BOLD);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        titleParams.setMargins(0, 0, 0, dpToPx(14));
+        titleTv.setLayoutParams(titleParams);
+        container.addView(titleTv);
+
+        // Info card: category, time, assigned to, assigned by — light green tint
+        LinearLayout infoCard = new LinearLayout(this);
+        infoCard.setOrientation(LinearLayout.VERTICAL);
+        android.graphics.drawable.GradientDrawable infoBg = new android.graphics.drawable.GradientDrawable();
+        infoBg.setColor(Color.parseColor("#F0FDF4"));
+        infoBg.setCornerRadius(dpToPx(14));
+        infoBg.setStroke(dpToPx(1), Color.parseColor("#DCFCE7"));
+        infoCard.setBackground(infoBg);
+        infoCard.setPadding(dpToPx(14), dpToPx(12), dpToPx(14), dpToPx(12));
+        LinearLayout.LayoutParams infoParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        infoParams.setMargins(0, 0, 0, dpToPx(16));
+        infoCard.setLayoutParams(infoParams);
+
+        addDetailRow(infoCard, "Category", first.category);
+        addDetailRow(infoCard, "Time", first.time);
+        addDetailRow(infoCard, "Assigned To", resolveAssignedToLabel(first));
+        boolean hasAssignedBy = first.assignedBy != null && !first.assignedBy.trim().isEmpty();
+        addDetailRow(infoCard, "Assigned By", hasAssignedBy ? resolveAssignedByLabel(first) : "-");
+        container.addView(infoCard);
+
+        TextView datesLabel = new TextView(this);
+        datesLabel.setText("Scheduled Dates");
+        datesLabel.setTypeface(null, Typeface.BOLD);
+        datesLabel.setTextColor(Color.parseColor("#111827"));
+        datesLabel.setTextSize(13);
+        LinearLayout.LayoutParams datesLabelParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        datesLabelParams.setMargins(0, 0, 0, dpToPx(8));
+        datesLabel.setLayoutParams(datesLabelParams);
+        container.addView(datesLabel);
+
+        LinearLayout datesContainer = new LinearLayout(this);
+        datesContainer.setOrientation(LinearLayout.VERTICAL);
+        container.addView(datesContainer);
 
         for (Task t : tasks) {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setPadding(0, 12, 0, 12);
             row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dpToPx(4), dpToPx(10), dpToPx(4), dpToPx(10));
 
             TextView dateTv = new TextView(this);
-            dateTv.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            dateTv.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
             dateTv.setText(t.day + " " + monthNames[t.month] + " " + t.year);
-            dateTv.setTextColor(Color.BLACK);
-            dateTv.setTextSize(15);
+            dateTv.setTextColor(Color.parseColor("#111827"));
+            dateTv.setTextSize(14);
 
             TextView statusTv = new TextView(this);
+            String pillBg, pillText;
+            if (getString(R.string.status_done).equals(t.status)) { pillBg = "#DCFCE7"; pillText = "#16A34A"; }
+            else if (getString(R.string.status_ongoing).equals(t.status)) { pillBg = "#DBEAFE"; pillText = "#2563EB"; }
+            else if (getString(R.string.status_missed).equals(t.status)) { pillBg = "#FEE2E2"; pillText = "#DC2626"; }
+            else { pillBg = "#FFEDD5"; pillText = "#EA580C"; }
+            android.graphics.drawable.GradientDrawable pillBgDrawable = new android.graphics.drawable.GradientDrawable();
+            pillBgDrawable.setColor(Color.parseColor(pillBg));
+            pillBgDrawable.setCornerRadius(dpToPx(20));
+            statusTv.setBackground(pillBgDrawable);
             statusTv.setText(t.status);
-            statusTv.setPadding(12, 4, 12, 4);
-            statusTv.setTextSize(12);
+            statusTv.setPadding(dpToPx(10), dpToPx(4), dpToPx(10), dpToPx(4));
+            statusTv.setTextSize(11);
             statusTv.setTypeface(null, Typeface.BOLD);
-            statusTv.setTextColor(Color.WHITE);
-
-            if (getString(R.string.status_done).equals(t.status)) statusTv.setBackgroundResource(R.drawable.bg_status_done);
-            else if (getString(R.string.status_ongoing).equals(t.status)) statusTv.setBackgroundResource(R.drawable.bg_status_ongoing);
-            else statusTv.setBackgroundResource(R.drawable.bg_status_pending);
+            statusTv.setTextColor(Color.parseColor(pillText));
 
             row.addView(dateTv);
             row.addView(statusTv);
             datesContainer.addView(row);
 
             View divider = new View(this);
-            divider.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1));
+            divider.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(1)));
             divider.setBackgroundColor(Color.parseColor("#F3F4F6"));
             datesContainer.addView(divider);
         }
 
-        new AlertDialog.Builder(this)
-                .setView(view)
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(container);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(scroll)
                 .setPositiveButton(getString(R.string.close), null)
-                .show();
+                .create();
+        dialog.show();
+
+        if (dialog.getWindow() != null) {
+            android.graphics.drawable.GradientDrawable windowBg = new android.graphics.drawable.GradientDrawable();
+            windowBg.setColor(Color.WHITE);
+            windowBg.setCornerRadius(dpToPx(20));
+            dialog.getWindow().setBackgroundDrawable(windowBg);
+        }
+        Button closeBtn = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+        if (closeBtn != null) {
+            closeBtn.setTextColor(Color.parseColor("#16A34A"));
+            closeBtn.setAllCaps(false);
+            closeBtn.setTypeface(null, Typeface.BOLD);
+        }
     }
 
     private void updateTasksUI() {
         if (tasksContainer == null) return;
         tasksContainer.removeAllViews();
-        int done = 0, ongoing = 0, pending = 0;
+        int done = 0, ongoing = 0, pending = 0, missed = 0;
         int selYear  = selectedDate.get(Calendar.YEAR);
         int selMonth = selectedDate.get(Calendar.MONTH);
         int selDay   = selectedDate.get(Calendar.DAY_OF_MONTH);
@@ -1439,6 +1773,7 @@ public class ScheduleActivity extends AppCompatActivity {
             // Update counts (reflects all tasks for the day)
             if (sDone.equals(task.status)) done++;
             else if (sOngoing.equals(task.status)) ongoing++;
+            else if (sMissed.equals(task.status)) missed++;   // new
             else pending++;
 
             // Apply active filter: ASSIGNED -> pending or ongoing, MISSING -> missed, DONE -> done
@@ -1547,24 +1882,19 @@ public class ScheduleActivity extends AppCompatActivity {
 
                 taskView.setOnClickListener(v -> {
                     if (isDone) {
-                        Toast.makeText(this, "Task already completed", Toast.LENGTH_SHORT).show();
+                        showDoneActionsDialog(task);
                         return;
                     }
                     if (isMissed) {
-                        if (roleManager.canEditFarm()) {
-                            showManagerOverrideDialog(task);
-                        } else {
-                            Toast.makeText(this, "Task was missed. Contact manager.", Toast.LENGTH_SHORT).show();
-                        }
+                        showMissedActionsDialog(task);
                         return;
                     }
                     if (!isOngoing) {
-                        // Manager Work Window dialog removed from here
                         Toast.makeText(this, "Can only update status when Ongoing (at " + task.time + ")", Toast.LENGTH_SHORT).show();
                         return;
                     }
 
-                    showStatusUpdateDialog(task);
+                    showTaskActionsDialog(task);
                 });
 
                 boolean canDelete = roleManager.canDeleteTask();
@@ -1581,6 +1911,7 @@ public class ScheduleActivity extends AppCompatActivity {
         if (doneCount != null) doneCount.setText(String.valueOf(done));
         if (ongoingCount != null) ongoingCount.setText(String.valueOf(ongoing));
         if (pendingCount != null) pendingCount.setText(String.valueOf(pending));
+        if (missedCount != null) missedCount.setText(String.valueOf(missed));   // new
         View placeholder = findViewById(R.id.noTasksPlaceholder);
         if (placeholder != null) placeholder.setVisibility(tasksContainer.getChildCount() == 0 ? View.VISIBLE : View.GONE);
     }
@@ -1637,7 +1968,7 @@ public class ScheduleActivity extends AppCompatActivity {
     // vs. owner extensions are distinguishable in the audit trail even though
     // both funnel through this same logger. Logging never blocks the update.
     // ───────────────────────────────────────────────────────────────────────
-    private void logTaskExtension(Task task, int minutesAdded, String reason) {
+    private void logTaskExtension(Task task, int minutesAdded, String context, String staffReason) {
         String actorName = accountManager != null ? accountManager.getCurrentUsername() : null;
         if (actorName == null || actorName.isEmpty()) actorName = currentUserEmail;
         String actorEmail = accountManager != null && actorName != null ? accountManager.getEmail(actorName) : null;
@@ -1648,44 +1979,578 @@ public class ScheduleActivity extends AppCompatActivity {
         metadata.put("taskTitle", task.title);
         metadata.put("extensionMinutes", task.extensionMinutes);
         metadata.put("minutesAdded", minutesAdded);
+        if (staffReason != null && !staffReason.isEmpty()) metadata.put("reason", staffReason);
 
         String durationLabel = minutesAdded >= 60
                 ? (minutesAdded / 60) + " hour" + (minutesAdded / 60 == 1 ? "" : "s")
                 : minutesAdded + " min";
 
+        String message = (actorName != null ? actorName : "Someone") + " rescheduled " + context + " task \"" + task.title + "\" by " + durationLabel;
+        if (staffReason != null && !staffReason.isEmpty()) message += " — reason: " + staffReason;
+
         FarmRepository.INSTANCE.logTaskUpdated(
                 actorName != null ? actorName : "Someone",
                 actorEmail != null ? actorEmail : "",
                 actorRole != null ? actorRole : "staff",
-                (actorName != null ? actorName : "Someone") + " extended " + reason + " task \"" + task.title + "\" by " + durationLabel,
+                message,
                 "New total extension: " + task.extensionMinutes + " min",
                 metadata,
                 null
         );
     }
+    /**
+     * Entry point for "Reschedule" (replaces the old "Extend 30 Minutes" / manager
+     * override). Same flow now covers both extending an Ongoing task's deadline and
+     * resetting a Missed task back to Ongoing. Staff request with a reason; the owner
+     * approves or denies. The owner can also set a custom reschedule directly with no
+     * pending request. Only valid for TODAY's task — never for a previous day.
+     */
+    private void showRescheduleDialog(Task task) {
+        if (!isTaskToday(task)) {
+            Toast.makeText(this, "Reschedule is only available for today's tasks.", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
-    private void showStatusUpdateDialog(Task task) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Update Task Status");
+        boolean hasPendingRequest = task.pendingRescheduleMinutes > 0
+                && task.pendingRescheduleReason != null && !task.pendingRescheduleReason.isEmpty();
 
-        // Extending the deadline is owner-only; staff only get "Mark as Done".
-        boolean canExtend = roleManager.isOwner();
-        String[] options = canExtend
-                ? new String[]{"Mark as Done", "Request 30min Extension"}
-                : new String[]{"Mark as Done"};
-        builder.setItems(options, (dialog, which) -> {
-            if (which == 0) {
-                // Marking Done now requires proof (comment + photo) before anything
-                // is written, followed by an explicit confirmation step.
-                showMarkDoneProofDialog(task);
-            } else if (canExtend) {
-                task.extensionMinutes += 30;
-                updateTaskStatus(task);
-                logTaskExtension(task, 30, "ongoing");
-                Toast.makeText(this, "Extension granted. New deadline updated.", Toast.LENGTH_SHORT).show();
+        if (roleManager.isOwner()) {
+            if (hasPendingRequest) showRescheduleApprovalDialog(task);
+            else showOwnerDirectRescheduleDialog(task);
+        } else {
+            if (hasPendingRequest && task.pendingRescheduleRequestedBy != null
+                    && task.pendingRescheduleRequestedBy.equalsIgnoreCase(currentUserEmail)) {
+                Toast.makeText(this, "You already have a pending reschedule request for this task. Waiting for manager approval.", Toast.LENGTH_LONG).show();
+            } else {
+                showStaffRequestRescheduleDialog(task);
             }
+        }
+    }
+
+    /** Staff: request a custom-minute reschedule with a required reason. Owner must approve. */
+    private void showStaffRequestRescheduleDialog(Task task) {
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setBackgroundColor(Color.WHITE);
+        int pad = dpToPx(20);
+        container.setPadding(pad, dpToPx(16), pad, 0);
+
+        // Custom title — forced black/bold, replaces setTitle() so it can't
+        // inherit the theme's washed-out dark-mode title color.
+        TextView titleTv = new TextView(this);
+        titleTv.setText("Request Reschedule");
+        titleTv.setTextColor(Color.parseColor("#111827"));
+        titleTv.setTextSize(18);
+        titleTv.setTypeface(null, Typeface.BOLD);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        titleParams.setMargins(0, 0, 0, dpToPx(14));
+        titleTv.setLayoutParams(titleParams);
+        container.addView(titleTv);
+
+        TextView minutesLabel = new TextView(this);
+        minutesLabel.setText("Minutes requested");
+        minutesLabel.setTypeface(null, Typeface.BOLD);
+        minutesLabel.setTextSize(13);
+        minutesLabel.setTextColor(Color.parseColor("#374151"));
+        container.addView(minutesLabel);
+
+        final EditText minutesInput = new EditText(this);
+        minutesInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        minutesInput.setHint("e.g. 30");
+        minutesInput.setTextColor(Color.parseColor("#111827"));
+        minutesInput.setHintTextColor(Color.parseColor("#9CA3AF"));
+        LinearLayout.LayoutParams minutesParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        minutesParams.setMargins(0, dpToPx(6), 0, dpToPx(16));
+        minutesInput.setLayoutParams(minutesParams);
+        container.addView(minutesInput);
+
+        TextView reasonLabel = new TextView(this);
+        reasonLabel.setText("Reason (required)");
+        reasonLabel.setTypeface(null, Typeface.BOLD);
+        reasonLabel.setTextSize(13);
+        reasonLabel.setTextColor(Color.parseColor("#374151"));
+        container.addView(reasonLabel);
+
+        final EditText reasonInput = new EditText(this);
+        reasonInput.setHint("Why do you need more time?");
+        reasonInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        reasonInput.setMinLines(2);
+        reasonInput.setTextColor(Color.parseColor("#111827"));
+        reasonInput.setHintTextColor(Color.parseColor("#9CA3AF"));
+        LinearLayout.LayoutParams reasonParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        reasonParams.setMargins(0, dpToPx(6), 0, dpToPx(8));
+        reasonInput.setLayoutParams(reasonParams);
+        container.addView(reasonInput);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(container)                 // ← no more .setTitle(...)
+                .setPositiveButton("Send Request", null)
+                .setNegativeButton("Cancel", null)
+                .create();
+        dialog.show();
+
+        if (dialog.getWindow() != null) {
+            android.graphics.drawable.GradientDrawable windowBg = new android.graphics.drawable.GradientDrawable();
+            windowBg.setColor(Color.WHITE);
+            windowBg.setCornerRadius(dpToPx(20));
+            dialog.getWindow().setBackgroundDrawable(windowBg);
+        }
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String minutesStr = minutesInput.getText().toString().trim();
+            String reason = reasonInput.getText().toString().trim();
+            if (minutesStr.isEmpty()) { Toast.makeText(this, "Enter how many minutes you need", Toast.LENGTH_SHORT).show(); return; }
+            int minutes;
+            try { minutes = Integer.parseInt(minutesStr); }
+            catch (NumberFormatException e) { Toast.makeText(this, "Enter a valid number of minutes", Toast.LENGTH_SHORT).show(); return; }
+            if (minutes <= 0) { Toast.makeText(this, "Minutes must be greater than 0", Toast.LENGTH_SHORT).show(); return; }
+            if (reason.isEmpty()) { Toast.makeText(this, "A reason is required", Toast.LENGTH_SHORT).show(); return; }
+            if (task.firestoreId == null) { Toast.makeText(this, "This task has no ID and cannot be updated", Toast.LENGTH_SHORT).show(); return; }
+
+            ensureAuthThenRun(() ->
+                    db.collection("farm_data").document("shared")
+                            .collection("tasks").document(task.firestoreId)
+                            .update("pendingRescheduleMinutes", minutes,
+                                    "pendingRescheduleReason", reason,
+                                    "pendingRescheduleRequestedBy", currentUserEmail)
+                            .addOnSuccessListener(unused -> {
+                                dialog.dismiss();
+                                Toast.makeText(this, "Reschedule request sent to manager for approval.", Toast.LENGTH_LONG).show();
+                            })
+                            .addOnFailureListener(e ->
+                                    Toast.makeText(this, "Failed to send request: " + e.getMessage(), Toast.LENGTH_SHORT).show())
+            );
         });
-        builder.show();
+    }
+
+    /** Owner: sees the staff's pending request and can Approve or Deny it. */
+    private void showRescheduleApprovalDialog(Task task) {
+        String requesterLabel = task.pendingRescheduleRequestedBy != null ? task.pendingRescheduleRequestedBy : "A staff member";
+        String cached = staffNameCache.get(task.pendingRescheduleRequestedBy);
+        if (cached != null) requesterLabel = cached;
+
+        String message = requesterLabel + " requested " + task.pendingRescheduleMinutes
+                + " more minute(s) for \"" + task.title + "\".\n\nReason: " + task.pendingRescheduleReason;
+
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setBackgroundColor(Color.WHITE);
+        int pad = dpToPx(20);
+        container.setPadding(pad, dpToPx(16), pad, dpToPx(4));
+
+        TextView titleTv = new TextView(this);
+        titleTv.setText("Reschedule Request");
+        titleTv.setTextColor(Color.parseColor("#111827"));
+        titleTv.setTextSize(18);
+        titleTv.setTypeface(null, Typeface.BOLD);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        titleParams.setMargins(0, 0, 0, dpToPx(12));
+        titleTv.setLayoutParams(titleParams);
+        container.addView(titleTv);
+
+        TextView messageTv = new TextView(this);
+        messageTv.setText(message);
+        messageTv.setTextColor(Color.parseColor("#111827"));
+        messageTv.setTextSize(14);
+        container.addView(messageTv);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(container)                 // ← no more .setTitle()/.setMessage()
+                .setPositiveButton("Approve", (d, w) -> approveReschedule(task))
+                .setNegativeButton("Deny", (d, w) -> denyReschedule(task))
+                .setNeutralButton("Later", null)
+                .create();
+        dialog.show();
+
+        if (dialog.getWindow() != null) {
+            android.graphics.drawable.GradientDrawable windowBg = new android.graphics.drawable.GradientDrawable();
+            windowBg.setColor(Color.WHITE);
+            windowBg.setCornerRadius(dpToPx(20));
+            dialog.getWindow().setBackgroundDrawable(windowBg);
+        }
+
+        int titleId = getResources().getIdentifier("alertTitle", "id", "android");
+        TextView titleView = dialog.findViewById(titleId);
+        if (titleView != null) titleView.setTextColor(Color.parseColor("#111827"));
+
+        TextView messageView = dialog.findViewById(android.R.id.message);
+        if (messageView != null) messageView.setTextColor(Color.parseColor("#111827"));
+    }
+
+    /** Owner: no pending request — owner sets a custom reschedule directly. */
+    private void showOwnerDirectRescheduleDialog(Task task) {
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setBackgroundColor(Color.WHITE);
+        int pad = dpToPx(20);
+        container.setPadding(pad, dpToPx(16), pad, 0);
+
+        boolean wasMissed = getString(R.string.status_missed).equals(task.status);
+
+        TextView titleTv = new TextView(this);
+        titleTv.setText("Reschedule Task");
+        titleTv.setTextColor(Color.parseColor("#111827"));
+        titleTv.setTextSize(18);
+        titleTv.setTypeface(null, Typeface.BOLD);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        titleParams.setMargins(0, 0, 0, dpToPx(14));
+        titleTv.setLayoutParams(titleParams);
+        container.addView(titleTv);
+
+        TextView minutesLabel = new TextView(this);
+        minutesLabel.setText(wasMissed ? "Minutes to add (resets task to Ongoing)" : "Minutes to add");
+        minutesLabel.setTypeface(null, Typeface.BOLD);
+        minutesLabel.setTextSize(13);
+        minutesLabel.setTextColor(Color.parseColor("#374151"));
+        container.addView(minutesLabel);
+
+        final EditText minutesInput = new EditText(this);
+        minutesInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        minutesInput.setHint("e.g. 30");
+        minutesInput.setTextColor(Color.parseColor("#111827"));
+        minutesInput.setHintTextColor(Color.parseColor("#9CA3AF"));
+        LinearLayout.LayoutParams minutesParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        minutesParams.setMargins(0, dpToPx(6), 0, dpToPx(16));
+        minutesInput.setLayoutParams(minutesParams);
+        container.addView(minutesInput);
+
+        TextView reasonLabel = new TextView(this);
+        reasonLabel.setText("Reason (optional)");
+        reasonLabel.setTypeface(null, Typeface.BOLD);
+        reasonLabel.setTextSize(13);
+        reasonLabel.setTextColor(Color.parseColor("#374151"));
+        container.addView(reasonLabel);
+
+        final EditText reasonInput = new EditText(this);
+        reasonInput.setHint("Notes for the record...");
+        reasonInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        reasonInput.setMinLines(2);
+        reasonInput.setTextColor(Color.parseColor("#111827"));
+        reasonInput.setHintTextColor(Color.parseColor("#9CA3AF"));
+        LinearLayout.LayoutParams reasonParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        reasonParams.setMargins(0, dpToPx(6), 0, dpToPx(8));
+        reasonInput.setLayoutParams(reasonParams);
+        container.addView(reasonInput);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(container)                 // ← no more .setTitle(...)
+                .setPositiveButton("Apply", null)
+                .setNegativeButton("Cancel", null)
+                .create();
+        dialog.show();
+
+        if (dialog.getWindow() != null) {
+            android.graphics.drawable.GradientDrawable windowBg = new android.graphics.drawable.GradientDrawable();
+            windowBg.setColor(Color.WHITE);
+            windowBg.setCornerRadius(dpToPx(20));
+            dialog.getWindow().setBackgroundDrawable(windowBg);
+        }
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String minutesStr = minutesInput.getText().toString().trim();
+            if (minutesStr.isEmpty()) { Toast.makeText(this, "Enter how many minutes to add", Toast.LENGTH_SHORT).show(); return; }
+            int minutes;
+            try { minutes = Integer.parseInt(minutesStr); }
+            catch (NumberFormatException e) { Toast.makeText(this, "Enter a valid number of minutes", Toast.LENGTH_SHORT).show(); return; }
+            if (minutes <= 0) { Toast.makeText(this, "Minutes must be greater than 0", Toast.LENGTH_SHORT).show(); return; }
+            String reason = reasonInput.getText().toString().trim();
+            dialog.dismiss();
+            applyReschedule(task, minutes, reason, wasMissed ? "missed" : "ongoing");
+        });
+    }
+
+    /** Approves a staff-requested reschedule: applies the requested minutes and clears the request. */
+    private void approveReschedule(Task task) {
+        boolean wasMissed = getString(R.string.status_missed).equals(task.status);
+        applyReschedule(task, task.pendingRescheduleMinutes, task.pendingRescheduleReason, wasMissed ? "missed" : "ongoing");
+    }
+
+    /** Denies a staff-requested reschedule: clears the request, task stays as-is. */
+    private void denyReschedule(Task task) {
+        if (task.firestoreId == null) return;
+        ensureAuthThenRun(() ->
+                db.collection("farm_data").document("shared")
+                        .collection("tasks").document(task.firestoreId)
+                        .update("pendingRescheduleMinutes", com.google.firebase.firestore.FieldValue.delete(),
+                                "pendingRescheduleReason", com.google.firebase.firestore.FieldValue.delete(),
+                                "pendingRescheduleRequestedBy", com.google.firebase.firestore.FieldValue.delete())
+                        .addOnSuccessListener(unused -> Toast.makeText(this, "Reschedule request denied.", Toast.LENGTH_SHORT).show())
+                        .addOnFailureListener(e -> Toast.makeText(this, "Failed to update: " + e.getMessage(), Toast.LENGTH_SHORT).show())
+        );
+    }
+
+    /** Applies a reschedule: adds minutes, resets Missed to Ongoing if needed, logs it, clears any pending request. */
+    private void applyReschedule(Task task, int minutes, String reason, String context) {
+        if (task.firestoreId == null) return;
+
+        task.extensionMinutes += minutes;
+        boolean wasMissed = "missed".equals(context);
+        if (wasMissed) task.status = getString(R.string.status_ongoing);
+
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("extensionMinutes", task.extensionMinutes);
+        updates.put("status", task.status);
+        updates.put("pendingRescheduleMinutes", com.google.firebase.firestore.FieldValue.delete());
+        updates.put("pendingRescheduleReason", com.google.firebase.firestore.FieldValue.delete());
+        updates.put("pendingRescheduleRequestedBy", com.google.firebase.firestore.FieldValue.delete());
+
+        ensureAuthThenRun(() ->
+                db.collection("farm_data").document("shared")
+                        .collection("tasks").document(task.firestoreId)
+                        .update(updates)
+                        .addOnSuccessListener(unused -> {
+                            logTaskHistory(task, task.status);
+                            logTaskExtension(task, minutes, context, reason);
+                            Toast.makeText(this, wasMissed ? "Task rescheduled and reset to Ongoing." : "Task rescheduled.", Toast.LENGTH_SHORT).show();
+                        })
+                        .addOnFailureListener(e ->
+                                Toast.makeText(this, getString(R.string.error_updating_status, e.getMessage()), Toast.LENGTH_SHORT).show())
+        );
+    }
+
+    /**
+     * Action sheet shown when tapping an Ongoing task. Now uses icon-led rows
+     * (colored icon circle + title/subtitle + chevron) instead of plain outlined
+     * buttons, and a small "×" close button instead of a text Cancel link.
+     */
+    private void showTaskActionsDialog(Task task) {
+        LinearLayout root = buildActionSheetHeader(task);
+        final AlertDialog[] dialogRef = new AlertDialog[1];
+
+        if (!roleManager.isOwner()) {
+            addModernActionRow(root, R.drawable.ic_check_circle, "#16A34A", "#DCFCE7",
+                    "Submit", "Mark this task as complete",
+                    v -> { dialogRef[0].dismiss(); showMarkDoneProofDialog(task); });
+        }
+        if (isTaskToday(task)) {
+            addModernActionRow(root, R.drawable.ic_alert_circle, "#2563EB", "#DBEAFE",
+                    "Reschedule", roleManager.isOwner() ? "Approve or set a custom extension" : "Request more time from your manager",
+                    v -> { dialogRef[0].dismiss(); showRescheduleDialog(task); });
+        }
+
+        addModernActionRow(root, R.drawable.ic_calendar, "#6B7280", "#F3F4F6",
+                "Task Detail", "View info, comment & photos",
+                v -> { dialogRef[0].dismiss(); showTaskDetailDialog(task); });
+
+        dialogRef[0] = showActionSheetDialog(root);
+    }
+
+    /** Done tasks: just the Task Detail row (view comment/photos submitted). */
+    private void showDoneActionsDialog(Task task) {
+        LinearLayout root = buildActionSheetHeader(task);
+        final AlertDialog[] dialogRef = new AlertDialog[1];
+
+        addModernActionRow(root, R.drawable.ic_calendar, "#6B7280", "#F3F4F6",
+                "Task Detail", "View completion comment & photos",
+                v -> { dialogRef[0].dismiss(); showTaskDetailDialog(task); });
+
+        dialogRef[0] = showActionSheetDialog(root);
+    }
+
+    /** Missed tasks: Reschedule (owner/manager only, resets to Ongoing) + Task Detail. */
+    private void showMissedActionsDialog(Task task) {
+        LinearLayout root = buildActionSheetHeader(task);
+        final AlertDialog[] dialogRef = new AlertDialog[1];
+
+        if (isTaskToday(task)) {
+            addModernActionRow(root, R.drawable.ic_alert_triangle, "#DC2626", "#FEE2E2",
+                    "Reschedule", roleManager.isOwner() ? "Approve or reset this task to Ongoing" : "Request to reset this task to Ongoing",
+                    v -> { dialogRef[0].dismiss(); showRescheduleDialog(task); });
+        }
+
+        addModernActionRow(root, R.drawable.ic_calendar, "#6B7280", "#F3F4F6",
+                "Task Detail", "View task info",
+                v -> { dialogRef[0].dismiss(); showTaskDetailDialog(task); });
+
+        dialogRef[0] = showActionSheetDialog(root);
+    }
+
+    /** Builds the shared header (title, subtitle, close button, divider) for all action sheets. */
+    private LinearLayout buildActionSheetHeader(Task task) {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(Color.WHITE);
+        int padH = dpToPx(20);
+        root.setPadding(padH, dpToPx(18), padH, dpToPx(12));
+
+        LinearLayout headerRow = new LinearLayout(this);
+        headerRow.setOrientation(LinearLayout.HORIZONTAL);
+        headerRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        LinearLayout headerText = new LinearLayout(this);
+        headerText.setOrientation(LinearLayout.VERTICAL);
+        headerText.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView titleTv = new TextView(this);
+        titleTv.setText(task.title);
+        titleTv.setTextColor(Color.parseColor("#111827"));
+        titleTv.setTextSize(20);
+        titleTv.setTypeface(null, Typeface.BOLD);
+        headerText.addView(titleTv);
+
+        TextView subtitle = new TextView(this);
+        subtitle.setText(task.category + "   ·   " + task.time);
+        subtitle.setTextColor(Color.parseColor("#6B7280"));
+        subtitle.setTextSize(14);
+        LinearLayout.LayoutParams subParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        subParams.setMargins(0, dpToPx(2), 0, 0);
+        subtitle.setLayoutParams(subParams);
+        headerText.addView(subtitle);
+
+        headerRow.addView(headerText);
+
+        TextView closeBtn = new TextView(this);
+        closeBtn.setTag("action_sheet_close_btn");
+        closeBtn.setText("×");
+        closeBtn.setTextSize(20);
+        closeBtn.setTypeface(null, Typeface.BOLD);
+        closeBtn.setTextColor(Color.parseColor("#6B7280"));
+        closeBtn.setGravity(Gravity.CENTER);
+        int closeSize = dpToPx(32);
+        closeBtn.setLayoutParams(new LinearLayout.LayoutParams(closeSize, closeSize));
+        android.graphics.drawable.GradientDrawable closeBg = new android.graphics.drawable.GradientDrawable();
+        closeBg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        closeBg.setColor(Color.parseColor("#F3F4F6"));
+        closeBtn.setBackground(closeBg);
+        headerRow.addView(closeBtn);
+
+        root.addView(headerRow);
+
+        View headerDivider = new View(this);
+        LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(1));
+        dividerParams.setMargins(0, dpToPx(16), 0, dpToPx(8));
+        headerDivider.setLayoutParams(dividerParams);
+        headerDivider.setBackgroundColor(Color.parseColor("#F3F4F6"));
+        root.addView(headerDivider);
+
+        return root;
+    }
+
+    /** Wraps the built root in an AlertDialog, wires the close button, and applies the rounded white window. */
+    private AlertDialog showActionSheetDialog(LinearLayout root) {
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(root)
+                .create();
+
+        View closeBtn = root.findViewWithTag("action_sheet_close_btn");
+        if (closeBtn != null) closeBtn.setOnClickListener(v -> dialog.dismiss());
+
+        dialog.show();
+        if (dialog.getWindow() != null) {
+            android.graphics.drawable.GradientDrawable windowBg = new android.graphics.drawable.GradientDrawable();
+            windowBg.setColor(Color.WHITE);
+            windowBg.setCornerRadius(dpToPx(24));
+            dialog.getWindow().setBackgroundDrawable(windowBg);
+        }
+        return dialog;
+    }
+
+    /**
+     * Builds one modern action-sheet row: colored icon circle on the left,
+     * title + subtitle in the middle, chevron on the right. Whole row is
+     * tappable with a ripple, matching the icon-circle style already used
+     * on the schedule task cards (see getCategoryIconStyle).
+     */
+    private void addModernActionRow(LinearLayout parent, int iconRes, String tintHex, String bgHex,
+                                    String title, String subtitle, View.OnClickListener onClick) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        int padV = dpToPx(12);
+        row.setPadding(dpToPx(4), padV, dpToPx(4), padV);
+        LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        row.setLayoutParams(rowParams);
+
+        // Ripple-on-tap feedback using the row's own state-based background.
+        android.util.TypedValue outValue = new android.util.TypedValue();
+        getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outValue, true);
+        row.setBackgroundResource(outValue.resourceId);
+        row.setClickable(true);
+        row.setFocusable(true);
+        row.setOnClickListener(onClick);
+
+        // Icon circle.
+        ImageView iconView = new ImageView(this);
+        int circleSize = dpToPx(44);
+        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(circleSize, circleSize);
+        iconParams.setMargins(0, 0, dpToPx(14), 0);
+        iconView.setLayoutParams(iconParams);
+        iconView.setImageResource(iconRes);
+        iconView.setColorFilter(Color.parseColor(tintHex));
+        int iconPad = dpToPx(10);
+        iconView.setPadding(iconPad, iconPad, iconPad, iconPad);
+        android.graphics.drawable.GradientDrawable circleBg = new android.graphics.drawable.GradientDrawable();
+        circleBg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        circleBg.setColor(Color.parseColor(bgHex));
+        iconView.setBackground(circleBg);
+        row.addView(iconView);
+
+        // Title + subtitle.
+        LinearLayout textCol = new LinearLayout(this);
+        textCol.setOrientation(LinearLayout.VERTICAL);
+        textCol.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView titleTv = new TextView(this);
+        titleTv.setText(title);
+        titleTv.setTextColor(Color.parseColor("#111827"));
+        titleTv.setTextSize(15.5f);
+        titleTv.setTypeface(null, Typeface.BOLD);
+        textCol.addView(titleTv);
+
+        TextView subTv = new TextView(this);
+        subTv.setText(subtitle);
+        subTv.setTextColor(Color.parseColor("#6B7280"));
+        subTv.setTextSize(12.5f);
+        LinearLayout.LayoutParams subTvParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        subTvParams.setMargins(0, dpToPx(1), 0, 0);
+        subTv.setLayoutParams(subTvParams);
+        textCol.addView(subTv);
+
+        row.addView(textCol);
+
+        // Chevron.
+        TextView chevron = new TextView(this);
+        chevron.setText("›");
+        chevron.setTextSize(20);
+        chevron.setTextColor(Color.parseColor("#D1D5DB"));
+        row.addView(chevron);
+
+        parent.addView(row);
+    }
+
+    /** Small helper so the three action buttons look consistent (full width, colored). */
+    /** Small helper so the three action buttons look consistent: white background,
+     *  colored text + a matching thin border, full width. */
+    private void styleActionButton(Button button, String colorHex, int topMargin) {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.setMargins(0, topMargin, 0, 0);
+        button.setLayoutParams(params);
+
+        int color = Color.parseColor(colorHex);
+        button.setTextColor(color);
+        button.setAllCaps(false);
+
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setColor(Color.WHITE);
+        bg.setStroke(dpToPx(1), color);
+        bg.setCornerRadius(dpToPx(8));
+        button.setBackground(bg);
+
+        int padH = dpToPx(16);
+        int padV = dpToPx(10);
+        button.setPadding(padH, padV, padH, padV);
     }
 
     // ── Mark-as-Done proof flow ──────────────────────────────────────────────
@@ -1695,156 +2560,355 @@ public class ScheduleActivity extends AppCompatActivity {
     // The task is NEVER marked Done if either the comment or the photo is missing.
 
     private void showMarkDoneProofDialog(Task task) {
+        if (roleManager.isOwner()) {
+            Toast.makeText(this, "Only staff can submit task completion", Toast.LENGTH_SHORT).show();
+            return;
+        }
         pendingDoneTask = task;
-        pendingProofImageUri = null;
-        pendingProofImageFile = null;
 
         LinearLayout container = new LinearLayout(this);
         container.setOrientation(LinearLayout.VERTICAL);
-        int pad = dpToPx(20);
-        container.setPadding(pad, pad, pad, pad);
+        container.setBackgroundColor(Color.WHITE);
+        int padH = dpToPx(24);
+        container.setPadding(padH, dpToPx(20), padH, dpToPx(16));
 
-        TextView label = new TextView(this);
-        label.setText("Completion proof required");
-        label.setTypeface(null, Typeface.BOLD);
-        label.setTextSize(16);
-        label.setTextColor(Color.parseColor("#111827"));
-        container.addView(label);
+        // ── Custom title: forced black/bold, replaces setTitle() so it can't
+        // inherit the theme's washed-out dark-mode title color.
+        TextView titleTv = new TextView(this);
+        titleTv.setText("Mark \"" + task.title + "\" as Done");
+        titleTv.setTextColor(Color.parseColor("#111827"));
+        titleTv.setTextSize(19);
+        titleTv.setTypeface(null, Typeface.BOLD);
+        container.addView(titleTv);
 
-        TextView sub = new TextView(this);
-        sub.setText("Add a comment and take a photo showing the task was completed. Both are required — this task cannot be marked Done without them.");
-        sub.setTextColor(Color.parseColor("#6B7280"));
-        sub.setTextSize(13);
-        LinearLayout.LayoutParams subParams = new LinearLayout.LayoutParams(
+        // ── Card-style info banner instead of a plain paragraph.
+        LinearLayout infoCard = new LinearLayout(this);
+        infoCard.setOrientation(LinearLayout.VERTICAL);
+        android.graphics.drawable.GradientDrawable infoBg = new android.graphics.drawable.GradientDrawable();
+        infoBg.setColor(Color.parseColor("#EFF6FF"));
+        infoBg.setCornerRadius(dpToPx(12));
+        infoCard.setBackground(infoBg);
+        infoCard.setPadding(dpToPx(14), dpToPx(12), dpToPx(14), dpToPx(12));
+        LinearLayout.LayoutParams infoParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        subParams.setMargins(0, dpToPx(4), 0, dpToPx(16));
-        sub.setLayoutParams(subParams);
-        container.addView(sub);
+        infoParams.setMargins(0, dpToPx(14), 0, dpToPx(18));
+        infoCard.setLayoutParams(infoParams);
+
+        TextView infoTitle = new TextView(this);
+        infoTitle.setText("Completion proof required");
+        infoTitle.setTypeface(null, Typeface.BOLD);
+        infoTitle.setTextSize(14);
+        infoTitle.setTextColor(Color.parseColor("#1D4ED8"));
+        infoCard.addView(infoTitle);
+
+        TextView infoSub = new TextView(this);
+        infoSub.setText("Add a comment and attach a photo. Both are required to mark this task Done.");
+        infoSub.setTextColor(Color.parseColor("#3B5BA9"));
+        infoSub.setTextSize(12.5f);
+        LinearLayout.LayoutParams infoSubParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        infoSubParams.setMargins(0, dpToPx(4), 0, 0);
+        infoSub.setLayoutParams(infoSubParams);
+        infoCard.addView(infoSub);
+        container.addView(infoCard);
+
+        // ── Comment field: boxed, modern outline instead of a bare underline.
+        TextView commentLabel = new TextView(this);
+        commentLabel.setText("Comment");
+        commentLabel.setTypeface(null, Typeface.BOLD);
+        commentLabel.setTextSize(13);
+        commentLabel.setTextColor(Color.parseColor("#374151"));
+        container.addView(commentLabel);
 
         final EditText commentInput = new EditText(this);
         commentInput.setHint("Describe what was done...");
         commentInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         commentInput.setMinLines(3);
         commentInput.setGravity(Gravity.TOP | Gravity.START);
+        commentInput.setTextColor(Color.parseColor("#111827"));
+        commentInput.setBackgroundColor(Color.TRANSPARENT);
+        android.graphics.drawable.GradientDrawable inputBg = new android.graphics.drawable.GradientDrawable();
+        inputBg.setColor(Color.WHITE);
+        inputBg.setStroke(dpToPx(1), Color.parseColor("#D1D5DB"));
+        inputBg.setCornerRadius(dpToPx(10));
+        commentInput.setBackground(inputBg);
+        commentInput.setPadding(dpToPx(12), dpToPx(10), dpToPx(12), dpToPx(10));
+        LinearLayout.LayoutParams commentParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        commentParams.setMargins(0, dpToPx(6), 0, dpToPx(18));
+        commentInput.setLayoutParams(commentParams);
         container.addView(commentInput);
 
-        Button takePhotoBtn = new Button(this);
-        takePhotoBtn.setText("Take Photo");
-        LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        btnParams.setMargins(0, dpToPx(16), 0, dpToPx(12));
-        takePhotoBtn.setLayoutParams(btnParams);
-        container.addView(takePhotoBtn);
+        // ── Attach File button — opens Take Photo / Choose from Gallery chooser.
+        TextView photoLabel = new TextView(this);
+        photoLabel.setText("Photos");
+        photoLabel.setTypeface(null, Typeface.BOLD);
+        photoLabel.setTextSize(13);
+        photoLabel.setTextColor(Color.parseColor("#374151"));
+        container.addView(photoLabel);
 
-        final ImageView preview = new ImageView(this);
-        preview.setVisibility(View.GONE);
-        LinearLayout.LayoutParams previewParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(200));
-        preview.setLayoutParams(previewParams);
-        preview.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        preview.setBackgroundColor(Color.parseColor("#F3F4F6"));
-        container.addView(preview);
+        Button attachBtn = new Button(this);
+        attachBtn.setText("Attach File");
+        styleActionButton(attachBtn, "#16A34A", dpToPx(6));
+        container.addView(attachBtn);
 
-        // Let the ActivityResultCallback registered in onCreate() write into this
-        // specific preview / URI for the duration of this dialog.
-        proofImagePreview = preview;
+// Thumbnails render small (72dp) in a scrollable row; each has a delete badge
+// and opens full-size on tap. Supports multiple attached photos.
+        HorizontalScrollView thumbScroll = new HorizontalScrollView(this);
+        thumbScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        thumbScroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        scrollParams.setMargins(0, dpToPx(12), 0, 0);
+        thumbScroll.setLayoutParams(scrollParams);
 
-        takePhotoBtn.setOnClickListener(v -> {
-            if (checkSelfPermission(android.Manifest.permission.CAMERA)
-                    == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                launchProofCamera();
-            } else {
-                proofCameraPermissionLauncher.launch(android.Manifest.permission.CAMERA);
-            }
-        });
+        LinearLayout thumbRow = new LinearLayout(this);
+        thumbRow.setOrientation(LinearLayout.HORIZONTAL);
+        thumbScroll.addView(thumbRow);
+        container.addView(thumbScroll);
+
+        proofThumbnailContainer = thumbRow;
+        pendingProofImageFiles.clear();
+        refreshProofThumbnails();
+
+        attachBtn.setOnClickListener(v -> showAttachFileOptions());
 
         ScrollView scroll = new ScrollView(this);
         scroll.addView(container);
 
         AlertDialog proofDialog = new AlertDialog.Builder(this)
-                .setTitle("Mark \"" + task.title + "\" as Done")
                 .setView(scroll)
-                .setPositiveButton("Continue", null) // overridden below so it can block on validation
+                .setPositiveButton("Continue", null) // overridden below to block on validation
                 .setNegativeButton("Cancel", (d, w) -> {
-                    pendingProofImageUri = null;
-                    pendingProofImageFile = null;
-                    proofImagePreview = null;
+                    pendingProofImageFiles.clear();
+                    proofThumbnailContainer = null;
                 })
                 .create();
 
         proofDialog.show();
-        proofDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-            String comment = commentInput.getText().toString().trim();
-            if (comment.isEmpty()) {
-                Toast.makeText(this, "A comment describing the completed work is required", Toast.LENGTH_SHORT).show();
-                return; // keep dialog open
-            }
-            if (pendingProofImageUri == null) {
-                Toast.makeText(this, "A photo is required as proof before this task can be marked Done", Toast.LENGTH_SHORT).show();
-                return; // keep dialog open
-            }
-            Uri capturedUri = pendingProofImageUri;
-            proofDialog.dismiss();
-            showMarkDoneConfirmationDialog(task, comment, capturedUri);
-        });
+
+        // Force white window background (rounded) — same fix as showTaskActionsDialog,
+        // since the AlertDialog window itself ignores content-view background in dark mode.
+        if (proofDialog.getWindow() != null) {
+            android.graphics.drawable.GradientDrawable windowBg = new android.graphics.drawable.GradientDrawable();
+            windowBg.setColor(Color.WHITE);
+            windowBg.setCornerRadius(dpToPx(20));
+            proofDialog.getWindow().setBackgroundDrawable(windowBg);
+        }
+
+        // Style the built-in Continue/Cancel buttons to match (theme default is the
+        // washed-out light-purple seen on dark mode).
+        Button continueBtn = proofDialog.getButton(AlertDialog.BUTTON_POSITIVE);
+        Button cancelBtn = proofDialog.getButton(AlertDialog.BUTTON_NEGATIVE);
+        if (continueBtn != null) {
+            continueBtn.setTextColor(Color.parseColor("#16A34A"));
+            continueBtn.setAllCaps(false);
+            continueBtn.setTypeface(null, Typeface.BOLD);
+        }
+        if (cancelBtn != null) {
+            cancelBtn.setTextColor(Color.parseColor("#6B7280"));
+            cancelBtn.setAllCaps(false);
+        }
+
+        if (continueBtn != null) {
+            continueBtn.setOnClickListener(v -> {
+                String comment = commentInput.getText().toString().trim();
+                if (comment.isEmpty()) {
+                    Toast.makeText(this, "A comment describing the completed work is required", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (pendingProofImageFiles.isEmpty()) {
+                    Toast.makeText(this, "At least one photo is required as proof before this task can be marked Done", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                List<File> capturedFiles = new ArrayList<>(pendingProofImageFiles);
+                proofDialog.dismiss();
+                showMarkDoneConfirmationDialog(task, comment, capturedFiles);
+            });
+        }
     }
 
     /** Explicit "are you sure" confirmation before the task is actually marked Done. */
-    private void showMarkDoneConfirmationDialog(Task task, String comment, Uri imageUri) {
+    private void showMarkDoneConfirmationDialog(Task task, String comment, List<File> proofFiles) {
         new AlertDialog.Builder(this)
                 .setTitle("Confirm completion")
-                .setMessage("Mark \"" + task.title + "\" as Done?\n\nYour comment and photo will be saved as proof of completion. This action cannot be undone.")
+                .setMessage("Mark \"" + task.title + "\" as Done?\n\nYour comment and " + proofFiles.size()
+                        + " photo(s) will be saved as proof of completion. This action cannot be undone.")
                 .setPositiveButton("Confirm", (d, w) -> {
                     AlertDialog progress = new AlertDialog.Builder(this)
                             .setMessage("Saving proof and completing task...")
                             .setCancelable(false)
                             .show();
-                    ensureAuthThenRun(() -> uploadProofImageAndFinalize(task, comment, imageUri, progress));
+                    ensureAuthThenRun(() -> uploadProofImagesAndFinalize(task, comment, proofFiles, progress));
                 })
-                .setNegativeButton("Back", (d, w) -> showMarkDoneProofDialog(task)) // let them fix the comment/photo instead of losing the flow
+                .setNegativeButton("Back", (d, w) -> showMarkDoneProofDialog(task))
                 .setCancelable(false)
                 .show();
     }
 
-    /** Compresses the proof photo to a Bitmap and writes it (as Base64) plus status + proof fields to Firestore. */
-    private void uploadProofImageAndFinalize(Task task, String comment, Uri imageUri, AlertDialog progress) {
+    /** Compresses each proof photo and writes them (as Base64 list) plus status + proof fields to Firestore. */
+    private void uploadProofImagesAndFinalize(Task task, String comment, List<File> proofFiles, AlertDialog progress) {
         if (task.firestoreId == null) {
             progress.dismiss();
             Toast.makeText(this, "This task has no ID and cannot be updated", Toast.LENGTH_SHORT).show();
             return;
         }
-
-        // Defense-in-depth: re-check right before encoding. The cache file can vanish
-        // between capture and this point (low-storage cache eviction, the OS killing
-        // the process while the camera app was in front, etc.).
-        if (!proofFileHasContent(imageUri)) {
-            progress.dismiss();
-            Toast.makeText(this, "The proof photo is no longer available. Please retake the photo and try again.", Toast.LENGTH_LONG).show();
-            pendingProofImageUri = null;
-            pendingProofImageFile = null;
-            showMarkDoneProofDialog(task);
-            return;
+        for (File f : proofFiles) {
+            if (!proofFileHasContent(f)) {
+                progress.dismiss();
+                Toast.makeText(this, "One of the proof photos is no longer available. Please retake it and try again.", Toast.LENGTH_LONG).show();
+                pendingProofImageFiles.clear();
+                showMarkDoneProofDialog(task);
+                return;
+            }
         }
 
-        final File proofFile = pendingProofImageFile;
+        // Split the ~600KB-per-doc budget across however many photos were attached.
+        int perImageByteBudget = PROOF_IMAGE_MAX_BYTES / Math.max(1, proofFiles.size());
 
-        // Decoding + downscaling + JPEG compression can take real time on a full-size
-        // camera photo, so do it off the main thread and hop back for the Firestore
-        // write. This stores the photo directly as Base64 in the task document — no
-        // Firebase Storage bucket required.
         Executors.newSingleThreadExecutor().execute(() -> {
-            String base64Image;
+            List<String> encoded = new ArrayList<>();
             try {
-                base64Image = encodeProofPhotoAsBase64(proofFile);
+                for (File f : proofFiles) {
+                    encoded.add(encodeProofPhotoAsBase64(f, perImageByteBudget));
+                }
             } catch (Exception e) {
                 runOnUiThread(() -> {
                     progress.dismiss();
-                    Toast.makeText(this, "Failed to process proof photo: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, "Failed to process proof photos: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 });
                 return;
             }
-            runOnUiThread(() -> markTaskDoneInFirestore(task, comment, base64Image, progress));
+            runOnUiThread(() -> markTaskDoneInFirestore(task, comment, encoded, progress));
         });
+    }
+
+    /** Shows task info plus the completion comment and photos, when they exist. */
+    private void showTaskDetailDialog(Task task) {
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setBackgroundColor(Color.WHITE);
+        int pad = dpToPx(20);
+        container.setPadding(pad, pad, pad, pad);
+
+        addDetailRow(container, "Category", task.category);
+        addDetailRow(container, "Time", task.time);
+        addDetailRow(container, "Status", task.status);
+        addDetailRow(container, "Assigned To", resolveAssignedToLabel(task));
+
+        TextView commentLabel = new TextView(this);
+        commentLabel.setText("Completion Comment");
+        commentLabel.setTypeface(null, Typeface.BOLD);
+        commentLabel.setTextColor(Color.parseColor("#111827"));
+        LinearLayout.LayoutParams lp1 = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp1.setMargins(0, dpToPx(16), 0, dpToPx(4));
+        commentLabel.setLayoutParams(lp1);
+        container.addView(commentLabel);
+
+        TextView commentText = new TextView(this);
+        commentText.setText(task.doneComment != null && !task.doneComment.isEmpty()
+                ? task.doneComment : "No comment submitted yet.");
+        commentText.setTextColor(Color.parseColor("#374151"));
+        commentText.setTextSize(14);
+        container.addView(commentText);
+
+        TextView photoLabel = new TextView(this);
+        photoLabel.setText("Completion Photos");
+        photoLabel.setTypeface(null, Typeface.BOLD);
+        photoLabel.setTextColor(Color.parseColor("#111827"));
+        LinearLayout.LayoutParams lp2 = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp2.setMargins(0, dpToPx(16), 0, dpToPx(4));
+        photoLabel.setLayoutParams(lp2);
+        container.addView(photoLabel);
+
+        if (task.doneImageUrls != null && !task.doneImageUrls.isEmpty()) {
+            HorizontalScrollView detailScroll = new HorizontalScrollView(this);
+            detailScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+            LinearLayout detailRow = new LinearLayout(this);
+            detailRow.setOrientation(LinearLayout.HORIZONTAL);
+            for (String base64 : task.doneImageUrls) {
+                ImageView iv = new ImageView(this);
+                int size = dpToPx(100);
+                LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(size, size);
+                p.setMargins(0, 0, dpToPx(10), 0);
+                iv.setLayoutParams(p);
+                iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+                bg.setColor(Color.parseColor("#F3F4F6"));
+                bg.setCornerRadius(dpToPx(10));
+                iv.setBackground(bg);
+                iv.setClipToOutline(true);
+                try {
+                    byte[] bytes = Base64.decode(base64, Base64.NO_WRAP);
+                    Bitmap bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                    iv.setImageBitmap(bmp);
+                    iv.setOnClickListener(v -> showFullBitmapDialog(bmp));
+                } catch (Exception ignored) { }
+                detailRow.addView(iv);
+            }
+            detailScroll.addView(detailRow);
+            container.addView(detailScroll);
+        } else {
+            TextView noPhoto = new TextView(this);
+            noPhoto.setText("No photo submitted yet.");
+            noPhoto.setTextColor(Color.parseColor("#9CA3AF"));
+            noPhoto.setTextSize(13);
+            container.addView(noPhoto);
+        }
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(container);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(scroll)
+                .setPositiveButton("Close", null)
+                .create();
+        dialog.show();
+        if (dialog.getWindow() != null) {
+            android.graphics.drawable.GradientDrawable windowBg = new android.graphics.drawable.GradientDrawable();
+            windowBg.setColor(Color.WHITE);
+            windowBg.setCornerRadius(dpToPx(20));
+            dialog.getWindow().setBackgroundDrawable(windowBg);
+        }
+    }
+
+    /** Full-screen preview of a decoded proof photo (used from showTaskDetailDialog). */
+    private void showFullBitmapDialog(Bitmap bmp) {
+        ImageView fullImage = new ImageView(this);
+        fullImage.setAdjustViewBounds(true);
+        fullImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        fullImage.setImageBitmap(bmp);
+        fullImage.setBackgroundColor(Color.BLACK);
+        AlertDialog dialog = new AlertDialog.Builder(this).setView(fullImage).setPositiveButton("Close", null).create();
+        dialog.show();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.BLACK));
+        }
+    }
+
+    /** Label/value row used by showTaskDetailDialog. */
+    private void addDetailRow(LinearLayout parent, String label, String value) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(0, dpToPx(4), 0, dpToPx(4));
+
+        TextView labelTv = new TextView(this);
+        labelTv.setText(label + ":");
+        labelTv.setTextColor(Color.parseColor("#6B7280"));
+        labelTv.setTextSize(13);
+        labelTv.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        row.addView(labelTv);
+
+        TextView valueTv = new TextView(this);
+        valueTv.setText(value != null && !value.isEmpty() ? value : "-");
+        valueTv.setTextColor(Color.parseColor("#111827"));
+        valueTv.setTextSize(13);
+        valueTv.setTypeface(null, Typeface.BOLD);
+        row.addView(valueTv);
+
+        parent.addView(row);
     }
 
     /**
@@ -1853,7 +2917,7 @@ public class ScheduleActivity extends AppCompatActivity {
      * the encoded Base64 string comfortably fits inside a single Firestore document
      * (1 MiB total document limit, so a wide margin is left for the other task fields).
      */
-    private String encodeProofPhotoAsBase64(File file) throws java.io.IOException {
+    private String encodeProofPhotoAsBase64(File file, int maxBytes) throws java.io.IOException {
         BitmapFactory.Options bounds = new BitmapFactory.Options();
         bounds.inJustDecodeBounds = true;
         BitmapFactory.decodeFile(file.getAbsolutePath(), bounds);
@@ -1884,12 +2948,12 @@ public class ScheduleActivity extends AppCompatActivity {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out);
             jpegBytes = out.toByteArray();
-            if (jpegBytes.length <= PROOF_IMAGE_MAX_BYTES || quality <= 25) break;
+            if (jpegBytes.length <= maxBytes || quality <= 25) break;
             quality -= 15;
         }
         bitmap.recycle();
 
-        if (jpegBytes.length > PROOF_IMAGE_MAX_BYTES) {
+        if (jpegBytes.length > maxBytes) {
             throw new java.io.IOException("Photo is too large to save even after compression");
         }
 
@@ -1914,14 +2978,12 @@ public class ScheduleActivity extends AppCompatActivity {
     }
 
     /** Only reachable once a comment and an encoded photo both exist. */
-    private void markTaskDoneInFirestore(Task task, String comment, String imageUrl, AlertDialog progress) {
+    private void markTaskDoneInFirestore(Task task, String comment, List<String> imageUrls, AlertDialog progress) {
         task.status = getString(R.string.status_done);
         task.doneComment = comment;
-        task.doneImageUrl = imageUrl;
+        task.doneImageUrls = imageUrls;
 
-        cancelNotification(task); // cancel alarm & dismiss any live notification
-
-        // Remove all related alerts from notification history (Firestore + local cache).
+        cancelNotification(task);
         FarmRepository.INSTANCE.deleteAlertByMessage(task.title, null);
         GlobalData.removeAlertsContaining(task.title);
 
@@ -1931,7 +2993,7 @@ public class ScheduleActivity extends AppCompatActivity {
                         "extensionMinutes", task.extensionMinutes,
                         "workWindowMinutes", task.workWindowMinutes,
                         "doneComment", comment,
-                        "doneImageUrl", imageUrl,
+                        "doneImageUrls", imageUrls,
                         "doneBy", currentUserEmail,
                         "doneAt", com.google.firebase.firestore.FieldValue.serverTimestamp())
                 .addOnSuccessListener(unused -> {
@@ -1939,9 +3001,8 @@ public class ScheduleActivity extends AppCompatActivity {
                     logTaskHistory(task, task.status);
                     Toast.makeText(this, "Task completed!", Toast.LENGTH_SHORT).show();
                     pendingDoneTask = null;
-                    pendingProofImageUri = null;
-                    pendingProofImageFile = null;
-                    proofImagePreview = null;
+                    pendingProofImageFiles.clear();
+                    proofThumbnailContainer = null;
                 })
                 .addOnFailureListener(e -> {
                     progress.dismiss();
@@ -1949,6 +3010,133 @@ public class ScheduleActivity extends AppCompatActivity {
                 });
     }
 
+    /** Rebuilds the horizontal thumbnail row inside the currently-open proof dialog. */
+    private void refreshProofThumbnails() {
+        if (proofThumbnailContainer == null) return;
+        proofThumbnailContainer.removeAllViews();
+
+        int size = dpToPx(72);
+        for (File file : pendingProofImageFiles) {
+            FrameLayout cell = new FrameLayout(this);
+            LinearLayout.LayoutParams cellParams = new LinearLayout.LayoutParams(size, size);
+            cellParams.setMargins(0, 0, dpToPx(10), 0);
+            cell.setLayoutParams(cellParams);
+
+            ImageView thumb = new ImageView(this);
+            thumb.setLayoutParams(new FrameLayout.LayoutParams(size, size));
+            thumb.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            android.graphics.drawable.GradientDrawable thumbBg = new android.graphics.drawable.GradientDrawable();
+            thumbBg.setColor(Color.parseColor("#F3F4F6"));
+            thumbBg.setCornerRadius(dpToPx(10));
+            thumb.setBackground(thumbBg);
+            thumb.setClipToOutline(true);
+            BitmapFactory.Options opts = new BitmapFactory.Options();
+            opts.inSampleSize = 4; // thumbnail only, no need for full resolution
+            Bitmap bmp = BitmapFactory.decodeFile(file.getAbsolutePath(), opts);
+            if (bmp != null) thumb.setImageBitmap(bmp);
+            thumb.setOnClickListener(v -> showFullProofImageDialog(file));
+            cell.addView(thumb);
+
+            // Delete badge, top-end corner.
+            TextView deleteBadge = new TextView(this);
+            deleteBadge.setText("×");
+            deleteBadge.setTextColor(Color.WHITE);
+            deleteBadge.setTextSize(14);
+            deleteBadge.setGravity(Gravity.CENTER);
+            deleteBadge.setTypeface(null, Typeface.BOLD);
+            int badgeSize = dpToPx(20);
+            FrameLayout.LayoutParams badgeParams = new FrameLayout.LayoutParams(badgeSize, badgeSize);
+            badgeParams.gravity = Gravity.TOP | Gravity.END;
+            badgeParams.setMargins(0, dpToPx(-4), dpToPx(-4), 0);
+            deleteBadge.setLayoutParams(badgeParams);
+            android.graphics.drawable.GradientDrawable badgeBg = new android.graphics.drawable.GradientDrawable();
+            badgeBg.setColor(Color.parseColor("#DC2626"));
+            badgeBg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            deleteBadge.setBackground(badgeBg);
+            deleteBadge.setOnClickListener(v -> {
+                pendingProofImageFiles.remove(file);
+                file.delete(); // no longer needed on disk once removed from the pending list
+                refreshProofThumbnails();
+            });
+            cell.addView(deleteBadge);
+
+            proofThumbnailContainer.addView(cell);
+        }
+    }
+
+    /** Full-screen preview of a single proof photo, opened by tapping its thumbnail. */
+    private void showFullProofImageDialog(File file) {
+        ImageView fullImage = new ImageView(this);
+        fullImage.setAdjustViewBounds(true);
+        fullImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        Bitmap bmp = BitmapFactory.decodeFile(file.getAbsolutePath());
+        if (bmp != null) fullImage.setImageBitmap(bmp);
+        fullImage.setBackgroundColor(Color.BLACK);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(fullImage)
+                .setPositiveButton("Close", null)
+                .create();
+        dialog.show();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.BLACK));
+        }
+    }
+
+    /** "Attach File" entry point — lets the user pick Take Photo or Choose from Gallery. */
+    private void showAttachFileOptions() {
+        String[] options = {"Take Photo", "Choose from Gallery"};
+        new AlertDialog.Builder(this)
+                .setTitle("Attach Completion Photo")
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) {
+                        if (checkSelfPermission(android.Manifest.permission.CAMERA)
+                                == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                            launchProofCamera();
+                        } else {
+                            proofCameraPermissionLauncher.launch(android.Manifest.permission.CAMERA);
+                        }
+                    } else {
+                        pickImageLauncher.launch("image/*");
+                    }
+                })
+                .show();
+    }
+
+    /**
+     * Validates the picked file is JPG or PNG, then copies it into the same
+     * proof_photos cache directory the camera uses so uploadProofImageAndFinalize()
+     * doesn't need to know whether the photo came from the camera or the gallery.
+     */
+    private void handlePickedProofImage(Uri sourceUri) {
+        String mimeType = getContentResolver().getType(sourceUri);
+        boolean isJpgOrPng = mimeType != null
+                && (mimeType.equalsIgnoreCase("image/jpeg") || mimeType.equalsIgnoreCase("image/png"));
+        if (!isJpgOrPng) {
+            Toast.makeText(this, "Only JPG or PNG images are supported. Please choose a different file.", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        File destFile = newProofImageFile();
+        if (destFile == null) {
+            Toast.makeText(this, "Could not prepare storage for the selected photo", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        try (java.io.InputStream in = getContentResolver().openInputStream(sourceUri);
+             java.io.OutputStream out = new java.io.FileOutputStream(destFile)) {
+            if (in == null) throw new java.io.IOException("Could not open selected image");
+            byte[] buffer = new byte[8192];
+            int len;
+            while ((len = in.read(buffer)) != -1) out.write(buffer, 0, len);
+        } catch (Exception e) {
+            Toast.makeText(this, "Failed to load the selected photo. Please try again.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        pendingProofImageFiles.add(destFile);
+        refreshProofThumbnails();
+    }
     /** Creates the proof image Uri and starts the camera capture. Only call once CAMERA permission is confirmed granted. */
     private void launchProofCamera() {
         File file = newProofImageFile();
@@ -1970,8 +3158,8 @@ public class ScheduleActivity extends AppCompatActivity {
         // preview) permission to every app that can actually handle the capture
         // intent is the standard workaround for that class of device bug.
         grantProofUriPermissionToCameraApps(uri);
-        pendingProofImageUri = uri;
-        pendingProofImageFile = file;
+        currentCaptureUri = uri;
+        currentCaptureFile = file;
         takePictureLauncher.launch(uri);
     }
 
@@ -1993,19 +3181,8 @@ public class ScheduleActivity extends AppCompatActivity {
      * catch the "RESULT_OK but nothing was written" failure mode some OEM camera
      * apps exhibit, before it turns into a confusing Firebase Storage error.
      */
-    private boolean proofFileHasContent(Uri uri) {
-        // Prefer checking the on-disk File directly when we have it — it's the same
-        // path the upload itself now reads from, so this check and the actual upload
-        // can never disagree about whether the photo is really there.
-        if (pendingProofImageFile != null) {
-            return pendingProofImageFile.exists() && pendingProofImageFile.length() > 0;
-        }
-        if (uri == null) return false;
-        try (android.content.res.AssetFileDescriptor afd = getContentResolver().openAssetFileDescriptor(uri, "r")) {
-            return afd != null && afd.getLength() != 0; // getLength() == 0 for genuinely empty files; UNKNOWN_LENGTH (-1) still counts as "has content"
-        } catch (Exception e) {
-            return false;
-        }
+    private boolean proofFileHasContent(File file) {
+        return file != null && file.exists() && file.length() > 0;
     }
 
     /** Creates a fresh, empty cache file for the camera to write the proof photo into. */
@@ -2059,20 +3236,7 @@ public class ScheduleActivity extends AppCompatActivity {
                 .show();
     }
 
-    private void showManagerOverrideDialog(Task task) {
-        new AlertDialog.Builder(this)
-                .setTitle("Manager Override")
-                .setMessage("Task '" + task.title + "' is MISSED. Reset it to Ongoing?")
-                .setPositiveButton("Reset to Ongoing", (d, w) -> {
-                    task.extensionMinutes += 60; // Add an hour to make it ongoing again
-                    task.status = getString(R.string.status_ongoing);
-                    updateTaskStatus(task);
-                    logTaskExtension(task, 60, "missed");
-                    Toast.makeText(this, "Task reset to Ongoing (1 hour added)", Toast.LENGTH_SHORT).show();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
+
 
     private void addCategoryHeader(String category) {
         TextView header = new TextView(this);
@@ -2266,7 +3430,7 @@ public class ScheduleActivity extends AppCompatActivity {
         }
         // Completion proof, when this status change is the Mark-as-Done flow.
         if (task.doneComment != null && !task.doneComment.isEmpty()) entry.put("comment", task.doneComment);
-        if (task.doneImageUrl != null && !task.doneImageUrl.isEmpty()) entry.put("proofImageUrl", task.doneImageUrl);
+        if (task.doneImageUrls != null && !task.doneImageUrls.isEmpty()) entry.put("proofImageUrls", task.doneImageUrls);
         entry.put("createdBy", currentUserEmail);
         entry.put("timestamp", com.google.firebase.firestore.FieldValue.serverTimestamp());
 
@@ -2343,7 +3507,7 @@ public class ScheduleActivity extends AppCompatActivity {
                         com.google.firebase.firestore.WriteBatch batch = db.batch();
                         boolean[] hasWrites = {false};
                         for (QueryDocumentSnapshot doc : snapshots) {
-                            String img = doc.getString("doneImageUrl");
+                            String img = doc.getString("doneImageUrls"); // won't match a list field via getString; see note below
                             if (img != null && !img.isEmpty()) {
                                 batch.update(doc.getReference(), "doneImageUrl", com.google.firebase.firestore.FieldValue.delete());
                                 hasWrites[0] = true;
@@ -2433,6 +3597,12 @@ public class ScheduleActivity extends AppCompatActivity {
     }
     private boolean isSameDay(Calendar c1, Calendar c2) {
         return c1.get(Calendar.YEAR) == c2.get(Calendar.YEAR) && c1.get(Calendar.DAY_OF_YEAR) == c2.get(Calendar.DAY_OF_YEAR);
+    }
+    /** Reschedule requests are only valid for today's task — a previous day's task cannot be rescheduled. */
+    private boolean isTaskToday(Task task) {
+        return task.year == today.get(Calendar.YEAR)
+                && task.month == today.get(Calendar.MONTH)
+                && task.day == today.get(Calendar.DAY_OF_MONTH);
     }
 
     private void scheduleNotification(Task task, int hour, int minute) {
@@ -2553,10 +3723,15 @@ public class ScheduleActivity extends AppCompatActivity {
         String recurrenceGroupId;
         List<String> assignedTo = new ArrayList<>(); // emails of assigned staff; empty = owner-only visible
         String assignedBy;    // email of the owner who created/assigned this task
-        int extensionMinutes = 0;
-        int workWindowMinutes = 60; // default
+        // Reschedule request (staff-initiated, owner-approved). 0/null = no pending request.
+        int extensionMinutes = 0;      // ← add this
+        int workWindowMinutes = 60;    // ← add this
+        int pendingRescheduleMinutes = 0;
+        String pendingRescheduleReason;
+        String pendingRescheduleRequestedBy;
+
         String doneComment;   // required comment proof, set only when marked Done via the proof flow
-        String doneImageUrl;  // Base64-encoded JPEG of the required proof photo (stored directly on the task doc, not Firebase Storage)
+        List<String> doneImageUrls = new ArrayList<>(); // Base64-encoded JPEGs of the proof photos (stored directly on the task doc, not Firebase Storage)
 
         Task(String firestoreId, String title, String category, String time, String status, int year, int month, int day, String recurrence, String recurrenceGroupId) {
             this.firestoreId = firestoreId;

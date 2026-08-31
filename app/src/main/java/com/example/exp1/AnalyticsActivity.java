@@ -230,7 +230,29 @@ public class AnalyticsActivity extends AppCompatActivity {
     }
 
     private void setupFilterSpinner() {
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, FILTERS);
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, FILTERS) {
+            @Override
+            public View getView(int position, View convertView, android.view.ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                if (view instanceof TextView) {
+                    TextView tv = (TextView) view;
+                    tv.setTextColor(Color.BLACK);
+                }
+                view.setBackgroundColor(Color.WHITE);
+                return view;
+            }
+
+            @Override
+            public View getDropDownView(int position, View convertView, android.view.ViewGroup parent) {
+                View view = super.getDropDownView(position, convertView, parent);
+                if (view instanceof TextView) {
+                    TextView tv = (TextView) view;
+                    tv.setTextColor(Color.BLACK);
+                }
+                view.setBackgroundColor(Color.WHITE);
+                return view;
+            }
+        };
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         filterSpinner.setAdapter(adapter);
         filterSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -239,8 +261,6 @@ public class AnalyticsActivity extends AppCompatActivity {
                 currentFilter = FILTERS[position];
                 updateFilterChoiceVisibility();
 
-                // First time a choice-based filter is picked, immediately prompt for
-                // the period instead of silently filtering on stale/default values.
                 if (currentFilter.equals("Custom") && (customStartDate == null || customEndDate == null)) {
                     showCustomRangePicker();
                 } else {
