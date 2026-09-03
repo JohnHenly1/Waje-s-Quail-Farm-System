@@ -1,7 +1,7 @@
-<resources>
+﻿<resources>
     <!-- Header Nav -->
     <string name="app_name">Waje\'s Quail Farm</string>
-    <string name="analytic">Analytics</string>
+    <string name="Report">Ulat</string>
     <string name="schedule_dashboard">Iskedyul</string>
     <string name="profile_dashboard">Profile</string>
     <string name="AddBtn">Dagdag</string>
@@ -9,50 +9,49 @@
     <!-- Dashboard strings -->
     <string name="menu">Menu</string>
     <string name="notifications">Mga Notipikasyon</string>
-    <string name="welcome_message">Hi, User!</string>
-    <string name="welcome_message_dynamic">Hi, %1$s!</string>
+    <string name="welcome_message">Kumusta, User!</string>
+    <string name="welcome_message_dynamic">Kumusta, %1$s!</string>
     <string name="welcome_back">Maligayang Pagbabalik!</string>
-    <string name="generating_reports">Gumagawa ng mga Ulat&#8230;</string>
-    <string name="fetching_tasks">Kinukuha ang mga Gawain&#8230;</string>
-    <string name="checking_inventory">Sinisiyasat ang Imbentaryo&#8230;</string>
-    <string name="loading_egg_records">Niloload ang mga Record ng Itlog&#8230;</string>
-    <string name="reading_sensors">Binabasa ang mga Sensor&#8230;</string>
-    <string name="syncing_farm_stats">Sini-sync ang mga Istatistika ng Farm&#8230;</string>
+    <string name="generating_reports">Gumagawa ng mga ulat…</string>
+    <string name="fetching_tasks">Kinukuha ang mga gawain…</string>
+    <string name="checking_inventory">Sinisiyasat ang imbentaryo…</string>
+    <string name="loading_egg_records">Naglo-load ng mga rekord ng itlog…</string>
+    <string name="reading_sensors">Binabasa ang mga sensor…</string>
+    <string name="syncing_farm_stats">Sine-sync ang mga istatistika ng farm…</string>
     <string name="photo_saved">Nai-save na ang larawan!</string>
     <string name="camera_permission_required">Kailangan ng pahintulot sa camera</string>
-    <string name="no_camera_app">Walang nahanap na camera app</string>
-    <string name="token_refresh_failed">Bigo ang pag-refresh ng token: %1$s</string>
+    <string name="no_camera_app">Walang natagpuang camera app</string>
+    <string name="token_refresh_failed">Nabigo ang pag-refresh ng token: %1$s</string>
     <string name="quick_actions">MABILIS NA AKSYON</string>
-    <string name="todays_overview">OVERVIEW NGAYON</string>
+    <string name="todays_overview">PAGLALANAN NGAYON</string>
     <string name="total_today">Kabuuan ngayong araw</string>
     <string name="remaining">Natitira</string>
     <string name="zero">0</string>
 
     <!-- AI Recommendation -->
-    <string name="ai_recommendation">Smart Tip na Rekomendasyon</string>
-    <string name="recommendation_text">I-click ang card para sa bagong tip!</string>
-
+    <string name="ai_recommendation">Tanungin ang Quail Assistant</string>
+    <string name="recommendation_text">Kumuha ng instant na sagot tungkol sa iyong kawan</string>
     <string-array name="smart_tips">
         <item>Pagpapakain sa Umaga: Pinaka-aktibo ang mga pugo sa umaga. Siguraduhing puno ang mga kainan bago mag-7 AM.</item>
-        <item>Pagsisiyasat ng Tubig: Suriin ang lebel ng tubig tuwing 4 na oras. Ang dehydration ay nagpapababa ng produksyon ng itlog.</item>
-        <item>Tip sa Pag-iilaw: Ang 14&#8211;16 oras na liwanag bawat araw ay mainam para sa tuluy-tuloy na pangingitlog.</item>
-        <item>Bentilasyon: Ang maayos na daloy ng hangin ay susi upang maiwasan ang ammonia mula sa dumi.</item>
-        <item>Pagkuha ng Itlog: Kolektahin ang mga itlog kahit dalawang beses sa isang araw para maiwasan ang pagkabasag.</item>
-        <item>Pamamahala ng Stress: Panatilihing mahina ang ingay sa paligid ng mga kulungan. Ang biglaang malakas na ingay ay maaaring magpatigil sa pangingitlog.</item>
-        <item>Calcium Boost: Ang pagdaragdag ng dinurog na shell ng talaba sa pakain ay tumutulong sa pagpapatigas ng balat ng itlog.</item>
-        <item>Molting: Kung huminto sa pangingitlog at nalalagas ang balahibo, baka sila ay nagmo-molting. Bigyan sila ng dagdag na protina.</item>
-        <item>Paglilinis ng Kulungan: Linisin ang mga waste tray araw-araw upang maiwasan ang amoy ng ammonia.</item>
-        <item>Bio-security: Hugasan nang regular ang iyong mga kamot bago at pagkatapos hawakan ang mga pugo o ang kanilang mga itlog.</item>
-        <item>Sariwang Pakain: Itago ang pakain sa isang malalamig at tuyong lugar upang maiwasan ang paglaki ng amag.</item>
-        <item>Pagkontrol ng Temperatura: Panatilihin ang bahay ng pugo sa pagitan ng 21°C at 32°C para sa pinakamainam na ginhawa at produksyon.</item>
-        <item>Katubigan: Panatilihin ang relative humidity sa 50-70% upang mapanatiling malusog ang mga pugo at hindi matuyo ang mga itlog.</item>
-        <item>Pagpupurga: Kumunsulta sa isang vet para sa regular na iskedyul ng pagpupurga upang matiyak ang kalusugan ng ibon.</item>
-        <item>Proteksyon sa Maninila: Siguraduhing ligtas ang mga kulungan laban sa mga daga, pusa, at ahas.</item>
-        <item>Pagtatala: Laging subaybayan ang iyong pang-araw-araw na bilang ng itlog upang maagang matukoy ang mga trend ng produksyon.</item>
-        <item>Espasyo: Siguraduhing may sapat na espasyo ang mga ibon. Ang pagsisikip ay humahantong sa stress at cannibalism.</item>
-        <item>Kalidad ng Pakain: Ang high-protein layer crumbles (mga 20-22%) ay pinakamainam para sa mga nangingitlog na pugo.</item>
-        <item>Dust Bathing: Magbigay ng kahon ng tuyong buhangin; gustong-gusto ng mga pugo ang dust bath upang manatiling malinis at walang kuto.</item>
-        <item>Pag-cull: Regular na tukuyin at alisin ang mga hindi nagpeperform o may sakit na ibon upang maprotektahan ang kawan.</item>
+        <item>Pagsusuri ng Tubig: Suriin ang lebel ng tubig bawat 4 na oras. Ang dehydration ay nagpapababa ng produksyon ng itlog.</item>
+        <item>Tip sa Pag-iilaw: 14–16 na oras ng liwanag kada araw ang mainam para sa tuloy-tuloy na pangingitlog.</item>
+        <item>Airflow: Mahalaga ang maayos na bentilasyon para maiwasan ang buildup ng ammonia mula sa dumi.</item>
+        <item>Pagkolekta ng Itlog: Kolektahin ang mga itlog nang hindi bababa sa dalawang beses bawat araw upang maiwasan ang pagkabasag o pag-peck.</item>
+        <item>Pamamahala ng Stress: Panatilihing mababa ang ingay sa paligid ng kulungan. Ang biglaang malakas na tunog ay maaaring pumigil sa pangingitlog ng ilang araw.</item>
+        <item>Calcium Boost: Ang pagdaragdag ng dinurog na shell ng talaba sa pakain ay nakakatulong palakasin ang balat ng itlog.</item>
+        <item>Molting: Kung humihinto sa pangingitlog at nalalagas ang balahibo, maaaring nagmo-molting ang mga ito. Magbigay ng dagdag na protina sa panahong ito.</item>
+        <item>Paglilinis ng Kulungan: Linisin ang mga tray ng dumi araw-araw upang maiwasan ang amoy ng ammonia.</item>
+        <item>Bio-security: Hugasan ang kamay bago at pagkatapos hawakan ang mga pugo o itlog para sa kaligtasan ng kawan.</item>
+        <item>Sariwang Pakain: Itago ang pakain sa malamig at tuyong lugar upang maiwasan ang amag.</item>
+        <item>Kontrol ng Temperatura: Panatilihin ang bahay ng pugo sa pagitan ng 21°C at 32°C para sa komportable at produktibong kondisyon.</item>
+        <item>Humidity: Panatilihin ang relative humidity sa 50–70% para mapanatili ang kalusugan ng pugo at maiwasang matuyo ang mga itlog.</item>
+        <item>Pagpupurga: Kumunsulta sa beterinaryo para sa regular na iskedyul ng pagpupurga.</item>
+        <item>Proteksyon sa Predator: Siguraduhing ligtas ang kulungan laban sa daga, pusa, at ahas.</item>
+        <item>Pagtatala: Subaybayan araw-araw ang bilang ng itlog upang makita agad ang mga trend.</item>
+        <item>Espasyo: Siguraduhing sapat ang espasyo ng mga ibon; ang pagsisikip ay nagdudulot ng stress at cannibalism.</item>
+        <item>Kalidad ng Pakain: Ang high-protein layer crumbles (humigit-kumulang 20–22%) ay angkop para sa mga nangingitlog.</item>
+        <item>Dust Bathing: Magbigay ng kahon ng tuyong buhangin; mahalaga ito para sa paglilinis at pag-iwas sa pulgas.</item>
+        <item>Pag-cull: Alisin ang mga hindi nagpe-perform o may sakit na ibon para protektahan ang kawan.</item>
     </string-array>
 
     <!-- Shortcuts -->
@@ -80,10 +79,11 @@
     <string name="back">Bumalik</string>
     <string name="settings">Mga Setting</string>
     <string name="critical">Kritikal</string>
-    <string name="warnings">Mga Babala</string>
+    <string name="warnings">Babala</string>
     <string name="total">Kabuuan</string>
     <string name="all_notifications">Lahat ng Notipikasyon</string>
-    <string name="mark_all_read">Markahan ang lahat bilang nabasa na</string>
+    <string name="all">Lahat</string>
+    <string name="mark_all_read">Markahan ang Lahat Bilang Nabasa</string>
 
     <!-- Schedule Strings -->
     <string name="Monday">Lun</string>
@@ -93,15 +93,14 @@
     <string name="Friday">Biy</string>
     <string name="Saturday">Sab</string>
     <string name="Sunday">Lin</string>
-
     <string name="textSchedule">Iskedyul Ngayon:</string>
     <string name="task1">Pakain sa Umaga</string>
     <string name="textSchedule3">Iskedyul:</string>
     <string name="distribute_quail_s_feed_at_this_time">Ipamahagi ang pakain ng pugo sa oras na ito!</string>
     <string name="add_schedule">Magdagdag ng Iskedyul</string>
-    <string name="bulk_delete">Burahin ang marami</string>
-    <string name="delete_selected_tasks">Burahin ang mga piniling gawain</string>
-    <string name="no_tasks_selected">Walang piniling gawain</string>
+    <string name="bulk_delete">Burahin nang Marami</string>
+    <string name="delete_selected_tasks">Burahin ang mga Piniling Gawain</string>
+    <string name="no_tasks_selected">Walang Piniling Gawain</string>
 
     <!-- Profile Strings -->
     <string name="manage_account">Pamahalaan ang iyong account</string>
@@ -109,7 +108,7 @@
     <string name="user_name">James Anderson</string>
     <string name="user_role">Farm Manager</string>
     <string name="user_email">james@wajequailfarm.com</string>
-    <string name="total_birds">Kabuuang Pugo</string>
+    <string name="total_birds">Kabuuang Ibon</string>
     <string name="total_birds_val">0</string>
     <string name="active_cages">Aktibong Kulungan</string>
     <string name="active_cages_val">0</string>
@@ -124,7 +123,7 @@
     <string name="help_support">Tulong at Suporta</string>
     <string name="log_out">Mag-logout</string>
     <string name="version_info">Waje\'s Quail Farm Beta Ver.</string>
-    <string name="copyright">© 2026 Nakareserba ang lahat ng karapatan</string>
+    <string name="copyright">© 2026 Nakareserba ang Lahat ng Karapatan</string>
     <string name="camera">Kamera</string>
     <string name="previous">Nakaraan</string>
     <string name="next">Susunod</string>
@@ -133,127 +132,232 @@
     <string name="login_title">Mag-login</string>
     <string name="continue_with_google">Magpatuloy gamit ang Google</string>
     <string name="register_account">Magrehistro ng Account</string>
-    <string name="system_access">Access sa System</string>
+    <string name="system_access">Pag-access sa System</string>
     <string name="enter_email_hint">Ilagay ang Email Address</string>
     <string name="enter_approved_email_hint">Ilagay ang Inaprubahang Email</string>
     <string name="login_with_email">Mag-login gamit ang Email</string>
     <string name="or_separator">— O —</string>
     <string name="select_role">Pumili ng Papel:</string>
     <string name="role_staff">Farm Staff</string>
-    <string name="request_code">Humingi ng Access Code</string>
+    <string name="request_code">Humiling ng Access Code</string>
     <string name="i_have_a_code">May Invite Code Ako</string>
-    <string name="initial_farm_setup">Initial na Setup ng Farm (Farm Owner)</string>
+    <string name="initial_farm_setup">Paunang Setup ng Farm (May-ari)</string>
     <string name="role_available">Available: %1$d/%2$d</string>
     <string name="role_full">Puno na ang Papel</string>
+    <string name="forgot_password_label" translatable="false">Forgot Password?</string>
+    <string name="reset_password" translatable="false">Reset Password</string>
+    <string name="new_password_hint" translatable="false">Enter New Password</string>
+    <string name="update_password" translatable="false">Update Password</string>
+    <string name="verify_email_msg" translatable="false">Please enter your email to verify your account.</string>
+    <string name="email_not_found" translatable="false">Email not found in our records</string>
+    <string name="password_updated_success" translatable="false">Password updated successfully!</string>
+
+    <!-- Added to replace hardcoded layout strings -->
+    <string name="refresh">I-refresh</string>
+    <string name="urgent_label">Mahalaga</string>
+    <string name="general_label">Pangkalahatan</string>
+    <string name="all_label">Lahat</string>
+    <string name="clear_all_alerts">I-clear ang Lahat ng Alerto</string>
+    <string name="enter_invite_code">Ilagay ang Invite Code</string>
+    <string name="invitation_verification">Pagpapatunay ng Imbitasyon</string>
+    <string name="enter_6digit_code_sent">Ilagay ang 6-digit na code na ipinadala sa iyong email ng may-ari.</string>
+    <string name="invite_code_hint">000000</string>
+    <string name="verify_and_register">Patunayan at Magrehistro</string>
+    <string name="view_by">Tingnan ayon sa</string>
+    <string name="select_period">Pumili ng Panahon</string>
+    <string name="change_label">Baguhin ›</string>
+    <string name="total_no_of_eggs_label">Kabuuang Bilang ng Itlog</string>
+    <string name="overall_quality">Pangkalahatang Kalidad</string>
+    <string name="egg_grade_distribution">Distribusyon ng Grado ng Itlog</string>
+    <string name="grade_breakdown">Pagkakabahagi ng Grado</string>
+    <string name="generate_report">Gumawa ng Ulat</string>
+    <string name="no_of_eggs_label">Bilang ng itlog: 0</string>
+
+    <!-- Chat bot / UI labels -->
+    <string name="quail_assistant">Quail Assistant</string>
+    <string name="quail_assistant_typing">Nagta-type ang Quail Assistant&#8230;</string>
+    <string name="model_3_5_flash">3.5 Flash</string>
+    <string name="ask_quail_hint">Magtanong tungkol sa pangingalaga ng pugo&#8230;</string>
+    <string name="send">Ipadala</string>
+    <string name="new_chat">Bagong chat</string>
+    <string name="chat_history">Kasaysayan ng chat</string>
+
+    <!-- Egg count screen strings -->
+    <string name="egg_count_title">Bilang at Kalidad ng Itlog</string>
+    <string name="live_time_placeholder">12:00 PM
+Apr 7, 2026</string>
+    <string name="reset_counts">I-reset ang mga bilang</string>
+    <string name="live_scan_badge">● LIVE SCAN</string>
+    <string name="capture_and_analyze">Kunan at Suriin</string>
+    <string name="retake">↩ Muling kunan</string>
+    <string name="pick_photo">Pumili ng Larawan</string>
+    <string name="discard">✕ Itapon</string>
+    <string name="save_collection">💾 I-save ang Koleksiyon</string>
+    <string name="total_eggs_detected">Kabuuang Itlog
+Natukoy</string>
+    <string name="collection_history">Kasaysayan ng Koleksyon</string>
+    <string name="this_week">Ngayong Linggo</string>
+    <string name="grade_normal">Normal</string>
+    <string name="grade_cracked">Basag</string>
+    <string name="grade_reject">Tanggihan</string>
+
+    <!-- Additional UI placeholders added during localization cleanup -->
+    <string name="sample_date">Mar 10, 2026</string>
+    <string name="today">Ngayon</string>
+    <string name="history">Kasaysayan</string>
+    <string name="search">Maghanap</string>
+    <string name="all_items">Lahat ng Items</string>
+    <string name="zero_items_found">Walang item na natagpuan</string>
+    <string name="sort_by">I-uri ayon sa:</string>
+    <string name="items">Mga Item</string>
+    <string name="best_grade">Pinakamagandang Grado</string>
+    <string name="php_0">Php 0.00</string>
+    <string name="captured_egg_photo_desc">Nakuha o piniling larawan ng itlog</string>
+    <string name="feed_item">Item ng Pakain</string>
+    <string name="in_stock">Nasa Stock</string>
+    <string name="inv_number_placeholder">#INV0001</string>
+    <string name="layer_feed">Layer Feed</string>
+    <string name="feed_description_placeholder">Deskripsyon ng pakain dito</string>
+    <string name="shop_1">Tindahan 1</string>
+    <string name="location_label">Lokasyon</string>
+    <string name="stock_label">Stock</string>
+    <string name="edit">I-edit</string>
+    <string name="delete">Burahin</string>
+    <string name="unit_price">Presyong yunit</string>
+    <string name="total_value">Kabuuang Halaga</string>
+    <string name="quantity">Dami</string>
+    <string name="view_grade_a_details">Tingnan ang mga detalye ng Grade A</string>
+    <string name="view_grade_b_details">Tingnan ang mga detalye ng Grade B</string>
+    <string name="view_grade_c_details">Tingnan ang mga detalye ng Grade C</string>
+    <string name="export_csv">I-export bilang CSV</string>
+
+    <!-- Additional small UI labels -->
+    <string name="daily_avg">Araw-araw na Avg</string>
+    <string name="zero_percent">0%</string>
+
+    <!-- Inventory / history labels -->
+    <string name="inventory_history_title">Kasaysayan ng Imbentaryo</string>
+    <string name="feed">Pakain</string>
+    <string name="supplements">Suplemento</string>
+    <string name="all_actions">Lahat ng Aksyon</string>
+    <string name="added">Nadagdag</string>
+    <string name="restock">Restock</string>
+    <string name="deleted">Nabura</string>
+    <string name="clear_history">I-clear ang Kasaysayan</string>
 
     <!-- Profile Dialog Strings -->
-    <string name="syncing_profile">Sini-sync ang Profile&#8230;</string>
-    <string name="detected_eggs">Nakakita ng %1$d na mga itlog!</string>
-    <string name="error_loading_farm_data">Error sa pag-load ng data ng farm</string>
+    <string name="syncing_profile">Sine-sync ang Profile…</string>
+    <string name="detected_eggs">Nakita ang %1$d itlog!</string>
+    <string name="error_loading_farm_data">May error sa pag-load ng data ng farm</string>
     <string name="edit_name">I-edit ang Pangalan</string>
     <string name="save">I-save</string>
-    <string name="cancel">Kanselahon</string>
+    <string name="cancel">Kanselahin</string>
     <string name="name_empty">Hindi maaaring walang pangalan</string>
     <string name="name_updated">Na-update na ang pangalan!</string>
-    <string name="failed_to_update">Bigo sa pag-update</string>
+    <string name="failed_to_update">Nabigong i-update</string>
     <string name="farm_recalibration">Recalibration ng Farm</string>
-    <string name="restart_days">Ulitin ang Araw</string>
-    <string name="fill_birds_cages">Pakisuyong punan ang bilang ng pugo at kulungan</string>
+    <string name="restart_days">I-reset ang Araw</string>
+    <string name="fill_birds_cages">Pakisuyong punan ang bilang ng mga ibon at mga kulungan</string>
     <string name="fill_all_location">Pakisuyong punan ang lahat ng field ng lokasyon ng farm o iwanan itong lahat na walang laman</string>
-    <string name="farm_stats_updated">Na-update na ang istatistika at lokasyon ng farm!</string>
+    <string name="farm_stats_updated">Na-update na ang istatistika ng farm at lokasyon!</string>
     <string name="save_failed">Bigo sa pag-save: %1$s</string>
-    <string name="restart_days_title">Ulitin ang mga Araw na Tumatakbo?</string>
-    <string name="restart_days_message">I-reset ang counter pabalik sa Day 1?</string>
-    <string name="restart">Ulitin</string>
-    <string name="days_restarted">Na-restart na ang mga araw!</string>
-    <string name="restart_failed">Bigo sa pag-restart</string>
+    <string name="restart_days_title">I-reset ba ang mga Araw na Tumatakbo?</string>
+    <string name="restart_days_message">I-reset ang counter pabalik sa Araw 1?</string>
+    <string name="restart">I-reset</string>
+    <string name="days_restarted">Na-reset na ang mga araw!</string>
+    <string name="restart_failed">Bigo sa pag-reset</string>
     <string name="change_password">Baguhin ang Password</string>
     <string name="update">I-update</string>
     <string name="password_updated">Matagumpay na na-update ang password</string>
     <string name="incorrect_password">Maling kasalukuyang password</string>
     <string name="delete_account">Burahin ang Account</string>
-    <string name="confirm_delete_account">Sigurado ka bang gusto mong burahin ang iyong account?</string>
-    <string name="delete">Burahin</string>
-    <string name="preferences_saved">Nai-save na ang mga kagustuhan</string>
-    <string name="user_removed">Naalis na ang user</string>
-    <string name="failed_to_remove_user">Bigo sa pag-alis ng user</string>
-    <string name="role_limits">Mga Limitasyon sa Papel</string>
-    <string name="limits_updated">Na-update na ang mga Limitasyon!</string>
+    <string name="confirm_delete_account">Sigurado ka bang nais mong burahin ang iyong account?</string>
+    <!-- duplicate 'delete' removed (kept earlier definition) -->
+    <string name="preferences_saved">Nai-save ang mga kagustuhan</string>
+    <string name="user_removed">Natanggal ang user</string>
+    <string name="failed_to_remove_user">Bigo sa pagtanggal ng user</string>
+    <string name="role_limits">Mga Limitasyon ng Papel</string>
+    <string name="limits_updated">Na-update ang mga limitasyon!</string>
     <string name="pending_access_requests">Mga Nakabinbing Kahilingan sa Access</string>
-    <string name="no_pending_requests">Walang mga nakabinbing kahilingan.</string>
-    <string name="request_approved">Inaprubahan ang Kahilingan</string>
+    <string name="no_pending_requests">Walang nakabinbing kahilingan.</string>
+    <string name="request_approved">Naaprubahan ang kahilingan</string>
     <string name="database_management">Pamamahala ng Database</string>
     <string name="wipe_everything">Burahin Lahat</string>
-    <string name="confirm_wipe">BABALA: Buburahin nito ang lahat ng user, lahat ng data ng farm, at i-i-reset ang system. Proceed?</string>
+    <string name="confirm_wipe">BABALA: Buburahin nito ang lahat ng user, lahat ng data ng farm, at i-reset ang system. Itutuloy ba?</string>
     <string name="wipe">BURAHIN</string>
 
     <!-- Schedule Dialogs & Messages -->
-    <string name="failed_to_load_tasks">Bigo sa pag-load ng mga gawain: %1$s</string>
+    <string name="failed_to_load_tasks">Nabigo sa pag-load ng mga gawain: %1$s</string>
     <string name="error_updating_status">Error sa pag-update ng status: %1$s</string>
     <string name="error_deleting">Error sa pagbura: %1$s</string>
-    <string name="all_recurring_deleted">Nabura na ang lahat ng umuulit na gawain</string>
-    <string name="selected_schedules_deleted">Nabura na ang mga piniling iskedyul</string>
+    <string name="all_recurring_deleted">Nabura na ang lahat ng umiulit na gawain</string>
+    <string name="selected_schedules_deleted">Nabura na ang mga napiling iskedyul</string>
     <string name="error_deleting_tasks">Error sa pagbura ng mga gawain: %1$s</string>
     <string name="repeat_every_days_suggestion">Ulitin tuwing %1$d araw?</string>
     <string name="total_dates_selected">Kabuuan: %1$d petsa ang napili</string>
     <string name="select_year_range">Pumili ng Saklaw ng Taon</string>
-    <string name="start_year_after_end">Ang taon ng pagsisimula ay hindi maaaring lampas sa taon ng pagtatapos</string>
-    <string name="invalid_year">Maling taon</string>
+    <string name="start_year_after_end">Ang taon ng pagsisimula ay hindi maaaring mas huli kaysa sa taon ng pagtatapos</string>
+    <string name="invalid_year">Hindi wastong taon</string>
     <string name="add_new_task">Magdagdag ng Bagong Gawain</string>
-    <string name="please_select_date">Mangyaring pumili ng hindi bababa sa isang petsa</string>
+    <string name="please_select_date">Mangyaring pumili ng kahit isang petsa</string>
     <string name="confirm_and_save">Kumpirmahin at I-save</string>
-    <string name="scheduling_tasks">Nag-iiskedyul ng mga gawain&#8230; mangyaring maghintay</string>
-    <string name="tasks_scheduled">%1$d mga gawain ang nai-iskedyul!</string>
+    <string name="scheduling_tasks">Nagsi-iskedyul ng mga gawain… mangyaring maghintay</string>
+    <string name="tasks_scheduled">%1$d mga gawain ang na-iskedyul!</string>
+    <string name="assigned_to_format">Itinalaga kay: %1$s</string>
+    <string name="assigned_by_format">Itinalaga ni: %1$s</string>
+    <string name="status_owner_fallback">May-ari</string>
+    <string name="unnamed_staff">Hindi pinangalanang Tauhan</string>
     <string name="delete_task_title">Burahin ang Gawain</string>
-    <string name="delete_task_msg">Sigurado ka bang gusto mong burahin ang gawaing ito?</string>
-    <string name="delete_recurring_title">Burahin ang Umuulit na Gawain</string>
-    <string name="delete_this_only">Burahin ang gawaing ito lamang</string>
-    <string name="delete_all_series">Burahin ang lahat sa seryeng ito</string>
-    <string name="select_schedules_delete">Pumili ng mga Iskedyul na Buburahin</string>
+    <string name="delete_task_msg">Sigurado ka bang nais mong burahin ang gawaing ito?</string>
+    <string name="delete_recurring_title">Burahin ang Umiulit na Gawain</string>
+    <string name="delete_this_only">Burahin lamang ang gawaing ito</string>
+    <string name="delete_all_series">Burahin ang lahat sa serye</string>
+    <string name="select_schedules_delete">Piliin ang mga Iskedyul na Buburahin</string>
     <string name="no_tasks_assigned">Walang nakatalagang mga gawain</string>
-    <string name="all_assigned_tasks">Lahat ng Nakatalagang Gawain</string>
+    <string name="all_assigned_tasks">Lahat ng Itinalagang Gawain</string>
     <string name="update_status">I-update ang Status</string>
     <string name="today_format">"\'Ngayon, \'MMMM d"</string>
     <string name="task_reminder_title">Paalala sa Gawain: %1$s</string>
-    <string name="task_reminder_msg">Oras na para sa %1$s</string>
+    <string name="task_reminder_msg">Panahon na para sa %1$s</string>
     <string name="server_time">Oras ng Server</string>
     <string name="_2024_05_20_08_30_pm">2024/05/20 08:30 PM</string>
 
     <string name="recur_once">Minsan</string>
-    <string name="recur_custom">Custom</string>
-    <string name="recur_weekdays">Mga Araw ng Linggo</string>
+    <string name="recur_custom">Pasadyang</string>
+    <string name="recur_weekdays">Mga Araw ng Trabaho</string>
     <string name="recur_weekends">Sabado at Linggo</string>
-    <string name="recur_monthly">Buwanan</string>
-    <string name="recur_yearly_weekdays">Mga Araw ng Linggo sa Buong Taon</string>
-    <string name="recur_yearly_weekends">Sabado at Linggo sa Buong Taon</string>
+    <string name="recur_monthly">Buwanang</string>
+    <string name="recur_yearly_weekdays">Taunang (Mga Araw ng Trabaho)</string>
+    <string name="recur_yearly_weekends">Taunang (Sabado at Linggo)</string>
     <string name="recur_yearly">Taunan</string>
     <string name="recur_every_days">Tuwing %1$d araw</string>
 
     <string name="status_pending">Nakabinbin</string>
-    <string name="status_ongoing">Kasalukuyan</string>
+    <string name="status_ongoing">Tumatakbo</string>
     <string name="status_done">Tapos Na</string>
+    <string name="status_missed" translatable="false">MISSED</string>
 
     <string-array name="task_categories">
         <item>Pagpapakain</item>
         <item>Pagpapatubig</item>
         <item>Paglilinis</item>
-        <item>Pagkuha ng Itlog</item>
+        <item>Pagkolekta ng Itlog</item>
         <item>Pag-iilaw</item>
         <item>Pagsusuri sa Kalusugan</item>
     </string-array>
 
     <string name="task_title_empty">Hindi maaaring walang pamagat</string>
     <string name="no_tasks_to_delete">Walang mga gawain na buburahin</string>
-    <string name="days_unit">Mga Araw</string>
+    <string name="days_unit">Araw</string>
     <string name="task_id_label">ID</string>
     <string name="task_category_label">Kategorya: %1$s</string>
     <string name="task_time_label">Oras: %1$s</string>
     <string name="close">Isara</string>
-    <string name="clear_selection">Burahin ang Pinili</string>
+    <string name="clear_selection">I-clear ang Pinili</string>
     <string name="full_year">Buong Taon</string>
     <string name="full_month">Buong Buwan</string>
-    <string name="weekends">Sabado at Linggo</string>
-    <string name="weekdays">Mga Araw ng Linggo</string>
+    <string name="weekends">Katapusan ng Linggo</string>
+    <string name="weekdays">Mga Araw ng Trabaho</string>
     <string name="confirm">Kumpirmahin</string>
 
     <string-array name="month_names">
@@ -272,9 +376,9 @@
     </string-array>
 
     <!-- Additional Profile Strings -->
-    <string name="data_collection_policy_title">Patakaran sa Koleksyon ng Data</string>
+    <string name="data_collection_policy_title">Patakaran sa Pagkolekta ng Data</string>
     <string name="data_usage_purpose_title">Layunin ng Paggamit ng Data</string>
-    <string name="data_retention_title">Pagpapanatili ng Data</string>
+    <string name="data_retention_title">Panahon ng Pag-iingat ng Data</string>
     <string name="privacy_policy_title">Patakaran sa Privacy</string>
     <string name="data_ownership_title">Pagmamay-ari ng Data</string>
     <string name="data_sharing_title">Pagbabahagi ng Data</string>
@@ -282,23 +386,23 @@
     <string name="security_implementation_title">Pagpapatupad ng Seguridad</string>
     <string name="encryption_title">Encryption</string>
     <string name="authentication_title">Pagpapatunay</string>
-    <string name="access_security_title">Seguridad sa Access</string>
+    <string name="access_security_title">Seguridad ng Access</string>
     <string name="monitoring_compliance_title">Pagsubaybay at Pagsunod</string>
     <string name="db_monitor_title">Real-Time na Monitor ng Database</string>
-    <string name="db_connection_checking">Koneksyon: Sinusuri&#8230;</string>
+    <string name="db_connection_checking">Koneksyon: Sinusuri…</string>
     <string name="db_connection_online">Koneksyon: Online</string>
     <string name="db_connection_offline">Koneksyon: Offline</string>
-    <string name="db_users_loading">Mga Inaprubahang User: Niloload&#8230;</string>
-    <string name="db_pending_loading">Mga Nakabinbing Kahilingan: Niloload&#8230;</string>
-    <string name="db_users_count">Mga Inaprubahang User: %1$d</string>
+    <string name="db_users_loading">Inaprubahang Mga User: Naglo-load…</string>
+    <string name="db_pending_loading">Mga Nakabinbing Kahilingan: Naglo-load…</string>
+    <string name="db_users_count">Inaprubahang Mga User: %1$d</string>
     <string name="db_pending_count">Mga Nakabinbing Kahilingan: %1$d</string>
     <string name="db_last_update">Huling Update: %1$s</string>
-    <string name="db_importing">Nag-iimport ng data mula sa backup&#8230;</string>
-    <string name="db_exporting">Nag-eexport ng mga record ng farm sa CSV&#8230;</string>
-    <string name="db_delete_confirm">Sigurado ka ba? Buburahin nito ang mga record ng farm lamang ngunit pananatilihin ang mga user account.</string>
+    <string name="db_importing">Nagalalagay ng data mula sa backup…</string>
+    <string name="db_exporting">Nag-e-export ng mga rekord ng farm sa CSV…</string>
+    <string name="db_delete_confirm">Sigurado ka ba? Ibubura lamang nito ang mga rekord ng farm ngunit mananatili ang mga user account.</string>
     <string name="db_deleted">Nabura na ang Database</string>
-    <string name="birthday_updated">Na-update na ang kaarawan sa %1$s</string>
-    <string name="birthday_update_failed">Bigo sa pag-update ng kaarawan</string>
+    <string name="birthday_updated">Na-update ang kaarawan sa %1$s</string>
+    <string name="birthday_update_failed">Nabigong i-update ang kaarawan</string>
     <string name="edit_address_title">I-edit ang Iyong Address</string>
     <string name="street_address_hint">Address ng Kalye</string>
     <string name="city_hint">Lungsod</string>
@@ -306,7 +410,7 @@
     <string name="postal_code_hint">Postal Code</string>
     <string name="fill_all_address">Pakisuyong punan ang lahat ng field ng address</string>
     <string name="location_updated">Matagumpay na na-update ang lokasyon</string>
-    <string name="location_update_failed">Bigo sa pag-update ng lokasyon</string>
+    <string name="location_update_failed">Nabigo sa pag-update ng lokasyon</string>
     <!-- backup owner role removed -->
     <string name="max_staff_hint">Max Farm Staff</string>
     <string name="verification_code_msg">Verification Code para kay %1$s: %2$s</string>
@@ -314,7 +418,7 @@
 
     <string name="role_label">Papel: %1$s</string>
     <string name="reject_request">Tanggihan ang Kahilingan</string>
-    <string name="confirm_reject_msg">Sigurado ka bang gusto mong tanggihan ang kahilingan mula kay %1$s?</string>
+    <string name="confirm_reject_msg">Sigurado ka bang nais mong tanggihan ang kahilingan mula kay %1$s?</string>
     <string name="request_rejected">Tinanggihan ang kahilingan</string>
     <string name="reject">Tanggihan</string>
 
@@ -330,8 +434,121 @@
     <string name="days_icon">Icon ng mga Araw</string>
     <string name="placeholder_dashes">--</string>
     <string name="chevron_icon">Icon ng Chevron</string>
-    <string name="admin_group_label">MGA USER NG FARM AT PAMAMAHALA NG DATABASE</string>
+    <string name="admin_group_label">FARM ADMIN</string>
     <string name="user_access_list">Listahan ng Access ng User</string>
     <string name="generate_invite_code">Gumawa ng Invite Code</string>
 
+    <!-- Translations added: previously missing from English file -->
+    <string name="active_invite_codes_count_placeholder">Aktibong Invite Codes: %1$d</string>
+    <string name="active_invite_codes_loading">Aktibong Invite Codes: Naglo-load&#8230;</string>
+    <string name="analyzing_farm_yield">Sinusuri ang Ani ng Farm&#8230;</string>
+    <string name="approved_users_error">Inaprubahang Mga User: Error</string>
+    <string name="birthday_hint">Kaarawan (MM/DD/YYYY)</string>
+    <string name="chart_unavailable">Hindi magagamit ang tsart</string>
+    <string name="choose_image_format">Pumili ng Format ng Imahe</string>
+    <string name="confirm_password_hint">Kumpirmahin ang Password</string>
+    <string name="create_password_hint">Gumawa ng Password</string>
+    <string name="custom_period">Pasadya — %1$s hanggang %2$s</string>
+    <string name="custom_range_label">Saklaw na Pasadya</string>
+    <string name="database_connection_error">Error sa Koneksyon ng Database</string>
+    <string name="delete_database_title">Burahin ang Database</string>
+    <string name="delete_db">Burahin ang Database</string>
+    <string name="egg_production">PRODUKSYON NG ITLOG</string>
+    <string name="export_db">I-export ang Database</string>
+    <string name="export_image">I-export bilang Imahe</string>
+    <string name="export_pdf">I-export bilang PDF</string>
+    <string name="failed_generate_image">Nabigong gumawa ng imahe: %1$s</string>
+    <string name="failed_generate_pdf">Nabigong gumawa ng PDF: %1$s</string>
+    <string name="farm_analytics_report_dash">Ulat ng Farm — %1$s</string>
+    <string name="farm_analytics_report_title">ULAT NG FARM</string>
+    <string name="farm_stats_display_format">Mga Ibon: %1$d\nMga Kulungan: %2$d\nPetsa ng Pagsisimula: %3$s</string>
+    <string name="farm_stats_explorer_title">Explorer ng Mga Istatiska ng Farm</string>
+    <string name="fetching_stats_placeholder">Kinukuha ang mga istatistika&#8230;</string>
+    <string name="finish_registration">Tapusin ang Rehistrasyon</string>
+    <string name="full_name_hint">Buong Pangalan</string>
+    <string name="generated">Nabuo: %1$s</string>
+    <string name="grade_a">Grado A</string>
+    <string name="grade_a_normal">Grado A (Normal)</string>
+    <string name="grade_b">Grado B</string>
+    <string name="grade_b_cracked">Grado B (Basag)</string>
+    <string name="grade_c">Grado C</string>
+    <string name="grade_c_reject">Grado C (Tanggihan)</string>
+    <string name="grade_distribution">Distribusyon ng Grado</string>
+    <string name="image_saved">Na-save na ang imahe: %1$s</string>
+    <string name="import_db">I-import ang Database</string>
+    <string name="invite_code_placeholder">Kodigo: %1$s (%2$s)</string>
+    <string name="jpeg_smaller_file">JPEG (mas maliit na file)</string>
+    <string name="monitor_db">I-monitor ang Database</string>
+    <string name="monthly_period">Buwanang — %1$s</string>
+    <string name="yearly_period">Taunan — %1$s</string>
+    <string name="na">N/A</string>
+    <string name="no_active_invite_codes">Walang aktibong invite code.</string>
+    <string name="no_data">Walang Data</string>
+    <string name="no_farm_stats_found">Walang natagpuang istatistika ng farm.</string>
+    <string name="ok">OK</string>
+    <string name="open_image_report">Buksan ang Ulat ng Imahe</string>
+    <string name="open_pdf_report">Buksan ang Ulat na PDF</string>
+    <string name="pdf_saved">Na-save na ang PDF: %1$s</string>
+    <string name="pending_requests_error">Mga Nakabinbing Kahilingan: Error</string>
+    <string name="percent_placeholder">%1$d%%</string>
+    <string name="period">Panahon: %1$s</string>
+    <string name="pick_any_day_in_week">Pumili ng anumang araw sa linggo</string>
+    <string name="png_best_quality">PNG (pinakamahusay na kalidad)</string>
+    <string name="profile_picture_desc">Larawan ng Profile</string>
+    <string name="refresh_failed">Nabigong i-refresh</string>
+    <string name="reset_stats_btn">I-reset ang Stats sa Zero</string>
+    <string name="role_display_placeholder">Papel: %1$s</string>
+    <string name="select_date_range">Pumili ng saklaw ng petsa</string>
+    <string name="select_end_date">Pumili ng Petsa ng Pagtatapos</string>
+    <string name="select_month">Pumili ng Buwan</string>
+    <string name="select_start_date">Pumili ng Petsa ng Pagsisimula</string>
+    <string name="select_year">Pumili ng Taon</string>
+    <string name="setup_profile_title">Kumpletuhin ang Iyong Profile</string>
+    <string name="this_week_last_7_days">Ngayong Linggo (huling 7 araw)</string>
+    <string name="today_period">Ngayon — %1$s</string>
+    <string name="total_eggs_collected">Kabuuang Bilang ng Itlog na Nakolekta</string>
+    <string name="total_no_of_eggs_format">Kabuuang Bilang ng Itlog : %1$d</string>
+    <string name="total_tasks_count_placeholder">Kabuuang Gawain: %1$d</string>
+    <string name="total_tasks_loading">Kabuuang Gawain: Naglo-load&#8230;</string>
+    <string name="user_email_placeholder">%1$s (%2$s)</string>
+    <string name="waje_report_title">Waje\'s Quail Farm — Ulat</string>
+    <string name="weekly_period">Lingguhan — %1$s hanggang %2$s</string>
+    <string name="wipe_everything_label">Burahin Lahat</string>
+    <string name="your_address_header">Ang Iyong Address</string>
+
+    <!-- Extracted privacy & security dialog translations -->
+    <string name="system_policies">Mga Patakaran ng Sistema</string>
+    <string name="data_collection_title">1. Pagkolekta ng Data (Ang Ano)</string>
+    <string name="data_collection_body">&#8226; Profile ng Farm: Pangalan, impormasyon sa pakikipag-ugnayan, at lokasyong GPS.&#10;&#8226; Rekord ng Kawan: Bilang ng pugo, lahi, edad, at rate ng mortalidad.&#10;&#8226; Produksyon: Pang-araw-araw na bilang ng itlog, timbang ng karne, at pagkonsumo ng pakain.&#10;&#8226; Kalusugan at Biosecurity: Mga petsa ng bakuna, talaan ng sakit, at talaan ng bisita.&#10;&#8226; Pinansyal: Gastos sa pakain at gastusin sa gamot.</string>
+    <string name="privacy_content_title">2. Nilalaman ng Privacy (Ang Paano)</string>
+    <string name="privacy_content_body">&#8226; Pagmamay-ari: Pag-aari ng magsasaka ang lahat ng data na nilikha ng farm.&#10;&#8226; Paggamit: Ginagamit ang data para lamang sa mga ulat, pagsusuri ng trend, o konsultasyon sa beterinaryo.&#10;&#8226; Pagbabahagi: Ibinubunyag namin kapag napupunta ang data sa mga 3rd party (hal., pagsubaybay sa sakit ng gobyerno o mga mananaliksik).&#10;&#8226; Anonymity: Anumang ibabahaging data na pang-rehiyon ay inaalis ang pangalan ng farm at eksaktong lokasyon.</string>
+    <string name="security_measures_title">3. Mga Hakbang sa Seguridad (Ang Kalasag)</string>
+    <string name="security_measures_body">&#8226; Encryption: Ang data ay ini-encrypt habang ina-upload at habang naka-imbak sa mga server.&#10;&#8226; Secure Login: Pinoprotektahan ang access ng mga password at/o biometric authentication.&#10;&#8226; Offline Safety: Ang data na naka-imbak sa device (kapag offline) ay protektado rin.&#10;&#8226; Access Control: Tanging awtorisadong mga user ang makakakita ng partikular na rekord ng farm.</string>    <string name="cd_privacy_icon">Icon ng Privacy</string>
+    <string name="cd_collection_icon">Icon ng Koleksyon</string>
+    <string name="cd_privacy_policy_icon">Icon ng Patakaran sa Privacy</string>
+    <string name="cd_security_armor_icon">Icon ng Kalasag ng Seguridad</string>
+
+    <!-- Help & Support dialog translations -->
+    <string name="help_support_title">Tulong at Suporta</string>
+    <string name="cd_help_circle_icon">Icon ng Tulong</string>
+    <string name="getting_started_title">Nagsisimula</string>
+    <string name="getting_started_body">Maligayang pagdating sa Waje\'s Quail Farm System. Tinutulungan ka ng app na ito na pamahalaan ang iyong quail farm nang epektibo sa pamamagitan ng pagsubaybay sa mga ibon, itlog, pakain, at gawain.</string>
+    <string name="dashboard_title">Dashboard</string>
+    <string name="dashboard_body">Ang dashboard ay nagbibigay ng mabilis na pangkalahatang paningin ng iyong farm. Puwedeng makuha ang mga shortcut para sa imbentaryo, bilang ng itlog, antas ng tubig, at gawain.</string>
+    <string name="tasks_inventory_title">Mga Gawain at Imbentaryo</string>
+    <string name="tasks_inventory_body">Gamitin ang Schedule tab para sa pang-araw-araw na gawain at ang Inventory section upang subaybayan ang mga antas ng stock (Puno, Katamtaman, Mababa).</string>
+    <string name="analytics_reports_title">Pagsusuri at Mga Ulat</string>
+    <string name="analytics_reports_body">Puwedeng makuha ang detalyadong mga ulat sa pagganap ng iyong farm, mga trend ng produksyon ng itlog, pagkonsumo ng pakain, at makasaysayang data. Gamitin ang mga filter upang suriin ang mga partikular na panahon.</string>
+    <string name="managing_team_members_title">Pag-manage ng mga Miyembro ng Koponan</string>
+    <string name="managing_team_members_body">Magpadala ng mga invite code sa mga miyembro ng koponan na may partikular na papel (may-ari o tauhan). Tingnan ang mga nakabinbing kahilingan sa pagsisiwalat at pamahalaan ang access ng miyembro ng koponan sa pamamagitan ng mga setting ng Privacy at Seguridad.</string>
+    <string name="settings_preferences_title">Mga Setting at Kagustuhan</string>
+    <string name="settings_preferences_body">I-customize ang mga kagustuhan sa wika, mga setting ng notipikasyon, seguridad ng account, at configuration ng farm. Puwedeng makuha ang Privacy at Seguridad upang subaybayan ang status ng database at pamahalaan ang mga pahintulot ng user.</string>
+    <string name="tips_best_practices_title">Mga Tip at Pinakamahusay na Kasanayan</string>
+    <string name="tips_best_practices_body">• I-update ang imbentaryo ng pakain nang regular upang matiyak ang tumpak na pagsubaybay\n• Suriin ang pang-araw-araw na gawain upang mapanatili ang kahusayan ng farm\n• Panatilihing subaybayan ang mga antas ng tubig upang maiwasan ang mga problema\n• Suriin ang pagsusuri linggo-linggo upang matukoy ang mga trend\n• Panatilihin ang malinaw na komunikasyon sa iyong mga miyembro ng koponan</string>
+    <string name="troubleshooting_title">Paglutas ng Mga Problema</string>
+    <string name="troubleshooting_body">• Walang internet? Siguruhing konektado ang iyong WiFi o mobile data\n• Bumagsak ang app? Subukan ang pag-clear ng cache ng app o muling pag-install\n• Mga isyu sa pag-sync? Suriin ang iyong koneksyon sa internet at subukan ang pag-refresh\n• Invite code ay hindi gumagana? Patunayan na tumutugma ang email sa iyong naka-register na account\n• Camera ay hindi bumubukas? Bigyan ng pahintulot sa camera sa mga setting ng app</string>
+    <string name="contact_support_title">Makipag-ugnayan sa Suporta</string>
+    <string name="contact_support_body">Kung nakakahanap ka ng anumang mga isyu na hindi saklaw sa itaas, mangyaring makipag-ugnayan sa aming koponan ng suporta sa support@wajequailfarm.com. Isama ang mga detalye tungkol sa iyong farm setup at ang isyu na iyong karanasan.</string>
+
 </resources>
+

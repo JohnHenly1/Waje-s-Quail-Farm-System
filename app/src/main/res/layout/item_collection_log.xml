@@ -31,7 +31,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:fontFamily="sans-serif-bold"
-                    android:text="Mar 10, 2026"
+                    android:text="@string/sample_date"
                     android:textColor="@color/black"
                     android:textSize="14sp" />
 
@@ -44,20 +44,20 @@
                     android:backgroundTint="#2E7D32"
                     android:paddingHorizontal="6dp"
                     android:paddingVertical="2dp"
-                    android:text="Today"
+                    android:text="@string/today"
                     android:textColor="@color/white"
                     android:textSize="10sp"
                     android:visibility="gone" />
             </LinearLayout>
 
-            <TextView
-                android:id="@+id/logTotal"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="sans-serif-bold"
-                android:text="650"
-                android:textColor="@color/dark_green"
-                android:textSize="22sp" />
+                <TextView
+                    android:id="@+id/logTotal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-bold"
+                    android:text="@string/zero"
+                    android:textColor="@color/dark_green"
+                    android:textSize="22sp" />
         </LinearLayout>
         <!--   Grades Row   -->
         <LinearLayout
@@ -80,7 +80,7 @@
                     android:id="@+id/logGradeALabel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Normal"
+                    android:text="@string/grade_normal"
                     android:textColor="@color/dark_gray"
                     android:textSize="10sp" />
 
@@ -88,7 +88,7 @@
                     android:id="@+id/logGradeA"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="420"
+                    android:text="@string/zero"
                     android:textColor="#2E7D32"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -107,7 +107,7 @@
                     android:id="@+id/logGradeBLabel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Cracked"
+                    android:text="@string/grade_cracked"
                     android:textColor="@color/dark_gray"
                     android:textSize="10sp" />
 
@@ -115,7 +115,7 @@
                     android:id="@+id/logGradeB"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="180"
+                    android:text="@string/zero"
                     android:textColor="#F57F17"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -133,7 +133,7 @@
                     android:id="@+id/logGradeCLabel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Reject"
+                    android:text="@string/grade_reject"
                     android:textColor="@color/dark_gray"
                     android:textSize="10sp" />
 
@@ -141,7 +141,7 @@
                     android:id="@+id/logGradeC"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="50"
+                    android:text="@string/zero"
                     android:textColor="#C62828"
                     android:textStyle="bold" />
             </LinearLayout>

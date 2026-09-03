@@ -40,7 +40,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:gravity="center"
-                android:text="Report"
+                android:text="@string/report"
                 android:textColor="@android:color/white"
                 android:textSize="22sp"
                 android:textStyle="bold" />
@@ -69,12 +69,17 @@
     <!-- Scroll -->
     <!-- ===================== -->
 
-    <androidx.core.widget.NestedScrollView
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipeRefreshLayout"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:fillViewport="true"
         app:layout_constraintTop_toBottomOf="@id/toolbar"
         app:layout_constraintBottom_toTopOf="@id/bottomNavContainer">
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -98,7 +103,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="View by"
+                        android:text="@string/view_by"
                         android:textColor="#1A1A1A"
                         android:textSize="16sp"
                         android:textStyle="bold"/>
@@ -144,14 +149,14 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:layout_marginStart="8dp"
-                            android:text="Select period"
+                            android:text="@string/select_period"
                             android:textColor="#355E1A"
                             android:textStyle="bold"/>
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Change ›"
+                            android:text="@string/change_label"
                             android:textColor="#355E1A"
                             android:textSize="12sp"/>
 
@@ -199,7 +204,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
-                            android:text="0"
+                            android:text="@string/zero"
                             android:textColor="@android:color/white"
                             android:textSize="20sp"
                             android:textStyle="bold"/>
@@ -207,7 +212,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Total no.of Eggs"
+                            android:text="@string/total_no_of_eggs_label"
                             android:textColor="@android:color/white"
                             android:textSize="11sp" />
 
@@ -242,7 +247,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
-                            android:text="0"
+                            android:text="@string/zero"
                             android:textColor="@android:color/white"
                             android:textSize="20sp"
                             android:textStyle="bold"/>
@@ -250,7 +255,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Daily Avg"
+                            android:text="@string/daily_avg"
                             android:textColor="@android:color/white"
                             android:textSize="11sp"/>
 
@@ -284,7 +289,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
-                            android:text="0%"
+                            android:text="@string/zero_percent"
                             android:textColor="@android:color/white"
                             android:textSize="20sp"
                             android:textStyle="bold"/>
@@ -292,7 +297,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Grade A"
+                            android:text="@string/grade_a"
                             android:textColor="@android:color/white"
                             android:textSize="11sp"/>
 
@@ -333,7 +338,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Egg Grade Distribution"
+                            android:text="@string/egg_grade_distribution"
                             android:textColor="#223552"
                             android:textSize="13sp"
                             android:textStyle="bold"/>
@@ -343,7 +348,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="1dp"
                             android:layout_marginBottom="6dp"
-                            android:text="Overall quality"
+                            android:text="@string/overall_quality"
                             android:textColor="#9CA3AF"
                             android:textSize="9sp"/>
 
@@ -378,7 +383,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginStart="6dp"
-                                    android:text="Grade A"
+                                    android:text="@string/grade_a"
                                     android:textColor="#374151"
                                     android:textSize="11sp"
                                     android:textStyle="bold"/>
@@ -404,7 +409,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginStart="6dp"
-                                    android:text="Grade B"
+                                    android:text="@string/grade_b"
                                     android:textColor="#374151"
                                     android:textSize="11sp"
                                     android:textStyle="bold"/>
@@ -430,7 +435,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginStart="6dp"
-                                    android:text="Grade C"
+                                    android:text="@string/grade_c"
                                     android:textColor="#374151"
                                     android:textSize="11sp"
                                     android:textStyle="bold"/>
@@ -447,7 +452,7 @@
                             android:layout_height="wrap_content"
                             android:layout_gravity="center"
                             android:layout_marginTop="10dp"
-                            android:text="no. of eggs : 0"
+                            android:text="@string/no_of_eggs_label"
                             android:textColor="#111827"
                             android:textSize="12sp"
                             android:textStyle="bold"/>
@@ -476,7 +481,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Grade Breakdown"
+                            android:text="@string/grade_breakdown"
                             android:textColor="#111827"
                             android:textSize="13sp"
                             android:textStyle="bold"/>
@@ -486,7 +491,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="1dp"
                             android:layout_marginBottom="8dp"
-                            android:text="Quality summary"
+                            android:text="@string/overall_quality"
                             android:textColor="#9CA3AF"
                             android:textSize="9sp"/>
 
@@ -502,7 +507,7 @@
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
-                                android:text="Grade A"
+                                android:text="@string/grade_a"
                                 android:textColor="#355E1A"
                                 android:textSize="11sp"
                                 android:textStyle="bold"/>
@@ -511,7 +516,7 @@
                                 android:id="@+id/gradeACount"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="0"
+                                android:text="@string/zero"
                                 android:textColor="#000000"
                                 android:textSize="11sp"
                                 android:textStyle="bold"/>
@@ -541,7 +546,7 @@
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
-                                android:text="Grade B"
+                                android:text="@string/grade_b"
                                 android:textColor="#7C3AED"
                                 android:textSize="11sp"
                                 android:textStyle="bold"/>
@@ -550,7 +555,7 @@
                                 android:id="@+id/gradeBCount"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="0"
+                                android:text="@string/zero"
                                 android:textColor="#000000"
                                 android:textSize="11sp"
                                 android:textStyle="bold"/>
@@ -580,7 +585,7 @@
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
-                                android:text="Grade C"
+                                android:text="@string/grade_c"
                                 android:textColor="#F4B400"
                                 android:textSize="11sp"
                                 android:textStyle="bold"/>
@@ -589,7 +594,7 @@
                                 android:id="@+id/gradeCCount"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="0"
+                                android:text="@string/zero"
                                 android:textColor="#000000"
                                 android:textSize="11sp"
                                 android:textStyle="bold"/>
@@ -620,7 +625,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Best Grade"
+                            android:text="@string/best_grade"
                             android:textColor="#6B7280"
                             android:textSize="10sp"/>
 
@@ -628,7 +633,7 @@
                             android:id="@+id/bestGradeText"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Grade A"
+                            android:text="@string/grade_a"
                             android:textColor="#111827"
                             android:textSize="14sp"
                             android:textStyle="bold"/>
@@ -686,7 +691,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
-                        android:text="Farm Report"
+                        android:text="@string/waje_report_title"
                         android:textColor="@android:color/white"
                         android:textSize="18sp"
                         android:textStyle="bold" />
@@ -696,7 +701,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
                         android:gravity="center"
-                        android:text="Generate a PDF summary of your egg production analytics."
+                        android:text="@string/analyzing_farm_yield"
                         android:textAlignment="center"
                         android:textColor="#E5E7EB"
                         android:textSize="13sp"/>
@@ -707,7 +712,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="16dp"
                         android:backgroundTint="@android:color/white"
-                        android:text="Generate Report"
+                        android:text="@string/generate_report"
                         android:textAllCaps="false"
                         android:textColor="#355E1A"
                         android:textStyle="bold"/>
@@ -719,6 +724,8 @@
         </LinearLayout>
 
     </androidx.core.widget.NestedScrollView>
+
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
     <!-- ======================================= -->
     <!-- Bottom Navigation -->
@@ -750,7 +757,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Home"
+                android:text="@string/home"
                 android:textColor="@android:color/white"
                 android:textSize="10sp"/>
 
@@ -796,7 +803,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Schedule"
+                android:text="@string/schedule"
                 android:textColor="@android:color/white"
                 android:textSize="10sp"/>
 
@@ -819,7 +826,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Profile"
+                android:text="@string/profile"
                 android:textColor="@android:color/white"
                 android:textSize="10sp"/>
 

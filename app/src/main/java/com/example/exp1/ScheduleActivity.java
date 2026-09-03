@@ -21,10 +21,8 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.Looper;
 import android.text.InputType;
 import android.util.Base64;
-import android.view.GestureDetector;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -94,9 +92,14 @@ public class ScheduleActivity extends AppCompatActivity {
     private View[] dayContainers;
     private Calendar today;
     private Calendar selectedDate;
-    private GestureDetector gestureDetector;
+
+    private TextView btnToday;
+    private float swipeDownRawX, swipeDownRawY;
+    private boolean swipeIsHorizontal, swipeGestureDecided;
+    private android.view.VelocityTracker swipeVelocityTracker;
 
     private LinearLayout tasksContainer;
+    private androidx.swiperefreshlayout.widget.SwipeRefreshLayout swipeRefreshLayout;
 
     private TextView doneCount, ongoingCount, pendingCount, missedCount;
     private List<Task> taskList = new ArrayList<>();
@@ -239,7 +242,14 @@ public class ScheduleActivity extends AppCompatActivity {
 
         monthText      = findViewById(R.id.month);
         weekRangeLabel = findViewById(R.id.weekRangeLabel);
+        btnToday = findViewById(R.id.btnToday);
+        if (btnToday != null) {
+            btnToday.setOnClickListener(v -> goToToday());
+        }
         tasksContainer = findViewById(R.id.tasksContainer);
+        swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout);
+        swipeRefreshLayout.setColorSchemeColors(Color.parseColor("#355E1A"));
+        swipeRefreshLayout.setOnRefreshListener(this::refreshTasks);
         doneCount      = findViewById(R.id.doneCount);
         ongoingCount   = findViewById(R.id.ongoingCount);
         pendingCount   = findViewById(R.id.pendingCount);
@@ -261,7 +271,6 @@ public class ScheduleActivity extends AppCompatActivity {
                 findViewById(R.id.dayContainer7)
         };
 
-        setupDayClickListeners();
 
         findViewById(R.id.imageButton).setOnClickListener(v -> {
             Intent intent = new Intent(ScheduleActivity.this, DashboardActivity.class);
@@ -380,6 +389,46 @@ public class ScheduleActivity extends AppCompatActivity {
                 });
     }
 
+    /** Pull-to-refresh: re-fetches tasks once and rebuilds the day's list. */
+    private void refreshTasks() {
+        db.collection("farm_data")
+                .document("shared")
+                .collection("tasks")
+                .get()
+                .addOnSuccessListener(snapshots -> {
+                    taskList.clear();
+                    for (QueryDocumentSnapshot doc : snapshots) {
+                        Task task = new Task(
+                                doc.getId(),
+                                doc.getString("title"),
+                                doc.getString("category"),
+                                doc.getString("time"),
+                                doc.getString("status"),
+                                doc.getLong("year")  != null ? doc.getLong("year").intValue()  : 0,
+                                doc.getLong("month") != null ? doc.getLong("month").intValue() : 0,
+                                doc.getLong("day")   != null ? doc.getLong("day").intValue()   : 0,
+                                doc.getString("recurrence") != null ? doc.getString("recurrence") : RECUR_ONCE,
+                                doc.getString("recurrenceGroupId")
+                        );
+                        task.extensionMinutes = doc.getLong("extensionMinutes") != null ? doc.getLong("extensionMinutes").intValue() : 0;
+                        task.workWindowMinutes = doc.getLong("workWindowMinutes") != null ? doc.getLong("workWindowMinutes").intValue() : 60;
+                        task.assignedTo = parseAssignedTo(doc.get("assignedTo"));
+                        task.assignedBy = doc.getString("assignedBy");
+                        task.doneComment = doc.getString("doneComment");
+                        task.doneImageUrls = parseAssignedTo(doc.get("doneImageUrls"));
+                        task.pendingRescheduleMinutes = doc.getLong("pendingRescheduleMinutes") != null ? doc.getLong("pendingRescheduleMinutes").intValue() : 0;
+                        task.pendingRescheduleReason = doc.getString("pendingRescheduleReason");
+                        task.pendingRescheduleRequestedBy = doc.getString("pendingRescheduleRequestedBy");
+                        taskList.add(task);
+                    }
+                    updateTasksUI();
+                    swipeRefreshLayout.setRefreshing(false);
+                })
+                .addOnFailureListener(e -> {
+                    swipeRefreshLayout.setRefreshing(false);
+                    Toast.makeText(this, "Refresh failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                });
+    }
     /**
      * Reads the assignedTo field defensively: new docs store a List<String>
      * (multi-assign), older docs (pre multi-assign) stored a single String
@@ -1847,8 +1896,22 @@ public class ScheduleActivity extends AppCompatActivity {
                 boolean isOngoing = getString(R.string.status_ongoing).equals(task.status);
                 boolean isMissed = getString(R.string.status_missed).equals(task.status);
 
-                if (isOngoing || isMissed) {
+                // Owner-only indicator: staff has an open reschedule request waiting on this task.
+                boolean hasPendingReschedule = task.pendingRescheduleMinutes > 0
+                        && task.pendingRescheduleReason != null && !task.pendingRescheduleReason.trim().isEmpty();
+
+                if (isOwner && hasPendingReschedule) {
                     deadlineTv.setVisibility(View.VISIBLE);
+                    deadlineTv.setTextColor(Color.parseColor("#DC2626"));
+                    deadlineTv.setTypeface(null, Typeface.BOLD);
+                    String requester = task.pendingRescheduleRequestedBy != null
+                            ? staffNameCache.getOrDefault(task.pendingRescheduleRequestedBy, task.pendingRescheduleRequestedBy)
+                            : "Staff";
+                    deadlineTv.setText("🔔 " + requester + " requested +" + task.pendingRescheduleMinutes + " min");
+                } else if (isOngoing || isMissed) {
+                    deadlineTv.setVisibility(View.VISIBLE);
+                    deadlineTv.setTextColor(Color.parseColor("#6B7280")); // restore normal deadline color
+                    deadlineTv.setTypeface(null, Typeface.NORMAL);
                     deadlineTv.setText("Deadline: " + calculateDeadlineTime(task));
                 } else {
                     deadlineTv.setVisibility(View.GONE);
@@ -2110,20 +2173,116 @@ public class ScheduleActivity extends AppCompatActivity {
             if (reason.isEmpty()) { Toast.makeText(this, "A reason is required", Toast.LENGTH_SHORT).show(); return; }
             if (task.firestoreId == null) { Toast.makeText(this, "This task has no ID and cannot be updated", Toast.LENGTH_SHORT).show(); return; }
 
-            ensureAuthThenRun(() ->
-                    db.collection("farm_data").document("shared")
-                            .collection("tasks").document(task.firestoreId)
-                            .update("pendingRescheduleMinutes", minutes,
-                                    "pendingRescheduleReason", reason,
-                                    "pendingRescheduleRequestedBy", currentUserEmail)
-                            .addOnSuccessListener(unused -> {
-                                dialog.dismiss();
-                                Toast.makeText(this, "Reschedule request sent to manager for approval.", Toast.LENGTH_LONG).show();
-                            })
-                            .addOnFailureListener(e ->
-                                    Toast.makeText(this, "Failed to send request: " + e.getMessage(), Toast.LENGTH_SHORT).show())
-            );
+            showConfirmSendRescheduleDialog(task, minutes, reason, dialog);
         });
+    }
+    /** Confirmation step shown before a staff reschedule request is actually sent. */
+    private void showConfirmSendRescheduleDialog(Task task, int minutes, String reason, AlertDialog requestDialog) {
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setBackgroundColor(Color.WHITE);
+        int pad = dpToPx(20);
+        container.setPadding(pad, dpToPx(18), pad, dpToPx(4));
+
+        TextView titleTv = new TextView(this);
+        titleTv.setText("Confirm Request");
+        titleTv.setTextColor(Color.parseColor("#111827"));
+        titleTv.setTextSize(18);
+        titleTv.setTypeface(null, Typeface.BOLD);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        titleParams.setMargins(0, 0, 0, dpToPx(14));
+        titleTv.setLayoutParams(titleParams);
+        container.addView(titleTv);
+
+        // Green-tinted hint card, matching the info banner style used in the
+        // Mark-as-Done proof dialog.
+        LinearLayout hintCard = new LinearLayout(this);
+        hintCard.setOrientation(LinearLayout.VERTICAL);
+        android.graphics.drawable.GradientDrawable hintBg = new android.graphics.drawable.GradientDrawable();
+        hintBg.setColor(Color.parseColor("#F0FDF4"));
+        hintBg.setCornerRadius(dpToPx(12));
+        hintBg.setStroke(dpToPx(1), Color.parseColor("#DCFCE7"));
+        hintCard.setBackground(hintBg);
+        hintCard.setPadding(dpToPx(14), dpToPx(12), dpToPx(14), dpToPx(12));
+        LinearLayout.LayoutParams hintParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        hintParams.setMargins(0, 0, 0, dpToPx(16));
+        hintCard.setLayoutParams(hintParams);
+
+        TextView hintTitle = new TextView(this);
+        hintTitle.setText("You're about to request " + minutes + " more minute(s)");
+        hintTitle.setTypeface(null, Typeface.BOLD);
+        hintTitle.setTextSize(14);
+        hintTitle.setTextColor(Color.parseColor("#16A34A"));
+        hintCard.addView(hintTitle);
+
+        TextView hintSub = new TextView(this);
+        hintSub.setText("Reason: " + reason);
+        hintSub.setTextColor(Color.parseColor("#166534"));
+        hintSub.setTextSize(12.5f);
+        LinearLayout.LayoutParams hintSubParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        hintSubParams.setMargins(0, dpToPx(4), 0, 0);
+        hintSub.setLayoutParams(hintSubParams);
+        hintCard.addView(hintSub);
+        container.addView(hintCard);
+
+        TextView bodyTv = new TextView(this);
+        bodyTv.setText("Your manager will need to approve this before \"" + task.title + "\" is rescheduled.");
+        bodyTv.setTextColor(Color.parseColor("#374151"));
+        bodyTv.setTextSize(13.5f);
+        container.addView(bodyTv);
+
+        AlertDialog confirmDialog = new AlertDialog.Builder(this)
+                .setView(container)
+                .setPositiveButton("Send Request", null) // overridden below
+                .setNegativeButton("Back", null)
+                .setCancelable(false)
+                .create();
+        confirmDialog.show();
+
+        if (confirmDialog.getWindow() != null) {
+            android.graphics.drawable.GradientDrawable windowBg = new android.graphics.drawable.GradientDrawable();
+            windowBg.setColor(Color.WHITE);
+            windowBg.setCornerRadius(dpToPx(20));
+            confirmDialog.getWindow().setBackgroundDrawable(windowBg);
+        }
+
+        Button confirmBtn = confirmDialog.getButton(AlertDialog.BUTTON_POSITIVE);
+        Button backBtn = confirmDialog.getButton(AlertDialog.BUTTON_NEGATIVE);
+        if (confirmBtn != null) {
+            confirmBtn.setTextColor(Color.parseColor("#16A34A"));
+            confirmBtn.setAllCaps(false);
+            confirmBtn.setTypeface(null, Typeface.BOLD);
+            confirmBtn.setOnClickListener(v -> {
+                confirmDialog.dismiss();
+                sendRescheduleRequest(task, minutes, reason, requestDialog);
+            });
+        }
+        if (backBtn != null) {
+            backBtn.setTextColor(Color.parseColor("#6B7280"));
+            backBtn.setAllCaps(false);
+            // Default (null) listener just dismisses confirmDialog and returns
+            // the user to the still-open request form behind it.
+        }
+    }
+
+    /** Actually writes the pending reschedule request to Firestore, after confirmation. */
+    private void sendRescheduleRequest(Task task, int minutes, String reason, AlertDialog requestDialog) {
+        ensureAuthThenRun(() ->
+                db.collection("farm_data").document("shared")
+                        .collection("tasks").document(task.firestoreId)
+                        .update("pendingRescheduleMinutes", minutes,
+                                "pendingRescheduleReason", reason,
+                                "pendingRescheduleRequestedBy", currentUserEmail)
+                        .addOnSuccessListener(unused -> {
+                            requestDialog.dismiss();
+                            Toast.makeText(this, "Reschedule request sent to manager for approval.", Toast.LENGTH_LONG).show();
+                        })
+                        .addOnFailureListener(e ->
+                                Toast.makeText(this, "Failed to send request: " + e.getMessage(), Toast.LENGTH_SHORT).show())
+        );
     }
 
     /** Owner: sees the staff's pending request and can Approve or Deny it. */
@@ -2898,7 +3057,10 @@ public class ScheduleActivity extends AppCompatActivity {
         labelTv.setText(label + ":");
         labelTv.setTextColor(Color.parseColor("#6B7280"));
         labelTv.setTextSize(13);
-        labelTv.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        labelParams.setMargins(0, 0, dpToPx(10), 0);
+        labelTv.setLayoutParams(labelParams);
         row.addView(labelTv);
 
         TextView valueTv = new TextView(this);
@@ -2906,6 +3068,8 @@ public class ScheduleActivity extends AppCompatActivity {
         valueTv.setTextColor(Color.parseColor("#111827"));
         valueTv.setTextSize(13);
         valueTv.setTypeface(null, Typeface.BOLD);
+        valueTv.setGravity(Gravity.END);
+        valueTv.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         row.addView(valueTv);
 
         parent.addView(row);
@@ -3261,17 +3425,6 @@ public class ScheduleActivity extends AppCompatActivity {
         }
     }
 
-    private void setupDayClickListeners() {
-        for (int i = 0; i < 7; i++) {
-            final int index = i;
-            dayContainers[i].setOnClickListener(v -> {
-                selectedDate = (Calendar) currentWeekCalendar.clone();
-                selectedDate.add(Calendar.DAY_OF_MONTH, index);
-                updateCalendarUI();
-                updateTasksUI();
-            });
-        }
-    }
 
     private void alignCalendarToMonday(Calendar cal) {
         while (cal.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) cal.add(Calendar.DAY_OF_MONTH, -1);
@@ -3290,36 +3443,173 @@ public class ScheduleActivity extends AppCompatActivity {
         }
     }
 
-    /** Lets the user swipe left/right over the week calendar card to move between weeks. */
+    /**
+     * Lets the user swipe left/right over the week calendar card to move between
+     * weeks, with the card visually following the finger. Attached to the card
+     * itself AND every day cell inside it — a plain click listener on a day cell
+     * would otherwise claim the whole gesture before the card ever sees a drag,
+     * since most of the card's visible surface is those day cells.
+     */
     private void setupSwipeGestures() {
         View swipeArea = findViewById(R.id.calendarCard);
         if (swipeArea == null) return;
 
-        gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
-            private static final int SWIPE_THRESHOLD = 100;
-            private static final int SWIPE_VELOCITY_THRESHOLD = 100;
+        View.OnTouchListener swipeTouchListener = (v, event) -> handleCalendarSwipeTouch(swipeArea, event, v);
 
-            @Override
-            public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
-                if (e1 == null) return false;
-                float diffX = e2.getX() - e1.getX();
-                float diffY = e2.getY() - e1.getY();
+        swipeArea.setOnTouchListener(swipeTouchListener);
+        for (View dayContainer : dayContainers) {
+            if (dayContainer != null) dayContainer.setOnTouchListener(swipeTouchListener);
+        }
+    }
 
-                if (Math.abs(diffX) > Math.abs(diffY)
-                        && Math.abs(diffX) > SWIPE_THRESHOLD
-                        && Math.abs(velocityX) > SWIPE_VELOCITY_THRESHOLD) {
-                    if (diffX < 0) {
-                        goToNextWeek();
-                    } else {
-                        goToPreviousWeek();
-                    }
-                    return true;
+    /**
+     * Combined tap + horizontal-swipe handler shared by the calendar card and
+     * each day cell. A short, mostly-vertical touch is treated as a tap on
+     * {@code sourceView} (selects that day). A horizontal drag past the touch
+     * slop instead drags {@code swipeArea} (the whole week strip) 1:1 with the
+     * finger; releasing past a distance or velocity threshold advances to the
+     * next/previous week with a slide animation, otherwise the card springs
+     * back to center.
+     */
+    private boolean handleCalendarSwipeTouch(View swipeArea, MotionEvent event, View sourceView) {
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN: {
+                swipeDownRawX = event.getRawX();
+                swipeDownRawY = event.getRawY();
+                swipeIsHorizontal = false;
+                swipeGestureDecided = false;
+                swipeArea.animate().cancel();
+                if (swipeVelocityTracker == null) swipeVelocityTracker = android.view.VelocityTracker.obtain();
+                else swipeVelocityTracker.clear();
+                swipeVelocityTracker.addMovement(event);
+                // Card sits inside a NestedScrollView; claim the gesture up front so a
+                // horizontal drag isn't stolen by page scrolling, then release the claim
+                // below once we determine the drag is actually vertical.
+                if (swipeArea.getParent() != null) {
+                    swipeArea.getParent().requestDisallowInterceptTouchEvent(true);
                 }
-                return false;
+                return true;
             }
-        });
+            case MotionEvent.ACTION_MOVE: {
+                if (swipeVelocityTracker != null) swipeVelocityTracker.addMovement(event);
+                float dx = event.getRawX() - swipeDownRawX;
+                float dy = event.getRawY() - swipeDownRawY;
+                int touchSlop = android.view.ViewConfiguration.get(this).getScaledTouchSlop() * 2;
+                if (!swipeGestureDecided && (Math.abs(dx) > touchSlop || Math.abs(dy) > touchSlop)) {
+                    swipeGestureDecided = true;
+                    swipeIsHorizontal = Math.abs(dx) > Math.abs(dy) * 1.3f; // bias toward horizontal, fewer false swipes
+                    if (!swipeIsHorizontal && swipeArea.getParent() != null) {
+                        // Turned out to be a vertical drag — hand it back to the
+                        // NestedScrollView so the page scrolls normally.
+                        swipeArea.getParent().requestDisallowInterceptTouchEvent(false);
+                    }
+                }
+                if (swipeIsHorizontal) {
+                    swipeArea.setTranslationX(dx); // card follows the finger 1:1
+                }
+                return true;
+            }
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL: {
+                float dx = event.getRawX() - swipeDownRawX;
+                float velocityX = 0f;
+                if (swipeVelocityTracker != null) {
+                    swipeVelocityTracker.addMovement(event);
+                    swipeVelocityTracker.computeCurrentVelocity(1000);
+                    velocityX = swipeVelocityTracker.getXVelocity();
+                    swipeVelocityTracker.recycle();
+                    swipeVelocityTracker = null;
+                }
 
-        swipeArea.setOnTouchListener((v, event) -> gestureDetector.onTouchEvent(event));
+                boolean isUp = event.getActionMasked() == MotionEvent.ACTION_UP;
+
+                if (swipeIsHorizontal && isUp) {
+                    int width = swipeArea.getWidth() > 0 ? swipeArea.getWidth() : 1;
+                    boolean pastDistance = Math.abs(dx) > width * 0.12f;
+                    boolean pastVelocity = Math.abs(velocityX) > 500f;
+                    if (pastDistance || pastVelocity) {
+                        boolean goNext = dx < 0;
+                        swipeArea.animate()
+                                .translationX(goNext ? -width : width)
+                                .setDuration(180)
+                                .setInterpolator(new android.view.animation.AccelerateInterpolator())
+                                .withEndAction(() -> {
+                                    if (goNext) goToNextWeek(); else goToPreviousWeek();
+                                    swipeArea.setTranslationX(goNext ? width * 0.4f : -width * 0.4f);
+                                    swipeArea.animate()
+                                            .translationX(0)
+                                            .setDuration(220)
+                                            .setInterpolator(new android.view.animation.DecelerateInterpolator())
+                                            .start();
+                                })
+                                .start();
+                    } else {
+                        swipeArea.animate()
+                                .translationX(0)
+                                .setDuration(220)
+                                .setInterpolator(new android.view.animation.OvershootInterpolator(1.1f))
+                                .start();
+                    }
+                } else {
+                    swipeArea.animate()
+                            .translationX(0)
+                            .setDuration(150)
+                            .setInterpolator(new android.view.animation.DecelerateInterpolator())
+                            .start();
+                    // Not a drag — treat it as a tap on whichever day cell was touched.
+                    if (!swipeIsHorizontal && isUp && sourceView != null && dayContainers != null) {
+                        for (int i = 0; i < dayContainers.length; i++) {
+                            if (dayContainers[i] == sourceView) {
+                                selectedDate = (Calendar) currentWeekCalendar.clone();
+                                selectedDate.add(Calendar.DAY_OF_MONTH, i);
+                                updateCalendarUI();
+                                updateTasksUI();
+                                break;
+                            }
+                        }
+                    }
+                }
+                swipeIsHorizontal = false;
+                swipeGestureDecided = false;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Jumps the week strip and selected day back to today, with the same slide-in animation as a swipe. */
+    private void goToToday() {
+        View swipeArea = findViewById(R.id.calendarCard);
+        boolean movingForward = currentWeekCalendar.before(today);
+        Calendar newWeekStart = (Calendar) today.clone();
+        alignCalendarToMonday(newWeekStart);
+
+        if (swipeArea != null) {
+            int width = swipeArea.getWidth() > 0 ? swipeArea.getWidth() : 1;
+            swipeArea.animate().cancel();
+            swipeArea.animate()
+                    .translationX(movingForward ? -width : width)
+                    .setDuration(150)
+                    .setInterpolator(new android.view.animation.AccelerateInterpolator())
+                    .withEndAction(() -> {
+                        currentWeekCalendar = newWeekStart;
+                        selectedDate = (Calendar) today.clone();
+                        updateCalendarUI();
+                        updateTasksUI();
+                        swipeArea.setTranslationX(movingForward ? width * 0.4f : -width * 0.4f);
+                        swipeArea.animate()
+                                .translationX(0)
+                                .setDuration(200)
+                                .setInterpolator(new android.view.animation.DecelerateInterpolator())
+                                .start();
+                    })
+                    .start();
+        } else {
+            currentWeekCalendar = newWeekStart;
+            selectedDate = (Calendar) today.clone();
+            updateCalendarUI();
+            updateTasksUI();
+        }
     }
 
     private void goToNextWeek() {
@@ -3544,9 +3834,6 @@ public class ScheduleActivity extends AppCompatActivity {
             updateCalendarUI();
             updateTasksUI();
         }, selectedDate.get(Calendar.YEAR), selectedDate.get(Calendar.MONTH), selectedDate.get(Calendar.DAY_OF_MONTH));
-        Calendar minFull = Calendar.getInstance();
-        minFull.set(Calendar.HOUR_OF_DAY, 0); minFull.set(Calendar.MINUTE, 0); minFull.set(Calendar.SECOND, 0); minFull.set(Calendar.MILLISECOND, 0);
-        dpFull.getDatePicker().setMinDate(minFull.getTimeInMillis());
         dpFull.show();
     }
 
@@ -3569,6 +3856,14 @@ public class ScheduleActivity extends AppCompatActivity {
             else if (weekOffset > 1)   weekLabel = "Next " + weekOffset + " Weeks";
             else                       weekLabel = Math.abs(weekOffset) + " Weeks Ago";
             weekRangeLabel.setText(weekLabel + "  \u00b7  " + monthName);
+        }
+
+        if (btnToday != null) {
+            boolean onCurrentWeek = isSameDay(selectedDate, today);
+            Calendar todayWeekStartCheck = (Calendar) today.clone();
+            alignCalendarToMonday(todayWeekStartCheck);
+            boolean viewingCurrentWeek = isSameDay(currentWeekCalendar, todayWeekStartCheck);
+            btnToday.setVisibility((onCurrentWeek && viewingCurrentWeek) ? View.GONE : View.VISIBLE);
         }
 
         Calendar tempCal = (Calendar) currentWeekCalendar.clone();

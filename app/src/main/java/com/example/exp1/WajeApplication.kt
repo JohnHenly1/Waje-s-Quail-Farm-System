@@ -48,7 +48,6 @@ class WajeApplication : Application() {
 
         val langTag = when (selectedLang) {
             "Tagalog" -> "fil"
-            "Cebuano" -> "ceb"
             else -> "en"
         }
 

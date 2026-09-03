@@ -21,6 +21,7 @@
             <ImageView
                 android:layout_width="32dp"
                 android:layout_height="32dp"
+                android:contentDescription="@string/cd_help_circle_icon"
                 android:src="@drawable/ic_help_circle"
                 app:tint="@color/dark_green" />
 
@@ -28,7 +29,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="12dp"
-                android:text="Help &amp; Support"
+                android:text="@string/help_support_title"
                 android:textColor="@color/dark_green"
                 android:textSize="22sp"
                 android:textStyle="bold" />
@@ -52,7 +53,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Getting Started"
+                    android:text="@string/getting_started_title"
                     android:textColor="@color/dark_green"
                     android:textStyle="bold"
                     android:textSize="16sp"
@@ -61,7 +62,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Welcome to Waje's Quail Farm System. This app helps you manage your quail farm efficiently by tracking birds, eggs, feed, and tasks."
+                    android:text="@string/getting_started_body"
                     android:textSize="13sp"
                     android:textColor="@color/black"
                     android:lineSpacingExtra="4dp" />
@@ -86,7 +87,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Dashboard"
+                    android:text="@string/dashboard_title"
                     android:textColor="@color/text_blue_600"
                     android:textStyle="bold"
                     android:textSize="16sp"
@@ -95,7 +96,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="The dashboard provides a quick overview of your farm. Access shortcuts for inventory, egg counts, water levels, and tasks."
+                    android:text="@string/dashboard_body"
                     android:textSize="13sp"
                     android:textColor="@color/black"
                     android:lineSpacingExtra="4dp" />
@@ -120,7 +121,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Tasks &amp; Inventory"
+                    android:text="@string/tasks_inventory_title"
                     android:textColor="@color/text_purple_600"
                     android:textStyle="bold"
                     android:textSize="16sp"
@@ -129,7 +130,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Use the Schedule tab for daily tasks and the Inventory section to track stock levels (Full, Medium, Low)."
+                    android:text="@string/tasks_inventory_body"
                     android:textSize="13sp"
                     android:textColor="@color/black"
                     android:lineSpacingExtra="4dp" />
@@ -154,7 +155,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Analytics &amp; Reports"
+                    android:text="@string/analytics_reports_title"
                     android:textColor="@color/stats_orange_end"
                     android:textStyle="bold"
                     android:textSize="16sp"
@@ -163,7 +164,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Access detailed reports on your farm performance, egg production trends, feed consumption, and historical data. Use filters to analyze specific time periods."
+                    android:text="@string/analytics_reports_body"
                     android:textSize="13sp"
                     android:textColor="@color/black"
                     android:lineSpacingExtra="4dp" />
@@ -188,7 +189,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Managing Team Members"
+                    android:text="@string/managing_team_members_title"
                     android:textColor="@color/logout_red"
                     android:textStyle="bold"
                     android:textSize="16sp"
@@ -197,7 +198,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Send invite codes to team members with specific roles (owner or staff). View pending approval requests and manage team member access through the Privacy &amp; Security settings."
+                    android:text="@string/managing_team_members_body"
                     android:textSize="13sp"
                     android:textColor="@color/black"
                     android:lineSpacingExtra="4dp" />
@@ -222,7 +223,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Settings &amp; Preferences"
+                    android:text="@string/settings_preferences_title"
                     android:textColor="@color/stats_blue_end"
                     android:textStyle="bold"
                     android:textSize="16sp"
@@ -231,7 +232,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Customize language preferences, notification settings, account security, and farm configuration. Access Privacy &amp; Security to monitor database status and manage user permissions."
+                    android:text="@string/settings_preferences_body"
                     android:textSize="13sp"
                     android:textColor="@color/black"
                     android:lineSpacingExtra="4dp" />
@@ -256,7 +257,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Tips &amp; Best Practices"
+                    android:text="@string/tips_best_practices_title"
                     android:textColor="@color/text_green_600"
                     android:textStyle="bold"
                     android:textSize="16sp"
@@ -265,7 +266,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="• Update feed inventory regularly to ensure accurate tracking\n• Review daily tasks to maintain farm efficiency\n• Keep water levels monitored to prevent issues\n• Check analytics weekly to identify trends\n• Maintain clear communication with your team members"
+                    android:text="@string/tips_best_practices_body"
                     android:textSize="13sp"
                     android:textColor="@color/black"
                     android:lineSpacingExtra="4dp" />
@@ -290,7 +291,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Troubleshooting"
+                    android:text="@string/troubleshooting_title"
                     android:textColor="@color/dark_gray"
                     android:textStyle="bold"
                     android:textSize="16sp"
@@ -299,7 +300,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="• No internet? Ensure your WiFi or mobile data is connected\n• App crashes? Try clearing app cache or reinstalling\n• Sync issues? Check your internet connection and try refreshing\n• Invite code not working? Verify the email matches your registered account\n• Camera not opening? Grant camera permissions in app settings"
+                    android:text="@string/troubleshooting_body"
                     android:textSize="13sp"
                     android:textColor="@color/black"
                     android:lineSpacingExtra="4dp" />
@@ -323,7 +324,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Contact Support"
+                    android:text="@string/contact_support_title"
                     android:textColor="@color/text_orange_600"
                     android:textStyle="bold"
                     android:textSize="16sp"
@@ -332,7 +333,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="If you encounter any issues not covered above, please contact our support team at support@wajequailfarm.com. Include details about your farm setup and the issue you\'re experiencing."
+                    android:text="@string/contact_support_body"
                     android:textSize="13sp"
                     android:textColor="@color/black"
                     android:lineSpacingExtra="4dp"

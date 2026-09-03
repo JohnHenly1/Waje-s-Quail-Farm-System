@@ -82,6 +82,7 @@ public class AnalyticsActivity extends AppCompatActivity {
     private TextView gradeACount, gradeBCount, gradeCCount;
     private TextView bestGradeText, productionRateText, totalProductionLabel;
     private TextView serverTimeLabel;
+    private androidx.swiperefreshlayout.widget.SwipeRefreshLayout swipeRefreshLayout;
     private Spinner filterSpinner;
     private CardView filterChoiceCard;
     private LinearLayout filterChoiceButton;
@@ -89,9 +90,10 @@ public class AnalyticsActivity extends AppCompatActivity {
     private ConnectivityManager.NetworkCallback networkCallback;
 
     private static final SimpleDateFormat DATE_KEY_FORMAT = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-    private static final String[] FILTERS = {"All Time", "Today", "Weekly", "Monthly", "Yearly", "Custom"};
+    // Filters are loaded from resources so they can be translated / changed in XML
+    private String[] FILTERS;
 
-    private String currentFilter = "All Time";
+    private String currentFilter;
     // Prevents the network callback AND the initial onCreate check from both
     // trying to attach the Firebase listener / toggle loading UI, which was
     // causing the loading overlay to show/hide/recreate() in a tight loop.
@@ -141,6 +143,9 @@ public class AnalyticsActivity extends AppCompatActivity {
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_analytics);
 
+        // Load filter labels from resources (strings.xml)
+        FILTERS = getResources().getStringArray(R.array.filters);
+        currentFilter = FILTERS.length > 0 ? FILTERS[0] : "All Time";
         // Firebase reference for egg collections
         eggCollectionsRef = FirebaseDatabase.getInstance().getReference("egg_collections");
 
@@ -157,7 +162,7 @@ public class AnalyticsActivity extends AppCompatActivity {
         if (!NavigationHelper.INSTANCE.isInternetActuallyWorking(this)) {
             NavigationHelper.INSTANCE.showNoInternetOverlay(this);
         } else {
-            NavigationHelper.INSTANCE.showGlobalLoading(this, "Analyzing Farm Yield...", () -> {
+            NavigationHelper.INSTANCE.showGlobalLoading(this, getString(R.string.analyzing_farm_yield), () -> {
                 attachRealtimeListener();
                 return Unit.INSTANCE;
             });
@@ -167,6 +172,7 @@ public class AnalyticsActivity extends AppCompatActivity {
         // validated connection — attachRealtimeListener() below is guarded against
         // running twice for exactly that reason.
         startLiveInternetSensor();
+        swipeRefreshLayout.setOnRefreshListener(this::refreshData);
 
         // Back button navigation
         ImageButton backButton = findViewById(R.id.imageButton);
@@ -207,6 +213,8 @@ public class AnalyticsActivity extends AppCompatActivity {
         productionRateText = findViewById(R.id.productionRateText);
         totalProductionLabel = findViewById(R.id.totalProductionLabel);
         serverTimeLabel = findViewById(R.id.serverTimeLabel);
+        swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout);
+        swipeRefreshLayout.setColorSchemeColors(Color.parseColor("#355E1A"));
         filterSpinner = findViewById(R.id.filterSpinner);
         filterChoiceCard = findViewById(R.id.filterChoiceCard);
         filterChoiceButton = findViewById(R.id.filterChoiceButton);
@@ -261,7 +269,7 @@ public class AnalyticsActivity extends AppCompatActivity {
                 currentFilter = FILTERS[position];
                 updateFilterChoiceVisibility();
 
-                if (currentFilter.equals("Custom") && (customStartDate == null || customEndDate == null)) {
+                if (currentFilter.equals(FILTERS[5]) && (customStartDate == null || customEndDate == null)) {
                     showCustomRangePicker();
                 } else {
                     updateDashboard();
@@ -271,12 +279,10 @@ public class AnalyticsActivity extends AppCompatActivity {
         });
 
         filterChoiceButton.setOnClickListener(v -> {
-            switch (currentFilter) {
-                case "Weekly": showWeekPicker(); break;
-                case "Monthly": showMonthYearPicker(); break;
-                case "Yearly": showYearPicker(); break;
-                case "Custom": showCustomRangePicker(); break;
-            }
+            if (currentFilter.equals(FILTERS[2])) showWeekPicker();
+            else if (currentFilter.equals(FILTERS[3])) showMonthYearPicker();
+            else if (currentFilter.equals(FILTERS[4])) showYearPicker();
+            else if (currentFilter.equals(FILTERS[5])) showCustomRangePicker();
         });
 
         updateFilterChoiceVisibility();
@@ -284,35 +290,29 @@ public class AnalyticsActivity extends AppCompatActivity {
 
     /** Shows/hides the period-choice row and keeps its label in sync with the current filter. */
     private void updateFilterChoiceVisibility() {
-        switch (currentFilter) {
-            case "Weekly":
-                filterChoiceCard.setVisibility(View.VISIBLE);
-                if (selectedWeekStartDate != null) {
-                    String weekEnd = weekEndDate(selectedWeekStartDate);
-                    filterChoiceText.setText(displayDate(selectedWeekStartDate) + "  —  " + displayDate(weekEnd));
-                } else {
-                    filterChoiceText.setText("This Week (last 7 days)");
-                }
-                break;
-            case "Monthly":
-                filterChoiceCard.setVisibility(View.VISIBLE);
-                filterChoiceText.setText(monthYearLabel(selectedMonth, selectedMonthYear));
-                break;
-            case "Yearly":
-                filterChoiceCard.setVisibility(View.VISIBLE);
-                filterChoiceText.setText(String.valueOf(selectedYear));
-                break;
-            case "Custom":
-                filterChoiceCard.setVisibility(View.VISIBLE);
-                if (customStartDate != null && customEndDate != null) {
-                    filterChoiceText.setText(displayDate(customStartDate) + "  —  " + displayDate(customEndDate));
-                } else {
-                    filterChoiceText.setText("Select date range");
-                }
-                break;
-            default:
-                filterChoiceCard.setVisibility(View.GONE);
-                break;
+        if (currentFilter.equals(FILTERS[2])) { // Weekly
+            filterChoiceCard.setVisibility(View.VISIBLE);
+            if (selectedWeekStartDate != null) {
+                String weekEnd = weekEndDate(selectedWeekStartDate);
+                filterChoiceText.setText(displayDate(selectedWeekStartDate) + "  —  " + displayDate(weekEnd));
+            } else {
+                filterChoiceText.setText(getString(R.string.this_week_last_7_days));
+            }
+        } else if (currentFilter.equals(FILTERS[3])) { // Monthly
+            filterChoiceCard.setVisibility(View.VISIBLE);
+            filterChoiceText.setText(monthYearLabel(selectedMonth, selectedMonthYear));
+        } else if (currentFilter.equals(FILTERS[4])) { // Yearly
+            filterChoiceCard.setVisibility(View.VISIBLE);
+            filterChoiceText.setText(String.valueOf(selectedYear));
+        } else if (currentFilter.equals(FILTERS[5])) { // Custom
+            filterChoiceCard.setVisibility(View.VISIBLE);
+            if (customStartDate != null && customEndDate != null) {
+                filterChoiceText.setText(displayDate(customStartDate) + "  —  " + displayDate(customEndDate));
+            } else {
+                filterChoiceText.setText(getString(R.string.select_date_range));
+            }
+        } else {
+            filterChoiceCard.setVisibility(View.GONE);
         }
     }
 
@@ -328,6 +328,17 @@ public class AnalyticsActivity extends AppCompatActivity {
         } catch (ParseException e) {
             return yyyyMmDd;
         }
+    }
+
+    /**
+     * Format a Date/time for display using the device's locale and 12/24-hour
+     * preference. This avoids hard-coded SimpleDateFormat patterns like
+     * "MM/dd/yyyy hh:mm a" which can mismatch user settings.
+     */
+    private String formatTimestamp(Date date) {
+        java.text.DateFormat dateFmt = android.text.format.DateFormat.getDateFormat(AnalyticsActivity.this);
+        java.text.DateFormat timeFmt = android.text.format.DateFormat.getTimeFormat(AnalyticsActivity.this);
+        return dateFmt.format(date) + " " + timeFmt.format(date);
     }
 
     /** Given a week-start (yyyy-MM-dd, Sunday), returns the Saturday 6 days later. */
@@ -365,7 +376,7 @@ public class AnalyticsActivity extends AppCompatActivity {
                     updateDashboard();
                 },
                 cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH));
-        dialog.setTitle("Pick Any Day in the Week");
+        dialog.setTitle(getString(R.string.pick_any_day_in_week));
         dialog.show();
     }
 
@@ -401,15 +412,15 @@ public class AnalyticsActivity extends AppCompatActivity {
         layout.addView(yearPicker, params);
 
         new AlertDialog.Builder(this)
-                .setTitle("Select Month")
+                .setTitle(getString(R.string.select_month))
                 .setView(layout)
-                .setPositiveButton("OK", (dialog, which) -> {
+                .setPositiveButton(getString(R.string.ok), (dialog, which) -> {
                     selectedMonth = monthPicker.getValue();
                     selectedMonthYear = yearPicker.getValue();
                     updateFilterChoiceVisibility();
                     updateDashboard();
                 })
-                .setNegativeButton("Cancel", null)
+                .setNegativeButton(getString(R.string.cancel), null)
                 .show();
     }
 
@@ -431,14 +442,14 @@ public class AnalyticsActivity extends AppCompatActivity {
         container.addView(yearPicker, fp);
 
         new AlertDialog.Builder(this)
-                .setTitle("Select Year")
+                .setTitle(getString(R.string.select_year))
                 .setView(container)
-                .setPositiveButton("OK", (dialog, which) -> {
+                .setPositiveButton(getString(R.string.ok), (dialog, which) -> {
                     selectedYear = yearPicker.getValue();
                     updateFilterChoiceVisibility();
                     updateDashboard();
                 })
-                .setNegativeButton("Cancel", null)
+                .setNegativeButton(getString(R.string.cancel), null)
                 .show();
     }
 
@@ -475,12 +486,12 @@ public class AnalyticsActivity extends AppCompatActivity {
                                 updateDashboard();
                             },
                             endCal.get(Calendar.YEAR), endCal.get(Calendar.MONTH), endCal.get(Calendar.DAY_OF_MONTH));
-                    endDialog.setTitle("Select End Date");
+                    endDialog.setTitle(getString(R.string.select_end_date));
                     endDialog.getDatePicker().setMinDate(chosenStart.getTimeInMillis());
                     endDialog.show();
                 },
                 startCal.get(Calendar.YEAR), startCal.get(Calendar.MONTH), startCal.get(Calendar.DAY_OF_MONTH));
-        startDialog.setTitle("Select Start Date");
+        startDialog.setTitle(getString(R.string.select_start_date));
         startDialog.show();
     }
 
@@ -514,12 +525,48 @@ public class AnalyticsActivity extends AppCompatActivity {
                 updateDashboard();
             }
             @Override public void onCancelled(DatabaseError error) {
-                Toast.makeText(AnalyticsActivity.this, "Database Connection Error", Toast.LENGTH_SHORT).show();
+                Toast.makeText(AnalyticsActivity.this, getString(R.string.database_connection_error), Toast.LENGTH_SHORT).show();
             }
         };
         eggCollectionsRef.addValueEventListener(eggCollectionsListener);
     }
+    private void refreshData() {
+        if (!NavigationHelper.INSTANCE.isInternetActuallyWorking(this)) {
+            swipeRefreshLayout.setRefreshing(false);
+            NavigationHelper.INSTANCE.showNoInternetOverlay(this);
+            return;
+        }
 
+        eggCollectionsRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override public void onDataChange(DataSnapshot snapshot) {
+                Map<String, DailyEggData> refreshed = new TreeMap<>();
+                for (DataSnapshot child : snapshot.getChildren()) {
+                    String dateKey = child.getKey();
+                    Long total = child.child("total").getValue(Long.class);
+                    Long gA = child.child("gradeA").getValue(Long.class);
+                    Long gB = child.child("gradeB").getValue(Long.class);
+                    Long gC = child.child("gradeC").getValue(Long.class);
+
+                    if (dateKey != null) {
+                        refreshed.put(dateKey, new DailyEggData(
+                                total != null ? total.intValue() : 0,
+                                gA != null ? gA.intValue() : 0,
+                                gB != null ? gB.intValue() : 0,
+                                gC != null ? gC.intValue() : 0
+                        ));
+                    }
+                }
+                allData = refreshed;
+                updateDashboard();
+                swipeRefreshLayout.setRefreshing(false);
+            }
+
+            @Override public void onCancelled(DatabaseError error) {
+                swipeRefreshLayout.setRefreshing(false);
+                Toast.makeText(AnalyticsActivity.this, getString(R.string.refresh_failed), Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
     /**
      * Returns the subset of allData matching the currently selected filter (Today / Weekly /
      * Monthly / Yearly / Custom / All Time). Shared by the dashboard cards+chart and by the
@@ -547,31 +594,24 @@ public class AnalyticsActivity extends AppCompatActivity {
 
         for (Map.Entry<String, DailyEggData> entry : allData.entrySet()) {
             boolean include = false;
-            switch (currentFilter) {
-                case "Today":
-                    if (entry.getKey().equals(today)) include = true;
-                    break;
-                case "Weekly":
-                    if (entry.getKey().compareTo(weekStart) >= 0 && entry.getKey().compareTo(weekEnd) <= 0) {
-                        include = true;
-                    }
-                    break;
-                case "Monthly":
-                    if (entry.getKey().startsWith(monthlyPrefix)) include = true;
-                    break;
-                case "Yearly":
-                    if (entry.getKey().startsWith(yearlyPrefix)) include = true;
-                    break;
-                case "Custom":
-                    if (customStartDate != null && customEndDate != null
-                            && entry.getKey().compareTo(customStartDate) >= 0
-                            && entry.getKey().compareTo(customEndDate) <= 0) {
-                        include = true;
-                    }
-                    break;
-                default: // All Time
+            if (currentFilter.equals(FILTERS[1])) { // Today
+                if (entry.getKey().equals(today)) include = true;
+            } else if (currentFilter.equals(FILTERS[2])) { // Weekly
+                if (entry.getKey().compareTo(weekStart) >= 0 && entry.getKey().compareTo(weekEnd) <= 0) {
                     include = true;
-                    break;
+                }
+            } else if (currentFilter.equals(FILTERS[3])) { // Monthly
+                if (entry.getKey().startsWith(monthlyPrefix)) include = true;
+            } else if (currentFilter.equals(FILTERS[4])) { // Yearly
+                if (entry.getKey().startsWith(yearlyPrefix)) include = true;
+            } else if (currentFilter.equals(FILTERS[5])) { // Custom
+                if (customStartDate != null && customEndDate != null
+                        && entry.getKey().compareTo(customStartDate) >= 0
+                        && entry.getKey().compareTo(customEndDate) <= 0) {
+                    include = true;
+                }
+            } else { // All Time
+                include = true;
             }
             if (include) filtered.put(entry.getKey(), entry.getValue());
         }
@@ -580,31 +620,31 @@ public class AnalyticsActivity extends AppCompatActivity {
 
     /** Human-readable description of the currently active filter, for display on the report. */
     private String getReportPeriodLabel() {
-        switch (currentFilter) {
-            case "Today": {
-                String today = DATE_KEY_FORMAT.format(Calendar.getInstance().getTime());
-                return "Today — " + displayDate(today);
+        if (currentFilter.equals(FILTERS[1])) { // Today
+            String today = DATE_KEY_FORMAT.format(Calendar.getInstance().getTime());
+            return getString(R.string.today_period, displayDate(today));
+        } else if (currentFilter.equals(FILTERS[2])) { // Weekly
+            Calendar cal7 = Calendar.getInstance();
+            cal7.add(Calendar.DAY_OF_YEAR, -6);
+            String sevenDaysAgo = DATE_KEY_FORMAT.format(cal7.getTime());
+            String today = DATE_KEY_FORMAT.format(Calendar.getInstance().getTime());
+            String weekStart = selectedWeekStartDate != null ? selectedWeekStartDate : sevenDaysAgo;
+            String weekEnd = selectedWeekStartDate != null ? weekEndDate(selectedWeekStartDate) : today;
+            return getString(R.string.weekly_period, displayDate(weekStart), displayDate(weekEnd));
+        } else if (currentFilter.equals(FILTERS[3])) { // Monthly
+            return getString(R.string.monthly_period, monthYearLabel(selectedMonth, selectedMonthYear));
+        } else if (currentFilter.equals(FILTERS[4])) { // Yearly
+            return getString(R.string.yearly_period, String.valueOf(selectedYear));
+        } else if (currentFilter.equals(FILTERS[5])) { // Custom
+            if (customStartDate != null && customEndDate != null) {
+                return getString(R.string.custom_period, displayDate(customStartDate), displayDate(customEndDate));
             }
-            case "Weekly": {
-                Calendar cal7 = Calendar.getInstance();
-                cal7.add(Calendar.DAY_OF_YEAR, -6);
-                String sevenDaysAgo = DATE_KEY_FORMAT.format(cal7.getTime());
-                String today = DATE_KEY_FORMAT.format(Calendar.getInstance().getTime());
-                String weekStart = selectedWeekStartDate != null ? selectedWeekStartDate : sevenDaysAgo;
-                String weekEnd = selectedWeekStartDate != null ? weekEndDate(selectedWeekStartDate) : today;
-                return "Weekly — " + displayDate(weekStart) + " to " + displayDate(weekEnd);
-            }
-            case "Monthly":
-                return "Monthly — " + monthYearLabel(selectedMonth, selectedMonthYear);
-            case "Yearly":
-                return "Yearly — " + selectedYear;
-            case "Custom":
-                if (customStartDate != null && customEndDate != null) {
-                    return "Custom — " + displayDate(customStartDate) + " to " + displayDate(customEndDate);
-                }
-                return "Custom Range";
-            default:
-                return "All Time";
+            return getString(R.string.custom_range_label);
+        } else {
+            // The filters array is loaded from resources and contains the localized
+            // label for the "All Time" filter at index 0. Use that rather than
+            // relying on a separate string resource to avoid mismatches.
+            return FILTERS.length > 0 ? FILTERS[0] : "All Time";
         }
     }
 
@@ -652,19 +692,19 @@ public class AnalyticsActivity extends AppCompatActivity {
 
         if (filteredTotal > 0) {
             if (filteredA > 0) {
-                entries.add(new PieEntry(filteredA, "Grade A"));
+                entries.add(new PieEntry(filteredA, getString(R.string.grade_a)));
                 sliceColors.add(COLOR_GRADE_A);
             }
             if (filteredB > 0) {
-                entries.add(new PieEntry(filteredB, "Grade B"));
+                entries.add(new PieEntry(filteredB, getString(R.string.grade_b)));
                 sliceColors.add(COLOR_GRADE_B);
             }
             if (filteredC > 0) {
-                entries.add(new PieEntry(filteredC, "Grade C"));
+                entries.add(new PieEntry(filteredC, getString(R.string.grade_c)));
                 sliceColors.add(COLOR_GRADE_C);
             }
         } else {
-            entries.add(new PieEntry(1, "No Data"));
+            entries.add(new PieEntry(1, getString(R.string.no_data)));
             sliceColors.add(COLOR_NO_DATA);
         }
 
@@ -727,15 +767,15 @@ public class AnalyticsActivity extends AppCompatActivity {
             gradeCProgress.setProgress(0);
         }
 
-        totalProductionLabel.setText(String.format(Locale.getDefault(), "Total No. of Eggs : %d", filteredTotal));
+        totalProductionLabel.setText(String.format(Locale.getDefault(), getString(R.string.total_no_of_eggs_format), filteredTotal));
 
         // Update Stats Labels
         if (filteredTotal > 0) {
-            if (filteredA >= filteredB && filteredA >= filteredC) bestGradeText.setText("Grade A");
-            else if (filteredB >= filteredA && filteredB >= filteredC) bestGradeText.setText("Grade B");
-            else bestGradeText.setText("Grade C");
+            if (filteredA >= filteredB && filteredA >= filteredC) bestGradeText.setText(getString(R.string.grade_a));
+            else if (filteredB >= filteredA && filteredB >= filteredC) bestGradeText.setText(getString(R.string.grade_b));
+            else bestGradeText.setText(getString(R.string.grade_c));
         } else {
-            bestGradeText.setText("N/A");
+            bestGradeText.setText(getString(R.string.na));
         }
 
         productionRateText.setText(String.format(Locale.getDefault(), "%d%%", gradeAPct));
@@ -748,35 +788,36 @@ public class AnalyticsActivity extends AppCompatActivity {
         }
         String periodLabel = getReportPeriodLabel();
 
-        String ts = new SimpleDateFormat("MM/dd/yyyy hh:mm a", Locale.getDefault()).format(new Date());
-        String summary = String.format(Locale.getDefault(),
-                "     FARM ANALYTICS REPORT\n" +
-                        "Generated: %s\n" +
-                        "Period: %s\n\n" +
-                        " EGG PRODUCTION\n" +
-                        "Total No. of Eggs Collected: %d\n" +
-                        "Grade A: %d\n" +
-                        "Grade B: %d\n" +
-                        "Grade C: %d", ts, periodLabel, total, a, b, c);
+        String ts = formatTimestamp(new Date());
+        StringBuilder sb = new StringBuilder();
+        sb.append("     ").append(getString(R.string.farm_analytics_report_title)).append("\n");
+        sb.append(getString(R.string.generated, ts)).append("\n");
+        sb.append(getString(R.string.period, periodLabel)).append("\n\n");
+        sb.append(getString(R.string.egg_production)).append("\n");
+        sb.append(getString(R.string.total_eggs_collected)).append(": ").append(total).append("\n");
+        sb.append(getString(R.string.grade_a)).append(": ").append(a).append("\n");
+        sb.append(getString(R.string.grade_b)).append(": ").append(b).append("\n");
+        sb.append(getString(R.string.grade_c)).append(": ").append(c);
+        String summary = sb.toString();
 
         int finalA = a;
         int finalTotal = total;
         int finalB = b;
         int finalC = c;
         new AlertDialog.Builder(this)
-                .setTitle("Farm Analytics Report — " + currentFilter)
+                .setTitle(getString(R.string.farm_analytics_report_dash, currentFilter))
                 .setMessage(summary)
-                .setPositiveButton("Export as PDF", (dialog, which) -> generatePdfReport(finalTotal, finalA, finalB, finalC, periodLabel))
-                .setNeutralButton("Export as Image", (dialog, which) -> showImageFormatChooser(finalTotal, finalA, finalB, finalC, periodLabel))
-                .setNegativeButton("Close", null)
+                .setPositiveButton(getString(R.string.export_pdf), (dialog, which) -> generatePdfReport(finalTotal, finalA, finalB, finalC, periodLabel))
+                .setNeutralButton(getString(R.string.export_image), (dialog, which) -> showImageFormatChooser(finalTotal, finalA, finalB, finalC, periodLabel))
+                .setNegativeButton(getString(R.string.close), null)
                 .show();
     }
 
     /** Lets the user pick PNG (lossless) or JPEG (smaller file) before exporting the report as an image. */
     private void showImageFormatChooser(int total, int a, int b, int c, String periodLabel) {
-        String[] formats = {"PNG (best quality)", "JPEG (smaller file)"};
+        String[] formats = { getString(R.string.png_best_quality), getString(R.string.jpeg_smaller_file) };
         new AlertDialog.Builder(this)
-                .setTitle("Choose Image Format")
+                .setTitle(getString(R.string.choose_image_format))
                 .setItems(formats, (dialog, which) -> {
                     if (which == 0) {
                         exportImageReport(total, a, b, c, periodLabel, Bitmap.CompressFormat.PNG, "png", "image/png");
@@ -789,6 +830,17 @@ public class AnalyticsActivity extends AppCompatActivity {
 
     /**
      * Renders the grade-distribution pie chart used in PDF/PNG/JPEG report exports.
+     *
+     * IMPORTANT: this is drawn by hand directly onto the Canvas (arcs + lines + text) instead
+     * of instantiating a real MPAndroidChart PieChart view and calling draw() on it. The old
+     * approach worked on most devices but was unreliable on others: an MPAndroidChart PieChart
+     * that's never attached to a window depends on Android view-system internals (measure/layout
+     * callbacks, the legend's own word-wrap logic, text-scale/density handling, Utils.init state)
+     * that don't always behave the same off-screen across OEM skins, densities and chart-library
+     * versions — which is exactly the kind of thing that shows up as "the pie chart just doesn't
+     * render" on some devices while working fine on others. Drawing the slices ourselves removes
+     * that dependency entirely: given the same a/b/c inputs, this always produces the same output,
+     * on every device, every time. It's also easy to make bigger (see REPORT_CHART_WIDTH/HEIGHT).
      *
      * IMPORTANT: this is drawn by hand directly onto the Canvas (arcs + lines + text) instead
      * of instantiating a real MPAndroidChart PieChart view and calling draw() on it. The old
@@ -815,11 +867,11 @@ public class AnalyticsActivity extends AppCompatActivity {
             List<Integer> values = new ArrayList<>();
             List<Integer> sliceColors = new ArrayList<>();
             if (total > 0) {
-                if (a > 0) { labels.add("Grade A"); values.add(a); sliceColors.add(COLOR_GRADE_A); }
-                if (b > 0) { labels.add("Grade B"); values.add(b); sliceColors.add(COLOR_GRADE_B); }
-                if (c > 0) { labels.add("Grade C"); values.add(c); sliceColors.add(COLOR_GRADE_C); }
+                if (a > 0) { labels.add(getString(R.string.grade_a)); values.add(a); sliceColors.add(COLOR_GRADE_A); }
+                if (b > 0) { labels.add(getString(R.string.grade_b)); values.add(b); sliceColors.add(COLOR_GRADE_B); }
+                if (c > 0) { labels.add(getString(R.string.grade_c)); values.add(c); sliceColors.add(COLOR_GRADE_C); }
             } else {
-                labels.add("No Data"); values.add(1); sliceColors.add(COLOR_NO_DATA);
+                labels.add(getString(R.string.no_data)); values.add(1); sliceColors.add(COLOR_NO_DATA);
             }
             int sliceTotal = 0;
             for (int v : values) sliceTotal += v;
@@ -912,7 +964,7 @@ public class AnalyticsActivity extends AppCompatActivity {
 
     private void generatePdfReport(int total, int a, int b, int c, String periodLabel) {
         try {
-            String ts = new SimpleDateFormat("MM/dd/yyyy hh:mm a", Locale.getDefault()).format(new Date());
+            String ts = formatTimestamp(new Date());
             PdfDocument document = new PdfDocument();
             PdfDocument.PageInfo pageInfo = new PdfDocument.PageInfo.Builder(595, 842, 1).create(); // A4 size
             PdfDocument.Page page = document.startPage(pageInfo);
@@ -926,6 +978,7 @@ public class AnalyticsActivity extends AppCompatActivity {
 
             // --- App logo, top-left of the header band ---
             // Logo PNG lives at app/src/main/res/drawable/app_logo.png — rename here if yours differs.
+            // Logo PNG lives at app/src/main/res/drawable/app_logo.png — rename here if yours differs.
             Bitmap logoBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.logo_quailfarm);
             if (logoBitmap != null) {
                 Bitmap scaledLogo = Bitmap.createScaledBitmap(logoBitmap, 50, 50, true);
@@ -933,21 +986,21 @@ public class AnalyticsActivity extends AppCompatActivity {
             }
 
             Paint ht = new Paint(); ht.setColor(Color.WHITE); ht.setTextSize(20f); ht.setFakeBoldText(true);
-            canvas.drawText("Waje's Quail Farm — Analytics Report", 78, 40, ht);
+            canvas.drawText(getString(R.string.waje_report_title), 78, 40, ht);
 
             Paint hs = new Paint(); hs.setColor(Color.WHITE); hs.setTextSize(11f);
-            canvas.drawText("Generated: " + ts, 78, 58, hs);
-            canvas.drawText("Period: " + periodLabel, 78, 76, hs);
+            canvas.drawText(getString(R.string.generated, ts), 78, 58, hs);
+            canvas.drawText(getString(R.string.period, periodLabel), 78, 76, hs);
 
             int y = 125;
-            drawSection(canvas, "Production Summary (" + currentFilter + ")", y); y += 30;
-            drawRow(canvas, "Total No. of Eggs Collected", String.valueOf(total), y); y += 20;
-            drawRow(canvas, "Grade A (Normal)", String.valueOf(a), y); y += 20;
-            drawRow(canvas, "Grade B (Cracked)", String.valueOf(b), y); y += 20;
-            drawRow(canvas, "Grade C (Reject)", String.valueOf(c), y); y += 40;
+            drawSection(canvas, getString(R.string.total_eggs_collected) + " (" + currentFilter + ")", y); y += 30;
+            drawRow(canvas, getString(R.string.total_eggs_collected), String.valueOf(total), y); y += 20;
+            drawRow(canvas, getString(R.string.grade_a_normal), String.valueOf(a), y); y += 20;
+            drawRow(canvas, getString(R.string.grade_b_cracked), String.valueOf(b), y); y += 20;
+            drawRow(canvas, getString(R.string.grade_c_reject), String.valueOf(c), y); y += 40;
 
             // --- Grade distribution pie chart ---
-            drawSection(canvas, "Grade Distribution", y); y += 20;
+            drawSection(canvas, getString(R.string.grade_distribution) /* fallback: label added in resources if needed */ , y); y += 20;
             Bitmap chartBitmap = createPieChartBitmap(a, b, c, REPORT_CHART_WIDTH, REPORT_CHART_HEIGHT);
             float chartLeft = (595 - REPORT_CHART_WIDTH) / 2f;
             if (chartBitmap != null) {
@@ -955,8 +1008,10 @@ public class AnalyticsActivity extends AppCompatActivity {
             } else {
                 // Should be effectively unreachable now that the chart is hand-drawn, but keep a
                 // visible fallback instead of silently leaving a blank gap on the report.
+                // Should be effectively unreachable now that the chart is hand-drawn, but keep a
+                // visible fallback instead of silently leaving a blank gap on the report.
                 Paint fallback = new Paint(); fallback.setColor(Color.GRAY); fallback.setTextSize(14f);
-                canvas.drawText("Chart unavailable", chartLeft, y + 30, fallback);
+                canvas.drawText(getString(R.string.chart_unavailable), chartLeft, y + 30, fallback);
             }
 
             document.finishPage(page);
@@ -971,10 +1026,10 @@ public class AnalyticsActivity extends AppCompatActivity {
             Intent intent = new Intent(Intent.ACTION_VIEW);
             intent.setDataAndType(uri, "application/pdf");
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            startActivity(Intent.createChooser(intent, "Open PDF Report"));
-            Toast.makeText(this, "PDF saved: " + filename, Toast.LENGTH_LONG).show();
+            startActivity(Intent.createChooser(intent, getString(R.string.open_pdf_report)));
+            Toast.makeText(this, getString(R.string.pdf_saved, filename), Toast.LENGTH_LONG).show();
         } catch (Exception e) {
-            Toast.makeText(this, "Failed to generate PDF: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.failed_generate_pdf, e.getMessage()), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -984,6 +1039,8 @@ public class AnalyticsActivity extends AppCompatActivity {
      */
     private void exportImageReport(int total, int a, int b, int c, String periodLabel, Bitmap.CompressFormat format, String ext, String mimeType) {
         try {
+            // Height increased (800 -> 870) to comfortably fit the larger REPORT_CHART_HEIGHT
+            // pie chart below the summary rows without clipping it.
             // Height increased (800 -> 870) to comfortably fit the larger REPORT_CHART_HEIGHT
             // pie chart below the summary rows without clipping it.
             int width = 595, height = 870;
@@ -1002,31 +1059,38 @@ public class AnalyticsActivity extends AppCompatActivity {
                 canvas.drawBitmap(scaledLogo, 18, 20, null);
             }
 
-            String ts = new SimpleDateFormat("MM/dd/yyyy hh:mm a", Locale.getDefault()).format(new Date());
+            String ts = formatTimestamp(new Date());
             Paint ht = new Paint(); ht.setColor(Color.WHITE); ht.setTextSize(20f); ht.setFakeBoldText(true);
-            canvas.drawText("Waje's Quail Farm — Analytics Report", 78, 40, ht);
+            canvas.drawText(getString(R.string.waje_report_title), 78, 40, ht);
 
             Paint hs = new Paint(); hs.setColor(Color.WHITE); hs.setTextSize(11f);
-            canvas.drawText("Generated: " + ts, 78, 58, hs);
-            canvas.drawText("Period: " + periodLabel, 78, 76, hs);
+            canvas.drawText(getString(R.string.generated, ts), 78, 58, hs);
+            canvas.drawText(getString(R.string.period, periodLabel), 78, 76, hs);
 
             int y = 125;
-            drawSection(canvas, "Production Summary (" + currentFilter + ")", y); y += 30;
-            drawRow(canvas, "Total No. of Eggs Collected", String.valueOf(total), y); y += 20;
-            drawRow(canvas, "Grade A (Normal)", String.valueOf(a), y); y += 20;
-            drawRow(canvas, "Grade B (Cracked)", String.valueOf(b), y); y += 20;
-            drawRow(canvas, "Grade C (Reject)", String.valueOf(c), y); y += 40;
+            drawSection(canvas, getString(R.string.total_eggs_collected) + " (" + currentFilter + ")", y); y += 30;
+            drawRow(canvas, getString(R.string.total_eggs_collected), String.valueOf(total), y); y += 20;
+            drawRow(canvas, getString(R.string.grade_a_normal), String.valueOf(a), y); y += 20;
+            drawRow(canvas, getString(R.string.grade_b_cracked), String.valueOf(b), y); y += 20;
+            drawRow(canvas, getString(R.string.grade_c_reject), String.valueOf(c), y); y += 40;
 
-            drawSection(canvas, "Grade Distribution", y); y += 20;
+            drawSection(canvas, getString(R.string.grade_distribution), y); y += 20;
             Bitmap chartBitmap = createPieChartBitmap(a, b, c, REPORT_CHART_WIDTH, REPORT_CHART_HEIGHT);
             float chartLeft = (width - REPORT_CHART_WIDTH) / 2f;
             if (chartBitmap != null) {
                 canvas.drawBitmap(chartBitmap, chartLeft, y, null);
             } else {
                 Paint fallback = new Paint(); fallback.setColor(Color.GRAY); fallback.setTextSize(14f);
-                canvas.drawText("Chart unavailable", chartLeft, y + 30, fallback);
+                canvas.drawText(getString(R.string.chart_unavailable), chartLeft, y + 30, fallback);
             }
 
+            // JPEG has no alpha channel — flatten onto white before compressing so
+            // transparent chart/logo edges don't turn black.
+            // NOTE: uses the same DIRECTORY_DOCUMENTS root as the PDF export (not
+            // DIRECTORY_PICTURES) because that's the root actually registered in
+            // res/xml/file_paths.xml for the FileProvider. Pointing FileProvider at an
+            // unregistered root is exactly what caused the "failed to find configured
+            // root" crash.
             // JPEG has no alpha channel — flatten onto white before compressing so
             // transparent chart/logo edges don't turn black.
             // NOTE: uses the same DIRECTORY_DOCUMENTS root as the PDF export (not
@@ -1046,10 +1110,10 @@ public class AnalyticsActivity extends AppCompatActivity {
             Intent intent = new Intent(Intent.ACTION_VIEW);
             intent.setDataAndType(uri, mimeType);
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            startActivity(Intent.createChooser(intent, "Open Image Report"));
-            Toast.makeText(this, "Image saved: " + filename, Toast.LENGTH_LONG).show();
+            startActivity(Intent.createChooser(intent, getString(R.string.open_image_report)));
+            Toast.makeText(this, getString(R.string.image_saved, filename), Toast.LENGTH_LONG).show();
         } catch (Exception e) {
-            Toast.makeText(this, "Failed to generate image: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.failed_generate_image, e.getMessage()), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -1079,6 +1143,12 @@ public class AnalyticsActivity extends AppCompatActivity {
                     // the whole activity (that was the cause of the flicker: recreate()
                     // re-registers this same callback, which fires onAvailable() again,
                     // which recreates again, and so on).
+                    // onAvailable() fires immediately on registration if the network is
+                    // already validated, so this can run right at activity startup — don't
+                    // let it fight with the initial onCreate loading state or recreate()
+                    // the whole activity (that was the cause of the flicker: recreate()
+                    // re-registers this same callback, which fires onAvailable() again,
+                    // which recreates again, and so on).
                     View ll = findViewById(R.id.loadingLayout);
                     if (ll != null) {
                         ll.setVisibility(View.GONE);
@@ -1094,11 +1164,10 @@ public class AnalyticsActivity extends AppCompatActivity {
     }
 
     private void startTimeUpdate() {
-        SimpleDateFormat timeFormat = new SimpleDateFormat("MM/dd/yyyy hh:mm a", Locale.getDefault());
         Handler handler = new Handler();
         handler.post(new Runnable() {
             @Override public void run() {
-                if (serverTimeLabel != null) serverTimeLabel.setText(timeFormat.format(new Date()));
+                if (serverTimeLabel != null) serverTimeLabel.setText(formatTimestamp(new Date()));
                 handler.postDelayed(this, 60000);
             }
         });

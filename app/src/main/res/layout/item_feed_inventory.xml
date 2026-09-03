@@ -19,20 +19,20 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content">
 
-            <TextView
+                <TextView
                 android:id="@+id/itemName"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_alignParentStart="true"
                 android:layout_toStartOf="@id/statusBadge"
                 android:layout_marginEnd="12dp"
-                android:text="Feed Item"
+                android:text="@string/feed_item"
                 android:textColor="@color/black"
                 android:textSize="17sp"
                 android:textStyle="bold"
                 android:fontFamily="sans-serif-medium" />
 
-            <TextView
+                <TextView
                 android:id="@+id/statusBadge"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -41,7 +41,7 @@
                 android:background="@drawable/rounded_green_bg"
                 android:paddingHorizontal="12dp"
                 android:paddingVertical="4dp"
-                android:text="In Stock"
+                android:text="@string/in_stock"
                 android:textColor="#2E7D32"
                 android:textSize="11sp"
                 android:textStyle="bold"
@@ -57,13 +57,13 @@
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <TextView
-                android:id="@+id/invNumber"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="#INV0001"
-                android:textColor="#8E8E93"
-                android:textSize="12sp" />
+                <TextView
+                    android:id="@+id/invNumber"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/inv_number_placeholder"
+                    android:textColor="#8E8E93"
+                    android:textSize="12sp" />
 
             <View
                 android:layout_width="4dp"
@@ -71,14 +71,14 @@
                 android:layout_marginHorizontal="8dp"
                 android:background="@drawable/rounded_gray_bg" />
 
-            <TextView
-                android:id="@+id/categoryTag"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Layer Feed"
-                android:textColor="@color/dark_green"
-                android:textSize="12sp"
-                android:fontFamily="sans-serif-medium" />
+                <TextView
+            android:id="@+id/categoryTag"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/layer_feed"
+            android:textColor="@color/dark_green"
+            android:textSize="12sp"
+            android:fontFamily="sans-serif-medium" />
         </LinearLayout>
 
         <!-- Description -->
@@ -87,7 +87,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
-            android:text="Feed description here"
+            android:text="@string/feed_description_placeholder"
             android:textColor="#666666"
             android:textSize="13sp"
             android:fontFamily="sans-serif"
@@ -134,7 +134,7 @@
                         android:id="@+id/locationTag"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Shop 1"
+                        android:text="@string/shop_1"
                         android:textColor="#333333"
                         android:textSize="13sp"
                         android:fontFamily="sans-serif-medium" />
@@ -151,7 +151,7 @@
                     android:id="@+id/quantityLabel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Stock"
+                    android:text="@string/stock_label"
                     android:textColor="#9E9E9E"
                     android:textSize="10sp"
                     android:textAllCaps="true"
@@ -162,7 +162,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
-                    android:text="0"
+                    android:text="@string/zero"
                     android:textColor="@color/black"
                     android:textSize="14sp"
                     android:textStyle="bold" />
@@ -181,7 +181,7 @@
                     android:layout_height="34dp"
                     android:background="@drawable/rounded_gray_bg"
                     android:backgroundTint="#F2F2F7"
-                    android:contentDescription="Edit"
+                    android:contentDescription="@string/edit"
                     android:padding="8dp"
                     android:scaleType="centerInside"
                     app:srcCompat="@drawable/ic_edit"
@@ -194,7 +194,7 @@
                     android:layout_marginStart="8dp"
                     android:background="@drawable/rounded_gray_bg"
                     android:backgroundTint="#FFF5F5"
-                    android:contentDescription="Delete"
+                    android:contentDescription="@string/delete"
                     android:padding="8dp"
                     android:scaleType="centerInside"
                     app:srcCompat="@drawable/ic_trash"
@@ -224,15 +224,15 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Unit Price"
+                    android:text="@string/unit_price"
                     android:textColor="#9E9E9E"
                     android:textSize="10sp"
                     android:textAllCaps="true" />
-                <TextView
+                    <TextView
                     android:id="@+id/unitPriceText"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Php 0.00"
+                    android:text="@string/php_0"
                     android:textColor="#333333"
                     android:textSize="13sp"
                     android:fontFamily="sans-serif-medium" />
@@ -246,15 +246,15 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Total Value"
+                    android:text="@string/total_value"
                     android:textColor="#9E9E9E"
                     android:textSize="10sp"
                     android:textAllCaps="true" />
-                <TextView
+                    <TextView
                     android:id="@+id/totalValueText"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Php 0.00"
+                    android:text="@string/php_0"
                     android:textColor="@color/dark_green"
                     android:textSize="15sp"
                     android:textStyle="bold" />

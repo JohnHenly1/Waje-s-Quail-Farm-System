@@ -81,6 +81,7 @@ class FeedInventoryActivity : AppCompatActivity() {
     private lateinit var locationsTv: TextView
     private lateinit var itemCountTv: TextView
     private lateinit var inventoryList: LinearLayout
+    private lateinit var swipeRefreshLayout: androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 
     // Tab views
     private lateinit var tabAllItems: TextView
@@ -104,6 +105,8 @@ class FeedInventoryActivity : AppCompatActivity() {
         }
 
         bindViews()
+        swipeRefreshLayout.setColorSchemeColors(android.graphics.Color.parseColor("#355E1A"))
+        swipeRefreshLayout.setOnRefreshListener { refreshFeedItems() }
         setupToolbar(currentUsername)
         setupFilterTabs()
         setupSortBar()
@@ -153,6 +156,7 @@ class FeedInventoryActivity : AppCompatActivity() {
         locationsTv      = findViewById(R.id.locationsValue)
         itemCountTv      = findViewById(R.id.itemCountLabel)
         inventoryList    = findViewById(R.id.inventoryList)
+        swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout)
         sortSpinner      = findViewById(R.id.sortSpinner)
 
         tabAllItems      = findViewById(R.id.tabAllItems)
@@ -289,7 +293,42 @@ class FeedInventoryActivity : AppCompatActivity() {
             renderList()
         }
     }
-
+    /** Pull-to-refresh: re-fetches feed items once, then rebuilds stats + list. */
+    private fun refreshFeedItems() {
+        feedCol.get()
+            .addOnSuccessListener { snaps ->
+                allItems.clear()
+                snaps.documents.forEach { doc ->
+                    val qty = doc.getLong("quantity") ?: 0L
+                    val initQty = doc.getLong("initialQuantity") ?: qty
+                    val category = doc.getString("category") ?: "Feed"
+                    val defaultUnit = if (category == "Feed") "Sacks" else "Bottle"
+                    allItems.add(
+                        FeedItem(
+                            firestoreId = doc.id,
+                            name        = doc.getString("name")        ?: "Unnamed",
+                            invNumber   = doc.getString("invNumber")   ?: "#INV----",
+                            description = doc.getString("description") ?: "",
+                            category    = category,
+                            location    = doc.getString("location")    ?: "Location Info",
+                            quantity    = qty,
+                            initialQuantity = initQty,
+                            unitPrice   = doc.getDouble("unitPrice")   ?: 0.0,
+                            status      = doc.getString("status")      ?: "In Stock",
+                            unit        = doc.getString("unit")        ?: defaultUnit,
+                            updatedAt   = doc.getTimestamp("updatedAt")
+                        )
+                    )
+                }
+                updateSummaryStats()
+                renderList()
+                swipeRefreshLayout.isRefreshing = false
+            }
+            .addOnFailureListener { e ->
+                swipeRefreshLayout.isRefreshing = false
+                Toast.makeText(this, "Refresh failed: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+    }
     // ──────────────────────────────────────────────────────────────────────────
     // Summary Stats
     // ──────────────────────────────────────────────────────────────────────────

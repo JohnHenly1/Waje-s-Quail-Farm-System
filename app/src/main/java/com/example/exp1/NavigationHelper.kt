@@ -315,12 +315,32 @@ object NavigationHelper {
     }
 
     // ─────────────────────────────────────────────────────────────────────
+    // BRAND PALETTE  (used to keep the "Add User" flow's colors consistent:
+    // light/white surfaces with a green accent, modernized.)
+    // ─────────────────────────────────────────────────────────────────────
+    private object Brand {
+        const val SURFACE = "#FFFFFF"          // dialog / card background
+        const val SURFACE_ALT = "#F3FBF6"      // faint green-tinted panel
+        const val GREEN_PRIMARY = "#1E8E3E"    // primary accent (buttons, active states)
+        const val GREEN_PRIMARY_DARK = "#146C2E"
+        const val GREEN_SOFT_BG = "#E6F6EC"    // chip/badge background
+        const val GREEN_LINE = "#CDEBD9"       // hairline / divider on light bg
+        const val TEXT_PRIMARY = "#1C1C1E"
+        const val TEXT_SECONDARY = "#6B7A72"
+        const val DANGER = "#D93025"
+        const val WARNING = "#B98900"
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
     // USER LIST  ("Add User" side-menu entry opens this first)
     // Shows only PENDING ("invited") users — approved/active users don't
     // clutter this screen. Each row has an "Unlock" action that runs the
     // verification-code procedure for that one person, and a "Delete"
     // action to remove the pending profile entirely — both behind their
     // own confirmation popups.
+    //
+    // UI: modernized light theme — white surface, soft green accents,
+    // rounded corners, no harsh borders.
     // ─────────────────────────────────────────────────────────────────────
 
     private data class PendingUser(
@@ -333,17 +353,47 @@ object NavigationHelper {
     fun showUserListDialog(activity: Activity, ownerEmail: String) {
         val dp = activity.resources.displayMetrics.density
 
+        // Outer scrollable-feel container, plain white.
         val root = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding((16 * dp).toInt(), (16 * dp).toInt(), (16 * dp).toInt(), (8 * dp).toInt())
+            setBackgroundColor(Color.parseColor(Brand.SURFACE))
+            setPadding((18 * dp).toInt(), (16 * dp).toInt(), (18 * dp).toInt(), (10 * dp).toInt())
         }
 
-        val addButton = MaterialButtonOrPlainButton(activity, "+  Add User")
+        // Header row: title + small green subtitle instead of relying only
+        // on the AlertDialog's default (theme-dependent) title bar.
+        val headerColumn = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        headerColumn.addView(TextView(activity).apply {
+            text = "Farm Users"
+            setTextColor(Color.parseColor(Brand.TEXT_PRIMARY))
+            textSize = 19f
+            setTypeface(typeface, Typeface.BOLD)
+        })
+        headerColumn.addView(TextView(activity).apply {
+            text = "Pending accounts waiting to be activated"
+            setTextColor(Color.parseColor(Brand.GREEN_PRIMARY_DARK))
+            textSize = 12.5f
+            setPadding(0, (2 * dp).toInt(), 0, 0)
+        })
+        root.addView(headerColumn)
+
+        // Thin green hairline under the header.
+        root.addView(View(activity).apply {
+            setBackgroundColor(Color.parseColor(Brand.GREEN_LINE))
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, (1 * dp).toInt()
+            ).apply { topMargin = (12 * dp).toInt(); bottomMargin = (14 * dp).toInt() }
+        })
+
+        val addButton = greenAddButton(activity, "+  Add User")
         root.addView(addButton)
 
         val listView = ListView(activity).apply {
             divider = null
             dividerHeight = (10 * dp).toInt()
+            setBackgroundColor(Color.TRANSPARENT)
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 (360 * dp).toInt()
@@ -351,16 +401,25 @@ object NavigationHelper {
         }
         root.addView(listView)
 
+        // Empty state: soft green rounded panel instead of plain gray text.
         val emptyText = TextView(activity).apply {
-            text = "No pending invites. Tap \"Add User\" to invite your first team member."
-            setTextColor(Color.parseColor("#8A8A8E"))
-            setPadding(0, (24 * dp).toInt(), 0, (24 * dp).toInt())
+            text = "No pending invites.\nTap \"Add User\" to invite your first team member."
+            setTextColor(Color.parseColor(Brand.GREEN_PRIMARY_DARK))
+            textSize = 13.5f
+            gravity = Gravity.CENTER
+            setPadding((18 * dp).toInt(), (28 * dp).toInt(), (18 * dp).toInt(), (28 * dp).toInt())
+            background = GradientDrawable().apply {
+                cornerRadius = 16 * dp
+                setColor(Color.parseColor(Brand.GREEN_SOFT_BG))
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = (14 * dp).toInt() }
             visibility = View.GONE
         }
         root.addView(emptyText)
 
         val dialog = AlertDialog.Builder(activity)
-            .setTitle("Farm Staff Pending Account")
             .setView(root)
             .setNegativeButton("Close", null)
             .create()
@@ -371,6 +430,18 @@ object NavigationHelper {
         }
 
         dialog.show()
+
+        // Rounded white dialog window + green "Close" action, so the whole
+        // sheet reads as one light, modern surface rather than the theme's
+        // default (often dark) dialog chrome.
+        dialog.window?.setBackgroundDrawable(GradientDrawable().apply {
+            cornerRadius = 24 * dp
+            setColor(Color.parseColor(Brand.SURFACE))
+        })
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.apply {
+            setTextColor(Color.parseColor(Brand.GREEN_PRIMARY_DARK))
+            setTypeface(typeface, Typeface.BOLD)
+        }
 
         val items = mutableListOf<PendingUser>()
         lateinit var adapter: PendingUserAdapter
@@ -459,13 +530,16 @@ object NavigationHelper {
         override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
             val user = items[position]
 
+            // Light card: white base with a faint green hairline border,
+            // instead of the previous flat gray fill.
             val card = LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding((14 * dp).toInt(), (12 * dp).toInt(), (14 * dp).toInt(), (12 * dp).toInt())
                 background = GradientDrawable().apply {
                     cornerRadius = 18 * dp
-                    setColor(Color.parseColor("#F4F4F7"))
+                    setColor(Color.parseColor(Brand.SURFACE))
+                    setStroke((1 * dp).toInt(), Color.parseColor(Brand.GREEN_LINE))
                 }
                 layoutParams = AbsListView.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
@@ -481,9 +555,10 @@ object NavigationHelper {
                 layoutParams = LinearLayout.LayoutParams((40 * dp).toInt(), (40 * dp).toInt())
                 background = GradientDrawable().apply {
                     shape = GradientDrawable.OVAL
+                    // Owner keeps a distinct color; staff uses the brand green.
                     setColor(
                         if (user.role == "owner") Color.parseColor("#5B6DFF")
-                        else Color.parseColor("#34A853")
+                        else Color.parseColor(Brand.GREEN_PRIMARY)
                     )
                 }
             }
@@ -498,19 +573,36 @@ object NavigationHelper {
             }
             textColumn.addView(TextView(activity).apply {
                 text = user.name
-                setTextColor(Color.parseColor("#1C1C1E"))
+                setTextColor(Color.parseColor(Brand.TEXT_PRIMARY))
                 textSize = 15f
                 setTypeface(typeface, Typeface.BOLD)
             })
             textColumn.addView(TextView(activity).apply {
                 text = "${RoleManager.displayName(user.role)}  •  ${user.email}"
-                setTextColor(Color.parseColor("#8A8A8E"))
+                setTextColor(Color.parseColor(Brand.TEXT_SECONDARY))
                 textSize = 12.5f
             })
+            // Status shown as a small rounded green/amber chip rather than
+            // plain colored text, for a more modern "badge" look.
             textColumn.addView(TextView(activity).apply {
                 text = if (user.isActive) "Active — can access the app" else "Inactive — locked out of the app"
-                setTextColor(if (user.isActive) Color.parseColor("#1E8E3E") else Color.parseColor("#C08A00"))
-                textSize = 11.5f
+                setTextColor(
+                    if (user.isActive) Color.parseColor(Brand.GREEN_PRIMARY_DARK)
+                    else Color.parseColor(Brand.WARNING)
+                )
+                textSize = 11f
+                setTypeface(typeface, Typeface.BOLD)
+                setPadding((8 * dp).toInt(), (3 * dp).toInt(), (8 * dp).toInt(), (3 * dp).toInt())
+                background = GradientDrawable().apply {
+                    cornerRadius = 10 * dp
+                    setColor(
+                        if (user.isActive) Color.parseColor(Brand.GREEN_SOFT_BG)
+                        else Color.parseColor("#FBF3DC")
+                    )
+                }
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = (5 * dp).toInt() }
             })
             card.addView(textColumn)
 
@@ -519,12 +611,23 @@ object NavigationHelper {
                 gravity = Gravity.CENTER_HORIZONTAL
             }
 
+            // Activate = solid green pill; Deactivate = outlined green pill,
+            // so the primary/positive action always reads as "green filled".
             val toggleButton: View = try {
                 MaterialButton(activity).apply {
                     text = if (user.isActive) "Deactivate" else "Activate"
                     textSize = 12f
                     cornerRadius = (14 * dp).toInt()
                     setPadding((12 * dp).toInt(), 0, (12 * dp).toInt(), 0)
+                    if (user.isActive) {
+                        setBackgroundColor(Color.parseColor(Brand.SURFACE))
+                        setTextColor(Color.parseColor(Brand.GREEN_PRIMARY_DARK))
+                        strokeColor = android.content.res.ColorStateList.valueOf(Color.parseColor(Brand.GREEN_PRIMARY))
+                        strokeWidth = (1 * dp).toInt()
+                    } else {
+                        setBackgroundColor(Color.parseColor(Brand.GREEN_PRIMARY))
+                        setTextColor(Color.WHITE)
+                    }
                 }
             } catch (e: Throwable) {
                 android.widget.Button(activity).apply {
@@ -538,7 +641,7 @@ object NavigationHelper {
 
             val deleteButton = TextView(activity).apply {
                 text = "Delete"
-                setTextColor(Color.parseColor("#D93025"))
+                setTextColor(Color.parseColor(Brand.DANGER))
                 textSize = 12f
                 gravity = Gravity.CENTER
                 setPadding(0, (8 * dp).toInt(), 0, 0)
@@ -549,6 +652,34 @@ object NavigationHelper {
             card.addView(actionColumn)
 
             return card
+        }
+    }
+
+    /**
+     * The "+ Add User" call-to-action: a solid green, fully-rounded pill
+     * button that sits at the top of the pending-users list. Falls back to
+     * a plain Button (still recolored) if MaterialButton isn't available.
+     */
+    private fun greenAddButton(activity: Activity, label: String): View {
+        val dp = activity.resources.displayMetrics.density
+        return try {
+            MaterialButton(activity).apply {
+                text = label
+                textSize = 14f
+                cornerRadius = (22 * dp).toInt()
+                setBackgroundColor(Color.parseColor(Brand.GREEN_PRIMARY))
+                setTextColor(Color.WHITE)
+                setPadding((16 * dp).toInt(), (10 * dp).toInt(), (16 * dp).toInt(), (10 * dp).toInt())
+            }
+        } catch (e: Throwable) {
+            android.widget.Button(activity).apply {
+                text = label
+                setTextColor(Color.WHITE)
+                background = GradientDrawable().apply {
+                    cornerRadius = 22 * dp
+                    setColor(Color.parseColor(Brand.GREEN_PRIMARY))
+                }
+            }
         }
     }
 
@@ -721,6 +852,7 @@ object NavigationHelper {
     private const val OTHER_BARANGAY_LABEL = "Other (type manually)"
 
     fun showAddUserDialog(activity: Activity, ownerEmail: String) {
+        val dp = activity.resources.displayMetrics.density
         val dialogView = LayoutInflater.from(activity).inflate(R.layout.dialog_invite_user, null)
         val editName = dialogView.findViewById<EditText>(R.id.inviteName)
         val editEmail = dialogView.findViewById<EditText>(R.id.inviteEmail)
@@ -736,6 +868,24 @@ object NavigationHelper {
         // regardless of theme / night mode / whatever the XML currently sets.
         listOf(editName, editEmail, editBirthday, editStreet, editState, editPostal, editBarangayCustom)
             .forEach { it.setTextColor(Color.BLACK) }
+
+        // Modernized light theme for this XML-based dialog too: white
+        // background behind each input with a green focus/border tint, so
+        // it visually matches the pending-users list above it. This is
+        // done in code (rather than requiring XML/style changes) by
+        // wrapping each field's existing background in a rounded,
+        // green-hinted drawable.
+        listOf(editName, editEmail, editBirthday, editStreet, editState, editPostal, editBarangayCustom).forEach { field ->
+            field.setBackgroundColor(Color.TRANSPARENT)
+            field.background = GradientDrawable().apply {
+                cornerRadius = 12 * dp
+                setColor(Color.parseColor(Brand.SURFACE))
+                setStroke((1 * dp).toInt(), Color.parseColor(Brand.GREEN_LINE))
+            }
+            field.setPadding((12 * dp).toInt(), (10 * dp).toInt(), (12 * dp).toInt(), (10 * dp).toInt())
+            field.setHintTextColor(Color.parseColor(Brand.TEXT_SECONDARY))
+        }
+        dialogView.setBackgroundColor(Color.parseColor(Brand.SURFACE))
 
         // Full Name: hard-block digits (and any other disallowed symbol) at
 // the keystroke level, instead of only flagging them after the fact
@@ -776,6 +926,9 @@ object NavigationHelper {
         val cityAdapter = blackTextArrayAdapter(activity, bataanCities)
         spinnerCity.adapter = cityAdapter
         val rbStaff = dialogView.findViewById<android.widget.RadioButton>(R.id.radioInviteStaff)
+        // Tint the staff radio button green so the one selectable role reads
+        // as "on-brand" rather than the system default accent color.
+        rbStaff?.buttonTintList = android.content.res.ColorStateList.valueOf(Color.parseColor(Brand.GREEN_PRIMARY))
 
         fun updateBarangaySpinner(city: String) {
             val options = mutableListOf("Select Barangay")
@@ -887,6 +1040,20 @@ object NavigationHelper {
 
         val dialog = builder.create()
         dialog.show()
+
+        // Rounded white sheet + green primary action, matching the list
+        // dialog's modernized look.
+        dialog.window?.setBackgroundDrawable(GradientDrawable().apply {
+            cornerRadius = 24 * dp
+            setColor(Color.parseColor(Brand.SURFACE))
+        })
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.apply {
+            setTextColor(Color.parseColor(Brand.GREEN_PRIMARY))
+            setTypeface(typeface, Typeface.BOLD)
+        }
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.apply {
+            setTextColor(Color.parseColor(Brand.TEXT_SECONDARY))
+        }
 
 // Tap anywhere in the dialog outside an active input to dismiss the keyboard.
         dismissKeyboardOnOutsideTouch(dialog, dialogView)

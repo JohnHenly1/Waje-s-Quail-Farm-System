@@ -120,6 +120,11 @@ public class ProfileActivity extends AppCompatActivity {
         userRoleTv       = findViewById(R.id.userRole);
         profileInitialTv = findViewById(R.id.profileInitial);
 
+// Force these stat values to always render in black
+        totalBirdsValue.setTextColor(android.graphics.Color.BLACK);
+        activeCagesValue.setTextColor(android.graphics.Color.BLACK);
+        daysRunningValue.setTextColor(android.graphics.Color.BLACK);
+
         if (userRoleTv != null) {
             String roleDisplayName = RoleManager.Companion.displayName(userRole != null ? userRole : "staff");
             userRoleTv.setText(getString(R.string.role_label, roleDisplayName));
@@ -801,37 +806,22 @@ public class ProfileActivity extends AppCompatActivity {
         Spinner spinnerRegion   = view.findViewById(R.id.spinnerRegion);
         Spinner spinnerProvince = view.findViewById(R.id.spinnerProvince);
 
-        String[] languages = {"English", "Tagalog", "Cebuano"};
-        ArrayAdapter<String> langAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, languages);
-        langAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        String[] languages = {"English", "Tagalog"};
+        ArrayAdapter<String> langAdapter = createBlackTextAdapter(languages);
         spinnerLanguage.setAdapter(langAdapter);
         spinnerLanguage.setSelection(Arrays.asList(languages).indexOf(accountManager.getSelectedLanguage()));
 
+        // Only Central Luzon (Region III) -> Bataan is available
         Map<String, List<String>> regionProvinceMap = new HashMap<>();
-        regionProvinceMap.put("National Capital Region (NCR)", List.of("Metro Manila"));
-        regionProvinceMap.put("Ilocos Region (Region I)", Arrays.asList("Ilocos Norte", "Ilocos Sur", "La Union", "Pangasinan"));
-        regionProvinceMap.put("Cagayan Valley (Region II)", Arrays.asList("Batanes", "Cagayan", "Isabela", "Nueva Vizcaya", "Quirino"));
-        regionProvinceMap.put("Central Luzon (Region III)", Arrays.asList("Aurora", "Bataan", "Bulacan", "Nueva Ecija", "Pampanga", "Tarlac", "Zambales"));
-        regionProvinceMap.put("CALABARZON (Region IV-A)", Arrays.asList("Batangas", "Cavite", "Laguna", "Quezon", "Rizal"));
-        regionProvinceMap.put("MIMAROPA Region (Region IV-B)", Arrays.asList("Marinduque", "Occidental Mindoro", "Oriental Mindoro", "Palawan", "Romblon"));
-        regionProvinceMap.put("Bicol Region (Region V)", Arrays.asList("Albay", "Camarines Norte", "Camarines Sur", "Catanduanes", "Masbate", "Sorsogon"));
-        regionProvinceMap.put("Western Visayas (Region VI)", Arrays.asList("Aklan", "Antique", "Capiz", "Guimaras", "Iloilo", "Negros Occidental"));
-        regionProvinceMap.put("Central Visayas (Region VII)", Arrays.asList("Bohol", "Cebu", "Negros Oriental", "Siquijor"));
-        regionProvinceMap.put("Eastern Visayas (Region VIII)", Arrays.asList("Biliran", "Eastern Samar", "Leyte", "Northern Samar", "Samar", "Southern Leyte"));
-        regionProvinceMap.put("Zamboanga Peninsula (Region IX)", Arrays.asList("Zamboanga del Norte", "Zamboanga del Sur", "Zamboanga Sibugay"));
-        regionProvinceMap.put("Northern Mindanao (Region X)", Arrays.asList("Bukidnon", "Camiguin", "Lanao del Norte", "Misamis Occidental", "Misamis Oriental"));
-        regionProvinceMap.put("Davao Region (Region XI)", Arrays.asList("Davao de Oro", "Davao del Norte", "Davao del Sur", "Davao Occidental", "Davao Oriental"));
-        regionProvinceMap.put("SOCCSKSARGEN (Region XII)", Arrays.asList("Cotabato", "Sarangani", "South Cotabato", "Sultan Kudarat"));
-        regionProvinceMap.put("Caraga (Region XIII)", Arrays.asList("Agusan del Norte", "Agusan del Sur", "Dinagat Islands", "Surigao del Norte", "Surigao del Sur"));
-        regionProvinceMap.put("BARMM", Arrays.asList("Basilan", "Lanao del Sur", "Maguindanao", "Sulu", "Tawi-Tawi"));
-        regionProvinceMap.put("Cordillera Administrative Region (CAR)", Arrays.asList("Abra", "Apayao", "Benguet", "Ifugao", "Kalinga", "Mountain Province"));
+        regionProvinceMap.put("Central Luzon (Region III)", List.of("Bataan"));
 
         String[] regions = regionProvinceMap.keySet().toArray(new String[0]);
         Arrays.sort(regions);
-        ArrayAdapter<String> regionAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, regions);
-        regionAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        ArrayAdapter<String> regionAdapter = createBlackTextAdapter(regions);
         spinnerRegion.setAdapter(regionAdapter);
-        spinnerRegion.setSelection(Arrays.asList(regions).indexOf(accountManager.getSelectedRegion()));
+
+        int regionIndex = Arrays.asList(regions).indexOf(accountManager.getSelectedRegion());
+        spinnerRegion.setSelection(regionIndex >= 0 ? regionIndex : 0);
 
         spinnerRegion.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
@@ -839,9 +829,8 @@ public class ProfileActivity extends AppCompatActivity {
                 String selectedRegion = regions[position];
                 List<String> provinces = regionProvinceMap.get(selectedRegion);
                 if (provinces != null) {
-                    ArrayAdapter<String> provinceAdapter = new ArrayAdapter<>(ProfileActivity.this,
-                            android.R.layout.simple_spinner_item, provinces);
-                    provinceAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                    ArrayAdapter<String> provinceAdapter = createBlackTextAdapter(
+                            provinces.toArray(new String[0]));
                     spinnerProvince.setAdapter(provinceAdapter);
                     String savedProvince = accountManager.getSelectedProvince();
                     if (provinces.contains(savedProvince)) {
@@ -861,8 +850,6 @@ public class ProfileActivity extends AppCompatActivity {
 
             String langTag = "en";
             if (selectedLang.equals("Tagalog")) langTag = "fil";
-            else if (selectedLang.equals("Cebuano")) langTag = "ceb";
-
             LocaleListCompat appLocales = LocaleListCompat.forLanguageTags(langTag);
             AppCompatDelegate.setApplicationLocales(appLocales);
 
@@ -876,6 +863,34 @@ public class ProfileActivity extends AppCompatActivity {
         });
         builder.setNegativeButton(getString(R.string.cancel), null);
         builder.show();
+    }
+
+    // Helper: builds a Spinner adapter that always renders black text,
+// for both the collapsed view and the dropdown list.
+    private ArrayAdapter<String> createBlackTextAdapter(String[] items) {
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this,
+                android.R.layout.simple_spinner_item, items) {
+            @Override
+            public View getView(int position, View convertView, android.view.ViewGroup parent) {
+                View v = super.getView(position, convertView, parent);
+                if (v instanceof TextView) {
+                    ((TextView) v).setTextColor(android.graphics.Color.BLACK);
+                }
+                return v;
+            }
+
+            @Override
+            public View getDropDownView(int position, View convertView, android.view.ViewGroup parent) {
+                View v = super.getDropDownView(position, convertView, parent);
+                if (v instanceof TextView) {
+                    ((TextView) v).setTextColor(android.graphics.Color.BLACK);
+                }
+                v.setBackgroundColor(android.graphics.Color.WHITE);
+                return v;
+            }
+        };
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        return adapter;
     }
 
     // ── Privacy & Security ─────────────────────────────────────────────────────

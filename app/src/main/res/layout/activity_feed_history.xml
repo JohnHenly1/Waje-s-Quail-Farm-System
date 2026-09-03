@@ -30,7 +30,7 @@
                 android:layout_alignParentStart="true"
                 android:layout_centerVertical="true"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="Back"
+                android:contentDescription="@string/back"
                 android:padding="8dp"
                 android:scaleType="centerInside"
                 app:srcCompat="@drawable/ic_arrow_back"
@@ -41,7 +41,7 @@
                 android:layout_height="wrap_content"
                 android:layout_centerInParent="true"
                 android:fontFamily="sans-serif-medium"
-                android:text="Inventory History"
+                android:text="@string/inventory_history_title"
                 android:textColor="@color/white"
                 android:textSize="18sp"
                 android:textStyle="bold" />
@@ -53,23 +53,23 @@
                 android:layout_centerVertical="true"
                 android:orientation="horizontal">
 
-                <ImageButton
-                    android:id="@+id/exportButton"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:layout_marginEnd="4dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="Export CSV"
-                    android:scaleType="centerInside"
-                    app:srcCompat="@android:drawable/ic_menu_save"
-                    app:tint="@color/white" />
+                    <ImageButton
+                        android:id="@+id/exportButton"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:layout_marginEnd="4dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/export_csv"
+                        android:scaleType="centerInside"
+                        app:srcCompat="@android:drawable/ic_menu_save"
+                        app:tint="@color/white" />
 
                 <ImageButton
                     android:id="@+id/clearHistoryButton"
                     android:layout_width="36dp"
                     android:layout_height="36dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="Clear History"
+                    android:contentDescription="@string/clear_history"
                     android:scaleType="centerInside"
                     app:srcCompat="@android:drawable/ic_menu_delete"
                     app:tint="@color/white" />
@@ -99,9 +99,9 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:paddingVertical="4dp">
-                <TextView android:id="@+id/tabAll" android:layout_width="wrap_content" android:layout_height="32dp" android:paddingHorizontal="16dp" android:layout_marginEnd="8dp" android:gravity="center" android:text="All" android:background="@drawable/rounded_dark_green" android:textColor="@color/white" android:textStyle="bold" android:textSize="12sp"/>
-                <TextView android:id="@+id/tabFeed" android:layout_width="wrap_content" android:layout_height="32dp" android:paddingHorizontal="16dp" android:layout_marginEnd="8dp" android:gravity="center" android:text="Feed" android:background="@drawable/rounded_gray_bg" android:textColor="@color/dark_gray" android:textSize="12sp"/>
-                <TextView android:id="@+id/tabSupplements" android:layout_width="wrap_content" android:layout_height="32dp" android:paddingHorizontal="16dp" android:gravity="center" android:text="Supplements" android:background="@drawable/rounded_gray_bg" android:textColor="@color/dark_gray" android:textSize="12sp"/>
+                <TextView android:id="@+id/tabAll" android:layout_width="wrap_content" android:layout_height="32dp" android:paddingHorizontal="16dp" android:layout_marginEnd="8dp" android:gravity="center" android:text="@string/all" android:background="@drawable/rounded_dark_green" android:textColor="@color/white" android:textStyle="bold" android:textSize="12sp"/>
+                <TextView android:id="@+id/tabFeed" android:layout_width="wrap_content" android:layout_height="32dp" android:paddingHorizontal="16dp" android:layout_marginEnd="8dp" android:gravity="center" android:text="@string/feed" android:background="@drawable/rounded_gray_bg" android:textColor="@color/dark_gray" android:textSize="12sp"/>
+                <TextView android:id="@+id/tabSupplements" android:layout_width="wrap_content" android:layout_height="32dp" android:paddingHorizontal="16dp" android:gravity="center" android:text="@string/supplements" android:background="@drawable/rounded_gray_bg" android:textColor="@color/dark_gray" android:textSize="12sp"/>
             </LinearLayout>
         </HorizontalScrollView>
 
@@ -117,10 +117,10 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:paddingVertical="4dp">
-                <TextView android:id="@+id/chipAllActions" android:layout_width="wrap_content" android:layout_height="28dp" android:paddingHorizontal="12dp" android:layout_marginEnd="8dp" android:gravity="center" android:text="All Actions" android:textSize="11sp" android:background="@drawable/rounded_dark_green" android:textColor="@color/white" android:textStyle="bold"/>
-                <TextView android:id="@+id/chipAdded" android:layout_width="wrap_content" android:layout_height="28dp" android:paddingHorizontal="12dp" android:layout_marginEnd="8dp" android:gravity="center" android:text="Added" android:textSize="11sp" android:background="@drawable/rounded_gray_bg" android:textColor="@color/dark_gray"/>
-                <TextView android:id="@+id/chipRestock" android:layout_width="wrap_content" android:layout_height="28dp" android:paddingHorizontal="12dp" android:layout_marginEnd="8dp" android:gravity="center" android:text="Restock" android:textSize="11sp" android:background="@drawable/rounded_gray_bg" android:textColor="@color/dark_gray"/>
-                <TextView android:id="@+id/chipDeleted" android:layout_width="wrap_content" android:layout_height="28dp" android:paddingHorizontal="12dp" android:gravity="center" android:text="Deleted" android:textSize="11sp" android:background="@drawable/rounded_gray_bg" android:textColor="@color/dark_gray"/>
+                <TextView android:id="@+id/chipAllActions" android:layout_width="wrap_content" android:layout_height="28dp" android:paddingHorizontal="12dp" android:layout_marginEnd="8dp" android:gravity="center" android:text="@string/all_actions" android:textSize="11sp" android:background="@drawable/rounded_dark_green" android:textColor="@color/white" android:textStyle="bold"/>
+                <TextView android:id="@+id/chipAdded" android:layout_width="wrap_content" android:layout_height="28dp" android:paddingHorizontal="12dp" android:layout_marginEnd="8dp" android:gravity="center" android:text="@string/added" android:textSize="11sp" android:background="@drawable/rounded_gray_bg" android:textColor="@color/dark_gray"/>
+                <TextView android:id="@+id/chipRestock" android:layout_width="wrap_content" android:layout_height="28dp" android:paddingHorizontal="12dp" android:layout_marginEnd="8dp" android:gravity="center" android:text="@string/restock" android:textSize="11sp" android:background="@drawable/rounded_gray_bg" android:textColor="@color/dark_gray"/>
+                <TextView android:id="@+id/chipDeleted" android:layout_width="wrap_content" android:layout_height="28dp" android:paddingHorizontal="12dp" android:gravity="center" android:text="@string/deleted" android:textSize="11sp" android:background="@drawable/rounded_gray_bg" android:textColor="@color/dark_gray"/>
             </LinearLayout>
         </HorizontalScrollView>
     </LinearLayout>

@@ -17,14 +17,15 @@
         android:src="@drawable/ic_arrow_back"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        app:tint="#466d1d" />
+        app:tint="#466d1d"
+        android:contentDescription="@string/back" />
 
     <TextView
         android:id="@+id/enterCodeTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="60dp"
-        android:text="Enter Invite Code"
+        android:text="@string/enter_invite_code"
         android:textColor="#466d1d"
         android:textSize="28sp"
         android:textStyle="bold"
@@ -62,7 +63,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Invitation Verification"
+                android:text="@string/invitation_verification"
                 android:textColor="#466d1d"
                 android:textStyle="bold"
                 android:textSize="16sp" />
@@ -71,7 +72,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="Enter the 6-digit code sent to your email by the owner."
+                android:text="@string/enter_6digit_code_sent"
                 android:textColor="@color/gray"
                 android:textSize="12sp" />
 
@@ -82,7 +83,7 @@
                 android:layout_marginTop="24dp"
                 android:background="@drawable/rounded_corner"
                 android:gravity="center"
-                android:hint="000000"
+                android:hint="@string/invite_code_hint"
                 android:inputType="number"
                 android:maxLength="6"
                 android:padding="12dp"
@@ -96,7 +97,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="56dp"
                 android:layout_marginTop="24dp"
-                android:text="Verify &amp; Register"
+                android:text="@string/verify_and_register"
                 android:textAllCaps="false"
                 android:textStyle="bold"
                 app:backgroundTint="#466d1d"

@@ -31,7 +31,7 @@
                     android:layout_width="48dp"
                     android:layout_height="48dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="Back"
+                    android:contentDescription="@string/back"
                     android:scaleType="centerInside"
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintStart_toStartOf="parent"
@@ -46,7 +46,7 @@
                     android:ellipsize="end"
                     android:fontFamily="sans-serif-medium"
                     android:maxLines="1"
-                    android:text="Quail Assistant"
+                    android:text="@string/quail_assistant"
                     android:textColor="@color/white"
                     android:textSize="16sp"
                     android:textStyle="bold"
@@ -60,7 +60,7 @@
                     android:layout_width="40dp"
                     android:layout_height="40dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="New chat"
+                    android:contentDescription="@string/new_chat"
                     android:scaleType="centerInside"
                     android:padding="9dp"
                     app:layout_constraintBottom_toBottomOf="parent"
@@ -74,7 +74,7 @@
                     android:layout_width="40dp"
                     android:layout_height="40dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="Chat history"
+                    android:contentDescription="@string/chat_history"
                     android:scaleType="centerInside"
                     android:padding="9dp"
                     app:layout_constraintBottom_toBottomOf="parent"
@@ -125,7 +125,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
-            android:text="Quail Assistant is typing..."
+            android:text="@string/quail_assistant_typing"
             android:textColor="#6B7280"
             android:textSize="12sp" />
     </LinearLayout>
@@ -169,18 +169,18 @@
             android:orientation="horizontal"
             android:paddingHorizontal="10dp">
 
-            <TextView
-                android:id="@+id/modelSelectorText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_weight="0"
-                android:maxWidth="90dp"
-                android:singleLine="true"
-                android:ellipsize="end"
-                android:fontFamily="sans-serif-medium"
-                android:text="3.5 Flash"
-                android:textColor="@color/dark_green"
-                android:textSize="11sp" />
+                <TextView
+                    android:id="@+id/modelSelectorText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0"
+                    android:maxWidth="90dp"
+                    android:singleLine="true"
+                    android:ellipsize="end"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="@string/model_3_5_flash"
+                    android:textColor="@color/dark_green"
+                    android:textSize="11sp" />
 
             <ImageView
                 android:layout_width="12dp"
@@ -190,13 +190,13 @@
                 app:tint="@color/dark_green" />
         </LinearLayout>
 
-        <EditText
+            <EditText
             android:id="@+id/chatInput"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:background="@drawable/bg_chat_input"
-            android:hint="Ask about quail farming..."
+                android:hint="@string/ask_quail_hint"
             android:imeOptions="actionSend"
             android:inputType="textCapSentences|textMultiLine"
             android:maxLines="4"
@@ -212,7 +212,7 @@
             android:layout_height="44dp"
             android:layout_marginStart="8dp"
             android:background="@drawable/bg_send_button"
-            android:contentDescription="Send"
+            android:contentDescription="@string/send"
             android:padding="10dp"
             android:scaleType="fitCenter"
             app:srcCompat="@drawable/lc_send"

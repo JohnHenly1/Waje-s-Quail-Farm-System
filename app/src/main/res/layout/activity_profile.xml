@@ -157,6 +157,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="6dp"
                     android:layout_weight="1"
+                    app:cardBackgroundColor="@android:color/white"
                     app:cardCornerRadius="16dp"
                     app:cardElevation="2dp"
                     app:strokeWidth="0dp">
@@ -183,7 +184,6 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="6dp"
                             android:text="@string/placeholder_dashes"
-                            android:textColor="?attr/colorOnSurface"
                             android:textSize="18sp"
                             android:textStyle="bold" />
 
@@ -203,6 +203,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginHorizontal="3dp"
                     android:layout_weight="1"
+                    app:cardBackgroundColor="@android:color/white"
                     app:cardCornerRadius="16dp"
                     app:cardElevation="2dp"
                     app:strokeWidth="0dp">
@@ -229,7 +230,6 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="6dp"
                             android:text="@string/placeholder_dashes"
-                            android:textColor="?attr/colorOnSurface"
                             android:textSize="18sp"
                             android:textStyle="bold" />
 
@@ -249,6 +249,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="6dp"
                     android:layout_weight="1"
+                    app:cardBackgroundColor="@android:color/white"
                     app:cardCornerRadius="16dp"
                     app:cardElevation="2dp"
                     app:strokeWidth="0dp">
@@ -275,7 +276,6 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="6dp"
                             android:text="@string/placeholder_dashes"
-                            android:textColor="?attr/colorOnSurface"
                             android:textSize="18sp"
                             android:textStyle="bold" />
 

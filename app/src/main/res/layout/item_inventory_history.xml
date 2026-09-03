@@ -26,7 +26,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Feed Item"
+                android:text="@string/feed_item"
                 android:textColor="@color/black"
                 android:textSize="16sp"
                 android:textStyle="bold"
@@ -39,7 +39,7 @@
                 android:background="@drawable/rounded_green_bg"
                 android:paddingHorizontal="12dp"
                 android:paddingVertical="4dp"
-                android:text="ACTION"
+                android:text="@string/all_actions"
                 android:textColor="#2E7D32"
                 android:textSize="12sp"
                 android:textStyle="bold" />
@@ -51,7 +51,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:text="Date/Time"
+            android:text="@string/sample_date"
             android:textColor="#9E9E9E"
             android:textSize="12sp"
             android:fontFamily="sans-serif" />
@@ -62,7 +62,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:text="Action description"
+            android:text="@string/feed_description_placeholder"
             android:textColor="#616161"
             android:textSize="13sp"
             android:fontFamily="sans-serif" />
@@ -104,7 +104,7 @@
                     android:id="@+id/quantityLabel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Quantity"
+                    android:text="@string/quantity"
                     android:textColor="#9E9E9E"
                     android:textSize="11sp" />
 
@@ -113,7 +113,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
-                    android:text="0"
+                    android:text="@string/zero"
                     android:textColor="@color/black"
                     android:textSize="14sp"
                     android:textStyle="bold" />
@@ -128,7 +128,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Unit Price"
+                    android:text="@string/unit_price"
                     android:textColor="#9E9E9E"
                     android:textSize="11sp" />
 
@@ -137,7 +137,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
-                    android:text="Php 0.00"
+                    android:text="@string/php_0"
                     android:textColor="@color/black"
                     android:textSize="14sp"
                     android:textStyle="bold" />
@@ -152,7 +152,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Total Value"
+                    android:text="@string/total_value"
                     android:textColor="#9E9E9E"
                     android:textSize="11sp" />
 
@@ -161,7 +161,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
-                    android:text="Php 0.00"
+                    android:text="@string/php_0"
                     android:textColor="@color/black"
                     android:textSize="14sp"
                     android:textStyle="bold" />
