@@ -33,6 +33,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Exp1">
 
+        <meta-data
+            android:name="firebase_app_check_debug_secret"
+            android:value="e36c43b1-8ab1-4f71-b127-33b449976406" />
+
 
         <receiver
             android:name=".BootReceiver"

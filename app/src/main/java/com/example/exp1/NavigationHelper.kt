@@ -868,7 +868,27 @@ object NavigationHelper {
         // regardless of theme / night mode / whatever the XML currently sets.
         listOf(editName, editEmail, editBirthday, editStreet, editState, editPostal, editBarangayCustom)
             .forEach { it.setTextColor(Color.BLACK) }
+        // Inline red validation text for the Full Name field — replaces the
+        // old "Invalid Character" AlertDialog with a standard under-field warning.
+        val nameErrorText = TextView(activity).apply {
+            setTextColor(Color.parseColor(Brand.DANGER))
+            textSize = 12f
+            visibility = View.GONE
+            setPadding((12 * dp).toInt(), (4 * dp).toInt(), (12 * dp).toInt(), 0)
+        }
+        (editName.parent as? ViewGroup)?.let { parent ->
+            val index = parent.indexOfChild(editName)
+            parent.addView(nameErrorText, index + 1)
+        }
 
+        fun showNameError(message: String?) {
+            if (message != null) {
+                nameErrorText.text = message
+                nameErrorText.visibility = View.VISIBLE
+            } else {
+                nameErrorText.visibility = View.GONE
+            }
+        }
         // Modernized light theme for this XML-based dialog too: white
         // background behind each input with a green focus/border tint, so
         // it visually matches the pending-users list above it. This is
@@ -888,27 +908,16 @@ object NavigationHelper {
         dialogView.setBackgroundColor(Color.parseColor(Brand.SURFACE))
 
         // Full Name: hard-block digits (and any other disallowed symbol) at
-// the keystroke level, instead of only flagging them after the fact
-// via the TextWatcher error below. Only letters, spaces, hyphens and
-// commas are allowed — no numbers, no other special characters.
+        // the keystroke level, instead of only flagging them after the fact
+        // via the TextWatcher error below. Only letters, spaces, hyphens and
+        // commas are allowed — no numbers, no other special characters.
         val nameAllowedRegex = Regex("^[A-Za-z\\s,-]*$")
-        var lastInvalidNameWarningAt = 0L
         editName.filters = editName.filters + android.text.InputFilter { source, start, end, _, _, _ ->
             val piece = source.subSequence(start, end)
             if (nameAllowedRegex.matches(piece)) {
                 null
             } else {
-                // Throttle so holding an invalid key (or pasting a bad string)
-                // doesn't stack multiple dialogs on top of each other.
-                val now = System.currentTimeMillis()
-                if (now - lastInvalidNameWarningAt > 800) {
-                    lastInvalidNameWarningAt = now
-                    AlertDialog.Builder(activity)
-                        .setTitle("Invalid Character")
-                        .setMessage("Full name can only contain letters, spaces, hyphens (-) and commas (,). Numbers and other special characters are not allowed.")
-                        .setPositiveButton("OK", null)
-                        .show()
-                }
+                showNameError("Full name can only contain letters, spaces, hyphens (-) and commas (,). Numbers and other special characters are not allowed.")
                 ""
             }
         }
@@ -973,7 +982,7 @@ object NavigationHelper {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: android.text.Editable?) {
-                editName.error = getNameValidationError(s.toString())
+                showNameError(getNameValidationError(s.toString()))
             }
         })
 
@@ -1036,7 +1045,9 @@ object NavigationHelper {
         val builder = AlertDialog.Builder(activity)
             .setView(dialogView)
             .setPositiveButton("Add User", null)
-            .setNegativeButton("Cancel", null)
+            .setNegativeButton("Cancel") { _, _ ->
+                showUserListDialog(activity, ownerEmail)
+            }
 
         val dialog = builder.create()
         dialog.show()

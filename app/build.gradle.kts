@@ -55,6 +55,10 @@ dependencies {
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.storage)
 
+    // Firebase Enforce and integrity for the app
+    implementation("com.google.firebase:firebase-appcheck-playintegrity:19.0.1")
+    implementation("com.google.firebase:firebase-appcheck-debug:19.0.1") // debug builds only
+
     // Other Firebase libraries
     implementation("com.google.firebase:firebase-ai")
 

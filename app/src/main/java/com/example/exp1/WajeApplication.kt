@@ -4,43 +4,43 @@ import android.app.Application
 import android.content.res.Configuration
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
+import com.google.firebase.Firebase
+import com.google.firebase.appcheck.appCheck
+import com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory
+import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.initialize
 import java.util.Locale
 
 class WajeApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
+        // ── App Check: must run before any other Firebase call ──────────────
+        Firebase.initialize(this)
+        val providerFactory = if (BuildConfig.DEBUG) {
+            DebugAppCheckProviderFactory.getInstance()
+        } else {
+            PlayIntegrityAppCheckProviderFactory.getInstance()
+        }
+        Firebase.appCheck.installAppCheckProviderFactory(providerFactory)
+        // ──────────────────────────────────────────────────────────────────
+
         // Initialise GlobalData first so SharedPreferences is ready
         // for both UI and BroadcastReceivers (TaskAlarmReceiver, etc.)
         GlobalData.init(this)
 
         // ── FIX: Ensure Firebase Auth always has a valid session ────────────
-        // The app uses a custom role/password system stored in Firestore, but
-        // Firebase Security Rules require request.auth != null.  Signing in
-        // anonymously gives every app install a stable Firebase UID without
-        // changing the existing custom login flow.
         val auth = FirebaseAuth.getInstance()
         if (auth.currentUser == null) {
             auth.signInAnonymously()
                 .addOnFailureListener { e ->
-                    // Non-fatal: log the error but don't crash.
-                    // The app will still work offline; Firestore/Storage
-                    // operations that require auth will surface their own errors.
                     android.util.Log.e("WajeApplication", "Anonymous sign-in failed: ${e.message}")
                 }
         }
         // ───────────────────────────────────────────────────────────────────
 
-        // Watches system_settings/app_status app-wide and force-logs-out +
-        // redirects whoever's using the app the moment maintenance mode is
-        // turned on. See MaintenanceGuard for details.
         MaintenanceGuard.start(this)
-
-        // Watches inventory stock, overdue tasks, and water level app-wide so
-        // alerts + system notifications fire as soon as they happen, instead
-        // of only when a staff member has the Notifications screen open. See
-        // AlertsMonitor for details.
         AlertsMonitor.start(this)
 
         val accountManager = AccountManager(this)
@@ -51,17 +51,14 @@ class WajeApplication : Application() {
             else -> "en"
         }
 
-        // Apply immediately to the current process's resources
         val locale = Locale.forLanguageTag(langTag)
         Locale.setDefault(locale)
 
         val config = Configuration(resources.configuration)
         config.setLocale(locale)
-        // This is deprecated but still useful for immediate effect in some OS versions
         @Suppress("DEPRECATION")
         resources.updateConfiguration(config, resources.displayMetrics)
 
-        // Set for AppCompat (persistence and modern way)
         val appLocales = LocaleListCompat.forLanguageTags(langTag)
         AppCompatDelegate.setApplicationLocales(appLocales)
     }
