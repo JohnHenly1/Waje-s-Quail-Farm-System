@@ -34,6 +34,8 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import java.text.SimpleDateFormat
+import android.view.ViewGroup
+import java.io.File
 import java.util.Calendar
 import java.util.Locale
 import java.util.concurrent.ExecutorService
@@ -91,6 +93,29 @@ class EggCountActivity : AppCompatActivity() {
     private var singleShotBitmap: Bitmap? = null
     private var singleShotResults: List<DetectionResult> = emptyList()
 
+    // ── Scanned-photo dedup ──────────────────────────────────────────────────
+    private val prefs by lazy { getSharedPreferences("egg_scan_dedup", MODE_PRIVATE) }
+    private fun loadScannedHashes(): MutableSet<String> =
+        prefs.getStringSet("scanned_hashes", emptySet())?.toMutableSet() ?: mutableSetOf()
+    private fun saveScannedHashes(hashes: Set<String>) {
+        prefs.edit().putStringSet("scanned_hashes", hashes).apply()
+    }
+    private val scannedThumbsDir by lazy {
+        File(filesDir, "scanned_thumbs").apply { mkdirs() }
+    }
+
+    private fun saveScannedThumb(hash: String, bmp: Bitmap) {
+        try {
+            val thumb = makeThumb(bmp)
+            File(scannedThumbsDir, "$hash.jpg").outputStream().use { out ->
+                thumb.compress(Bitmap.CompressFormat.JPEG, 80, out)
+            }
+        } catch (e: Exception) { Log.w(TAG, "saveScannedThumb failed", e) }
+    }
+
+    private fun deleteScannedThumb(hash: String) {
+        File(scannedThumbsDir, "$hash.jpg").delete()
+    }
     // ── Firebase Realtime Database ────────────────────────────────────────────
     private val database by lazy { FirebaseDatabase.getInstance() }
     private val auth by lazy { FirebaseAuth.getInstance() }
@@ -107,6 +132,12 @@ class EggCountActivity : AppCompatActivity() {
     private lateinit var retakeBtn: Button
     private lateinit var discardBtn: Button
     private lateinit var modeSwitchBtn: Button
+    // True whenever modeSwitchBtn currently means "return to Live Mode" (and
+    // therefore tapping it must go through confirmLiveModeSwitch). False
+    // means it currently means "Pick Photo". Set explicitly everywhere the
+    // button's text is changed — never inferred from other state, since that
+    // was the source of the bug where the dialog got silently skipped.
+    private var modeSwitchIsReturnToLive = false
     private lateinit var captureModeToggleBtn: Button
     private lateinit var frozenOverlay: View
     private lateinit var saveBtn: Button
@@ -270,6 +301,7 @@ class EggCountActivity : AppCompatActivity() {
     private fun wireListeners() {
         findViewById<View>(R.id.backButton).setOnClickListener { finish() }
         findViewById<View>(R.id.refreshButton).setOnClickListener { resetCounts() }
+        findViewById<View>(R.id.viewScannedBtn).setOnClickListener { showScannedPhotosDialog() }
 
         captureBtn.setOnClickListener    { onCaptureBtnClicked() }
         // Retake: either dismisses a thumbnail preview back to live batch capture,
@@ -284,10 +316,7 @@ class EggCountActivity : AppCompatActivity() {
         // Discard: throw away everything captured so far — now confirmed first.
         discardBtn.setOnClickListener    { confirmDiscard() }
         modeSwitchBtn.setOnClickListener {
-            // Decide by the button's current label, not isLiveMode — otherwise
-            // tapping "Pick Photo" while the camera is off falls through to
-            // resumeLive() and shows a stale/frozen preview instead of the picker.
-            if (modeSwitchBtn.text == "↩ Live Mode") {
+            if (modeSwitchIsReturnToLive) {
                 confirmLiveModeSwitch()
             } else {
                 onPickPhotoClicked()
@@ -330,8 +359,8 @@ class EggCountActivity : AppCompatActivity() {
             }
 
             if (now - lastTapTime <= doubleTapInterval) {
-                stopCamera()
                 lastTapTime = 0L
+                confirmDoubleTapStop()
             } else {
                 lastTapTime = now
             }
@@ -473,6 +502,38 @@ class EggCountActivity : AppCompatActivity() {
         }
     }
 
+    /** Double-tap-to-stop guard: if there's unsaved work (a queued/scanned
+     * batch, or a captured single shot) sitting around, confirm before the
+     * double-tap gesture wipes it — same protection modeSwitchBtn already
+     * gets via confirmLiveModeSwitch(), just reached through a different
+     * gesture on the same screen. */
+    private fun confirmDoubleTapStop() {
+        if (isScanningBatch) {
+            MaterialAlertDialogBuilder(this)
+                .setTitle("Scanning in progress")
+                .setMessage("A batch scan is still running. Stopping the camera now will cancel the scan and lose any results gathered so far. Continue?")
+                .setPositiveButton("Stop Anyway") { _, _ -> stopCamera() }
+                .setNegativeButton("Keep Scanning", null)
+                .show()
+            return
+        }
+        val hasBatch = captureMode == CaptureMode.BATCH && pendingBatchShots.isNotEmpty()
+        val hasSingle = captureMode == CaptureMode.SINGLE && singleShotBitmap != null
+        if (!hasBatch && !hasSingle) {
+            stopCamera()
+            return
+        }
+        val message = if (hasBatch)
+            "This will discard all ${pendingBatchShots.size} queued photo(s) and any scanned results. This cannot be undone."
+        else
+            "This will discard the current photo and its egg count. This cannot be undone."
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Stop Camera?")
+            .setMessage(message)
+            .setPositiveButton("Stop") { _, _ -> stopCamera() }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
     /** Double-tap-triggered stop: same as [stopCameraCore] plus the double-tap toast. */
     private fun stopCamera() {
         stopCameraCore()
@@ -489,9 +550,6 @@ class EggCountActivity : AppCompatActivity() {
         analyzing.set(false)
         overlayView.setImageSize(0, 0)
         overlayView.setResults(emptyList())
-        // Camera is fully off — go solid black rather than the translucent dim
-        // used when reviewing a frozen/captured shot, so it's obvious there's
-        // no feed instead of looking like a frozen/stuck frame.
         frozenOverlay.setBackgroundColor(Color.BLACK)
         frozenOverlay.visibility = View.VISIBLE
         frozenPreviewImage.visibility = View.GONE
@@ -503,6 +561,7 @@ class EggCountActivity : AppCompatActivity() {
         retakeBtn.visibility  = View.GONE
         discardBtn.visibility = View.GONE
         modeSwitchBtn.text    = "Pick Photo"
+        modeSwitchIsReturnToLive = false
         saveBtn.visibility    = View.GONE
         batchShotCount = 0
         resetCounts()
@@ -650,8 +709,6 @@ class EggCountActivity : AppCompatActivity() {
         frozenOverlay.visibility = View.VISIBLE
         frozenPreviewImage.setImageBitmap(bmp)
         frozenPreviewImage.visibility = View.VISIBLE
-        // Tell the overlay the true source bitmap size so boxes line up correctly
-        // with the centerCrop-scaled preview image instead of a naive 1:1 mapping.
         overlayView.setImageSize(bmp.width, bmp.height)
         liveScanLabel.text = "● ANALYZING"
         captureBtn.visibility = View.GONE
@@ -659,6 +716,7 @@ class EggCountActivity : AppCompatActivity() {
         retakeBtn.text        = "Retake"
         discardBtn.visibility = View.VISIBLE
         modeSwitchBtn.text    = "↩ Live Mode"
+        modeSwitchIsReturnToLive = true
 
         startScanAnimation()
 
@@ -675,8 +733,6 @@ class EggCountActivity : AppCompatActivity() {
                 }
                 overlayView.setResults(results)
                 updateCountUI()
-                // Gallery save is deferred until the user confirms Save Collection —
-                // stash the shot + its detections instead of writing to disk now.
                 singleShotBitmap = bmp
                 singleShotResults = results
 
@@ -707,6 +763,19 @@ class EggCountActivity : AppCompatActivity() {
      * exist on disk and must never be re-saved (that was the duplicate bug).
      */
     private fun addShotToBatchQueue(shot: BatchShot) {
+        val hash = contentHash(shot.full)
+
+        // Already scanned in a previous session — skip.
+        if (loadScannedHashes().contains(hash)) {
+            toast("Already scanned — skipped")
+            return
+        }
+        // Already queued in this session (e.g. picked twice) — skip.
+        if (pendingBatchShots.any { contentHash(it.full) == hash }) {
+            toast("Already queued — skipped")
+            return
+        }
+
         pendingBatchShots.add(shot)
         // Gallery save is deferred until Save Collection is confirmed — see
         // finishSessionAfterSave. Nothing gets written to disk here.
@@ -850,13 +919,14 @@ class EggCountActivity : AppCompatActivity() {
         retakeBtn.visibility  = View.GONE
         discardBtn.visibility = View.VISIBLE
         modeSwitchBtn.text    = "↩ Live Mode"
+        modeSwitchIsReturnToLive = true
         liveScanLabel.text    = "● SCANNING (0/${pendingBatchShots.size})"
 
         gradeA = 0; gradeB = 0; gradeC = 0; countedBoxes.clear()
         overlayView.setResults(emptyList())
         startScanAnimation()
 
-        val queued = pendingBatchShots.map { it.full } // snapshot for the background thread
+        val queued = pendingBatchShots.map { it.full }
         cameraExecutor.execute {
             var processed = 0
             queued.forEachIndexed { idx, bmp ->
@@ -880,6 +950,7 @@ class EggCountActivity : AppCompatActivity() {
             runOnUiThread {
                 stopScanAnimation()
                 isScanningBatch = false
+
                 val total = gradeA + gradeB + gradeC
                 liveScanLabel.text = "● BATCH DONE — $processed photo(s)"
                 saveBtn.visibility = View.VISIBLE
@@ -945,10 +1016,18 @@ class EggCountActivity : AppCompatActivity() {
      * shot's count, or the whole batch preview) via resumeLive() — confirm
      * first so a stray tap doesn't silently wipe out unsaved work. */
     private fun confirmLiveModeSwitch() {
+        if (isScanningBatch) {
+            MaterialAlertDialogBuilder(this)
+                .setTitle("Scanning in progress")
+                .setMessage("A batch scan is still running. Switching to Live Mode now will cancel the scan and lose any results gathered so far. Continue?")
+                .setPositiveButton("Cancel Scan") { _, _ -> resumeLive() }
+                .setNegativeButton("Keep Scanning", null)
+                .show()
+            return
+        }
         val hasBatch = captureMode == CaptureMode.BATCH && pendingBatchShots.isNotEmpty()
         val hasSingle = captureMode == CaptureMode.SINGLE && singleShotBitmap != null
         if (!hasBatch && !hasSingle) {
-            // Nothing to lose — just switch back.
             resumeLive()
             return
         }
@@ -970,7 +1049,7 @@ class EggCountActivity : AppCompatActivity() {
         isPreviewingThumbnail = false
         frozenOverlay.visibility = View.GONE
         frozenPreviewImage.visibility = View.GONE
-        overlayView.setImageSize(0, 0) // back to naive 1:1 mapping for the live camera feed
+        overlayView.setImageSize(0, 0)
         stopScanAnimation()
         overlayView.setResults(emptyList())
         captureBtn.visibility = View.VISIBLE
@@ -979,6 +1058,7 @@ class EggCountActivity : AppCompatActivity() {
         retakeBtn.visibility  = View.GONE
         discardBtn.visibility = View.GONE
         modeSwitchBtn.text    = "Pick Photo"
+        modeSwitchIsReturnToLive = false
         saveBtn.visibility    = View.GONE
         batchShotCount = 0
         resetCounts()
@@ -987,7 +1067,6 @@ class EggCountActivity : AppCompatActivity() {
         refreshBatchThumbnails()
         doneBatchBtn.visibility = View.GONE
         isScanningBatch = false
-        // Discard any shot staged for gallery save — nothing gets written now.
         singleShotBitmap = null
         singleShotResults = emptyList()
     }
@@ -1156,6 +1235,15 @@ class EggCountActivity : AppCompatActivity() {
         // picks (fromCamera == false) are skipped since they're already on disk.
         val singleToSave = singleShotBitmap?.let { it to singleShotResults }
         val batchToSave = pendingBatchShots.filter { it.fromCamera }.map { it.full to it.results }
+
+        // Only now — after a confirmed Save — do these photos get locked in as
+        // "scanned" for dedup. A scan that's discarded or cancelled (e.g. via
+        // Live Mode mid-scan) never reaches this point, so it leaves no trace
+        // and the same photo can be picked/shot and scanned again freely.
+        val allScannedBitmaps = mutableListOf<Bitmap>()
+        singleShotBitmap?.let { allScannedBitmaps.add(it) }
+        allScannedBitmaps.addAll(pendingBatchShots.map { it.full })
+
         singleShotBitmap = null
         singleShotResults = emptyList()
 
@@ -1166,6 +1254,14 @@ class EggCountActivity : AppCompatActivity() {
             batchToSave.forEach { (bmp, results) ->
                 trySaveToGallery(drawDetectionsOnBitmap(bmp, results))
             }
+
+            val hashes = loadScannedHashes()
+            allScannedBitmaps.forEach { bmp ->
+                val h = contentHash(bmp)
+                hashes.add(h)
+                saveScannedThumb(h, bmp)
+            }
+            saveScannedHashes(hashes)
         }
 
         pendingBatchShots.clear()
@@ -1376,6 +1472,269 @@ class EggCountActivity : AppCompatActivity() {
     // ─────────────────────────────────────────────────────────────────────────
     //  Utility
     // ─────────────────────────────────────────────────────────────────────────
+
+    /** Cheap, deterministic content hash for dedup — downsamples to a tiny
+     * fixed size first so near-identical re-compressions of the same photo
+     * still hash the same, and so this stays fast even on large bitmaps. */
+    private fun contentHash(bmp: Bitmap): String {
+        val small = Bitmap.createScaledBitmap(bmp, 16, 16, true)
+        val sb = StringBuilder()
+        for (y in 0 until small.height) {
+            for (x in 0 until small.width) {
+                sb.append(small.getPixel(x, y).toString(16))
+            }
+        }
+        if (small !== bmp) small.recycle()
+        return sb.toString().hashCode().toString()
+    }
+
+    private fun showScannedPhotosDialog() {
+        val hashes = loadScannedHashes().toList()
+        if (hashes.isEmpty()) {
+            toast("No scanned photos recorded yet")
+            return
+        }
+
+        val density = resources.displayMetrics.density
+        fun dp(v: Int) = (v * density).toInt()
+
+        // ── Root container ──────────────────────────────────────────────
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.WHITE)
+        }
+
+        // ── Header: count + subtitle ────────────────────────────────────
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#2E7D32"))
+            setPadding(dp(20), dp(18), dp(20), dp(18))
+        }
+        header.addView(TextView(this).apply {
+            text = "Scanned Photos"
+            setTextColor(Color.WHITE)
+            textSize = 18f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+        })
+        header.addView(TextView(this).apply {
+            text = "${hashes.size} photo(s) locked from re-scanning"
+            setTextColor(Color.parseColor("#CCE8CC"))
+            textSize = 12f
+            setPadding(0, dp(4), 0, 0)
+        })
+        root.addView(header)
+
+        // ── Scrollable photo grid — built from weighted rows so items ALWAYS
+        // divide the real available width evenly, no matter what width the
+        // dialog window ends up rendering at. This removes the whole class
+        // of "column overflows past the card edge" bugs. ──
+        val scroll = ScrollView(this).apply {
+            setBackgroundColor(Color.parseColor("#F4F6F4"))
+        }
+        val gridContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(10), dp(14), dp(10), dp(14))
+        }
+        scroll.addView(gridContainer)
+
+        val itemsPerRow = 3
+        var remaining = hashes.size
+        val validHashes = hashes.filter { File(scannedThumbsDir, "$it.jpg").exists() }
+        remaining = validHashes.size
+
+        fun buildEmptyState() {
+            gridContainer.removeAllViews()
+            gridContainer.addView(TextView(this@EggCountActivity).apply {
+                text = "No scanned photos left"
+                setTextColor(Color.parseColor("#999999"))
+                textSize = 13f
+                gravity = android.view.Gravity.CENTER
+                setPadding(dp(8), dp(24), dp(8), dp(8))
+            })
+        }
+
+        fun buildThumbCard(hash: String): View {
+            val cardBg = android.graphics.drawable.GradientDrawable().apply {
+                setColor(Color.WHITE)
+                cornerRadius = dp(12).toFloat()
+            }
+            val card = FrameLayout(this).apply {
+                background = cardBg
+                clipToOutline = true
+                elevation = dp(2).toFloat()
+                layoutParams = LinearLayout.LayoutParams(
+                    0, dp(100), 1f
+                ).apply {
+                    setMargins(dp(5), dp(5), dp(5), dp(5))
+                }
+            }
+            val file = File(scannedThumbsDir, "$hash.jpg")
+            card.addView(ImageView(this).apply {
+                layoutParams = FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+                )
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                setImageBitmap(android.graphics.BitmapFactory.decodeFile(file.absolutePath))
+            })
+            card.addView(TextView(this).apply {
+                text = "✕"
+                setTextColor(Color.WHITE)
+                textSize = 13f
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    setColor(Color.parseColor("#CC000000"))
+                    shape = android.graphics.drawable.GradientDrawable.OVAL
+                }
+                gravity = android.view.Gravity.CENTER
+                val btnSize = dp(22)
+                layoutParams = FrameLayout.LayoutParams(btnSize, btnSize).apply {
+                    gravity = android.view.Gravity.TOP or android.view.Gravity.END
+                    setMargins(0, dp(4), dp(4), 0)
+                }
+                setOnClickListener {
+                    val updated = loadScannedHashes().apply { remove(hash) }
+                    saveScannedHashes(updated)
+                    deleteScannedThumb(hash)
+                    toast("Removed — this photo can be scanned again")
+                    (card.parent as? ViewGroup)?.removeView(card)
+                    remaining--
+                    if (remaining <= 0) buildEmptyState()
+                }
+            })
+            return card
+        }
+
+        if (validHashes.isEmpty()) {
+            buildEmptyState()
+        } else {
+            validHashes.chunked(itemsPerRow).forEach { rowHashes ->
+                val row = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                    )
+                }
+                rowHashes.forEach { hash -> row.addView(buildThumbCard(hash)) }
+                // Pad out the last row with invisible spacers so items stay
+                // left-aligned at their true size instead of stretching wide
+                // when the final row has fewer than itemsPerRow photos.
+                repeat(itemsPerRow - rowHashes.size) {
+                    row.addView(View(this).apply {
+                        layoutParams = LinearLayout.LayoutParams(0, dp(100), 1f)
+                    })
+                }
+                gridContainer.addView(row)
+            }
+        }
+
+        root.addView(scroll, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, dp(360)
+        ))
+
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setView(root)
+            .create()
+
+        // ── Footer: Clear All / Close ───────────────────────────────────
+        val footer = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setBackgroundColor(Color.WHITE)
+            setPadding(dp(16), dp(12), dp(16), dp(16))
+        }
+        footer.addView(Button(this).apply {
+            text = "Clear All"
+            setTextColor(Color.parseColor("#C62828"))
+            setBackgroundColor(Color.TRANSPARENT)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setOnClickListener {
+                dialog.dismiss()
+                confirmClearScannedHistory()
+            }
+        })
+        footer.addView(Button(this).apply {
+            text = "Close"
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#2E7D32"))
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = dp(8)
+            }
+            setOnClickListener { dialog.dismiss() }
+        })
+        root.addView(footer)
+
+        dialog.show()
+    }
+
+    private fun confirmClearScannedHistory() {
+        val density = resources.displayMetrics.density
+        fun dp(v: Int) = (v * density).toInt()
+
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.WHITE)
+        }
+
+        // ── Header: warning-styled, red instead of green (destructive action) ──
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#C62828"))
+            setPadding(dp(20), dp(18), dp(20), dp(18))
+        }
+        header.addView(TextView(this).apply {
+            text = "Clear Scan History?"
+            setTextColor(Color.WHITE)
+            textSize = 18f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+        })
+        root.addView(header)
+
+        // ── Body message ──────────────────────────────────────────────
+        val body = TextView(this).apply {
+            text = "This removes the memory of all previously scanned photos — " +
+                    "they can all be picked and scanned again. This cannot be undone."
+            setTextColor(Color.parseColor("#444444"))
+            textSize = 14f
+            setLineSpacing(dp(4).toFloat(), 1f)
+            setPadding(dp(20), dp(20), dp(20), dp(8))
+        }
+        root.addView(body)
+
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setView(root)
+            .setCancelable(true)
+            .create()
+
+        // ── Footer: Cancel / Clear ──────────────────────────────────────
+        val footer = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setBackgroundColor(Color.WHITE)
+            setPadding(dp(16), dp(12), dp(16), dp(16))
+        }
+        footer.addView(Button(this).apply {
+            text = "Cancel"
+            setTextColor(Color.parseColor("#555555"))
+            setBackgroundColor(Color.TRANSPARENT)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setOnClickListener { dialog.dismiss() }
+        })
+        footer.addView(Button(this).apply {
+            text = "Clear"
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#C62828"))
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = dp(8)
+            }
+            setOnClickListener {
+                saveScannedHashes(emptySet())
+                scannedThumbsDir.listFiles()?.forEach { it.delete() }
+                toast("Scan history cleared")
+                dialog.dismiss()
+            }
+        })
+        root.addView(footer)
+
+        dialog.show()
+    }
 
     private fun uriToBitmap(uri: Uri): Bitmap? = try {
         contentResolver.openInputStream(uri)?.use {

@@ -3797,9 +3797,10 @@ public class ScheduleActivity extends AppCompatActivity {
                         com.google.firebase.firestore.WriteBatch batch = db.batch();
                         boolean[] hasWrites = {false};
                         for (QueryDocumentSnapshot doc : snapshots) {
-                            String img = doc.getString("doneImageUrls"); // won't match a list field via getString; see note below
-                            if (img != null && !img.isEmpty()) {
-                                batch.update(doc.getReference(), "doneImageUrl", com.google.firebase.firestore.FieldValue.delete());
+                            Object img = doc.get("doneImageUrls"); // stored as List<String>, not String
+                            boolean hasImages = (img instanceof List) && !((List<?>) img).isEmpty();
+                            if (hasImages) {
+                                batch.update(doc.getReference(), "doneImageUrls", com.google.firebase.firestore.FieldValue.delete());
                                 hasWrites[0] = true;
                             }
                         }
