@@ -73,6 +73,32 @@ class FeedInventoryActivity : AppCompatActivity() {
     private val historyCol    get() = db.collection("farm_data").document("shared").collection("feed_history")
     // inventory_history is the new structured audit trail (Feature 2)
     private val auditCol      get() = db.collection("inventory_history")
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Invoice-number uniqueness registry.
+    //   farm_data → shared → meta → invoiceCounter   { last: Long }
+    //   farm_data → shared → invoice_numbers → {invNumber}   { feedDocId, reservedAt }
+    // Every invNumber ever assigned gets its own doc (ID == the invNumber
+    // string) in `invoice_numbers`, so checking/reserving a number is a single
+    // direct document read+write — something a Firestore transaction CAN do
+    // atomically (transactions can't run arbitrary queries, but they can read
+    // and write specific documents). This is what actually prevents two
+    // concurrent "Add" taps — from the same device or different devices —
+    // from ever being handed the same invoice number.
+    // ──────────────────────────────────────────────────────────────────────────
+    private val invoiceCounterRef
+        get() = db.collection("farm_data").document("shared")
+            .collection("meta").document("invoiceCounter")
+
+    private fun invoiceNumberRef(invNumber: String) =
+        db.collection("farm_data").document("shared")
+            .collection("invoice_numbers").document(invNumber)
+
+    private fun formatInvNumber(n: Long): String = "#INV" + n.toString().padStart(4, '0')
+
+    /** Thrown inside the create-item transaction when a manually-typed invoice number is already taken. */
+    private class InvoiceNumberTakenException(val invNumber: String) :
+        Exception("Invoice number $invNumber is already in use")
     val currency = NumberFormat.getCurrencyInstance(Locale("en", "PH"))
 
     // View references
@@ -81,7 +107,6 @@ class FeedInventoryActivity : AppCompatActivity() {
     private lateinit var locationsTv: TextView
     private lateinit var itemCountTv: TextView
     private lateinit var inventoryList: LinearLayout
-    private lateinit var swipeRefreshLayout: androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 
     // Tab views
     private lateinit var tabAllItems: TextView
@@ -105,8 +130,6 @@ class FeedInventoryActivity : AppCompatActivity() {
         }
 
         bindViews()
-        swipeRefreshLayout.setColorSchemeColors(android.graphics.Color.parseColor("#355E1A"))
-        swipeRefreshLayout.setOnRefreshListener { refreshFeedItems() }
         setupToolbar(currentUsername)
         setupFilterTabs()
         setupSortBar()
@@ -156,7 +179,6 @@ class FeedInventoryActivity : AppCompatActivity() {
         locationsTv      = findViewById(R.id.locationsValue)
         itemCountTv      = findViewById(R.id.itemCountLabel)
         inventoryList    = findViewById(R.id.inventoryList)
-        swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout)
         sortSpinner      = findViewById(R.id.sortSpinner)
 
         tabAllItems      = findViewById(R.id.tabAllItems)
@@ -293,42 +315,7 @@ class FeedInventoryActivity : AppCompatActivity() {
             renderList()
         }
     }
-    /** Pull-to-refresh: re-fetches feed items once, then rebuilds stats + list. */
-    private fun refreshFeedItems() {
-        feedCol.get()
-            .addOnSuccessListener { snaps ->
-                allItems.clear()
-                snaps.documents.forEach { doc ->
-                    val qty = doc.getLong("quantity") ?: 0L
-                    val initQty = doc.getLong("initialQuantity") ?: qty
-                    val category = doc.getString("category") ?: "Feed"
-                    val defaultUnit = if (category == "Feed") "Sacks" else "Bottle"
-                    allItems.add(
-                        FeedItem(
-                            firestoreId = doc.id,
-                            name        = doc.getString("name")        ?: "Unnamed",
-                            invNumber   = doc.getString("invNumber")   ?: "#INV----",
-                            description = doc.getString("description") ?: "",
-                            category    = category,
-                            location    = doc.getString("location")    ?: "Location Info",
-                            quantity    = qty,
-                            initialQuantity = initQty,
-                            unitPrice   = doc.getDouble("unitPrice")   ?: 0.0,
-                            status      = doc.getString("status")      ?: "In Stock",
-                            unit        = doc.getString("unit")        ?: defaultUnit,
-                            updatedAt   = doc.getTimestamp("updatedAt")
-                        )
-                    )
-                }
-                updateSummaryStats()
-                renderList()
-                swipeRefreshLayout.isRefreshing = false
-            }
-            .addOnFailureListener { e ->
-                swipeRefreshLayout.isRefreshing = false
-                Toast.makeText(this, "Refresh failed: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
-    }
+
     // ──────────────────────────────────────────────────────────────────────────
     // Summary Stats
     // ──────────────────────────────────────────────────────────────────────────
@@ -651,13 +638,21 @@ class FeedInventoryActivity : AppCompatActivity() {
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // Atomic create: new feed item + initial-stock audit entry (batch write).
-    // A transaction isn't needed here since there is no existing document to
-    // read/guard — a batch already guarantees both writes succeed or fail
-    // together. No audit entry is written when the starting quantity is zero.
+    // Atomic create: reserve a guaranteed-unique invoice number + create the
+    // new feed item + initial-stock audit entry, all inside ONE Firestore
+    // transaction. Reserving the number as part of the same transaction that
+    // creates the document is what makes it safe against races: two "Add"
+    // taps (even from different devices) that both try to claim the same
+    // number will have one succeed and one automatically retried by the SDK
+    // against the now-updated state, so they can never both win.
+    //
+    // [requestedInvNumber] blank  -> auto-assign the next available "#INVxxxx"
+    // [requestedInvNumber] set    -> use exactly that number, or fail if taken
+    // No audit entry is written when the starting quantity is zero.
     // ──────────────────────────────────────────────────────────────────────────
     private fun commitNewFeedItem(
         data: Map<String, Any>,
+        requestedInvNumber: String,
         qty: Long,
         name: String,
         category: String,
@@ -675,32 +670,88 @@ class FeedInventoryActivity : AppCompatActivity() {
         val newFeedRef  = feedCol.document()   // pre-generate id so it can be reused below
         val auditDocRef = auditCol.document()
 
-        val batch = db.batch()
-        batch.set(newFeedRef, data)
+        db.runTransaction { transaction ->
+            val finalInvNumber: String
 
-        if (qty != 0L) {
-            val auditEntry = mapOf(
-                "productId"       to newFeedRef.id,
-                "productName"     to name,
-                "category"        to category,
-                "action"          to "add",
-                "quantityBefore"  to 0L,
-                "quantityChanged" to qty,
-                "quantityAfter"   to qty,
-                "editedByUid"     to uid,
-                "editedByName"    to editorName,
-                "editedByRole"    to editorRole,
-                "timestamp"       to FieldValue.serverTimestamp(),
-                "notes"           to "Initial stock added"
-            )
-            batch.set(auditDocRef, auditEntry)
-        }
+            if (requestedInvNumber.isBlank()) {
+                // Auto-generate: start from the shared counter and walk
+                // forward past any number that's already reserved (covers
+                // manually-typed numbers that landed ahead of the counter,
+                // and any leftover data from before this fix). All reads
+                // happen before any writes, which Firestore transactions
+                // require and allow.
+                val counterSnap = transaction.get(invoiceCounterRef)
+                var candidate = (counterSnap.getLong("last") ?: 0L) + 1
+                var candidateRef = invoiceNumberRef(formatInvNumber(candidate))
+                var candidateSnap = transaction.get(candidateRef)
+                while (candidateSnap.exists()) {
+                    candidate += 1
+                    candidateRef = invoiceNumberRef(formatInvNumber(candidate))
+                    candidateSnap = transaction.get(candidateRef)
+                }
+                finalInvNumber = formatInvNumber(candidate)
 
-        batch.commit()
-            .addOnSuccessListener { onSuccess() }
-            .addOnFailureListener { e ->
+                transaction.set(
+                    invoiceCounterRef,
+                    mapOf("last" to candidate),
+                    com.google.firebase.firestore.SetOptions.merge()
+                )
+                transaction.set(
+                    candidateRef,
+                    mapOf("feedDocId" to newFeedRef.id, "reservedAt" to FieldValue.serverTimestamp())
+                )
+            } else {
+                // User typed a specific number: verify — inside the
+                // transaction, not just against the local cached list — that
+                // it isn't already claimed before saving.
+                val ref  = invoiceNumberRef(requestedInvNumber)
+                val snap = transaction.get(ref)
+                if (snap.exists()) {
+                    throw InvoiceNumberTakenException(requestedInvNumber)
+                }
+                finalInvNumber = requestedInvNumber
+
+                transaction.set(
+                    ref,
+                    mapOf("feedDocId" to newFeedRef.id, "reservedAt" to FieldValue.serverTimestamp())
+                )
+            }
+
+            val fullData = data.toMutableMap()
+            fullData["invNumber"] = finalInvNumber
+            transaction.set(newFeedRef, fullData)
+
+            if (qty != 0L) {
+                val auditEntry = mapOf(
+                    "productId"       to newFeedRef.id,
+                    "productName"     to name,
+                    "category"        to category,
+                    "action"          to "add",
+                    "quantityBefore"  to 0L,
+                    "quantityChanged" to qty,
+                    "quantityAfter"   to qty,
+                    "editedByUid"     to uid,
+                    "editedByName"    to editorName,
+                    "editedByRole"    to editorRole,
+                    "timestamp"       to FieldValue.serverTimestamp(),
+                    "notes"           to "Initial stock added"
+                )
+                transaction.set(auditDocRef, auditEntry)
+            }
+            null
+        }.addOnSuccessListener {
+            onSuccess()
+        }.addOnFailureListener { e ->
+            if (e is InvoiceNumberTakenException) {
+                Toast.makeText(
+                    this,
+                    "Invoice number ${e.invNumber} is already in use. Please choose another.",
+                    Toast.LENGTH_LONG
+                ).show()
+            } else {
                 Toast.makeText(this, "Add failed: ${e.message}", Toast.LENGTH_SHORT).show()
             }
+        }
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -965,7 +1016,19 @@ class FeedInventoryActivity : AppCompatActivity() {
                 val unit       = unitSpinner?.selectedItem?.toString() ?: if (cat == "Feed") "Sacks" else "Bottle"
                 val totalPrice = qtyIn * price
                 var desc       = descInput.text.toString().trim()
-                val inv        = invInput.text.toString().trim().ifEmpty { generateInvNumber() }
+
+                // Blank => auto-generate the next available number inside the
+                // save transaction below. Non-blank => the user typed a
+                // specific number, so give immediate feedback here if it's
+                // obviously already used; the transaction still re-verifies
+                // this before saving, since this local list can be stale.
+                val requestedInv = invInput.text.toString().trim()
+                if (requestedInv.isNotEmpty() &&
+                    allItems.any { it.invNumber.equals(requestedInv, ignoreCase = true) }
+                ) {
+                    invInput.error = "This invoice number is already in use"
+                    return@setOnClickListener
+                }
 
                 val matchingItem = allItems.find {
                     it.name.equals(name, true) &&
@@ -1010,7 +1073,6 @@ class FeedInventoryActivity : AppCompatActivity() {
                     val data = hashMapOf<String, Any>(
                         "name"            to name,
                         "description"     to desc,
-                        "invNumber"       to inv,
                         "location"        to location,
                         "quantity"        to qtyIn,
                         "initialQuantity" to qtyIn,
@@ -1022,7 +1084,7 @@ class FeedInventoryActivity : AppCompatActivity() {
                         "status"          to status,
                         "updatedAt"       to FieldValue.serverTimestamp()
                     )
-                    commitNewFeedItem(data, qtyIn, name, cat) {
+                    commitNewFeedItem(data, requestedInv, qtyIn, name, cat) {
                         logHistory("ADDED", name, qtyIn, price, cat)
 
                         // New product created — always record a Created →
@@ -1100,8 +1162,4 @@ class FeedInventoryActivity : AppCompatActivity() {
         }
     }
 
-    private fun generateInvNumber(): String {
-        val next = (allItems.size + 1).toString().padStart(4, '0')
-        return "#INV$next"
-    }
 }
