@@ -128,6 +128,27 @@ class DashboardActivity : AppCompatActivity() {
             else Toast.makeText(this, getString(R.string.camera_permission_required), Toast.LENGTH_SHORT).show()
         }
 
+    // FIX: notification permission used to only be requested inside ScheduleActivity's
+    // onCreate(). On Android 13+ that meant POST_NOTIFICATIONS was never granted for any
+    // user who never happened to open the Schedule screen — so inventory, water-level, and
+    // schedule notifications could all silently fail to post, regardless of app state,
+    // even though the FCM push / BootReceiver / AlarmManager paths that trigger them were
+    // firing correctly. DashboardActivity is the screen that stays alive right after every
+    // login path (Google sign-in, manual login, cached session, offline mode), so the
+    // permission is now requested here instead, app-wide, before the user ever needs to
+    // visit Schedule.
+    private val requestNotificationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* no-op either way */ }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -137,6 +158,8 @@ class DashboardActivity : AppCompatActivity() {
         accountManager = AccountManager(this)
         username = intent.getStringExtra("username") ?: accountManager.getCurrentUsername() ?: "User"
         userRole = accountManager.getRole(username)
+
+        requestNotificationPermissionIfNeeded()
 
         // ----------------------------
         // NEW: Force refresh token & sync role

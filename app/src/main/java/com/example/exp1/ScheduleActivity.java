@@ -167,7 +167,8 @@ public class ScheduleActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        requestNotificationPermission();
+        // FIX: POST_NOTIFICATIONS is now requested app-wide from DashboardActivity right
+        // after login, so it's no longer gated behind the user opening this screen first.
         EdgeToEdge.enable(this);
 
         RECUR_ONCE = getString(R.string.recur_once);
@@ -449,16 +450,6 @@ public class ScheduleActivity extends AppCompatActivity {
         return result;
     }
 
-    private void requestNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
-                    != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(
-                        new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 101);
-            }
-        }
-    }
-
     private Map<String, Object> buildTaskMap(Task task) {
         Map<String, Object> data = new HashMap<>();
         data.put("title",              task.title);
@@ -641,8 +632,8 @@ public class ScheduleActivity extends AppCompatActivity {
         androidx.core.widget.NestedScrollView addScheduleScroll = dialogView.findViewById(R.id.addScheduleScrollView);
         final Runnable[] pendingScrollRestore = new Runnable[1];
 
-    // Call captureScroll() right before showing any DatePickerDialog, then
-    // call restoreScroll() at the end of that dialog's callback.
+        // Call captureScroll() right before showing any DatePickerDialog, then
+        // call restoreScroll() at the end of that dialog's callback.
         java.util.function.Supplier<Integer> captureScroll = () ->
                 addScheduleScroll != null ? addScheduleScroll.getScrollY() : 0;
 
@@ -1180,9 +1171,9 @@ public class ScheduleActivity extends AppCompatActivity {
 
             View previewView = LayoutInflater.from(this).inflate(R.layout.dialog_schedule_preview, null);
 
-        // Force a white background + dark text regardless of system dark mode.
-        // The layout's default colors come from theme attrs, which flip in dark
-        // mode; setting them explicitly here overrides that for this dialog only.
+            // Force a white background + dark text regardless of system dark mode.
+            // The layout's default colors come from theme attrs, which flip in dark
+            // mode; setting them explicitly here overrides that for this dialog only.
             previewView.setBackgroundColor(Color.WHITE);
             forceLightPreviewColors(previewView);
 
@@ -1247,12 +1238,12 @@ public class ScheduleActivity extends AppCompatActivity {
                     .setNegativeButton(getString(R.string.back), null)
                     .create();
 
-                    previewDialog.show();
-                // AlertDialog's own window background also follows the system theme in dark
-                // mode (a dark panel behind/around previewView); force that white too.
-                    if (previewDialog.getWindow() != null) {
-                        previewDialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.WHITE));
-                    }
+            previewDialog.show();
+            // AlertDialog's own window background also follows the system theme in dark
+            // mode (a dark panel behind/around previewView); force that white too.
+            if (previewDialog.getWindow() != null) {
+                previewDialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.WHITE));
+            }
         });
     }
 

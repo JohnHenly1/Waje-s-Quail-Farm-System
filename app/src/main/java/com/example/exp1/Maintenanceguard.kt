@@ -141,6 +141,9 @@ object MaintenanceGuard : Application.ActivityLifecycleCallbacks {
             FarmRepository.logLogout(name, email, role ?: "staff", "maintenance")
         }
         accountManager.clearSession()
+        // FIX: drop this device's per-user task-reminder topic subscription
+        // on forced logout too — see MainActivity.stopCheckingAndClear().
+        PushTopics.syncSubscriptions(activity)
 
         Toast.makeText(activity, maintenanceMessage, Toast.LENGTH_LONG).show()
 

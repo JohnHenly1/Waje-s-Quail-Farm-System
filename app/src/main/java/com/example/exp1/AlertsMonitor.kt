@@ -117,18 +117,15 @@ object AlertsMonitor {
     }
 
     // ── Water level ──────────────────────────────────────────────────────
-    // Maps a water level percentage to the alert threshold it falls under
-    // (if any). Checked most-severe-first so e.g. 0% resolves to
-    // "Emergency", not "Notice". percent >= 100 ("Refilled") is what covers
-    // the "notify when the tank shows full" case.
+    // Only fires when the level moves above 50% — signals the tank is at a
+    // healthy/filled level. Everything at or below 50% is intentionally
+    // silent now (previously had separate Notice/Warning/Critical/Emergency
+    // tiers for low levels; those were removed).
     fun resolveWaterLevelAlert(percent: Int): Triple<Int, String, String>? {
-        return when {
-            percent >= 100 -> Triple(100, "Refilled", "Water tank has been successfully refilled to full capacity.")
-            percent <= 0 -> Triple(0, "Emergency", "Water tank is empty. Refill immediately to prevent disruptions.")
-            percent <= 15 -> Triple(15, "Critical", "Water level is critically low. Immediate action is required.")
-            percent <= 25 -> Triple(25, "Warning", "Water level is low. Refill the water tank soon.")
-            percent <= 50 -> Triple(50, "Notice", "Water level is decreasing. Monitor the water supply.")
-            else -> null
+        return if (percent > 50) {
+            Triple(percent, "Filled", "Water tank is filled and at a healthy level.")
+        } else {
+            null
         }
     }
 
@@ -161,6 +158,13 @@ object AlertsMonitor {
     }
 
     // ── Missed / overdue tasks ───────────────────────────────────────────
+    // FIX: this used to notify for EVERY pending task in the shared collection,
+    // on every device that had Schedule alerts on — so a staff member's phone
+    // would buzz for tasks assigned to other staff, or to no one at all. Now
+    // only raises a notification on THIS device if the task's assignedTo list
+    // actually includes the currently logged-in user, mirroring the same
+    // "assignedToMe" filtering ScheduleActivity already uses for what's shown
+    // on-screen.
     private fun startTasksListener() {
         tasksListener?.remove()
         tasksListener = FirebaseFirestore.getInstance()
@@ -168,9 +172,13 @@ object AlertsMonitor {
             .whereEqualTo("status", "Pending")
             .addSnapshotListener { snapshots, e ->
                 if (e != null || snapshots == null) return@addSnapshotListener
-                if (!AccountManager(appContext).isScheduleEnabled()) return@addSnapshotListener
+                val accountManager = AccountManager(appContext)
+                if (!accountManager.isScheduleEnabled()) return@addSnapshotListener
+                val currentUserEmail = accountManager.getCurrentUsername() ?: return@addSnapshotListener
                 val now = Calendar.getInstance()
                 for (doc in snapshots.documents) {
+                    if (!isAssignedTo(doc.get("assignedTo"), currentUserEmail)) continue
+
                     val year = doc.getLong("year")?.toInt() ?: 0
                     val month = doc.getLong("month")?.toInt() ?: 0
                     val day = doc.getLong("day")?.toInt() ?: 0
@@ -191,6 +199,21 @@ object AlertsMonitor {
                     }
                 }
             }
+    }
+
+    /**
+     * Reads a task's `assignedTo` field defensively — new docs store a
+     * List<String> (multi-assign), older docs stored a single String email —
+     * and checks (case-insensitively) whether it contains [email]. Mirrors
+     * ScheduleActivity.parseAssignedTo()'s normalization.
+     */
+    private fun isAssignedTo(raw: Any?, email: String): Boolean {
+        val assignees: List<String> = when (raw) {
+            is List<*> -> raw.mapNotNull { it?.toString()?.trim()?.takeIf { s -> s.isNotEmpty() } }
+            is String -> raw.trim().takeIf { it.isNotEmpty() }?.let { listOf(it) } ?: emptyList()
+            else -> emptyList()
+        }
+        return assignees.any { it.equals(email, ignoreCase = true) }
     }
 
     // ── System notification ─────────────────────────────────────────────

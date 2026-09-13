@@ -261,6 +261,10 @@ object NavigationHelper {
                 R.id.nav_logout -> {
                     FarmRepository.logLogout(currentName, currentEmail ?: "", currentRole, "manual")
                     accountManager.clearSession()
+                    // FIX: drop this device's per-user task-reminder topic
+                    // subscription on manual logout too — see
+                    // MainActivity.stopCheckingAndClear().
+                    PushTopics.syncSubscriptions(activity)
                     val intent = Intent(activity, MainActivity::class.java)
                     intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                     activity.startActivity(intent)

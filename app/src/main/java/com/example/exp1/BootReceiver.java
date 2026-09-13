@@ -87,21 +87,35 @@ public class BootReceiver extends BroadcastReceiver {
                     return;
                 }
 
+                String currentUserEmail = accountManager.getCurrentUsername();
+                if (currentUserEmail == null || currentUserEmail.trim().isEmpty()) {
+                    Log.w(TAG, "No cached username on this device — skipping alarm restore.");
+                    auth.removeAuthStateListener(this);
+                    return;
+                }
+
                 // ── Correct implementation ─────────────────────────────────────
-                readSharedTasksAndReschedule(context, auth, this);
+                readSharedTasksAndReschedule(context, auth, this, currentUserEmail);
             }
         });
     }
 
     /**
      * Read all tasks from  farm_data/tasks  (shared collection),
-     * then for each non-Done task:
+     * then for each non-Done task ASSIGNED TO THIS DEVICE'S USER:
      *   • If the alarm time is in the future  →  schedule it.
      *   • If the alarm time is in the past    →  show a "missed" notification immediately.
+     *
+     * FIX: this used to reschedule alarms / show missed-alarm notifications
+     * for EVERY task in the shared collection, on every device, regardless of
+     * who it was assigned to — so a staff member's phone would alarm for
+     * other staff's tasks after every reboot. Now skips any task whose
+     * assignedTo list doesn't include [currentUserEmail].
      */
     private void readSharedTasksAndReschedule(Context context,
                                               FirebaseAuth auth,
-                                              FirebaseAuth.AuthStateListener listener) {
+                                              FirebaseAuth.AuthStateListener listener,
+                                              String currentUserEmail) {
         FirebaseFirestore.getInstance()
                 .collection("farm_data")      // top-level collection
                 // "tasks" is ALSO a top-level collection (see FarmRepository.tasksCol)
@@ -146,6 +160,7 @@ public class BootReceiver extends BroadcastReceiver {
                             if ("Done".equalsIgnoreCase(status)) continue;
                             if (title == null || time == null
                                     || yearL == null || monthL == null || dayL == null) continue;
+                            if (!isAssignedTo(doc.get("assignedTo"), currentUserEmail)) continue;
 
                             int[] hm = parseTime(time);
                             if (hm == null) continue;
@@ -188,6 +203,27 @@ public class BootReceiver extends BroadcastReceiver {
                         Log.e(TAG, "Firestore fetch failed on boot: " + e.getMessage()));
 
         auth.removeAuthStateListener(listener);
+    }
+
+    // ── Assignment filtering ─────────────────────────────────────────────────
+    // Reads `assignedTo` defensively: new docs store a List<String>
+    // (multi-assign), older docs stored a single String email. Mirrors
+    // ScheduleActivity.parseAssignedTo()'s normalization.
+    @SuppressWarnings("unchecked")
+    private boolean isAssignedTo(Object raw, String email) {
+        java.util.List<String> assignees = new java.util.ArrayList<>();
+        if (raw instanceof java.util.List) {
+            for (Object o : (java.util.List<Object>) raw) {
+                if (o != null && !o.toString().trim().isEmpty()) assignees.add(o.toString().trim());
+            }
+        } else if (raw instanceof String) {
+            String s = ((String) raw).trim();
+            if (!s.isEmpty()) assignees.add(s);
+        }
+        for (String assignee : assignees) {
+            if (assignee.equalsIgnoreCase(email)) return true;
+        }
+        return false;
     }
 
     // ── Show a "missed alarm" notification immediately ─────────────────────────

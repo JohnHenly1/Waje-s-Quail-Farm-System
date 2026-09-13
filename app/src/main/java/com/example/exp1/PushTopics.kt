@@ -11,21 +11,70 @@ import com.google.firebase.messaging.FirebaseMessaging
  * switches the user already sees in AlertsActivity's Notification Preferences
  * dialog, with no change to how those prefs are stored.
  *
- * Two topics, mirroring AlertsMonitor's two gates:
- *  - "farm_alerts"     -> inventory + water-level pushes (gated by isAlertsEnabled)
- *  - "task_reminders"  -> missed/overdue task pushes      (gated by isScheduleEnabled)
+ * "farm_alerts" (inventory + water level) is intentionally shared by every
+ * device — those alerts are meant to reach the whole team.
+ *
+ * FIX: task/schedule reminders used to also go through one shared topic
+ * ("task_reminders"), which meant every device with Schedule alerts on
+ * received every OTHER staff member's task notifications too, regardless of
+ * who a task was actually assigned to. Each device now instead subscribes to
+ * a topic derived from ITS OWN logged-in user's email, and the Cloud
+ * Function looks up each task's `assignedTo` list and pushes only to those
+ * specific per-user topics (see topicForUser() in functions/index.js, which
+ * this sanitization must exactly mirror).
  */
 object PushTopics {
 
     private const val TAG = "PushTopics"
     const val TOPIC_FARM_ALERTS = "farm_alerts"
-    const val TOPIC_TASK_REMINDERS = "task_reminders"
 
-    /** Call on app start, on login, on token refresh, and right after preferences are saved. */
+    private const val PREFS_NAME = "push_topics_tracker"
+    private const val KEY_SUBSCRIBED_USER_TOPIC = "subscribed_user_task_topic"
+
+    /**
+     * Call on app start, on login, on logout, on token refresh, and right after
+     * preferences are saved. Safe to call repeatedly / with no signed-in user.
+     */
     fun syncSubscriptions(context: Context) {
         val accountManager = AccountManager(context)
         setTopic(TOPIC_FARM_ALERTS, accountManager.isAlertsEnabled())
-        setTopic(TOPIC_TASK_REMINDERS, accountManager.isScheduleEnabled())
+        syncUserTaskTopic(context, accountManager)
+    }
+
+    /**
+     * Subscribes this device to its current user's personal task-reminder topic
+     * (gated by the Schedule-alerts toggle), and unsubscribes from whatever
+     * per-user topic it was previously on — covers logout, switching accounts on
+     * a shared device, and toggling Schedule alerts off.
+     */
+    private fun syncUserTaskTopic(context: Context, accountManager: AccountManager) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val previousTopic = prefs.getString(KEY_SUBSCRIBED_USER_TOPIC, null)
+
+        val email = accountManager.getCurrentUsername()
+        val scheduleEnabled = accountManager.isScheduleEnabled()
+        val newTopic = if (!email.isNullOrBlank() && scheduleEnabled) topicForUser(email) else null
+
+        if (previousTopic != null && previousTopic != newTopic) {
+            FirebaseMessaging.getInstance().unsubscribeFromTopic(previousTopic)
+                .addOnFailureListener { e -> Log.e(TAG, "Failed to unsubscribe $previousTopic: ${e.message}") }
+        }
+
+        if (newTopic != null && newTopic != previousTopic) {
+            FirebaseMessaging.getInstance().subscribeToTopic(newTopic)
+                .addOnFailureListener { e -> Log.e(TAG, "Failed to subscribe $newTopic: ${e.message}") }
+        }
+
+        prefs.edit().putString(KEY_SUBSCRIBED_USER_TOPIC, newTopic).apply()
+    }
+
+    /**
+     * Deterministic per-user topic name. MUST exactly mirror the sanitization
+     * used server-side in functions/index.js's topicForUser() — any mismatch
+     * means pushes silently go to a topic this device never subscribed to.
+     */
+    fun topicForUser(email: String): String {
+        return "user_" + email.trim().lowercase().replace(Regex("[^a-z0-9_-]"), "_")
     }
 
     private fun setTopic(topic: String, subscribed: Boolean) {

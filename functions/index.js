@@ -36,7 +36,6 @@ initializeApp();
 const db = getFirestore();
 
 const TOPIC_FARM_ALERTS = "farm_alerts";
-const TOPIC_TASK_REMINDERS = "task_reminders";
 const CHANNEL_ALERTS = "alerts_channel";
 const CHANNEL_TASK_REMINDER = "task_reminder_channel";
 
@@ -104,6 +103,96 @@ async function raiseAlert({ message, type, topic, title, body, channel }) {
   return true;
 }
 
+// ── Per-user push targeting for schedule/task alerts ─────────────────────
+// FIX: task reminders used to broadcast to one shared "task_reminders" topic
+// that every device with Schedule alerts on was subscribed to — so a task
+// notification meant for one staff member landed on everyone's phone,
+// regardless of that task's `assignedTo` list. Each device now subscribes
+// (see PushTopics.kt) to a topic derived from its OWN logged-in user's
+// email, and this function pushes individually to each assignee's topic
+// instead of one shared topic.
+
+// MUST exactly mirror PushTopics.kt's topicForUser() sanitization — any
+// mismatch means a push silently goes to a topic no device subscribed to.
+function topicForUser(email) {
+  return "user_" + email.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+}
+
+// Reads `assignedTo` defensively: new docs store an array (multi-assign),
+// older docs stored a single string email. Mirrors
+// ScheduleActivity.parseAssignedTo() / AlertsMonitor.isAssignedTo().
+function parseAssignedTo(raw) {
+  if (Array.isArray(raw)) {
+    return raw.map((v) => (v == null ? "" : String(v).trim())).filter((v) => v.length > 0);
+  }
+  if (typeof raw === "string" && raw.trim().length > 0) return [raw.trim()];
+  return [];
+}
+
+/**
+ * Task-specific alert raiser. Writes the same shared alert record raiseAlert()
+ * does (deduped per day+message, so it still shows once in the Alerts screen
+ * regardless of how many assignees there are), then pushes to EACH assignee's
+ * personal topic individually, with its own per-assignee-per-day dedup doc —
+ * so two assignees on the same task each get exactly one push today, and one
+ * assignee's push isn't blocked just because another assignee already
+ * triggered the shared alert record.
+ *
+ * Tasks with no assignees are skipped entirely: with the old broadcast topic
+ * everyone found out about every task anyway, but per the app's requirement
+ * that schedule notifications only go to assigned individuals, an
+ * unassigned task has no one to notify.
+ */
+async function raiseTaskAlertForAssignees({ message, type, assignees, title, body, channel }) {
+  if (!assignees || assignees.length === 0) {
+    logger.info(`No assignees for task alert, skipping: ${message}`);
+    return false;
+  }
+
+  const docId = `${todayKey()}_${sanitize(message)}`;
+  const alertRef = db.collection("farm_data").doc("shared").collection("alert").doc(docId);
+  try {
+    await alertRef.create({
+      message,
+      type,
+      timestamp: FieldValue.serverTimestamp(),
+      dayKey: todayKey(),
+      isRead: false,
+    });
+  } catch (e) {
+    if (e.code !== 6 && e.code !== "already-exists") throw e;
+    // Alert record already exists today (e.g. another assignee's run already
+    // wrote it) — fine, per-assignee push dedup below is independent of this.
+  }
+
+  let anyPushed = false;
+  for (const email of assignees) {
+    const pushDocId = `${docId}__${sanitize(email)}`;
+    const pushRef = db.collection("farm_data").doc("shared").collection("_taskPushLog").doc(pushDocId);
+    try {
+      await pushRef.create({ email, message, timestamp: FieldValue.serverTimestamp() });
+    } catch (e) {
+      if (e.code === 6 || e.code === "already-exists") continue; // already pushed to this assignee today
+      throw e;
+    }
+
+    await getMessaging().send({
+      topic: topicForUser(email),
+      data: {
+        title,
+        body,
+        channel,
+        notifId: String(stableId(message + email)),
+      },
+      android: { priority: "high" },
+    });
+    anyPushed = true;
+  }
+
+  if (anyPushed) logger.info(`Task alert pushed to [${assignees.join(", ")}]: ${message}`);
+  return anyPushed;
+}
+
 // ── Inventory: farm_data/shared/feed/{feedId} ────────────────────────────
 // Mirrors AlertsMonitor.startInventoryListener().
 exports.onFeedWrite = onDocumentWritten(
@@ -147,11 +236,7 @@ exports.onFeedWrite = onDocumentWritten(
 // ── Water level: /water_level/percentage (RTDB) ──────────────────────────
 // Mirrors AlertsMonitor.resolveWaterLevelAlert() + raiseWaterLevelAlert().
 function resolveWaterLevelAlert(percent) {
-  if (percent >= 100) return ["Refilled", "Water tank has been successfully refilled to full capacity."];
-  if (percent <= 0) return ["Emergency", "Water tank is empty. Refill immediately to prevent disruptions."];
-  if (percent <= 15) return ["Critical", "Water level is critically low. Immediate action is required."];
-  if (percent <= 25) return ["Warning", "Water level is low. Refill the water tank soon."];
-  if (percent <= 50) return ["Notice", "Water level is decreasing. Monitor the water supply."];
+  if (percent > 50) return ["Filled", "Water tank is filled and at a healthy level."];
   return null;
 }
 
@@ -203,11 +288,12 @@ exports.checkOverdueTasks = onSchedule("every 15 minutes", async () => {
     const taskDate = new Date(year, month, day, hour, minute);
     if (taskDate >= now) continue;
 
+    const assignees = parseAssignedTo(data.assignedTo);
     const message = `Missed Task: ${title} was scheduled for ${day}/${month + 1}/${year}`;
-    await raiseAlert({
+    await raiseTaskAlertForAssignees({
       message,
       type: "Critical",
-      topic: TOPIC_TASK_REMINDERS,
+      assignees,
       title: "Missed Task",
       body: message,
       channel: CHANNEL_TASK_REMINDER,

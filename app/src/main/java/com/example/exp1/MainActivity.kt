@@ -797,6 +797,11 @@ class MainActivity : AppCompatActivity() {
     private fun stopCheckingAndClear() {
         firestoreListener?.remove()
         accountManager.clearSession()
+        // FIX: drop this device's per-user task-reminder topic subscription
+        // now that no one is signed in, so a later login on this device (or
+        // this account staying logged out) never keeps receiving another
+        // user's task pushes.
+        PushTopics.syncSubscriptions(this)
         recreate()
     }
 
@@ -836,6 +841,13 @@ class MainActivity : AppCompatActivity() {
         accountManager.registerAccount(email, email, password, role)
         accountManager.saveCurrentSession(email)
         accountManager.updateCachedName(email, name)
+
+        // FIX: (re)subscribe this device to the now-current user's personal
+        // task-reminder topic. Needed on every entry, not just fresh logins —
+        // a shared device switching between staff accounts must drop the
+        // previous user's topic and pick up the new one, or task reminders
+        // meant for one staff member could keep landing on another's phone.
+        PushTopics.syncSubscriptions(this)
 
         val uid = FirebaseAuth.getInstance().currentUser?.uid
         if (uid != null) {
