@@ -248,6 +248,7 @@ class AlertsActivity : AppCompatActivity() {
                     eggHour,
                     eggMinute
                 )
+                PushTopics.syncSubscriptions(this)
                 Toast.makeText(this, "Preferences saved", Toast.LENGTH_SHORT).show()
                 if (switchEggCount.isChecked) {
                     scheduleEggCountNotification(eggHour, eggMinute)

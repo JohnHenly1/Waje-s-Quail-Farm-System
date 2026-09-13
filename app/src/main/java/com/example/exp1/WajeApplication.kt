@@ -43,6 +43,11 @@ class WajeApplication : Application() {
         MaintenanceGuard.start(this)
         AlertsMonitor.start(this)
 
+        // Make sure this device's FCM topic subscriptions match its current
+        // Notification Preferences toggles (covers fresh installs and the
+        // case where prefs were changed on another device for a shared login).
+        PushTopics.syncSubscriptions(this)
+
         val accountManager = AccountManager(this)
         val selectedLang = accountManager.getSelectedLanguage()
 

@@ -412,13 +412,13 @@ class EggCountActivity : AppCompatActivity() {
                 "unbroken, and evenly speckled in light brown/tan spots. The shape is a " +
                 "consistent small oval with no dents, cracks, or discoloration. This is " +
                 "the grade you want most of your eggs to be."
-        "B" -> "This egg grading is either had cracks or in rare cases a softshell " +
-                "— usually a hairline crack or a small chip in the shell. You can often " +
-                "spot a thin dark line running across the speckled surface. Still usable, " +
-                "not sold usually used for fertilization."
-        "C" -> "This egg is rejected. Look for major pattern difference — discoloration " +
+        "B" -> "This egg grading is either had cracks or in rare cases a softshell, " +
+                "usually a hairline crack or a small chip in the shell. You can often " +
+                "spot a thin dark line running across the speckled surface. This is not consumable." +
+                " But still usable, not sold usually used for fertilization."
+        "C" -> "This egg is rejected. Look for major pattern difference like discoloration " +
                 "shell, leaking contents, a badly misshapen or crushed form, or shell " +
-                "discoloration/mold. These are not sold but this is eaten."
+                "discoloration/mold. These are not sold but this are sometimes consumable."
         else -> ""
     }
 
