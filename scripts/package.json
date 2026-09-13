@@ -1,0 +1,12 @@
+{
+  "name": "waje-quail-farm-alert-checker",
+  "version": "1.0.0",
+  "description": "Blaze-free replacement for functions/index.js — polls Firestore/RTDB and pushes FCM notifications, run on a schedule by GitHub Actions.",
+  "main": "checkAlerts.js",
+  "scripts": {
+    "check": "node checkAlerts.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.6.0"
+  }
+}
