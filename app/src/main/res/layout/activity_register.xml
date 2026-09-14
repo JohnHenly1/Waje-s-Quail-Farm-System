@@ -56,7 +56,7 @@
                 android:id="@+id/btnEnterCode"
                 style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="64dp"
                 android:text="@string/i_have_a_code"
                 android:textAllCaps="false"
                 android:textColor="@color/white"
@@ -64,16 +64,7 @@
                 android:textStyle="bold"
                 app:backgroundTint="#6B8E23"
                 app:cornerRadius="16dp"
-                app:icon="@drawable/ic_file_text"
                 app:iconGravity="textStart" />
-
-            <View
-                android:id="@+id/divider"
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginTop="32dp"
-                android:layout_marginBottom="16dp"
-                android:background="#CCCCCC" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnFarmSetup"
@@ -87,7 +78,6 @@
                 android:textAllCaps="false"
                 app:backgroundTint="#8B4513"
                 app:cornerRadius="16dp"
-                app:icon="@drawable/lc_farmrefresh"
                 app:iconGravity="textStart"
                 android:visibility="gone"
                 tools:visibility="visible" />

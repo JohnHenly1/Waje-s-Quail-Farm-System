@@ -26,7 +26,9 @@ const { onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { onValueWritten } = require("firebase-functions/v2/database");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { setGlobalOptions } = require("firebase-functions/v2");
+const { defineSecret } = require("firebase-functions/params");
 const logger = require("firebase-functions/logger");
+const nodemailer = require("nodemailer");
 
 // Same region as the RTDB instance (asia-southeast1), so the RTDB trigger
 // is valid and everything lives together.
@@ -38,6 +40,51 @@ const db = getFirestore();
 const TOPIC_FARM_ALERTS = "farm_alerts";
 const CHANNEL_ALERTS = "alerts_channel";
 const CHANNEL_TASK_REMINDER = "task_reminder_channel";
+
+// ── Email (Gmail) ─────────────────────────────────────────────────────────
+// Credentials are pulled from Cloud Functions secrets, NOT hardcoded or
+// committed. Set them once per project with:
+//   firebase functions:secrets:set GMAIL_USER
+//   firebase functions:secrets:set GMAIL_APP_PASSWORD
+// GMAIL_APP_PASSWORD must be a 16-character Gmail "App Password"
+// (myaccount.google.com/apppasswords) for the GMAIL_USER account, not that
+// account's normal login password — Gmail rejects SMTP login with the
+// regular password if 2FA is on, and app passwords let us send without
+// exposing the actual account credentials.
+const GMAIL_USER = defineSecret("GMAIL_USER");
+const GMAIL_APP_PASSWORD = defineSecret("GMAIL_APP_PASSWORD");
+
+// Built lazily (only once a function that declares these secrets actually
+// runs) so functions that don't need email never try to read the secrets.
+let cachedTransporter = null;
+function getMailTransporter() {
+  if (!cachedTransporter) {
+    cachedTransporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: GMAIL_USER.value(),
+        pass: GMAIL_APP_PASSWORD.value(),
+      },
+    });
+  }
+  return cachedTransporter;
+}
+
+// Best-effort — a failed email should never take down the push notification
+// or throw the whole function, since the push is the more important channel.
+async function sendAssignmentEmail(toEmail, subject, text) {
+  try {
+    await getMailTransporter().sendMail({
+      from: `"Waje's Quail Farm" <${GMAIL_USER.value()}>`,
+      to: toEmail,
+      subject,
+      text,
+    });
+    logger.info(`Assignment email sent to ${toEmail}`);
+  } catch (e) {
+    logger.error(`Failed to email ${toEmail}: ${e.message}`);
+  }
+}
 
 // ── Shared dedupe + push helper ──────────────────────────────────────────
 // Mirrors FarmRepository.addAlert()'s ID scheme exactly so both the app and
@@ -262,6 +309,76 @@ exports.onWaterLevelWrite = onValueWritten(
       body: description,
       channel: CHANNEL_ALERTS,
     });
+  }
+);
+
+// ── New task assignment: farm_data/shared/tasks/{taskId} ─────────────────
+// FIX: staff previously only found out about a task via checkOverdueTasks,
+// i.e. only AFTER it was already missed. Nothing notified them the moment
+// a task was actually assigned. This fires on every write to a task doc and
+// notifies (push + email) any assignee who is NEW on this write (present in
+// `after` but not in `before`) — so creating a task notifies every initial
+// assignee, and later adding a staff member to an existing task notifies
+// just that person, without re-pinging assignees who were already on the
+// task for an unrelated edit (e.g. marking it done, changing its time).
+//
+// `assignedTo` entries ARE the staff member's email addresses (see
+// ScheduleActivity's assignee selector, which is keyed by email) — so no
+// extra user lookup is needed to know who to email.
+exports.onTaskAssigned = onDocumentWritten(
+  { document: "farm_data/shared/tasks/{taskId}", secrets: [GMAIL_USER, GMAIL_APP_PASSWORD] },
+  async (event) => {
+    const before = event.data?.before;
+    const after = event.data?.after;
+    if (!after || !after.exists) return; // ignore deletes
+
+    const afterData = after.data();
+    const afterAssignees = parseAssignedTo(afterData.assignedTo);
+    if (afterAssignees.length === 0) return;
+
+    const beforeAssignees = before && before.exists
+      ? parseAssignedTo(before.data().assignedTo)
+      : [];
+    const newAssignees = afterAssignees.filter((e) => !beforeAssignees.includes(e));
+    if (newAssignees.length === 0) return;
+
+    const title = afterData.title || "Task";
+    const category = afterData.category || "";
+    const dateStr = (afterData.year !== undefined && afterData.month !== undefined && afterData.day !== undefined)
+      ? `${afterData.day}/${afterData.month + 1}/${afterData.year}`
+      : "an upcoming date";
+    const timeStr = afterData.time || "";
+
+    // taskId folded into the dedup message so this can't collide with
+    // raiseTaskAlertForAssignees' "Missed Task" message, or with another
+    // task instance (e.g. a recurring series) that shares the same title
+    // and gets assigned on the same day.
+    const message = `New Task Assigned: ${title} (${event.params.taskId})`;
+
+    await raiseTaskAlertForAssignees({
+      message,
+      type: "Task Assigned",
+      assignees: newAssignees,
+      title: "New Task Assigned",
+      body: `You've been assigned: ${title}`,
+      channel: CHANNEL_TASK_REMINDER,
+    });
+
+    // Email runs alongside the push, not instead of it — each assignee's
+    // `assignedTo` entry is their email, so send directly, no lookup needed.
+    const emailBody =
+      `You've been assigned a new task on Waje's Quail Farm.\n\n` +
+      `Task: ${title}\n` +
+      `Category: ${category || "N/A"}\n` +
+      `Scheduled: ${dateStr}${timeStr ? " at " + timeStr : ""}\n` +
+      (afterData.assignedBy ? `Assigned by: ${afterData.assignedBy}\n` : "") +
+      `\nOpen the app's Schedule tab to see the full details.`;
+
+    await Promise.all(
+      newAssignees.map((email) =>
+        sendAssignmentEmail(email, `New Task Assigned: ${title}`, emailBody)
+      )
+    );
   }
 );
 

@@ -53,17 +53,6 @@
                 android:textColorHint="#996B8E23" />
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnForgotPassword"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="end"
-                android:text="@string/forgot_password_label"
-                android:textColor="#466d1d"
-                android:textAllCaps="false"
-                android:textSize="12sp" />
-
-            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnManualLogin"
                 style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
                 android:layout_width="match_parent"
@@ -75,28 +64,16 @@
                 app:backgroundTint="#466d1d"
                 app:cornerRadius="16dp" />
 
-            <TextView
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnForgotPassword"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:layout_marginTop="8dp"
-                android:text="@string/or_separator"
-                android:textColor="@color/gray"
-                android:textSize="12sp" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/Btn"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:layout_marginTop="16dp"
-                android:text="@string/continue_with_google"
+                android:layout_gravity="end"
+                android:text="@string/forgot_password_label"
                 android:textAllCaps="false"
-                app:cornerRadius="16dp"
-                app:icon="@drawable/lc_google_icon"
-                app:iconGravity="textStart"
-                app:iconTint="@null"
-                app:strokeColor="#466d1d" />
+                android:textColor="#466d1d"
+                android:textSize="12sp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnRegister"
@@ -105,8 +82,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="@string/register_account"
-                android:textColor="#466d1d"
-                android:textAllCaps="false" />
+                android:textAllCaps="false"
+                android:textColor="#466d1d" />
 
         </LinearLayout>
     </LinearLayout>

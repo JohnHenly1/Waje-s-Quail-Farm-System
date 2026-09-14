@@ -172,11 +172,6 @@ public class ProfileActivity extends AppCompatActivity {
             if (adminCard != null) adminCard.setVisibility(View.GONE);
         }
 
-        View languageRegionButton = findViewById(R.id.languageRegionButton);
-        if (languageRegionButton != null) {
-            languageRegionButton.setOnClickListener(v -> showLanguageRegionDialog());
-        }
-
         View privacySecurityButton = findViewById(R.id.privacySecurityButton);
         if (privacySecurityButton != null) {
             privacySecurityButton.setOnClickListener(v -> showPrivacySecurityDialog());

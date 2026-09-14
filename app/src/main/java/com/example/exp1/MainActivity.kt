@@ -135,15 +135,6 @@ class MainActivity : AppCompatActivity() {
 
         checkMaintenanceThenProceed(currentEmail)
 
-        // GOOGLE LOGIN BUTTON WITH MULTI-ACCOUNT PICKER
-        findViewById<View>(R.id.Btn).setOnClickListener {
-            // Force account picker by signing out first
-            googleSignInClient.signOut().addOnCompleteListener {
-                val intent = googleSignInClient.signInIntent
-                startActivityForResult(intent, GOOGLE_SIGN_IN_REQUEST)
-            }
-        }
-
         findViewById<View>(R.id.btnManualLogin).setOnClickListener { handleManualLogin() }
         findViewById<View>(R.id.btnRegister).setOnClickListener { startActivity(Intent(this, RegisterActivity::class.java)) }
         findViewById<View>(R.id.btnForgotPassword).setOnClickListener { showForgotPasswordDialog() }
@@ -151,7 +142,7 @@ class MainActivity : AppCompatActivity() {
     /**
      * Tapping anywhere outside the currently focused EditText dismisses the
      * keyboard and clears focus from that field. Taps on another EditText
-     * still work normally — this only intercepts taps that land outside
+     * still work normally this only intercepts taps that land outside
      * every focusable input.
      */
     override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
