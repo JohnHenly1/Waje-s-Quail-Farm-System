@@ -4,7 +4,7 @@ on:
   schedule:
     # Every 15 minutes, matching the original checkOverdueTasks schedule.
     # GitHub's scheduler can lag a few minutes under load — fine for this use case.
-    - cron: "*/15 * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch: {} # lets you trigger a run manually from the Actions tab
 
 jobs:
