@@ -78,6 +78,7 @@ class InventoryHistoryActivity : AppCompatActivity() {
         findViewById<View>(R.id.exportButton).setOnClickListener { startExportCsv() }
 
         bindFilters()
+        runOneTimeAuditNameMigrationIfNeeded()
         startHistoryListener()
     }
 
@@ -85,7 +86,53 @@ class InventoryHistoryActivity : AppCompatActivity() {
         super.onDestroy()
         historyListener?.remove()
     }
+    // ──────────────────────────────────────────────────────────────────────────
+    // One-time migration: older inventory_history docs were written with the
+    // user's email in editedByName (no editedByEmail field). Backfill the real
+    // name from user_access/{email} and move the email to editedByEmail.
+    // Guarded by a SharedPreferences flag so this only ever runs once.
+    // ──────────────────────────────────────────────────────────────────────────
+    private fun runOneTimeAuditNameMigrationIfNeeded() {
+        val prefs = getSharedPreferences("app_migrations", MODE_PRIVATE)
+        if (prefs.getBoolean("audit_name_migration_v1_done", false)) return
 
+        auditCol.get().addOnSuccessListener { snaps ->
+            val usersCol = db.collection("user_access")
+            val docsNeedingFix = snaps.documents.filter { doc ->
+                val name  = doc.getString("editedByName")  ?: ""
+                val email = doc.getString("editedByEmail") ?: ""
+                email.isBlank() && name.contains("@")
+            }
+
+            if (docsNeedingFix.isEmpty()) {
+                prefs.edit().putBoolean("audit_name_migration_v1_done", true).apply()
+                return@addOnSuccessListener
+            }
+
+            var remaining = docsNeedingFix.size
+            fun maybeFinish() {
+                remaining--
+                if (remaining == 0) {
+                    prefs.edit().putBoolean("audit_name_migration_v1_done", true).apply()
+                }
+            }
+
+            docsNeedingFix.forEach { doc ->
+                val email = doc.getString("editedByName") ?: ""
+                usersCol.document(email).get()
+                    .addOnSuccessListener { userDoc ->
+                        val realName = userDoc.getString("name") ?: email
+                        doc.reference.update(
+                            mapOf(
+                                "editedByName"  to realName,
+                                "editedByEmail" to email
+                            )
+                        ).addOnCompleteListener { maybeFinish() }
+                    }
+                    .addOnFailureListener { maybeFinish() }
+            }
+        }
+    }
     // ──────────────────────────────────────────────────────────────────────────
     // Filters
     // ──────────────────────────────────────────────────────────────────────────
@@ -187,6 +234,7 @@ class InventoryHistoryActivity : AppCompatActivity() {
         val category     = doc.getString("category")      ?: ""
         val action       = doc.getString("action")        ?: "add"
         val editorName   = doc.getString("editedByName")  ?: "Unknown"
+        val editorEmail  = doc.getString("editedByEmail") ?: ""
         val editorRole   = doc.getString("editedByRole")  ?: ""
         val qtyBefore    = doc.getLong("quantityBefore")  ?: 0L
         val qtyAfter     = doc.getLong("quantityAfter")   ?: 0L
@@ -206,9 +254,11 @@ class InventoryHistoryActivity : AppCompatActivity() {
         card.findViewById<TextView>(R.id.itemName).text =
             "[$editorName] $actionVerb $absChange $unitLabel $productName"
 
-        // Subtitle: editor role
+        // Subtitle: editor role, with email underneath (blank-safe for
+        // older audit entries written before editedByEmail existed)
+        val roleLine = editorRole.replaceFirstChar { it.uppercase() }
         card.findViewById<TextView>(R.id.itemDescription).text =
-            editorRole.replaceFirstChar { it.uppercase() }
+            if (editorEmail.isNotBlank()) "$roleLine\n$editorEmail" else roleLine
 
         // Timestamp in place of invNumber
         card.findViewById<TextView>(R.id.invNumber).text = formatRelativeDate(ts)
