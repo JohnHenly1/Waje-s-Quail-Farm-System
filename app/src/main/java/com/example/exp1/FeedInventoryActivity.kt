@@ -583,9 +583,11 @@ class FeedInventoryActivity : AppCompatActivity() {
             return
         }
 
-        val uid          = auth.currentUser?.uid ?: "unknown"
-        val editorName   = accountManager.getCurrentUsername() ?: "User"
-        val editorRole   = roleManager.role
+        val uid              = auth.currentUser?.uid ?: "unknown"
+        val currentUsername  = accountManager.getCurrentUsername() ?: "User"
+        val editorName       = accountManager.getCachedName(currentUsername)
+        val editorEmail      = accountManager.getEmail(currentUsername) ?: ""
+        val editorRole       = roleManager.role
         val quantityDiff = newQty - item.quantity
         val action       = if (quantityDiff >= 0) "add" else "deduct"
 
@@ -624,6 +626,7 @@ class FeedInventoryActivity : AppCompatActivity() {
                     "quantityAfter"   to newQty,
                     "editedByUid"     to uid,
                     "editedByName"    to editorName,
+                    "editedByEmail"   to editorEmail,
                     "editedByRole"    to editorRole,
                     "timestamp"       to FieldValue.serverTimestamp(),
                     "notes"           to notes
@@ -664,9 +667,11 @@ class FeedInventoryActivity : AppCompatActivity() {
             return
         }
 
-        val uid        = auth.currentUser?.uid ?: "unknown"
-        val editorName = accountManager.getCurrentUsername() ?: "User"
-        val editorRole = roleManager.role
+        val uid              = auth.currentUser?.uid ?: "unknown"
+        val currentUsername  = accountManager.getCurrentUsername() ?: "User"
+        val editorName       = accountManager.getCachedName(currentUsername)
+        val editorEmail      = accountManager.getEmail(currentUsername) ?: ""
+        val editorRole       = roleManager.role
 
         val newFeedRef  = feedCol.document()   // pre-generate id so it can be reused below
         val auditDocRef = auditCol.document()
@@ -733,6 +738,7 @@ class FeedInventoryActivity : AppCompatActivity() {
                     "quantityAfter"   to qty,
                     "editedByUid"     to uid,
                     "editedByName"    to editorName,
+                    "editedByEmail"   to editorEmail,
                     "editedByRole"    to editorRole,
                     "timestamp"       to FieldValue.serverTimestamp(),
                     "notes"           to "Initial stock added"
@@ -960,6 +966,35 @@ class FeedInventoryActivity : AppCompatActivity() {
             override fun onNothingSelected(p: AdapterView<*>?) {}
         }
 
+        // Auto-fill from an existing item as the user types the name — mirrors
+        // what the "existing items" spinner does, but triggers live so the
+        // user doesn't have to scroll/select manually. Only fires on an exact
+        // (case-insensitive) name match within the same category, and only
+        // while the user hasn't started editing description themselves for a
+        // *different* name than what's currently matched.
+        var lastAutoFilledName: String? = null
+        nameInput.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {}
+            override fun onTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {
+                val typedName = s?.toString()?.trim() ?: ""
+                val match = sameCatItems.find { it.name.equals(typedName, ignoreCase = true) }
+                if (match != null) {
+                    if (lastAutoFilledName != match.name) {
+                        descInput.setText(match.description)
+                        invInput.setText(match.invNumber)
+                        locationInput.setText(match.location)
+                        priceInput.setText(match.unitPrice.toString())
+                        lastAutoFilledName = match.name
+                    }
+                } else {
+                    // Name no longer matches any existing item — clear the
+                    // auto-filled marker so a future match will re-fill.
+                    lastAutoFilledName = null
+                }
+            }
+        })
+
         // Live total-price watcher
         val priceWatcher = object : android.text.TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {}
@@ -1018,23 +1053,26 @@ class FeedInventoryActivity : AppCompatActivity() {
                 val totalPrice = qtyIn * price
                 var desc       = descInput.text.toString().trim()
 
+                val matchingItem = allItems.find {
+                    it.name.equals(name, true) &&
+                            it.location.equals(location, true) &&
+                            it.unitPrice == price
+                }
+
                 // Blank => auto-generate the next available number inside the
                 // save transaction below. Non-blank => the user typed a
                 // specific number, so give immediate feedback here if it's
                 // obviously already used; the transaction still re-verifies
                 // this before saving, since this local list can be stale.
+                // Skip this check entirely when restocking an existing item
+                // (matchingItem != null) — the invoice number field is just
+                // autofilled from that item's own number in that case.
                 val requestedInv = invInput.text.toString().trim()
-                if (requestedInv.isNotEmpty() &&
+                if (matchingItem == null && requestedInv.isNotEmpty() &&
                     allItems.any { it.invNumber.equals(requestedInv, ignoreCase = true) }
                 ) {
                     invInput.error = "This invoice number is already in use"
                     return@setOnClickListener
-                }
-
-                val matchingItem = allItems.find {
-                    it.name.equals(name, true) &&
-                            it.location.equals(location, true) &&
-                            it.unitPrice == price
                 }
 
                 val nameExists = allItems.any { it.name.equals(name, true) }
@@ -1067,8 +1105,8 @@ class FeedInventoryActivity : AppCompatActivity() {
                         onSuccess    = {
                             logHistory("RESTOCK", matchingItem.name, qtyIn, price, matchingItem.category)
                             dialog.dismiss()
-                        }
-                    )
+                            showAddSuccessDialog(matchingItem.name)
+                        } )
                 } else {
                     val status = calculateStatus(qtyIn, qtyIn)
                     val data = hashMapOf<String, Any>(
@@ -1110,6 +1148,7 @@ class FeedInventoryActivity : AppCompatActivity() {
                         )
 
                         dialog.dismiss()
+                        showAddSuccessDialog(name)
                     }
                 }
             }
@@ -1162,5 +1201,39 @@ class FeedInventoryActivity : AppCompatActivity() {
             else -> "In Stock"
         }
     }
+    private fun showAddSuccessDialog(itemName: String) {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(64, 48, 64, 48)
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(android.graphics.Color.WHITE)
+                cornerRadius = 24f
+                setStroke(2, android.graphics.Color.parseColor("#E8F5E9"))
+            }
+        }
+        val icon = TextView(this).apply {
+            text = "✓ Success"
+            setTextColor(android.graphics.Color.parseColor("#2E7D32"))
+            textSize = 16f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding(24, 16, 24, 16)
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(android.graphics.Color.parseColor("#E8F5E9"))
+                cornerRadius = 40f
+            }
+        }
+        val message = TextView(this).apply {
+            text = "\"$itemName\" was added to inventory."
+            setTextColor(android.graphics.Color.parseColor("#1C1C1E"))
+            textSize = 14f
+            setPadding(0, 24, 0, 0)
+        }
+        container.addView(icon)
+        container.addView(message)
 
+        AlertDialog.Builder(this)
+            .setView(container)
+            .setPositiveButton("OK", null)
+            .show()
+    }
 }
