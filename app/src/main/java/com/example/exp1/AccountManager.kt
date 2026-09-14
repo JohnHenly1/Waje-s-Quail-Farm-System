@@ -126,6 +126,31 @@ class AccountManager(context: Context) {
         sharedPreferences.edit().remove("current_user_session").apply()
     }
 
+    // ---------------------------------------------------------------------
+    // Per-user "clear alerts" cutoff.
+    //
+    // Alerts themselves live in one shared Firestore collection (the whole
+    // farm sees the same alert history). Previously "Clear All" deleted
+    // those shared documents outright, which wiped every other user's
+    // notifications too. Instead, clearing now just records *this* user's
+    // cutoff timestamp locally: alerts older than the cutoff are hidden
+    // from this user's list (and don't count toward their unread badge),
+    // while every other account keeps seeing the full shared history.
+    // Any alert that arrives after the cutoff still shows up normally.
+    // ---------------------------------------------------------------------
+
+    fun getAlertsClearedBefore(): Long {
+        val username = getCurrentUsername() ?: "default"
+        return sharedPreferences.getLong("${username}_alerts_cleared_before", 0L)
+    }
+
+    fun setAlertsClearedNow() {
+        val username = getCurrentUsername() ?: "default"
+        sharedPreferences.edit()
+            .putLong("${username}_alerts_cleared_before", System.currentTimeMillis())
+            .apply()
+    }
+
     fun saveFarmStats(totalBirds: Int, activeCages: Int) {
         sharedPreferences.edit().apply {
             putInt("total_birds", totalBirds)

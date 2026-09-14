@@ -54,14 +54,32 @@ object GlobalData {
         saveAlerts(deduped)
     }
 
+    /**
+     * Returns alerts, optionally hiding anything at/older than [clearedBeforeMillis].
+     * That cutoff comes from AccountManager.getAlertsClearedBefore() and is
+     * per-user/per-device — passing 0L (the default) returns the full shared
+     * history untouched, which is what the underlying cloud data still holds
+     * for every other account.
+     */
     @Synchronized
-    fun getAlerts(): List<AlertItem> = loadAlerts()
+    fun getAlerts(clearedBeforeMillis: Long = 0L): List<AlertItem> {
+        val all = loadAlerts()
+        if (clearedBeforeMillis <= 0L) return all
+        return all.filter { timestampMillis(it.timestamp) > clearedBeforeMillis }
+    }
 
     @Synchronized
     fun markAllAsRead() {
         saveAlerts(loadAlerts().map { it.copy(isRead = true) })
     }
 
+    /**
+     * Clears this device's local alert cache only. Does NOT touch the shared
+     * Firestore alert history — use AccountManager.setAlertsClearedNow() +
+     * the [clearedBeforeMillis] filter on getAlerts()/getUnreadCount() for the
+     * "Clear All" button, so one user's clear can't wipe alerts other users
+     * still need to see.
+     */
     @Synchronized
     fun clearAlerts() = saveAlerts(emptyList())
 
@@ -79,11 +97,25 @@ object GlobalData {
     }
 
     @Synchronized
-    fun getUnreadCount(): Int = loadAlerts().count { !it.isRead }
+    fun getUnreadCount(clearedBeforeMillis: Long = 0L): Int =
+        getAlerts(clearedBeforeMillis).count { !it.isRead }
 
     // -------------------------------------------------------------------------
     // Persistence helpers
     // -------------------------------------------------------------------------
+
+    // Same format FarmRepository/AlertsActivity/DashboardActivity render
+    // timestamps in. Anything that fails to parse is treated as "now" so a
+    // malformed timestamp is never accidentally hidden by an old clear.
+    private val timestampFormat =
+        java.text.SimpleDateFormat("yyyy/MM/dd hh:mm a", java.util.Locale.getDefault())
+
+    private fun timestampMillis(timestamp: String): Long =
+        try {
+            timestampFormat.parse(timestamp)?.time ?: System.currentTimeMillis()
+        } catch (e: Exception) {
+            System.currentTimeMillis()
+        }
 
     private fun loadAlerts(): List<AlertItem> {
         val raw = prefs?.getString(KEY_ALERTS, null) ?: return emptyList()

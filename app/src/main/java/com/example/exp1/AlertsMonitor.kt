@@ -42,8 +42,15 @@ import java.util.Locale
  */
 object AlertsMonitor {
 
-    private const val CHANNEL_ID = "alerts_channel"
+    // Bumped from "alerts_channel" -> a new channel id, because Android
+    // freezes a notification channel's sound/vibration settings the first
+    // time it's created on a device. Any device that already had the old
+    // channel would keep whatever (non-buzzing) settings it was created
+    // with, no matter what we change here. A new id forces Android to
+    // create it fresh with vibration on.
+    private const val CHANNEL_ID = "alerts_channel_v2"
     private const val PREFS_NAME = "auto_alerts_tracker"
+    private const val WATER_TIER_PREF_KEY = "last_water_tier"
 
     private var started = false
     private lateinit var appContext: Context
@@ -82,6 +89,15 @@ object AlertsMonitor {
     }
 
     // ── Inventory ────────────────────────────────────────────────────────
+    // FIX: dedup used to be keyed by the *rendered message text* — which is
+    // built from the item's `name` alone. Two different feed items that
+    // happen to share a name (or both fall back to the generic "Item" label
+    // when `name` is missing) produced the exact same message string, so
+    // the second item's notification got silently swallowed by
+    // wasAlreadyAlertedToday() as if it were a duplicate of the first.
+    // Dedup keys are now prefixed with the Firestore document id, so every
+    // item gets its own independent notification regardless of what any
+    // other item is named.
     private fun startInventoryListener() {
         inventoryListener?.remove()
         inventoryListener = FirebaseFirestore.getInstance()
@@ -95,19 +111,21 @@ object AlertsMonitor {
                     val qty = doc.getLong("quantity") ?: 0L
                     val name = doc.getString("name") ?: "Item"
                     if (qty == 0L) {
+                        val dedupKey = "${doc.id}:depleted"
                         val message = "Inventory Alert: $name is STOCK DEPLETED"
-                        if (!wasAlreadyAlertedToday(message)) {
+                        if (!wasAlreadyAlertedToday(dedupKey)) {
                             FarmRepository.addAlert(message, "Critical")
-                            markAsAlertedToday(message)
+                            markAsAlertedToday(dedupKey)
                             showLocalNotification("Inventory Alert", message)
                         }
                     } else {
                         val status = doc.getString("status") ?: ""
                         if (status == "Low Stock" || status == "Medium") {
+                            val dedupKey = "${doc.id}:$status"
                             val message = "Inventory Alert: $name is currently $status"
-                            if (!wasAlreadyAlertedToday(message)) {
+                            if (!wasAlreadyAlertedToday(dedupKey)) {
                                 FarmRepository.addAlert(message, "Inventory")
-                                markAsAlertedToday(message)
+                                markAsAlertedToday(dedupKey)
                                 showLocalNotification("Inventory Update", message)
                             }
                         }
@@ -117,26 +135,39 @@ object AlertsMonitor {
     }
 
     // ── Water level ──────────────────────────────────────────────────────
-    // Only fires when the level moves above 50% — signals the tank is at a
-    // healthy/filled level. Everything at or below 50% is intentionally
-    // silent now (previously had separate Notice/Warning/Critical/Emergency
-    // tiers for low levels; those were removed).
+    // FIX: restored the low-level tiers (Notice/Warning/Critical/Emergency)
+    // that had been stripped out, leaving only the >50% "Filled" case and no
+    // alert at all for a low or empty tank. Now every band from empty to
+    // filled produces a notification.
     fun resolveWaterLevelAlert(percent: Int): Triple<Int, String, String>? {
-        return if (percent > 50) {
-            Triple(percent, "Filled", "Water tank is filled and at a healthy level.")
-        } else {
-            null
+        return when {
+            percent > 50 -> Triple(percent, "Filled", "Water tank is filled and at a healthy level.")
+            percent in 21..50 -> Triple(percent, "Notice", "Water tank is getting low. Consider refilling soon.")
+            percent in 11..20 -> Triple(percent, "Warning", "Water tank is low. Please refill soon.")
+            percent in 1..10 -> Triple(percent, "Critical", "Water tank is critically low. Refill immediately.")
+            percent <= 0 -> Triple(percent, "Emergency", "Water tank is empty. Refill immediately.")
+            else -> null
         }
     }
 
+    // FIX: this used to dedupe by exact message text, once per calendar day —
+    // so once today's "Water Level Emergency" notification had fired, the
+    // tank could refill, drain back to empty, refill, drain again... and it
+    // would stay silent for the rest of the day. Now it tracks only the
+    // *last tier that was actually notified* and fires again the moment the
+    // tier changes to something different, with no day limit. Repeated
+    // Firebase updates that don't change the tier (e.g. 0% written again)
+    // still won't spam duplicate notifications for the same unchanged state.
     private fun raiseWaterLevelAlert(percent: Int) {
         val (_, label, description) = resolveWaterLevelAlert(percent) ?: return
+        val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val lastTier = prefs.getString(WATER_TIER_PREF_KEY, null)
+        if (lastTier == label) return
+        prefs.edit().putString(WATER_TIER_PREF_KEY, label).apply()
+
         val message = "Water Level $label: $description"
-        if (!wasAlreadyAlertedToday(message)) {
-            FarmRepository.addAlert(message, "Water Level")
-            markAsAlertedToday(message)
-            showLocalNotification("Water Level $label", description)
-        }
+        FarmRepository.addAlert(message, "Water Level")
+        showLocalNotification("Water Level $label", description)
     }
 
     private fun startWaterLevelListener() {
@@ -217,6 +248,13 @@ object AlertsMonitor {
     }
 
     // ── System notification ─────────────────────────────────────────────
+    private val vibratePattern = longArrayOf(0, 400, 200, 400, 200, 400)
+    // Strictly-incrementing id instead of hashing message+timestamp, so two
+    // notifications fired within the same millisecond (e.g. two inventory
+    // items both hitting 0 in the same batch) can never collide onto the
+    // same notification id and silently overwrite one another.
+    private val notificationIdCounter = java.util.concurrent.atomic.AtomicInteger(1000)
+
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -227,6 +265,7 @@ object AlertsMonitor {
                 description = "Important farm alerts: inventory, schedule, water level"
                 enableLights(true)
                 enableVibration(true)
+                vibrationPattern = vibratePattern
                 setLockscreenVisibility(android.app.Notification.VISIBILITY_PUBLIC)
             }
             val nm = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -248,11 +287,25 @@ object AlertsMonitor {
             .setContentTitle(title)
             .setContentText(message)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
+            // Pre-O devices read vibration off the builder directly (O+ reads
+            // it from the channel above); setting both covers every version.
+            .setVibrate(vibratePattern)
+            .setDefaults(NotificationCompat.DEFAULT_SOUND)
+            // Make sure every post buzzes even if a notification with this
+            // same id is already showing, instead of silently updating it.
+            .setOnlyAlertOnce(false)
 
         try {
-            NotificationManagerCompat.from(appContext).notify(message.hashCode(), builder.build())
+            // A unique, ever-increasing id per post so a repeat alert always
+            // shows as its own new, buzzing notification instead of
+            // silently colliding with or updating one already on screen.
+            NotificationManagerCompat.from(appContext).notify(
+                notificationIdCounter.incrementAndGet(),
+                builder.build()
+            )
         } catch (e: SecurityException) {
             e.printStackTrace()
         }

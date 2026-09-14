@@ -249,7 +249,9 @@ class DashboardActivity : AppCompatActivity() {
     }
 
     private fun updateNotificationBadge() {
-        val unreadCount = GlobalData.getUnreadCount()
+        // Respect this user's own "cleared" cutoff so the badge matches what
+        // AlertsActivity shows them, without touching anyone else's alerts.
+        val unreadCount = GlobalData.getUnreadCount(accountManager.getAlertsClearedBefore())
         if (unreadCount > 0) {
             notificationBadge.visibility = View.VISIBLE
             notificationBadge.text = if (unreadCount > 99) "99+" else unreadCount.toString()

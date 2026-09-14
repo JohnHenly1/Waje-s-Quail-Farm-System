@@ -93,16 +93,15 @@ class AlertsActivity : AppCompatActivity() {
         }
 
         findViewById<View>(R.id.clearAllButton).setOnClickListener {
-            // Delete alerts from Firestore (Cloud sync)
-            FarmRepository.clearAllAlerts { err ->
-                if (err == null) {
-                    GlobalData.clearAlerts()
-                    updateAlertsList()
-                    Toast.makeText(this, "All alerts cleared from cloud", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(this, "Failed to clear alerts: ${err.message}", Toast.LENGTH_SHORT).show()
-                }
-            }
+            // Alerts live in ONE shared Firestore collection for the whole farm.
+            // Deleting those documents (the old behavior) cleared them for every
+            // account, not just the person who tapped the button. Instead, record
+            // a per-user "cleared before now" cutoff and filter with it locally —
+            // this user's list empties out, everyone else's is untouched, and any
+            // new alert raised after this point still shows up normally.
+            accountManager.setAlertsClearedNow()
+            updateAlertsList()
+            Toast.makeText(this, "Alerts cleared", Toast.LENGTH_SHORT).show()
         }
 
         findViewById<View>(R.id.markAllReadBtn).setOnClickListener {
@@ -303,7 +302,10 @@ class AlertsActivity : AppCompatActivity() {
     }
 
     private fun updateAlertsList() {
-        val allAlerts = GlobalData.getAlerts()
+        // Only hides alerts this account has cleared (see clearAllButton above) —
+        // the underlying shared alert history is untouched, so other users'
+        // lists are unaffected.
+        val allAlerts = GlobalData.getAlerts(accountManager.getAlertsClearedBefore())
 
         // Filter logic updated to correctly handle category separation
         val alerts = if (activeFilter == "All") {
