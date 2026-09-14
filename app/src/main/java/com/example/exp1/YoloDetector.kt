@@ -14,10 +14,32 @@ data class DetectionResult(
     val boundingBox: RectF
 )
 
-class YoloDetector(context: Context) {
+class YoloDetector @JvmOverloads constructor(context: Context, val modelType: ModelType = ModelType.MY_MODEL) {
+
+    /** The two interchangeable detector backends. Each ships a different ONNX
+     *  export format, so [detect] dispatches to a different output parser
+     *  depending on which one is active — see [OutputFormat]. */
+    enum class ModelType(
+        val fileName: String,
+        val displayName: String,
+        val outputFormat: OutputFormat
+    ) {
+        MY_MODEL("my_model.onnx", "YOLOv3 (my_model)", OutputFormat.END2END_NMS),
+        YOLOV4("Yolov4.onnx", "YOLOv4", OutputFormat.RAW_GRID)
+    }
+
+    /** END2END_NMS: Ultralytics "end2end" export — NMS already applied inside
+     *  the graph, fixed [1, 300, 6] output of [x1,y1,x2,y2,conf,classId] boxes
+     *  in pixel coordinates of the resized input.
+     *
+     *  RAW_GRID: plain detection head export with no built-in NMS, output
+     *  [1, 4+numClasses, numAnchors] (channels-first): rows 0-3 are
+     *  [cx,cy,w,h] in pixel coordinates of the resized input, rows 4..N are
+     *  per-class sigmoid scores (no separate objectness column). Needs
+     *  decoding + NMS on-device, which [detect] handles via [dedupeOverlaps]. */
+    enum class OutputFormat { END2END_NMS, RAW_GRID }
 
     companion object {
-        private const val MODEL_FILE           = "my_model.onnx"
         private const val INPUT_SIZE           = 640
         private const val CONFIDENCE_THRESHOLD = 0.40f
         private const val NMS_IOU_THRESHOLD    = 0.45f
@@ -30,7 +52,7 @@ class YoloDetector(context: Context) {
     private val ortSession: OrtSession
 
     init {
-        val modelBytes = context.assets.open(MODEL_FILE).readBytes()
+        val modelBytes = context.assets.open(modelType.fileName).readBytes()
         val opts = OrtSession.SessionOptions()
         opts.setIntraOpNumThreads(2)
         opts.setInterOpNumThreads(1)
@@ -78,11 +100,26 @@ class YoloDetector(context: Context) {
 
         val outputMap = ortSession.run(inputMap)
 
-        // This model is an Ultralytics "end2end" (YOLO26-style) export: it performs
-        // NMS internally and returns a fixed [1, 300, 6] tensor, where each row is
-        // [x1, y1, x2, y2, confidence, class_id] in pixel coordinates of the
-        // INPUT_SIZE x INPUT_SIZE resized image. This is NOT the old raw
-        // [1, 4+numClasses, 8400] anchor-grid format, so no further NMS is needed.
+        val candidates = when (modelType.outputFormat) {
+            OutputFormat.END2END_NMS -> parseEnd2EndOutput(outputMap, padX, padY, scale, srcW, srcH)
+            OutputFormat.RAW_GRID    -> parseRawGridOutput(outputMap, padX, padY, scale, srcW, srcH)
+        }
+
+        inputTensor.close()
+        outputMap.close()
+        // END2END_NMS already ran per-class NMS internally, so this pass only
+        // mops up leftover cross-class duplicates. RAW_GRID has had no NMS
+        // applied yet at this point, so this pass is doing the full job.
+        return dedupeOverlaps(candidates, NMS_IOU_THRESHOLD)
+    }
+
+    /** Ultralytics "end2end" (YOLO26-style) export: NMS performed internally,
+     *  fixed [1, 300, 6] tensor of [x1,y1,x2,y2,confidence,classId] rows in
+     *  pixel coordinates of the INPUT_SIZE x INPUT_SIZE resized image. */
+    private fun parseEnd2EndOutput(
+        outputMap: OrtSession.Result,
+        padX: Float, padY: Float, scale: Float, srcW: Float, srcH: Float
+    ): List<DetectionResult> {
         val raw = outputMap[0].value as Array<Array<FloatArray>>
         val detections = raw[0] // shape: [300][6]
 
@@ -113,10 +150,62 @@ class YoloDetector(context: Context) {
                 ))
             }
         }
+        return candidates
+    }
 
-        inputTensor.close()
-        outputMap.close()
-        return dedupeOverlaps(candidates, NMS_IOU_THRESHOLD)
+    /** Plain detection-head export (e.g. this project's Yolov4.onnx) with no
+     *  built-in NMS: channels-first [1, 4+numClasses, numAnchors] tensor.
+     *  Rows 0-3 are [cx,cy,w,h] in pixel coordinates of the resized input;
+     *  rows 4..N are per-class sigmoid scores (no separate objectness row). */
+    private fun parseRawGridOutput(
+        outputMap: OrtSession.Result,
+        padX: Float, padY: Float, scale: Float, srcW: Float, srcH: Float
+    ): List<DetectionResult> {
+        val raw      = outputMap[0].value as Array<Array<FloatArray>>
+        val channels = raw[0]                 // shape: [4+numClasses][numAnchors]
+        val numAnchors = channels[0].size
+        val numClasses = channels.size - 4
+
+        val candidates = mutableListOf<DetectionResult>()
+        for (i in 0 until numAnchors) {
+            var bestClass = -1
+            var bestScore = 0f
+            for (c in 0 until numClasses) {
+                val score = channels[4 + c][i]
+                if (score > bestScore) {
+                    bestScore = score
+                    bestClass = c
+                }
+            }
+            if (bestScore < CONFIDENCE_THRESHOLD || bestClass !in LABELS.indices) continue
+
+            val cx = channels[0][i]
+            val cy = channels[1][i]
+            val w  = channels[2][i]
+            val h  = channels[3][i]
+
+            val x1 = cx - w / 2f
+            val y1 = cy - h / 2f
+            val x2 = cx + w / 2f
+            val y2 = cy + h / 2f
+
+            val ox1 = (x1 - padX) / scale
+            val oy1 = (y1 - padY) / scale
+            val ox2 = (x2 - padX) / scale
+            val oy2 = (y2 - padY) / scale
+
+            candidates.add(DetectionResult(
+                label       = LABELS[bestClass],
+                confidence  = bestScore,
+                boundingBox = RectF(
+                    (ox1 / srcW).coerceIn(0f, 1f),
+                    (oy1 / srcH).coerceIn(0f, 1f),
+                    (ox2 / srcW).coerceIn(0f, 1f),
+                    (oy2 / srcH).coerceIn(0f, 1f)
+                )
+            ))
+        }
+        return candidates
     }
 
     /**

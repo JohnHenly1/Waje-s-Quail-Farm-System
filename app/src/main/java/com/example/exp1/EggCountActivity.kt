@@ -67,6 +67,9 @@ class EggCountActivity : AppCompatActivity() {
 
     // ── YOLO detector (null = failed to load, camera still works) ─────────────
     private var detector: YoloDetector? = null
+    private lateinit var modelSwitchBtn: android.widget.Button
+    private val modelPrefs by lazy { getSharedPreferences("egg_model_prefs", MODE_PRIVATE) }
+    private var currentModelType: YoloDetector.ModelType = YoloDetector.ModelType.MY_MODEL
 
     // ── Camera ────────────────────────────────────────────────────────────────
     private lateinit var cameraExecutor: ExecutorService
@@ -205,7 +208,9 @@ class EggCountActivity : AppCompatActivity() {
         setupUI()
         NavigationHelper.setupBottomNavigation(this)
 
-        tryLoadDetector()
+        currentModelType = loadSavedModelType()
+        updateModelSwitchBtnLabel()
+        tryLoadDetector(currentModelType)
 
         cameraExecutor = Executors.newSingleThreadExecutor()
     }
@@ -283,6 +288,7 @@ class EggCountActivity : AppCompatActivity() {
         discardBtn    = findViewById(R.id.discardBtn)
         modeSwitchBtn = findViewById(R.id.modeSwitchBtn)
         captureModeToggleBtn = findViewById(R.id.captureModeToggleBtn)
+        modelSwitchBtn = findViewById(R.id.modelSwitchBtn)
         frozenOverlay = findViewById(R.id.frozenOverlay)
         saveBtn       = findViewById(R.id.saveCollectionBtn)
         liveTimeText  = findViewById(R.id.liveTimeText)
@@ -302,6 +308,7 @@ class EggCountActivity : AppCompatActivity() {
         findViewById<View>(R.id.backButton).setOnClickListener { finish() }
         findViewById<View>(R.id.refreshButton).setOnClickListener { resetCounts() }
         findViewById<View>(R.id.viewScannedBtn).setOnClickListener { showScannedPhotosDialog() }
+        modelSwitchBtn.setOnClickListener { onModelSwitchClicked() }
 
         captureBtn.setOnClickListener    { onCaptureBtnClicked() }
         // Retake: either dismisses a thumbnail preview back to live batch capture,
@@ -445,18 +452,25 @@ class EggCountActivity : AppCompatActivity() {
     //  YOLO model loading
     // ─────────────────────────────────────────────────────────────────────────
 
-    private fun tryLoadDetector() {
+    private fun tryLoadDetector(modelType: YoloDetector.ModelType = currentModelType) {
         try {
-            detector = YoloDetector(this)
-            showBanner("✓ YOLO model ready — tap preview to activate camera", isError = false, autoHide = true)
+            detector?.close()
+            detector = YoloDetector(this, modelType)
+            currentModelType = modelType
+            saveModelType(modelType)
+            updateModelSwitchBtnLabel()
+            showBanner(
+                "✓ ${modelType.displayName} ready — tap preview to activate camera",
+                isError = false, autoHide = true
+            )
         } catch (e: Exception) {
-            Log.e(TAG, "YoloDetector init failed", e)
-            val msg = buildModelErrorMessage(e)
+            Log.e(TAG, "YoloDetector init failed (${modelType.fileName})", e)
+            val msg = buildModelErrorMessage(e, modelType)
             showBanner(msg, isError = true, autoHide = false)
         }
     }
 
-    private fun buildModelErrorMessage(e: Exception): String {
+    private fun buildModelErrorMessage(e: Exception, modelType: YoloDetector.ModelType): String {
         val raw = e.message ?: ""
         return when {
             raw.contains("opset", ignoreCase = true) ->
@@ -464,13 +478,57 @@ class EggCountActivity : AppCompatActivity() {
                         "  model.export(format='onnx', opset=19)\n" +
                         "Camera preview is still active."
             raw.contains("FileNotFoundException", ignoreCase = true) ||
-                    raw.contains("my_model", ignoreCase = true) ->
-                "⚠ my_model.onnx not found in assets/.\n" +
+                    raw.contains(modelType.fileName, ignoreCase = true) ->
+                "⚠ ${modelType.fileName} not found in assets/.\n" +
                         "Add it at app/src/main/assets/ and rebuild.\n" +
                         "Camera preview is still active."
             else ->
                 "⚠ Model error: ${raw.take(120)}\nCamera preview is still active."
         }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Model switching (my_model.onnx <-> Yolov4.onnx)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private fun onModelSwitchClicked() {
+        val nextType = if (currentModelType == YoloDetector.ModelType.MY_MODEL)
+            YoloDetector.ModelType.YOLOV4
+        else
+            YoloDetector.ModelType.MY_MODEL
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Switch detection model?")
+            .setMessage(
+                "Currently using ${currentModelType.displayName}.\n" +
+                        "Switch to ${nextType.displayName}?\n\n" +
+                        "The camera will stop and any in-progress scan will be reset."
+            )
+            .setPositiveButton("Switch") { _, _ -> switchModel(nextType) }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    /** Stops any live analysis first — swapping the ONNX session out from under
+     *  an in-flight detect() call on the camera-analysis thread would crash —
+     *  then tears down the old detector and loads the new one. */
+    private fun switchModel(newType: YoloDetector.ModelType) {
+        if (isLiveMode) stopCameraCore()
+        tryLoadDetector(newType)
+    }
+
+    private fun updateModelSwitchBtnLabel() {
+        modelSwitchBtn.text = "Model: ${currentModelType.displayName}"
+    }
+
+    private fun loadSavedModelType(): YoloDetector.ModelType {
+        val saved = modelPrefs.getString("model_type", null) ?: return YoloDetector.ModelType.MY_MODEL
+        return runCatching { YoloDetector.ModelType.valueOf(saved) }
+            .getOrDefault(YoloDetector.ModelType.MY_MODEL)
+    }
+
+    private fun saveModelType(modelType: YoloDetector.ModelType) {
+        modelPrefs.edit().putString("model_type", modelType.name).apply()
     }
 
     // ─────────────────────────────────────────────────────────────────────────
