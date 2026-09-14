@@ -1,12 +1,11 @@
 package com.example.exp1;
 
 import android.content.Intent;
-import android.app.DatePickerDialog;
-import android.os.Build;
+import android.view.ViewGroup;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-
+import android.view.inputmethod.InputMethodManager;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.TypedValue;
@@ -18,7 +17,6 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
@@ -29,7 +27,6 @@ import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
-import androidx.appcompat.widget.SwitchCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.os.LocaleListCompat;
@@ -39,7 +36,6 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.textfield.TextInputLayout;
-import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Source;
@@ -53,14 +49,11 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Random;
-import java.text.SimpleDateFormat;
 
 public class ProfileActivity extends AppCompatActivity {
     private CameraHelper cameraHelper;
@@ -475,12 +468,11 @@ public class ProfileActivity extends AppCompatActivity {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         View view = getLayoutInflater().inflate(R.layout.dialog_account_settings, null);
         builder.setView(view);
-
         View changePasswordBtn = view.findViewById(R.id.changePasswordBtn);
-        View editBirthdayBtn   = view.findViewById(R.id.editBirthdayBtn);
+        View editNameBtn       = view.findViewById(R.id.editNameBtn);
 
         changePasswordBtn.setOnClickListener(v -> showChangePasswordDialog());
-        editBirthdayBtn.setOnClickListener(v -> showEditBirthdayDialog());
+        editNameBtn.setOnClickListener(v -> showEditNameDialog());
 
         builder.setPositiveButton("Close", null);
         builder.show();
@@ -1014,19 +1006,38 @@ public class ProfileActivity extends AppCompatActivity {
         RecyclerView rvUserList    = view.findViewById(R.id.rvUserList);
         ProgressBar progressBar    = view.findViewById(R.id.progressBar);
         TextView errorTextView     = view.findViewById(R.id.errorTextView);
+        TextView closeBtn          = view.findViewById(R.id.btnCloseUserManagement);
 
         rvUserList.setLayoutManager(new LinearLayoutManager(this));
 
         view.findViewById(R.id.btnRoleLimits).setOnClickListener(v -> showRoleLimitsDialog());
-        view.findViewById(R.id.btnInviteNew).setOnClickListener(v -> NavigationHelper.INSTANCE.showAddUserDialog(this, currentEmail));
         view.findViewById(R.id.btnViewCodes).setOnClickListener(v -> showInviteCodesManagementDialog());
 
         progressBar.setVisibility(View.VISIBLE);
         errorTextView.setVisibility(View.GONE);
         rvUserList.setVisibility(View.GONE);
 
-        builder.setPositiveButton(getString(R.string.close), null);
         final AlertDialog dialog = builder.create();
+
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+            dialog.getWindow().setGravity(android.view.Gravity.CENTER);
+            dialog.getWindow().setLayout(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    (int) (getResources().getDisplayMetrics().heightPixels * 0.8)
+            );
+        }
+
+        // "Add User" now opens the pending-users list first (same flow as the
+        // side menu's "Add User" entry) instead of going straight to the
+        // fill-in-info form. The form itself is reached from that list's own
+        // "+ Add User" button.
+        view.findViewById(R.id.btnInviteNew).setOnClickListener(v -> {
+            dialog.dismiss();
+            NavigationHelper.INSTANCE.showUserListDialog(this, currentEmail);
+        });
+
+        closeBtn.setOnClickListener(v -> dialog.dismiss());
 
         FirebaseFirestore.getInstance().collection("user_access")
                 .whereEqualTo("status", "approved")
@@ -1075,30 +1086,94 @@ public class ProfileActivity extends AppCompatActivity {
     }
 
     private void showInviteCodesManagementDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Generated Invite Codes");
+        int dp16 = dp(16);
+        int dp24 = dp(24);
 
-        LinearLayout container = new LinearLayout(this);
-        container.setOrientation(LinearLayout.VERTICAL);
-        container.setPadding(40, 40, 40, 40);
+        LinearLayout rootContainer = new LinearLayout(this);
+        rootContainer.setOrientation(LinearLayout.VERTICAL);
+        rootContainer.setBackgroundColor(android.graphics.Color.WHITE);
+        rootContainer.setPadding(dp24, dp24, dp24, dp16);
+
+        TextView titleTv = new TextView(this);
+        titleTv.setText("Generated Invite Codes");
+        titleTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
+        titleTv.setTypeface(null, android.graphics.Typeface.BOLD);
+        titleTv.setTextColor(COLOR_GREEN_DARK);
+        titleTv.setPadding(0, 0, 0, dp16);
+        rootContainer.addView(titleTv);
+
+        // Clear All button, right-aligned above the list
+        TextView clearAllBtn = new TextView(this);
+        clearAllBtn.setText(getString(R.string.clear_all));
+        clearAllBtn.setTextColor(COLOR_ERROR_RED);
+        clearAllBtn.setTypeface(null, android.graphics.Typeface.BOLD);
+        clearAllBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        clearAllBtn.setPadding(dp16, dp16 / 2, dp16, dp16);
+        LinearLayout.LayoutParams clearBtnParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        clearBtnParams.gravity = android.view.Gravity.END;
+        clearAllBtn.setLayoutParams(clearBtnParams);
+        rootContainer.addView(clearAllBtn);
+
+        LinearLayout listContainer = new LinearLayout(this);
+        listContainer.setOrientation(LinearLayout.VERTICAL);
 
         ScrollView scroll = new ScrollView(this);
-        scroll.addView(container);
-        builder.setView(scroll);
+        scroll.addView(listContainer);
+        rootContainer.addView(scroll);
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setView(rootContainer);
         builder.setPositiveButton(getString(R.string.close), null);
 
         final AlertDialog dialog = builder.create();
 
-        FirebaseFirestore.getInstance().collection("invite_codes").get()
+        Runnable[] reload = new Runnable[1];
+        reload[0] = () -> FirebaseFirestore.getInstance().collection("invite_codes").get()
                 .addOnSuccessListener(docs -> {
-                    container.removeAllViews();
+                    listContainer.removeAllViews();
+                    clearAllBtn.setVisibility(docs.isEmpty() ? View.GONE : View.VISIBLE);
+
                     if (docs.isEmpty()) {
-                        TextView tv = new TextView(this);
-                        tv.setText(R.string.no_active_invite_codes);
-                        container.addView(tv);
+                        TextView emptyTv = new TextView(this);
+                        emptyTv.setText(R.string.no_active_invite_codes);
+                        emptyTv.setTextColor(android.graphics.Color.DKGRAY);
+                        emptyTv.setPadding(dp16, dp16, dp16, dp16);
+                        listContainer.addView(emptyTv);
                     }
+
+                    int codeCount = docs.size();
+
+                    clearAllBtn.setOnClickListener(v ->
+                            new AlertDialog.Builder(this)
+                                    .setTitle(getString(R.string.clear_all_invite_codes_title))
+                                    .setMessage(getString(R.string.clear_all_invite_codes_msg, codeCount))
+                                    .setPositiveButton(getString(R.string.clear_all), (d, w) -> {
+                                        List<com.google.firebase.firestore.DocumentReference> refs = new ArrayList<>();
+                                        for (DocumentSnapshot doc : docs) {
+                                            refs.add(doc.getReference());
+                                        }
+                                        com.google.firebase.firestore.WriteBatch batch =
+                                                FirebaseFirestore.getInstance().batch();
+                                        for (com.google.firebase.firestore.DocumentReference ref : refs) {
+                                            batch.delete(ref);
+                                        }
+                                        batch.commit()
+                                                .addOnSuccessListener(a -> {
+                                                    Toast.makeText(this,
+                                                            getString(R.string.all_invite_codes_cleared),
+                                                            Toast.LENGTH_SHORT).show();
+                                                    reload[0].run();
+                                                })
+                                                .addOnFailureListener(e -> Toast.makeText(this,
+                                                        getString(R.string.failed_to_clear_codes, e.getMessage()),
+                                                        Toast.LENGTH_SHORT).show());
+                                    })
+                                    .setNegativeButton(getString(R.string.cancel), null)
+                                    .show());
+
                     for (DocumentSnapshot doc : docs) {
-                        View row = getLayoutInflater().inflate(R.layout.item_user_manage, container, false);
+                        View row = getLayoutInflater().inflate(R.layout.item_user_manage, listContainer, false);
                         String code = doc.getId();
                         String invitedEmail = doc.getString("invitedEmail");
                         String role = doc.getString("role");
@@ -1116,17 +1191,24 @@ public class ProfileActivity extends AppCompatActivity {
                                 .setPositiveButton(getString(R.string.delete), (d, w) -> doc.getReference().delete()
                                         .addOnSuccessListener(a -> {
                                             Toast.makeText(this, "Invite code deleted", Toast.LENGTH_SHORT).show();
-                                            dialog.dismiss();
-                                            showInviteCodesManagementDialog();
+                                            reload[0].run();
                                         })
-                                        .addOnFailureListener(e -> Toast.makeText(this, getString(R.string.save_failed, e.getMessage()), Toast.LENGTH_SHORT).show()))
+                                        .addOnFailureListener(e -> Toast.makeText(this,
+                                                getString(R.string.save_failed, e.getMessage()), Toast.LENGTH_SHORT).show()))
                                 .setNegativeButton(getString(R.string.cancel), null)
                                 .show());
-                        container.addView(row);
+                        listContainer.addView(row);
                     }
                 });
 
         dialog.show();
+
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.white);
+        }
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(COLOR_GREEN_PRIMARY);
+
+        reload[0].run();
     }
 
     private void showRoleLimitsDialog() {
@@ -1293,27 +1375,171 @@ public class ProfileActivity extends AppCompatActivity {
         builder.show();
     }
 
-    // ── Birthday & Location ────────────────────────────────────────────────────
+    // ── Edit Name ───────────────────────────────────────────────────────────────
 
-    private void showEditBirthdayDialog() {
-        Calendar calendar = Calendar.getInstance();
-        DatePickerDialog.OnDateSetListener dateSetListener = (view, year, month, dayOfMonth) -> {
-            calendar.set(Calendar.YEAR, year);
-            calendar.set(Calendar.MONTH, month);
-            calendar.set(Calendar.DAY_OF_MONTH, dayOfMonth);
-            String format = "MM/dd/yyyy";
-            SimpleDateFormat sdf = new SimpleDateFormat(format, Locale.US);
-            String newBirthday = sdf.format(calendar.getTime());
+    private static final int COLOR_GREEN_PRIMARY = android.graphics.Color.parseColor("#2E7D32");
+    private static final int COLOR_GREEN_DARK    = android.graphics.Color.parseColor("#1B5E20");
+    private static final int COLOR_GREEN_LIGHT   = android.graphics.Color.parseColor("#A5D6A7");
+    private static final int COLOR_ERROR_RED     = android.graphics.Color.parseColor("#D32F2F");
+
+    private void showEditNameDialog() {
+        int dp16 = dp(16);
+        int dp24 = dp(24);
+
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(dp24, dp24, dp24, dp16);
+        container.setBackgroundColor(android.graphics.Color.WHITE);
+
+        TextView titleTv = new TextView(this);
+        titleTv.setText(getString(R.string.edit_name));
+        titleTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
+        titleTv.setTypeface(null, android.graphics.Typeface.BOLD);
+        titleTv.setTextColor(COLOR_GREEN_DARK);
+        titleTv.setPadding(0, 0, 0, dp16);
+        container.addView(titleTv);
+
+        TextInputLayout nameLayout = new TextInputLayout(this);
+        nameLayout.setHint(getString(R.string.enter_name_hint));
+        nameLayout.setBoxBackgroundMode(TextInputLayout.BOX_BACKGROUND_OUTLINE);
+        nameLayout.setBoxStrokeColor(COLOR_GREEN_PRIMARY);
+        nameLayout.setBoxBackgroundColor(android.graphics.Color.WHITE);
+        nameLayout.setDefaultHintTextColor(
+                android.content.res.ColorStateList.valueOf(COLOR_GREEN_PRIMARY));
+        nameLayout.setErrorTextColor(
+                android.content.res.ColorStateList.valueOf(COLOR_ERROR_RED));
+        nameLayout.setErrorIconDrawable(null);
+
+        EditText nameInput = new EditText(this);
+        nameInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS);
+        nameInput.setTextColor(android.graphics.Color.BLACK);
+        nameInput.setHighlightColor(COLOR_GREEN_LIGHT);
+        if (userNameTv.getText() != null) {
+            nameInput.setText(userNameTv.getText());
+            nameInput.setSelection(nameInput.getText().length());
+        }
+        nameLayout.addView(nameInput);
+        container.addView(nameLayout);
+
+        // Live validation as the user types
+        nameInput.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable s) {
+                String text = s.toString().trim();
+                if (text.isEmpty()) {
+                    nameLayout.setError(getString(R.string.name_empty));
+                } else {
+                    nameLayout.setError(getNameValidationError(text));
+                }
+            }
+        });
+
+        // Tapping empty space inside the dialog hides the keyboard without closing it
+        container.setOnTouchListener((v, event) -> {
+            hideKeyboard(nameInput);
+            return false;
+        });
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setView(container);
+        builder.setPositiveButton(getString(R.string.save), null);
+        builder.setNegativeButton(getString(R.string.cancel), null);
+
+        AlertDialog dialog = builder.create();
+
+        // Don't let a tap outside close the dialog — just dismiss the keyboard
+        dialog.setCanceledOnTouchOutside(false);
+
+        dialog.show();
+
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.white);
+        }
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(COLOR_GREEN_PRIMARY);
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(android.graphics.Color.GRAY);
+
+        // Background outside the card (dim scrim) also just hides the keyboard
+        View decorView = dialog.getWindow() != null ? dialog.getWindow().getDecorView() : null;
+        if (decorView != null) {
+            decorView.setOnTouchListener((v, event) -> {
+                hideKeyboard(nameInput);
+                return false;
+            });
+        }
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String newName = nameInput.getText().toString().trim();
+
+            if (newName.isEmpty()) {
+                nameLayout.setError(getString(R.string.name_empty));
+                return;
+            }
+
+            String nameError = getNameValidationError(newName);
+            if (nameError != null) {
+                nameLayout.setError(nameError);
+                return;
+            }
+
+            if (currentEmail == null || currentEmail.isEmpty()) {
+                Toast.makeText(this,
+                        "Cannot identify your account. Please log out and back in.",
+                        Toast.LENGTH_LONG).show();
+                return;
+            }
+
             FirebaseFirestore.getInstance().collection("user_access").document(currentEmail)
-                    .update("birthday", newBirthday)
-                    .addOnSuccessListener(a ->
-                            Toast.makeText(this, getString(R.string.birthday_updated, newBirthday), Toast.LENGTH_SHORT).show())
-                    .addOnFailureListener(e ->
-                            Toast.makeText(this, getString(R.string.birthday_update_failed), Toast.LENGTH_SHORT).show());
-        };
-        new DatePickerDialog(this, dateSetListener,
-                calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH))
-                .show();
+                    .update("name", newName)
+                    .addOnSuccessListener(a -> runOnUiThread(() -> {
+                        userNameTv.setText(newName);
+                        profileInitialTv.setText(String.valueOf(newName.charAt(0)).toUpperCase());
+                        accountManager.updateCachedName(currentEmail, newName);
+                        Toast.makeText(this, getString(R.string.name_updated), Toast.LENGTH_SHORT).show();
+                        hideKeyboard(nameInput);
+                        dialog.dismiss();
+                    }))
+                    .addOnFailureListener(e -> runOnUiThread(() ->
+                            Toast.makeText(this, getString(R.string.failed_to_update), Toast.LENGTH_SHORT).show()));
+        });
+    }
+
+    /**
+     * Typical "real name" restrictions:
+     * - letters only (unicode-aware, so accented names like "José" or "Muñoz" work)
+     * - spaces, hyphens, apostrophes, and periods allowed (e.g. "Mary-Jane", "O'Brien", "Jr.")
+     * - no digits, no other symbols
+     * - 2–50 characters
+     * - no doubled-up punctuation like "--" or "''"
+     */
+    private String getNameValidationError(String name) {
+        if (name.length() < 2) return "Name must be at least 2 characters";
+        if (name.length() > 50) return "Name must be less than 50 characters";
+
+        if (!name.matches("^[\\p{L} .'-]+$")) {
+            return "Only letters, spaces, hyphens, apostrophes, and periods allowed";
+        }
+        if (name.matches(".*[ .'-]{2,}.*")) {
+            return "Name contains an invalid character sequence";
+        }
+        if (name.startsWith(" ") || name.startsWith("-") || name.startsWith("'") || name.startsWith(".")
+                || name.endsWith(" ") || name.endsWith("-") || name.endsWith("'") || name.endsWith(".")) {
+            return "Name cannot start or end with punctuation";
+        }
+        return null;
+    }
+
+    private int dp(int value) {
+        return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value,
+                getResources().getDisplayMetrics());
+    }
+
+    private void hideKeyboard(View view) {
+        InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+        if (imm != null) {
+            imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+        }
     }
 
     @SuppressWarnings("unchecked")

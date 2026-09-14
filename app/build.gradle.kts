@@ -46,6 +46,7 @@ android {
 }
 
 dependencies {
+    implementation("androidx.viewpager2:viewpager2:1.1.0")
     // Firebase BoM - Manages versions for Firebase libraries
     implementation(platform("com.google.firebase:firebase-bom:34.16.0"))
 

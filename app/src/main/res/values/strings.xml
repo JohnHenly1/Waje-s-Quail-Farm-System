@@ -425,6 +425,12 @@
     <string name="performance_alert">Production Alert</string>
     <!--  New Profile Activity Strings  -->
     <string name="profile_image">Profile Image</string>
+    <string name="enter_name_hint">Enter your name</string>
+    <string name="clear_all">Clear All</string>
+    <string name="clear_all_invite_codes_title">Clear All Invite Codes?</string>
+    <string name="clear_all_invite_codes_msg">This will permanently delete all %1$d generated invite code(s). This cannot be undone.</string>
+    <string name="all_invite_codes_cleared">All invite codes cleared</string>
+    <string name="failed_to_clear_codes">Failed to clear invite codes: %1$s</string>
     <string name="birds_icon">Birds Icon</string>
     <string name="cages_icon">Cages Icon</string>
     <string name="days_icon">Days Icon</string>

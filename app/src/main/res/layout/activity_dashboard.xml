@@ -403,224 +403,34 @@
                                 android:textSize="11sp" />
                         </LinearLayout>
                     </GridLayout>
-                    <!--  Egg Grade Overview Mini Widget  -->
-                    <com.google.android.material.card.MaterialCardView
-                        android:id="@+id/eggOverviewCard"
+                    <androidx.viewpager2.widget.ViewPager2
+                        android:id="@+id/dashboardWidgetPager"
                         android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+                    <LinearLayout
+                        android:id="@+id/dashboardWidgetDots"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:layout_gravity="center_horizontal"
+                        android:layout_marginTop="8dp"
                         android:layout_marginBottom="12dp"
-                        app:cardBackgroundColor="@color/white"
-                        app:cardCornerRadius="16dp"
-                        app:cardElevation="2dp"
-                        app:strokeColor="#E0E0E0"
-                        app:strokeWidth="1dp">
+                        android:gravity="center"
+                        android:orientation="horizontal">
 
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="vertical"
-                            android:padding="14dp">
+                        <View
+                            android:id="@+id/dotWidget0"
+                            android:layout_width="8dp"
+                            android:layout_height="8dp"
+                            android:layout_margin="3dp"
+                            android:background="@drawable/bg_dot_active" />
 
-                            <!--  Header: title + filter spinner  -->
-                            <LinearLayout
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:gravity="center_vertical"
-                                android:orientation="horizontal">
-
-                                <TextView
-                                    android:layout_width="0dp"
-                                    android:layout_height="wrap_content"
-                                    android:layout_weight="1"
-                                    android:fontFamily="sans-serif-medium"
-                                    android:text="Egg Grade Overview"
-                                    android:textColor="@color/dark_green"
-                                    android:textSize="13sp"
-                                    android:textStyle="bold" />
-
-                                <Spinner
-                                    android:id="@+id/eggFilterSpinner"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="28dp"
-                                    android:minWidth="90dp" />
-                            </LinearLayout>
-                            <!--  Period choice row (Weekly / Monthly / Yearly / Custom)  -->
-                            <androidx.cardview.widget.CardView
-                                android:id="@+id/eggFilterChoiceCard"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="6dp"
-                                android:visibility="gone"
-                                app:cardBackgroundColor="#F3F4F6"
-                                app:cardCornerRadius="10dp"
-                                app:cardElevation="0dp"
-                                tools:visibility="visible">
-
-                                <LinearLayout
-                                    android:id="@+id/eggFilterChoiceButton"
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:background="?attr/selectableItemBackground"
-                                    android:gravity="center_vertical"
-                                    android:orientation="horizontal"
-                                    android:paddingHorizontal="10dp"
-                                    android:paddingVertical="7dp">
-
-                                    <ImageView
-                                        android:layout_width="14dp"
-                                        android:layout_height="14dp"
-                                        android:layout_marginEnd="6dp"
-                                        app:srcCompat="@drawable/ic_schedule"
-                                        app:tint="@color/dark_green" />
-
-                                    <TextView
-                                        android:id="@+id/eggFilterChoiceText"
-                                        android:layout_width="0dp"
-                                        android:layout_height="wrap_content"
-                                        android:layout_weight="1"
-                                        android:fontFamily="sans-serif"
-                                        android:text="Select period"
-                                        android:textColor="#374151"
-                                        android:textSize="11sp" />
-                                </LinearLayout>
-                            </androidx.cardview.widget.CardView>
-                            <!--  Total (filtered)  -->
-                            <TextView
-                                android:id="@+id/eggWidgetTotalText"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="8dp"
-                                android:fontFamily="sans-serif"
-                                android:text="Total No. of Eggs: 0"
-                                android:textColor="#6B7280"
-                                android:textSize="10sp" />
-                            <!--  Pie chart + grade breakdown  -->
-                            <LinearLayout
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="6dp"
-                                android:gravity="center_vertical"
-                                android:orientation="horizontal">
-
-                                <com.github.mikephil.charting.charts.PieChart
-                                    android:id="@+id/miniGradePieChart"
-                                    android:layout_width="84dp"
-                                    android:layout_height="84dp" />
-
-                                <LinearLayout
-                                    android:layout_width="0dp"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="10dp"
-                                    android:layout_weight="1"
-                                    android:orientation="vertical">
-                                    <!--  Grade A  -->
-                                    <LinearLayout
-                                        android:layout_width="match_parent"
-                                        android:layout_height="wrap_content"
-                                        android:gravity="center_vertical"
-                                        android:orientation="horizontal">
-
-                                        <TextView
-                                            android:layout_width="wrap_content"
-                                            android:layout_height="wrap_content"
-                                            android:layout_marginEnd="4dp"
-                                            android:text="A"
-                                            android:textColor="#374151"
-                                            android:textSize="9sp" />
-
-                                        <ProgressBar
-                                            android:id="@+id/miniGradeAProgress"
-                                            style="?android:attr/progressBarStyleHorizontal"
-                                            android:layout_width="0dp"
-                                            android:layout_height="4dp"
-                                            android:layout_weight="1"
-                                            android:max="100"
-                                            android:progress="0"
-                                            android:progressTint="#355E1A" />
-
-                                        <TextView
-                                            android:id="@+id/miniGradeACount"
-                                            android:layout_width="wrap_content"
-                                            android:layout_height="wrap_content"
-                                            android:layout_marginStart="4dp"
-                                            android:text="@string/zero"
-                                            android:textColor="#374151"
-                                            android:textSize="9sp" />
-                                    </LinearLayout>
-                                    <!--  Grade B  -->
-                                    <LinearLayout
-                                        android:layout_width="match_parent"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="5dp"
-                                        android:gravity="center_vertical"
-                                        android:orientation="horizontal">
-
-                                        <TextView
-                                            android:layout_width="wrap_content"
-                                            android:layout_height="wrap_content"
-                                            android:layout_marginEnd="4dp"
-                                            android:text="B"
-                                            android:textColor="#374151"
-                                            android:textSize="9sp" />
-
-                                        <ProgressBar
-                                            android:id="@+id/miniGradeBProgress"
-                                            style="?android:attr/progressBarStyleHorizontal"
-                                            android:layout_width="0dp"
-                                            android:layout_height="4dp"
-                                            android:layout_weight="1"
-                                            android:max="100"
-                                            android:progress="0"
-                                            android:progressTint="#7C3AED" />
-
-                                        <TextView
-                                            android:id="@+id/miniGradeBCount"
-                                            android:layout_width="wrap_content"
-                                            android:layout_height="wrap_content"
-                                            android:layout_marginStart="4dp"
-                                            android:text="@string/zero"
-                                            android:textColor="#374151"
-                                            android:textSize="9sp" />
-                                    </LinearLayout>
-                                    <!--  Grade C  -->
-                                    <LinearLayout
-                                        android:layout_width="match_parent"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="5dp"
-                                        android:gravity="center_vertical"
-                                        android:orientation="horizontal">
-
-                                        <TextView
-                                            android:layout_width="wrap_content"
-                                            android:layout_height="wrap_content"
-                                            android:layout_marginEnd="4dp"
-                                            android:text="C"
-                                            android:textColor="#374151"
-                                            android:textSize="9sp" />
-
-                                        <ProgressBar
-                                            android:id="@+id/miniGradeCProgress"
-                                            style="?android:attr/progressBarStyleHorizontal"
-                                            android:layout_width="0dp"
-                                            android:layout_height="4dp"
-                                            android:layout_weight="1"
-                                            android:max="100"
-                                            android:progress="0"
-                                            android:progressTint="#F4B400" />
-
-                                        <TextView
-                                            android:id="@+id/miniGradeCCount"
-                                            android:layout_width="wrap_content"
-                                            android:layout_height="wrap_content"
-                                            android:layout_marginStart="4dp"
-                                            android:text="@string/zero"
-                                            android:textColor="#374151"
-                                            android:textSize="9sp" />
-                                    </LinearLayout>
-                                </LinearLayout>
-                            </LinearLayout>
-                        </LinearLayout>
-                    </com.google.android.material.card.MaterialCardView>
+                        <View
+                            android:id="@+id/dotWidget1"
+                            android:layout_width="8dp"
+                            android:layout_height="8dp"
+                            android:layout_margin="3dp"
+                            android:background="@drawable/bg_dot_inactive" />
+                    </LinearLayout>
                 </LinearLayout>
 
             </androidx.core.widget.NestedScrollView>

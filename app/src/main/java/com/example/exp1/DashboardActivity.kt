@@ -6,6 +6,11 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.Uri
+import androidx.recyclerview.widget.RecyclerView
+import androidx.viewpager2.widget.ViewPager2
+import android.view.LayoutInflater
+import android.graphics.drawable.GradientDrawable
+import android.widget.ImageView
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -78,6 +83,12 @@ class DashboardActivity : AppCompatActivity() {
     // Egg Grade Overview mini widget (mirrors AnalyticsActivity's filter/chart logic)
     // ----------------------------
     private lateinit var eggCollectionsRef: DatabaseReference
+
+    private lateinit var widgetPager: ViewPager2
+    private lateinit var upcomingTasksContainer: LinearLayout
+    private lateinit var upcomingTasksEmptyText: TextView
+    private val staffNameCache = mutableMapOf<String, String>()   // ← add this line
+    private var upcomingTasksListener: ListenerRegistration? = null
     private var eggCollectionsListener: ValueEventListener? = null
     private var eggAllData: TreeMap<String, DailyEggData> = TreeMap()
     private var eggListenerAttached = false
@@ -179,7 +190,7 @@ class DashboardActivity : AppCompatActivity() {
         setupNavigation()
         setupServerTime()
         setupSwipeToRefresh()
-        setupEggOverviewWidget()
+        setupWidgetPager()
 
         // Show personalized loading on entry
         showLoading(getString(R.string.syncing_farm_stats)) {
@@ -325,6 +336,7 @@ class DashboardActivity : AppCompatActivity() {
         super.onDestroy()
         roleListener?.remove()
         alertsListener?.remove()
+        upcomingTasksListener?.remove()
         eggCollectionsListener?.let { eggCollectionsRef.removeEventListener(it) }
         if (::updateTimeRunnable.isInitialized) {
             handler.removeCallbacks(updateTimeRunnable)
@@ -475,28 +487,308 @@ class DashboardActivity : AppCompatActivity() {
     }
 
     // ============================================================
-    // Egg Grade Overview mini widget
+    // Egg Grade and upcoming task Overview mini widget
     // ============================================================
+    private fun setupWidgetPager() {
+        widgetPager = findViewById(R.id.dashboardWidgetPager)
 
-    private fun setupEggOverviewWidget() {
+        val adapter = DashboardWidgetPagerAdapter { position, view ->
+            when (position) {
+                0 -> bindEggOverviewWidget(view)
+                1 -> bindUpcomingTasksWidget(view)
+            }
+        }
+        widgetPager.adapter = adapter
+        widgetPager.offscreenPageLimit = 1
+
+        val dot0 = findViewById<View>(R.id.dotWidget0)
+        val dot1 = findViewById<View>(R.id.dotWidget1)
+        widgetPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                dot0.setBackgroundResource(if (position == 0) R.drawable.bg_dot_active else R.drawable.bg_dot_inactive)
+                dot1.setBackgroundResource(if (position == 1) R.drawable.bg_dot_active else R.drawable.bg_dot_inactive)
+                updatePagerHeightForCurrentPage()
+            }
+        })
+
+        // ViewPager2 wraps an internal RecyclerView as its only child.
+        // Whenever a page view attaches, wait for it to finish laying out, then
+        // resize the pager to match its natural content height.
+        val recyclerView = widgetPager.getChildAt(0) as? RecyclerView
+        recyclerView?.addOnChildAttachStateChangeListener(object : RecyclerView.OnChildAttachStateChangeListener {
+            override fun onChildViewAttachedToWindow(view: View) {
+                view.viewTreeObserver.addOnGlobalLayoutListener(object : android.view.ViewTreeObserver.OnGlobalLayoutListener {
+                    override fun onGlobalLayout() {
+                        view.viewTreeObserver.removeOnGlobalLayoutListener(this)
+                        updatePagerHeightForCurrentPage()
+                    }
+                })
+            }
+
+            override fun onChildViewDetachedFromWindow(view: View) {}
+        })
+    }
+
+    private fun updatePagerHeightForCurrentPage() {
+        val recyclerView = widgetPager.getChildAt(0) as? RecyclerView ?: return
+        val currentChild = recyclerView.findViewHolderForAdapterPosition(widgetPager.currentItem)?.itemView ?: return
+
+        currentChild.measure(
+            View.MeasureSpec.makeMeasureSpec(widgetPager.width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.UNSPECIFIED
+        )
+        val height = currentChild.measuredHeight
+        val params = widgetPager.layoutParams
+        if (params.height != height) {
+            params.height = height
+            widgetPager.layoutParams = params
+        }
+    }
+
+    private fun bindEggOverviewWidget(root: View) {
         eggCollectionsRef = FirebaseDatabase.getInstance().reference.child("egg_collections")
 
-        miniGradePieChart = findViewById(R.id.miniGradePieChart)
-        eggFilterSpinner = findViewById(R.id.eggFilterSpinner)
-        eggFilterChoiceCard = findViewById(R.id.eggFilterChoiceCard)
-        eggFilterChoiceButton = findViewById(R.id.eggFilterChoiceButton)
-        eggFilterChoiceText = findViewById(R.id.eggFilterChoiceText)
-        eggWidgetTotalText = findViewById(R.id.eggWidgetTotalText)
-        miniGradeAProgress = findViewById(R.id.miniGradeAProgress)
-        miniGradeBProgress = findViewById(R.id.miniGradeBProgress)
-        miniGradeCProgress = findViewById(R.id.miniGradeCProgress)
-        miniGradeACount = findViewById(R.id.miniGradeACount)
-        miniGradeBCount = findViewById(R.id.miniGradeBCount)
-        miniGradeCCount = findViewById(R.id.miniGradeCCount)
+        miniGradePieChart = root.findViewById(R.id.miniGradePieChart)
+        eggFilterSpinner = root.findViewById(R.id.eggFilterSpinner)
+        eggFilterChoiceCard = root.findViewById(R.id.eggFilterChoiceCard)
+        eggFilterChoiceButton = root.findViewById(R.id.eggFilterChoiceButton)
+        eggFilterChoiceText = root.findViewById(R.id.eggFilterChoiceText)
+        eggWidgetTotalText = root.findViewById(R.id.eggWidgetTotalText)
+        miniGradeAProgress = root.findViewById(R.id.miniGradeAProgress)
+        miniGradeBProgress = root.findViewById(R.id.miniGradeBProgress)
+        miniGradeCProgress = root.findViewById(R.id.miniGradeCProgress)
+        miniGradeACount = root.findViewById(R.id.miniGradeACount)
+        miniGradeBCount = root.findViewById(R.id.miniGradeBCount)
+        miniGradeCCount = root.findViewById(R.id.miniGradeCCount)
 
         setupMiniPieChart()
         setupEggFilterSpinner()
         attachEggRealtimeListener()
+    }
+
+    private fun bindUpcomingTasksWidget(root: View) {
+        upcomingTasksContainer = root.findViewById(R.id.upcomingTasksContainer)
+        upcomingTasksEmptyText = root.findViewById(R.id.upcomingTasksEmptyText)
+        attachUpcomingTasksListener()
+    }
+
+    private fun attachUpcomingTasksListener() {
+        upcomingTasksListener?.remove()
+        upcomingTasksListener = FirebaseFirestore.getInstance()
+            .collection("farm_data").document("shared").collection("tasks")
+            .addSnapshotListener { snapshots, error ->
+                if (error != null || snapshots == null) return@addSnapshotListener
+                renderUpcomingTasks(snapshots.documents)
+            }
+    }
+
+    private fun renderUpcomingTasks(docs: List<com.google.firebase.firestore.DocumentSnapshot>) {
+        if (!::upcomingTasksContainer.isInitialized) return
+
+        val isOwner = RoleManager(userRole).isOwner
+        val currentEmail = accountManager.getCurrentUsername()?.let { accountManager.getEmail(it) }
+
+        val cal = Calendar.getInstance()
+        val todayY = cal.get(Calendar.YEAR); val todayM = cal.get(Calendar.MONTH); val todayD = cal.get(Calendar.DAY_OF_MONTH)
+
+        data class Row(val title: String, val category: String, val time: String, val status: String,
+                       val assignedTo: List<String>, val assignedBy: String?,
+                       val year: Int, val month: Int, val day: Int)
+        val rows = mutableListOf<Row>()
+
+        for (doc in docs) {
+            val status = doc.getString("status") ?: "Pending"
+            if (status == "Done") continue
+
+            val year = doc.getLong("year")?.toInt() ?: continue
+            val month = doc.getLong("month")?.toInt() ?: continue
+            val day = doc.getLong("day")?.toInt() ?: continue
+
+            val isPastDay = year < todayY || (year == todayY && month < todayM) ||
+                    (year == todayY && month == todayM && day < todayD)
+            if (isPastDay) continue
+
+            val assignedTo = (doc.get("assignedTo") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
+
+            if (!isOwner) {
+                if (currentEmail == null || assignedTo.none { it.equals(currentEmail, ignoreCase = true) }) continue
+            }
+
+            rows.add(Row(doc.getString("title") ?: "Untitled", doc.getString("category") ?: "",
+                doc.getString("time") ?: "", status, assignedTo, doc.getString("assignedBy"),
+                year, month, day))
+        }
+
+        rows.sortWith(compareBy({ it.year }, { it.month }, { it.day }, { it.time }))
+        val topRows = rows.take(5)
+
+        upcomingTasksContainer.removeAllViews()
+        upcomingTasksEmptyText.visibility = if (topRows.isEmpty()) View.VISIBLE else View.GONE
+
+        val monthNames = DateFormatSymbols(Locale.getDefault()).months
+        for ((index, r) in topRows.withIndex()) {
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, dpToPx(8), 0, dpToPx(8))
+            }
+
+            val (iconRes, iconColor, iconBgColor) = categoryVisual(r.category)
+            val iconCircle = FrameLayout(this).apply {
+                layoutParams = LinearLayout.LayoutParams(dpToPx(32), dpToPx(32))
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(iconBgColor)
+                }
+            }
+            iconCircle.addView(ImageView(this).apply {
+                layoutParams = FrameLayout.LayoutParams(dpToPx(16), dpToPx(16), Gravity.CENTER)
+                setImageResource(iconRes)
+                setColorFilter(iconColor)
+            })
+            row.addView(iconCircle)
+
+            val textCol = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    marginStart = dpToPx(10)
+                }
+            }
+
+            val titleRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            titleRow.addView(TextView(this).apply {
+                text = r.title
+                setTextColor(Color.parseColor("#1F2937"))
+                textSize = 12f
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            })
+
+            val (pillBg, pillText) = statusColors(r.status)
+            titleRow.addView(TextView(this).apply {
+                text = r.status
+                setTextColor(pillText)
+                textSize = 9f
+                setPadding(dpToPx(8), dpToPx(2), dpToPx(8), dpToPx(2))
+                background = GradientDrawable().apply {
+                    cornerRadius = dpToPx(10).toFloat()
+                    setColor(pillBg)
+                }
+            })
+            textCol.addView(titleRow)
+
+            textCol.addView(TextView(this).apply {
+                text = "${r.category}  ·  ${r.day} ${monthNames[r.month]}  ${r.time}"
+                setTextColor(Color.parseColor("#9CA3AF"))
+                textSize = 10f
+                setPadding(0, dpToPx(3), 0, 0)
+            })
+
+            val hasAssignedBy = !r.assignedBy.isNullOrBlank()
+            val assignText = "To: ${resolveAssignedToLabel(r.assignedTo)}" +
+                    if (hasAssignedBy) "   ·   By: ${resolveAssignedByLabel(r.assignedBy)}" else ""
+            textCol.addView(TextView(this).apply {
+                text = assignText
+                setTextColor(Color.parseColor("#16A34A"))
+                textSize = 9.5f
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                setPadding(0, dpToPx(3), 0, 0)
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            })
+
+            row.addView(textCol)
+            upcomingTasksContainer.addView(row)
+
+            if (index < topRows.lastIndex) {
+                upcomingTasksContainer.addView(View(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(1))
+                    setBackgroundColor(Color.parseColor("#F3F4F6"))
+                })
+            }
+        }
+
+        if (widgetPager.currentItem == 1) {
+            updatePagerHeightForCurrentPage()
+        }
+    }
+
+    /** Icon + tint + background color per category, copied 1:1 from ScheduleActivity.getCategoryIconStyle(). */
+    private fun categoryVisual(category: String): Triple<Int, Int, Int> {
+        val c = category.trim()
+        return when {
+            c.equals("Watering", ignoreCase = true) ->
+                Triple(R.drawable.ic_water_level, Color.parseColor("#0284C7"), Color.parseColor("#E0F2FE"))
+            c.equals("Feeding", ignoreCase = true) ->
+                Triple(R.drawable.ic_shopping_bag, Color.parseColor("#EA580C"), Color.parseColor("#FFEDD5"))
+            c.equals("Cleaning", ignoreCase = true) ->
+                Triple(R.drawable.ic_check_circle, Color.parseColor("#059669"), Color.parseColor("#D1FAE5"))
+            c.equals("Egg Collection", ignoreCase = true) ->
+                Triple(R.drawable.lc_egg, Color.parseColor("#D97706"), Color.parseColor("#FEF3C7"))
+            c.equals("Lighting", ignoreCase = true) ->
+                Triple(R.drawable.ic_alert_circle, Color.parseColor("#7C3AED"), Color.parseColor("#EDE9FE"))
+            c.equals("Health Check", ignoreCase = true) ->
+                Triple(R.drawable.ic_alert_triangle, Color.parseColor("#DC2626"), Color.parseColor("#FEE2E2"))
+            else ->
+                Triple(R.drawable.ic_calendar, Color.parseColor("#6B7280"), Color.parseColor("#F3F4F6"))
+        }
+    }
+
+    /** Status pill background + text color, copied 1:1 from ScheduleActivity.updateTasksUI(). */
+    private fun statusColors(status: String): Pair<Int, Int> {
+        return when (status) {
+            "Missed" -> Color.parseColor("#FEE2E2") to Color.parseColor("#DC2626")
+            "Done" -> Color.parseColor("#DCFCE7") to Color.parseColor("#16A34A")
+            "Ongoing" -> Color.parseColor("#DBEAFE") to Color.parseColor("#2563EB")
+            else -> Color.parseColor("#FFEDD5") to Color.parseColor("#EA580C") // Pending
+        }
+    }
+    /** Resolves assignedTo emails to display names, same source/cache pattern as ScheduleActivity. */
+    private fun resolveAssignedToLabel(assignedTo: List<String>): String {
+        if (assignedTo.isEmpty()) return "Owner"
+        val labels = mutableListOf<String>()
+        for (rawEmail in assignedTo) {
+            val email = rawEmail.trim()
+            if (email.isEmpty()) continue
+            val cached = staffNameCache[email]
+            if (cached != null) {
+                labels.add(cached)
+            } else {
+                labels.add(email) // show email until the async lookup resolves
+                FirebaseFirestore.getInstance().collection("user_access").document(email).get()
+                    .addOnSuccessListener { doc ->
+                        val name = doc.getString("name")
+                        staffNameCache[email] = if (!name.isNullOrEmpty()) name else email
+                        // Re-render so the resolved name replaces the raw email.
+                        attachUpcomingTasksListener()
+                    }
+                    .addOnFailureListener { staffNameCache[email] = email }
+            }
+        }
+        return if (labels.isEmpty()) "Owner" else labels.joinToString(", ")
+    }
+
+    /** Resolves the assignedBy email to a display name, same cache as above. */
+    private fun resolveAssignedByLabel(assignedBy: String?): String {
+        if (assignedBy.isNullOrBlank()) return "Owner"
+        val email = assignedBy.trim()
+        val cached = staffNameCache[email]
+        if (cached != null) return cached
+
+        staffNameCache[email] = email // show email until the async lookup resolves
+        FirebaseFirestore.getInstance().collection("user_access").document(email).get()
+            .addOnSuccessListener { doc ->
+                val name = doc.getString("name")
+                staffNameCache[email] = if (!name.isNullOrEmpty()) name else email
+                attachUpcomingTasksListener()
+            }
+            .addOnFailureListener { staffNameCache[email] = email }
+        return email
     }
 
     private fun setupMiniPieChart() {
@@ -869,4 +1161,23 @@ class DashboardActivity : AppCompatActivity() {
         miniGradeCProgress.progress = pctC
     }
 
+    private class DashboardWidgetPagerAdapter(
+        private val onBind: (position: Int, view: View) -> Unit
+    ) : RecyclerView.Adapter<DashboardWidgetPagerAdapter.WidgetViewHolder>() {
+
+        class WidgetViewHolder(view: View) : RecyclerView.ViewHolder(view)
+
+        override fun getItemViewType(position: Int) = position
+        override fun getItemCount() = 2
+
+        override fun onCreateViewHolder(parent: android.view.ViewGroup, viewType: Int): WidgetViewHolder {
+            val layoutRes = if (viewType == 0) R.layout.widget_egg_overview else R.layout.widget_upcoming_tasks
+            val view = LayoutInflater.from(parent.context).inflate(layoutRes, parent, false)
+            return WidgetViewHolder(view)
+        }
+
+        override fun onBindViewHolder(holder: WidgetViewHolder, position: Int) {
+            onBind(position, holder.itemView)
+        }
+    }
 }

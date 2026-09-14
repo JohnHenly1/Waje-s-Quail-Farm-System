@@ -71,7 +71,7 @@
 
     <!-- Edit Birthday Option -->
     <LinearLayout
-        android:id="@+id/editBirthdayBtn"
+        android:id="@+id/editNameBtn"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="?android:attr/selectableItemBackground"
@@ -83,7 +83,7 @@
         <ImageView
             android:layout_width="24dp"
             android:layout_height="24dp"
-            android:src="@drawable/ic_calendar"
+            android:src="@drawable/ic_users"
             app:tint="@color/dark_green" />
 
         <TextView
@@ -91,7 +91,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginStart="16dp"
-            android:text="Edit Birthday"
+            android:text="Edit Name"
             android:textColor="@color/black"
             android:textSize="16sp" />
 

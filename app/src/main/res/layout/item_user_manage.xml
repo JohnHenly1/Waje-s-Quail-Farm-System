@@ -1,99 +1,71 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:background="@drawable/bg_member_card"
+    android:padding="16dp"
     android:layout_marginBottom="12dp"
-    app:cardCornerRadius="16dp"
-    app:cardElevation="2dp"
-    app:cardBackgroundColor="@color/white">
+    android:elevation="1dp">
+
+    <TextView
+        android:id="@+id/userInitialText"
+        android:layout_width="52dp"
+        android:layout_height="52dp"
+        android:background="@drawable/bg_avatar_circle"
+        android:gravity="center"
+        android:textColor="#1B5E20"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:text="A" />
 
     <LinearLayout
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:padding="16dp">
+        android:layout_weight="1"
+        android:layout_marginStart="16dp"
+        android:orientation="vertical">
 
-        <FrameLayout
-            android:layout_width="52dp"
-            android:layout_height="52dp">
-
-            <TextView
-                android:id="@+id/userInitialText"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="@drawable/circle_dark_green"
-                android:backgroundTint="@color/bg_green_100"
-                android:gravity="center"
-                android:text="U"
-                android:textColor="@color/dark_green"
-                android:textSize="20sp"
-                android:textStyle="bold" />
-
-            <ImageView
-                android:id="@+id/userProfileImage"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:scaleType="centerCrop"
-                android:visibility="gone" />
-        </FrameLayout>
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextView
-                android:id="@+id/userNameText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="User Name"
-                android:textColor="@color/black"
-                android:textSize="16sp"
-                android:fontFamily="sans-serif-medium" />
-
-            <TextView
-                android:id="@+id/userRoleText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Staff"
-                android:textColor="@color/gray"
-                android:textSize="13sp"
-                android:layout_marginTop="2dp" />
-        </LinearLayout>
-
-        <LinearLayout
+        <TextView
+            android:id="@+id/userNameText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:baselineAligned="false">
+            android:textColor="#212121"
+            android:textSize="16sp"
+            android:textStyle="bold" />
 
-            <ImageButton
-                android:id="@+id/rejectBtn"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
-                android:src="@drawable/ic_trash"
-                app:tint="@color/logout_red"
-                android:padding="10dp"
-                android:scaleType="centerInside"
-                android:visibility="gone"
-                android:contentDescription="@string/reject" />
-
-            <ImageButton
-                android:id="@+id/deleteUserBtn"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
-                android:src="@drawable/ic_trash"
-                app:tint="@color/logout_red"
-                android:padding="10dp"
-                android:scaleType="centerInside"
-                android:contentDescription="Action Button" />
-        </LinearLayout>
-
+        <TextView
+            android:id="@+id/userRoleText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textColor="#757575"
+            android:textSize="13sp" />
     </LinearLayout>
-</androidx.cardview.widget.CardView>
+
+    <ImageButton
+        android:id="@+id/deleteUserBtn"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="@drawable/bg_delete_circle"
+        android:padding="8dp"
+        android:src="@android:drawable/ic_menu_delete"
+        app:tint="#C62828"
+        android:contentDescription="@string/delete"
+        android:layout_marginStart="8dp" />
+
+    <ImageButton
+        android:id="@+id/rejectBtn"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="@drawable/bg_delete_circle"
+        android:padding="8dp"
+        android:src="@android:drawable/ic_menu_close_clear_cancel"
+        app:tint="#C62828"
+        android:contentDescription="@string/reject"
+        android:visibility="gone"
+        android:layout_marginStart="8dp" />
+
+</LinearLayout>

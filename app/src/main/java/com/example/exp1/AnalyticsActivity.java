@@ -88,6 +88,7 @@ public class AnalyticsActivity extends AppCompatActivity {
     private LinearLayout filterChoiceButton;
     private TextView filterChoiceText;
     private ConnectivityManager.NetworkCallback networkCallback;
+    private int lastFilteredTotal, lastFilteredA, lastFilteredB, lastFilteredC;
 
     private static final SimpleDateFormat DATE_KEY_FORMAT = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
     // Filters are loaded from resources so they can be translated / changed in XML
@@ -224,17 +225,113 @@ public class AnalyticsActivity extends AppCompatActivity {
     }
 
     private void setupPieChart() {
-        gradePieChart.setUsePercentValues(true);
-        gradePieChart.getDescription().setEnabled(false);
-        gradePieChart.setExtraOffsets(10, 10, 10, 10);
-        gradePieChart.setDragDecelerationFrictionCoef(0.95f);
-        gradePieChart.setDrawHoleEnabled(true);
-        gradePieChart.setHoleColor(Color.WHITE);
-        gradePieChart.setTransparentCircleRadius(61f);
-        gradePieChart.setEntryLabelColor(Color.BLACK);
-        gradePieChart.setEntryLabelTextSize(12f);
-        gradePieChart.getLegend().setEnabled(false);
-        gradePieChart.setDrawEntryLabels(false);
+        configurePieChartStyle(gradePieChart, 14f);
+        gradePieChart.setOnClickListener(v -> showEnlargedPieChart());
+    }
+
+    private void configurePieChartStyle(PieChart chart, float offset) {
+        chart.setUsePercentValues(true);
+        chart.getDescription().setEnabled(false);
+        chart.setExtraOffsets(offset, offset, offset, offset);
+        chart.setDragDecelerationFrictionCoef(0.95f);
+        chart.setDrawHoleEnabled(true);
+        chart.setHoleColor(Color.WHITE);
+        chart.setTransparentCircleRadius(61f);
+        chart.setEntryLabelColor(Color.BLACK);
+        chart.setEntryLabelTextSize(12f);
+        chart.getLegend().setEnabled(false);
+        chart.setDrawEntryLabels(false);
+        chart.setTouchEnabled(false);
+    }
+
+    private void populatePieChart(PieChart chart, int total, int a, int b, int c, boolean enlarged) {
+        List<PieEntry> entries = new ArrayList<>();
+        List<Integer> sliceColors = new ArrayList<>();
+        if (total > 0) {
+            if (a > 0) { entries.add(new PieEntry(a, getString(R.string.grade_a))); sliceColors.add(COLOR_GRADE_A); }
+            if (b > 0) { entries.add(new PieEntry(b, getString(R.string.grade_b))); sliceColors.add(COLOR_GRADE_B); }
+            if (c > 0) { entries.add(new PieEntry(c, getString(R.string.grade_c))); sliceColors.add(COLOR_GRADE_C); }
+        } else {
+            entries.add(new PieEntry(1, getString(R.string.no_data)));
+            sliceColors.add(COLOR_NO_DATA);
+        }
+
+        PieDataSet dataSet = new PieDataSet(entries, "");
+        dataSet.setColors(sliceColors);
+        dataSet.setSliceSpace(3f);
+        dataSet.setSelectionShift(5f);
+        dataSet.setValueLinePart1OffsetPercentage(80f);
+        dataSet.setValueLinePart1Length(0.5f);
+        dataSet.setValueLinePart2Length(0f);
+        dataSet.setValueLineWidth(enlarged ? 2.2f : 1.5f);
+        dataSet.setUsingSliceColorAsValueLineColor(true);
+        dataSet.setXValuePosition(PieDataSet.ValuePosition.OUTSIDE_SLICE);
+        dataSet.setYValuePosition(PieDataSet.ValuePosition.OUTSIDE_SLICE);
+        dataSet.setValueTextColor(Color.BLACK);
+        dataSet.setValueTextSize(enlarged ? 16f : 11f);
+
+        PieData pieData = new PieData(dataSet);
+        if (total > 0) {
+            pieData.setValueFormatter(new PercentFormatter(chart));
+        } else {
+            pieData.setValueFormatter(new ValueFormatter() {
+                @Override public String getPieLabel(float value, PieEntry entry) { return ""; }
+            });
+        }
+        pieData.setValueTextSize(enlarged ? 16f : 11f);
+        chart.setData(pieData);
+        chart.setMinAngleForSlices(18f);
+        chart.invalidate();
+        chart.animateY(1000);
+    }
+
+    private void showEnlargedPieChart() {
+        PieChart enlargedChart = new PieChart(this);
+        configurePieChartStyle(enlargedChart, 40f);
+
+        int size = (int) (Math.min(getResources().getDisplayMetrics().widthPixels,
+                getResources().getDisplayMetrics().heightPixels) * 0.8f);
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(Color.WHITE);
+        int pad = dpToPx(16);
+        root.setPadding(pad, pad, pad, pad);
+
+        FrameLayout chartContainer = new FrameLayout(this);
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(size, size);
+        lp.gravity = Gravity.CENTER;
+        chartContainer.addView(enlargedChart, lp);
+        root.addView(chartContainer);
+
+        populatePieChart(enlargedChart, lastFilteredTotal, lastFilteredA, lastFilteredB, lastFilteredC, true);
+
+        // Custom green title on a white bar (replaces default setTitle)
+        TextView titleView = new TextView(this);
+        titleView.setText(getString(R.string.grade_distribution));
+        titleView.setTextColor(Color.parseColor("#355E1A"));
+        titleView.setTextSize(20f);
+        titleView.setTypeface(titleView.getTypeface(), android.graphics.Typeface.BOLD);
+        titleView.setBackgroundColor(Color.WHITE);
+        titleView.setPadding(pad, pad, pad, pad / 2);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setCustomTitle(titleView)
+                .setView(root)
+                .setPositiveButton(getString(R.string.close), null)
+                .create();
+
+        dialog.setOnShowListener(d -> {
+            if (dialog.getWindow() != null) {
+                dialog.getWindow().setBackgroundDrawable(
+                        new android.graphics.drawable.ColorDrawable(Color.WHITE));
+            }
+            Button closeBtn = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+            if (closeBtn != null) {
+                closeBtn.setTextColor(Color.parseColor("#355E1A"));
+            }
+        });
+        dialog.show();
     }
 
     private void setupFilterSpinner() {
@@ -681,86 +778,29 @@ public class AnalyticsActivity extends AppCompatActivity {
         double avg = dayCount > 0 ? (double) filteredTotal / dayCount : 0;
         dailyAverageText.setText(String.format(Locale.getDefault(), "%.1f", avg));
 
-        int gradeAPct = filteredTotal > 0 ? (filteredA * 100 / filteredTotal) : 0;
-        gradeAPercentText.setText(String.format(Locale.getDefault(), "%d%%", gradeAPct));
+        double gradeAPct = filteredTotal > 0 ? (filteredA * 100.0 / filteredTotal) : 0;
+        gradeAPercentText.setText(String.format(Locale.getDefault(), "%.1f%%", gradeAPct));
 
-        // ---- Update Pie Chart (on-screen dashboard — still MPAndroidChart, unchanged) ----
-        // Build entries and colors TOGETHER so a color always stays attached to its grade,
-        // even when one or more grades are zero and get skipped from the slice list.
-        List<PieEntry> entries = new ArrayList<>();
-        List<Integer> sliceColors = new ArrayList<>();
-
-        if (filteredTotal > 0) {
-            if (filteredA > 0) {
-                entries.add(new PieEntry(filteredA, getString(R.string.grade_a)));
-                sliceColors.add(COLOR_GRADE_A);
-            }
-            if (filteredB > 0) {
-                entries.add(new PieEntry(filteredB, getString(R.string.grade_b)));
-                sliceColors.add(COLOR_GRADE_B);
-            }
-            if (filteredC > 0) {
-                entries.add(new PieEntry(filteredC, getString(R.string.grade_c)));
-                sliceColors.add(COLOR_GRADE_C);
-            }
-        } else {
-            entries.add(new PieEntry(1, getString(R.string.no_data)));
-            sliceColors.add(COLOR_NO_DATA);
-        }
-
-        PieDataSet dataSet = new PieDataSet(entries, "");
-        dataSet.setColors(sliceColors);
-        dataSet.setSliceSpace(3f);
-        dataSet.setSelectionShift(5f);
-
-        // --- Straight leader lines pointing at each slice ---
-        dataSet.setValueLinePart1OffsetPercentage(80f);   // where the line starts (near slice edge)
-        dataSet.setValueLinePart1Length(0.5f);            // radial line length
-        dataSet.setValueLinePart2Length(0f);               // 0 = no horizontal kink, keeps it a straight line
-        dataSet.setValueLineWidth(1.5f);
-        dataSet.setUsingSliceColorAsValueLineColor(true);
-        dataSet.setXValuePosition(PieDataSet.ValuePosition.OUTSIDE_SLICE);
-        dataSet.setYValuePosition(PieDataSet.ValuePosition.OUTSIDE_SLICE);
-        dataSet.setValueTextColor(Color.BLACK);
-        dataSet.setValueTextSize(11f);
-
-        PieData pieData = new PieData(dataSet);
-        if (filteredTotal > 0) {
-            pieData.setValueFormatter(new PercentFormatter(gradePieChart));
-        } else {
-            // Don't show "100%" on the placeholder "No Data" slice
-            pieData.setValueFormatter(new ValueFormatter() {
-                @Override
-                public String getPieLabel(float value, PieEntry entry) {
-                    return "";
-                }
-            });
-        }
-        pieData.setValueTextSize(11f);
-        gradePieChart.setData(pieData);
-
-        // Force every slice to keep at least this much visual angle so that two
-        // small/near-equal grades don't collapse into each other and squish their
-        // percentage labels together. Purely visual — underlying % values shown
-        // in the labels themselves are still the real numbers.
-        gradePieChart.setMinAngleForSlices(18f);
-
-        gradePieChart.invalidate();
-        gradePieChart.animateY(1000);
+        // ---- Update Pie Chart (on-screen dashboard) ----
+        lastFilteredTotal = filteredTotal;
+        lastFilteredA = filteredA;
+        lastFilteredB = filteredB;
+        lastFilteredC = filteredC;
+        populatePieChart(gradePieChart, filteredTotal, filteredA, filteredB, filteredC, false);
 
         // Update Grade Breakdown ProgressBars, counts, and per-grade percentages
-        int pctB = filteredTotal > 0 ? (filteredB * 100 / filteredTotal) : 0;
-        int pctC = filteredTotal > 0 ? (filteredC * 100 / filteredTotal) : 0;
+        double pctB = filteredTotal > 0 ? (filteredB * 100.0 / filteredTotal) : 0;
+        double pctC = filteredTotal > 0 ? (filteredC * 100.0 / filteredTotal) : 0;
         // gradeAPct already computed above as gradeAPct
 
-        gradeACount.setText(String.format(Locale.getDefault(), "%d (%d%%)", filteredA, gradeAPct));
-        gradeBCount.setText(String.format(Locale.getDefault(), "%d (%d%%)", filteredB, pctB));
-        gradeCCount.setText(String.format(Locale.getDefault(), "%d (%d%%)", filteredC, pctC));
+        gradeACount.setText(String.format(Locale.getDefault(), "%d (%.1f%%)", filteredA, gradeAPct));
+        gradeBCount.setText(String.format(Locale.getDefault(), "%d (%.1f%%)", filteredB, pctB));
+        gradeCCount.setText(String.format(Locale.getDefault(), "%d (%.1f%%)", filteredC, pctC));
 
         if (filteredTotal > 0) {
-            gradeAProgress.setProgress(gradeAPct);
-            gradeBProgress.setProgress(pctB);
-            gradeCProgress.setProgress(pctC);
+            gradeAProgress.setProgress((int) gradeAPct);
+            gradeBProgress.setProgress((int) pctB);
+            gradeCProgress.setProgress((int) pctC);
         } else {
             gradeAProgress.setProgress(0);
             gradeBProgress.setProgress(0);
@@ -778,7 +818,7 @@ public class AnalyticsActivity extends AppCompatActivity {
             bestGradeText.setText(getString(R.string.na));
         }
 
-        productionRateText.setText(String.format(Locale.getDefault(), "%d%%", gradeAPct));
+        productionRateText.setText(String.format(Locale.getDefault(), "%.1f%%", gradeAPct));
     }
 
     private void showReportDialog() {
