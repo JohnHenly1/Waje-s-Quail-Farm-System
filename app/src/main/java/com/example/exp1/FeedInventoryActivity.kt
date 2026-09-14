@@ -529,8 +529,16 @@ class FeedInventoryActivity : AppCompatActivity() {
                     dialog.dismiss()
                     return@setOnClickListener
                 }
-                commitQuantityUpdate(item, newQty, "Stock updated") {
-                    dialog.dismiss()
+
+                val diff = newQty - item.quantity
+                showConfirmActionDialog(
+                    itemName  = item.name,
+                    isRestock = diff > 0,
+                    quantity  = kotlin.math.abs(diff)
+                ) {
+                    commitQuantityUpdate(item, newQty, "Stock updated") {
+                        dialog.dismiss()
+                    }
                 }
             }
         }
@@ -951,6 +959,17 @@ class FeedInventoryActivity : AppCompatActivity() {
         val existAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, spinnerData)
         existAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         existSpinner.adapter = existAdapter
+        var lastAutoFilledName: String? = null          // <-- PUT IT HERE
+        val lockableFields = listOfNotNull(descInput, invInput, locationInput, priceInput, unitSpinner)
+
+        fun setRestockLock(locked: Boolean) {
+            lockableFields.forEach { field ->
+                field.isEnabled = !locked
+                if (field is EditText) {
+                    field.alpha = if (locked) 0.6f else 1f
+                }
+            }
+        }
 
         existSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
@@ -961,6 +980,11 @@ class FeedInventoryActivity : AppCompatActivity() {
                     invInput.setText(selected.invNumber)
                     locationInput.setText(selected.location)
                     priceInput.setText(selected.unitPrice.toString())
+                    lastAutoFilledName = selected.name
+                    setRestockLock(true)
+                } else {
+                    lastAutoFilledName = null
+                    setRestockLock(false)
                 }
             }
             override fun onNothingSelected(p: AdapterView<*>?) {}
@@ -972,7 +996,6 @@ class FeedInventoryActivity : AppCompatActivity() {
         // (case-insensitive) name match within the same category, and only
         // while the user hasn't started editing description themselves for a
         // *different* name than what's currently matched.
-        var lastAutoFilledName: String? = null
         nameInput.addTextChangedListener(object : android.text.TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {}
             override fun afterTextChanged(s: android.text.Editable?) {}
@@ -987,10 +1010,12 @@ class FeedInventoryActivity : AppCompatActivity() {
                         priceInput.setText(match.unitPrice.toString())
                         lastAutoFilledName = match.name
                     }
+                    setRestockLock(true)
                 } else {
                     // Name no longer matches any existing item — clear the
-                    // auto-filled marker so a future match will re-fill.
+                    // auto-filled marker and unlock fields for a fresh entry.
                     lastAutoFilledName = null
+                    setRestockLock(false)
                 }
             }
         })
@@ -1096,17 +1121,24 @@ class FeedInventoryActivity : AppCompatActivity() {
                         "totalPrice"   to finalTotalPrice
                     )
 
-                    commitFeedChange(
-                        item         = matchingItem,
-                        feedDocRef   = feedCol.document(matchingItem.firestoreId),
-                        fieldUpdates = fieldUpdates,
-                        newQty       = finalQty,
-                        notes        = "Stock restocked",
-                        onSuccess    = {
-                            logHistory("RESTOCK", matchingItem.name, qtyIn, price, matchingItem.category)
-                            dialog.dismiss()
-                            showAddSuccessDialog(matchingItem.name)
-                        } )
+                    showConfirmActionDialog(
+                        itemName  = matchingItem.name,
+                        isRestock = true,
+                        quantity  = qtyIn
+                    ) {
+                        commitFeedChange(
+                            item         = matchingItem,
+                            feedDocRef   = feedCol.document(matchingItem.firestoreId),
+                            fieldUpdates = fieldUpdates,
+                            newQty       = finalQty,
+                            notes        = "Stock restocked",
+                            onSuccess    = {
+                                logHistory("RESTOCK", matchingItem.name, qtyIn, price, matchingItem.category)
+                                dialog.dismiss()
+                                showAddSuccessDialog(matchingItem.name, isRestock = true)
+                            }
+                        )
+                    }
                 } else {
                     val status = calculateStatus(qtyIn, qtyIn)
                     val data = hashMapOf<String, Any>(
@@ -1123,32 +1155,35 @@ class FeedInventoryActivity : AppCompatActivity() {
                         "status"          to status,
                         "updatedAt"       to FieldValue.serverTimestamp()
                     )
-                    commitNewFeedItem(data, requestedInv, qtyIn, name, cat) {
-                        logHistory("ADDED", name, qtyIn, price, cat)
 
-                        // New product created — always record a Created →
-                        // Inventory entry, regardless of starting quantity
-                        // (unlike the inventory_history audit trail above,
-                        // which only tracks quantity *changes*).
-                        val editorName  = accountManager.getCurrentUsername() ?: "User"
-                        val editorEmail = accountManager.getEmail(editorName) ?: ""
-                        val editorRole  = roleManager.role
-                        FarmRepository.logInventoryCreated(
-                            actorName = editorName,
-                            actorEmail = editorEmail,
-                            actorRole = editorRole,
-                            productName = name,
-                            category = cat,
-                            metadata = mapOf(
-                                "itemName" to name,
-                                "category" to cat,
-                                "initialQuantity" to qtyIn,
-                                "unitPrice" to price
+                    showConfirmActionDialog(
+                        itemName  = name,
+                        isRestock = false,
+                        quantity  = qtyIn
+                    ) {
+                        commitNewFeedItem(data, requestedInv, qtyIn, name, cat) {
+                            logHistory("ADDED", name, qtyIn, price, cat)
+
+                            val editorName  = accountManager.getCurrentUsername() ?: "User"
+                            val editorEmail = accountManager.getEmail(editorName) ?: ""
+                            val editorRole  = roleManager.role
+                            FarmRepository.logInventoryCreated(
+                                actorName = editorName,
+                                actorEmail = editorEmail,
+                                actorRole = editorRole,
+                                productName = name,
+                                category = cat,
+                                metadata = mapOf(
+                                    "itemName" to name,
+                                    "category" to cat,
+                                    "initialQuantity" to qtyIn,
+                                    "unitPrice" to price
+                                )
                             )
-                        )
 
-                        dialog.dismiss()
-                        showAddSuccessDialog(name)
+                            dialog.dismiss()
+                            showAddSuccessDialog(name)
+                        }
                     }
                 }
             }
@@ -1201,39 +1236,158 @@ class FeedInventoryActivity : AppCompatActivity() {
             else -> "In Stock"
         }
     }
-    private fun showAddSuccessDialog(itemName: String) {
+    // ──────────────────────────────────────────────────────────────────────────
+    // Pre-commit confirmation — shown AFTER validation passes but BEFORE any
+    // Firestore write happens. This is the only place the user can back out;
+    // once they tap Confirm here, commitFeedChange/commitNewFeedItem runs.
+    // ──────────────────────────────────────────────────────────────────────────
+    private fun showConfirmActionDialog(
+        itemName: String,
+        isRestock: Boolean,
+        quantity: Long,
+        onConfirm: () -> Unit
+    ) {
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(64, 48, 64, 48)
-            background = android.graphics.drawable.GradientDrawable().apply {
-                setColor(android.graphics.Color.WHITE)
-                cornerRadius = 24f
-                setStroke(2, android.graphics.Color.parseColor("#E8F5E9"))
-            }
+            setPadding(64, 56, 64, 40)
+            setBackgroundColor(android.graphics.Color.WHITE)
         }
-        val icon = TextView(this).apply {
-            text = "✓ Success"
-            setTextColor(android.graphics.Color.parseColor("#2E7D32"))
-            textSize = 16f
+
+        val iconWrapper = TextView(this).apply {
+            text = "?"
+            setTextColor(android.graphics.Color.WHITE)
+            textSize = 22f
             setTypeface(null, android.graphics.Typeface.BOLD)
-            setPadding(24, 16, 24, 16)
+            gravity = android.view.Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(120, 120)
             background = android.graphics.drawable.GradientDrawable().apply {
-                setColor(android.graphics.Color.parseColor("#E8F5E9"))
-                cornerRadius = 40f
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+                setColor(android.graphics.Color.parseColor("#2E7D32"))
             }
         }
-        val message = TextView(this).apply {
-            text = "\"$itemName\" was added to inventory."
-            setTextColor(android.graphics.Color.parseColor("#1C1C1E"))
-            textSize = 14f
-            setPadding(0, 24, 0, 0)
+        val iconContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER
+            addView(iconWrapper)
         }
-        container.addView(icon)
+
+        val title = TextView(this).apply {
+            text = if (isRestock) "Confirm Restock" else "Confirm New Item"
+            setTextColor(android.graphics.Color.parseColor("#1C1C1E"))
+            textSize = 18f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 28, 0, 8)
+        }
+
+        val message = TextView(this).apply {
+            text = if (isRestock)
+                "Add $quantity to \"$itemName\"'s current stock?"
+            else
+                "Create \"$itemName\" with $quantity in stock?"
+            setTextColor(android.graphics.Color.parseColor("#616161"))
+            textSize = 14f
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 0, 0, 8)
+        }
+
+        container.addView(iconContainer)
+        container.addView(title)
         container.addView(message)
 
-        AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this)
+            .setView(container)
+            .setPositiveButton("Confirm", null)
+            .setNegativeButton("Cancel", null)
+            .setCancelable(false)
+            .create()
+
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).apply {
+                setTextColor(android.graphics.Color.parseColor("#2E7D32"))
+                setOnClickListener {
+                    dialog.dismiss()
+                    onConfirm()
+                }
+            }
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).apply {
+                setTextColor(android.graphics.Color.parseColor("#757575"))
+                setOnClickListener {
+                    // Cancel: nothing has been written yet, just close this
+                    // dialog. The Add/Edit dialog underneath stays open so the
+                    // user can adjust values.
+                    dialog.dismiss()
+                }
+            }
+        }
+
+        dialog.show()
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Post-commit info dialog — shown AFTER the Firestore write has already
+    // succeeded. Purely informational, so it only needs an OK button; there is
+    // nothing left to cancel at this point.
+    // ──────────────────────────────────────────────────────────────────────────
+    private fun showAddSuccessDialog(itemName: String, isRestock: Boolean = false) {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(64, 56, 64, 40)
+            setBackgroundColor(android.graphics.Color.WHITE)
+        }
+
+        val iconWrapper = TextView(this).apply {
+            text = "✓"
+            setTextColor(android.graphics.Color.WHITE)
+            textSize = 22f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            gravity = android.view.Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(120, 120)
+            background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+                setColor(android.graphics.Color.parseColor("#2E7D32"))
+            }
+        }
+        val iconContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER
+            addView(iconWrapper)
+        }
+
+        val title = TextView(this).apply {
+            text = "Success"
+            setTextColor(android.graphics.Color.parseColor("#1C1C1E"))
+            textSize = 18f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 28, 0, 8)
+        }
+
+        val message = TextView(this).apply {
+            text = if (isRestock)
+                "\"$itemName\" was restocked successfully."
+            else
+                "\"$itemName\" was added to inventory."
+            setTextColor(android.graphics.Color.parseColor("#616161"))
+            textSize = 14f
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 0, 0, 8)
+        }
+
+        container.addView(iconContainer)
+        container.addView(title)
+        container.addView(message)
+
+        val dialog = AlertDialog.Builder(this)
             .setView(container)
             .setPositiveButton("OK", null)
-            .show()
+            .create()
+
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setTextColor(android.graphics.Color.parseColor("#2E7D32"))
+        }
+
+        dialog.show()
     }
 }
