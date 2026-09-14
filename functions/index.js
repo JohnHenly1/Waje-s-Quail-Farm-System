@@ -26,9 +26,7 @@ const { onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { onValueWritten } = require("firebase-functions/v2/database");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { setGlobalOptions } = require("firebase-functions/v2");
-const { defineSecret } = require("firebase-functions/params");
 const logger = require("firebase-functions/logger");
-const nodemailer = require("nodemailer");
 
 // Same region as the RTDB instance (asia-southeast1), so the RTDB trigger
 // is valid and everything lives together.
@@ -41,50 +39,18 @@ const TOPIC_FARM_ALERTS = "farm_alerts";
 const CHANNEL_ALERTS = "alerts_channel";
 const CHANNEL_TASK_REMINDER = "task_reminder_channel";
 
-// ── Email (Gmail) ─────────────────────────────────────────────────────────
-// Credentials are pulled from Cloud Functions secrets, NOT hardcoded or
-// committed. Set them once per project with:
-//   firebase functions:secrets:set GMAIL_USER
-//   firebase functions:secrets:set GMAIL_APP_PASSWORD
-// GMAIL_APP_PASSWORD must be a 16-character Gmail "App Password"
-// (myaccount.google.com/apppasswords) for the GMAIL_USER account, not that
-// account's normal login password — Gmail rejects SMTP login with the
-// regular password if 2FA is on, and app passwords let us send without
-// exposing the actual account credentials.
-const GMAIL_USER = defineSecret("GMAIL_USER");
-const GMAIL_APP_PASSWORD = defineSecret("GMAIL_APP_PASSWORD");
-
-// Built lazily (only once a function that declares these secrets actually
-// runs) so functions that don't need email never try to read the secrets.
-let cachedTransporter = null;
-function getMailTransporter() {
-  if (!cachedTransporter) {
-    cachedTransporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: GMAIL_USER.value(),
-        pass: GMAIL_APP_PASSWORD.value(),
-      },
-    });
-  }
-  return cachedTransporter;
-}
-
-// Best-effort — a failed email should never take down the push notification
-// or throw the whole function, since the push is the more important channel.
-async function sendAssignmentEmail(toEmail, subject, text) {
-  try {
-    await getMailTransporter().sendMail({
-      from: `"Waje's Quail Farm" <${GMAIL_USER.value()}>`,
-      to: toEmail,
-      subject,
-      text,
-    });
-    logger.info(`Assignment email sent to ${toEmail}`);
-  } catch (e) {
-    logger.error(`Failed to email ${toEmail}: ${e.message}`);
-  }
-}
+// FIX: task-assignment email used to be sent from here via Gmail SMTP
+// (nodemailer). Removed — this file requires the Blaze billing plan to
+// even deploy (Cloud Functions v2 runs on Cloud Run/Cloud Build), which
+// this project isn't on; see scripts/checkAlerts.js for the actual
+// Blaze-free replacement that runs in production. Email now goes out
+// directly from the Android client (ScheduleActivity.sendTaskAssignment
+// EmailsDirect()) the instant a task is saved, via the same Apps Script
+// web app the invite-email flow already uses — no Gmail SMTP credentials,
+// no server-side hop, and no dependency on this file (or its GitHub
+// Actions equivalent) being deployed/running at all. Push notifications
+// stay here since they still need something that runs independent of
+// whichever device made the assignment.
 
 // ── Shared dedupe + push helper ──────────────────────────────────────────
 // Mirrors FarmRepository.addAlert()'s ID scheme exactly so both the app and
@@ -112,11 +78,21 @@ function stableId(str) {
 }
 
 /**
- * Writes the dedup/alert doc and, only if it didn't already exist today,
- * sends the FCM push. Returns true if a push was sent.
+ * Writes the dedup/alert doc and, only if it didn't already exist, sends the
+ * FCM push. Returns true if a push was sent.
+ *
+ * `dedupKey` overrides the default day+message dedup ID. That default meant
+ * an alert could only ever fire once per calendar day for a given message —
+ * fine for a one-off event, but wrong for a repeatable condition like stock
+ * depletion or a water-level state: depleted → restocked → depleted again
+ * should alert both times, not just the first. Callers that track their own
+ * state transitions (see onFeedWrite/onWaterLevelWrite) pass a dedupKey
+ * scoped to this specific write event instead, so dedup only protects
+ * against the same event retrying, not against a genuine second occurrence
+ * later the same day.
  */
-async function raiseAlert({ message, type, topic, title, body, channel }) {
-  const docId = `${todayKey()}_${sanitize(message)}`;
+async function raiseAlert({ message, type, topic, title, body, channel, dedupKey }) {
+  const docId = dedupKey || `${todayKey()}_${sanitize(message)}`;
   const alertRef = db.collection("farm_data").doc("shared").collection("alert").doc(docId);
 
   try {
@@ -129,7 +105,7 @@ async function raiseAlert({ message, type, topic, title, body, channel }) {
     });
   } catch (e) {
     if (e.code === 6 || e.code === "already-exists") {
-      // Already alerted today — same behaviour as wasAlreadyAlertedToday().
+      // Same event retried, or (default key only) already alerted today.
       return false;
     }
     throw e;
@@ -141,7 +117,7 @@ async function raiseAlert({ message, type, topic, title, body, channel }) {
       title,
       body,
       channel,
-      notifId: String(stableId(message)),
+      notifId: String(stableId(message + docId)),
     },
     android: { priority: "high" },
   });
@@ -189,14 +165,27 @@ function parseAssignedTo(raw) {
  * everyone found out about every task anyway, but per the app's requirement
  * that schedule notifications only go to assigned individuals, an
  * unassigned task has no one to notify.
+ *
+ * `dedupKey` overrides the default day+message dedup ID. The default (day +
+ * truncated message) is right for checkOverdueTasks, which polls repeatedly
+ * and needs day-scoped dedup so it doesn't re-alert every 15 minutes — but
+ * it's wrong for onTaskAssigned, an event-driven trigger that already only
+ * fires for genuinely new assignees. Reusing the day-scoped key there caused
+ * two real bugs: (1) sanitize() truncates to 80 chars, and since the
+ * taskId sits at the END of the assignment message, a long title could
+ * silently chop it off, making two different tasks collide on the same
+ * dedup doc; (2) same-day re-assignment (unassign + reassign the same
+ * person later that day — e.g. after a declined task) produced the exact
+ * same message text, so it hit the first assignment's dedup doc and never
+ * pushed again. Callers that pass an explicit dedupKey bypass both issues.
  */
-async function raiseTaskAlertForAssignees({ message, type, assignees, title, body, channel }) {
+async function raiseTaskAlertForAssignees({ message, type, assignees, title, body, channel, dedupKey }) {
   if (!assignees || assignees.length === 0) {
     logger.info(`No assignees for task alert, skipping: ${message}`);
     return false;
   }
 
-  const docId = `${todayKey()}_${sanitize(message)}`;
+  const docId = dedupKey || `${todayKey()}_${sanitize(message)}`;
   const alertRef = db.collection("farm_data").doc("shared").collection("alert").doc(docId);
   try {
     await alertRef.create({
@@ -242,41 +231,50 @@ async function raiseTaskAlertForAssignees({ message, type, assignees, title, bod
 
 // ── Inventory: farm_data/shared/feed/{feedId} ────────────────────────────
 // Mirrors AlertsMonitor.startInventoryListener().
+//
+// Classifies a feed doc into an alert state (or null if it's fine). Used on
+// both the before- and after-write data so onFeedWrite can alert on the
+// TRANSITION into a bad state rather than on every write while it stays bad
+// — that's what lets a depleted → restocked → depleted-again cycle alert
+// twice instead of the first depletion silently eating the day's only alert.
+function feedAlertState(doc) {
+  if (!doc) return null;
+  const qty = doc.quantity ?? 0;
+  if (qty === 0) return "DEPLETED";
+  const status = doc.status ?? "";
+  if (status === "Low Stock" || status === "Medium") return status;
+  return null;
+}
+
 exports.onFeedWrite = onDocumentWritten(
   "farm_data/shared/feed/{feedId}",
   async (event) => {
     const after = event.data?.after;
     if (!after || !after.exists) return; // ignore deletes
 
+    const before = event.data?.before;
+    const beforeState = before && before.exists ? feedAlertState(before.data()) : null;
+    const afterState = feedAlertState(after.data());
+
+    // Not in a bad state, or unchanged from the previous write (redundant
+    // save while still e.g. DEPLETED) — nothing new to alert on.
+    if (!afterState || afterState === beforeState) return;
+
     const doc = after.data();
-    const qty = doc.quantity ?? 0;
     const name = doc.name ?? "Item";
+    const message = afterState === "DEPLETED"
+      ? `Inventory Alert: ${name} is STOCK DEPLETED`
+      : `Inventory Alert: ${name} is currently ${afterState}`;
 
-    if (qty === 0) {
-      const message = `Inventory Alert: ${name} is STOCK DEPLETED`;
-      await raiseAlert({
-        message,
-        type: "Critical",
-        topic: TOPIC_FARM_ALERTS,
-        title: "Inventory Alert",
-        body: message,
-        channel: CHANNEL_ALERTS,
-      });
-      return;
-    }
-
-    const status = doc.status ?? "";
-    if (status === "Low Stock" || status === "Medium") {
-      const message = `Inventory Alert: ${name} is currently ${status}`;
-      await raiseAlert({
-        message,
-        type: "Inventory",
-        topic: TOPIC_FARM_ALERTS,
-        title: "Inventory Update",
-        body: message,
-        channel: CHANNEL_ALERTS,
-      });
-    }
+    await raiseAlert({
+      message,
+      type: afterState === "DEPLETED" ? "Critical" : "Inventory",
+      topic: TOPIC_FARM_ALERTS,
+      title: afterState === "DEPLETED" ? "Inventory Alert" : "Inventory Update",
+      body: message,
+      channel: CHANNEL_ALERTS,
+      dedupKey: event.id, // idempotency against this exact write retrying
+    });
   }
 );
 
@@ -296,9 +294,19 @@ exports.onWaterLevelWrite = onValueWritten(
     const percent = event.data.after.val();
     if (percent === null || percent === undefined) return;
 
-    const resolved = resolveWaterLevelAlert(Number(percent));
-    if (!resolved) return;
-    const [label, description] = resolved;
+    const afterResolved = resolveWaterLevelAlert(Number(percent));
+    if (!afterResolved) return;
+
+    // Same transition-on-change logic as onFeedWrite: only alert when this
+    // write actually crosses into (or changes) the alert state, so refilling
+    // then draining again re-alerts instead of being stuck dedup'd all day.
+    const beforePercent = event.data.before?.val?.();
+    const beforeResolved = beforePercent === null || beforePercent === undefined
+      ? null
+      : resolveWaterLevelAlert(Number(beforePercent));
+    if (beforeResolved && beforeResolved[0] === afterResolved[0]) return;
+
+    const [label, description] = afterResolved;
     const message = `Water Level ${label}: ${description}`;
 
     await raiseAlert({
@@ -308,6 +316,7 @@ exports.onWaterLevelWrite = onValueWritten(
       title: `Water Level ${label}`,
       body: description,
       channel: CHANNEL_ALERTS,
+      dedupKey: event.id, // idempotency against this exact write retrying
     });
   }
 );
@@ -326,7 +335,7 @@ exports.onWaterLevelWrite = onValueWritten(
 // ScheduleActivity's assignee selector, which is keyed by email) — so no
 // extra user lookup is needed to know who to email.
 exports.onTaskAssigned = onDocumentWritten(
-  { document: "farm_data/shared/tasks/{taskId}", secrets: [GMAIL_USER, GMAIL_APP_PASSWORD] },
+  "farm_data/shared/tasks/{taskId}",
   async (event) => {
     const before = event.data?.before;
     const after = event.data?.after;
@@ -343,11 +352,6 @@ exports.onTaskAssigned = onDocumentWritten(
     if (newAssignees.length === 0) return;
 
     const title = afterData.title || "Task";
-    const category = afterData.category || "";
-    const dateStr = (afterData.year !== undefined && afterData.month !== undefined && afterData.day !== undefined)
-      ? `${afterData.day}/${afterData.month + 1}/${afterData.year}`
-      : "an upcoming date";
-    const timeStr = afterData.time || "";
 
     // taskId folded into the dedup message so this can't collide with
     // raiseTaskAlertForAssignees' "Missed Task" message, or with another
@@ -355,6 +359,15 @@ exports.onTaskAssigned = onDocumentWritten(
     // and gets assigned on the same day.
     const message = `New Task Assigned: ${title} (${event.params.taskId})`;
 
+    // Keyed to this specific write (taskId + Firestore event ID), not to
+    // "today" + the message text — see raiseTaskAlertForAssignees' doc
+    // comment for why the day-scoped default caused pushes to silently stop
+    // firing on same-day re-assignments and on long/colliding titles. Event
+    // ID retries of this exact write still dedup correctly; a genuinely new
+    // write (a real re-assignment) always gets a fresh key and always pushes.
+    //
+    // Email is NOT sent from here — see the top-of-file note. It goes out
+    // directly from the Android client the moment the task is saved.
     await raiseTaskAlertForAssignees({
       message,
       type: "Task Assigned",
@@ -362,23 +375,8 @@ exports.onTaskAssigned = onDocumentWritten(
       title: "New Task Assigned",
       body: `You've been assigned: ${title}`,
       channel: CHANNEL_TASK_REMINDER,
+      dedupKey: `assign_${event.params.taskId}_${event.id}`,
     });
-
-    // Email runs alongside the push, not instead of it — each assignee's
-    // `assignedTo` entry is their email, so send directly, no lookup needed.
-    const emailBody =
-      `You've been assigned a new task on Waje's Quail Farm.\n\n` +
-      `Task: ${title}\n` +
-      `Category: ${category || "N/A"}\n` +
-      `Scheduled: ${dateStr}${timeStr ? " at " + timeStr : ""}\n` +
-      (afterData.assignedBy ? `Assigned by: ${afterData.assignedBy}\n` : "") +
-      `\nOpen the app's Schedule tab to see the full details.`;
-
-    await Promise.all(
-      newAssignees.map((email) =>
-        sendAssignmentEmail(email, `New Task Assigned: ${title}`, emailBody)
-      )
-    );
   }
 );
 

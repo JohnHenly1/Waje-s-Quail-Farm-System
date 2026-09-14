@@ -40,6 +40,18 @@ if (!serviceAccountJson) {
   process.exit(1);
 }
 
+// FIX: task-assignment email now goes out directly from the Android client
+// (ScheduleActivity.sendTaskAssignmentEmailsDirect(), same Apps Script web
+// app as the invite-email flow) the instant a task is saved — not from
+// here. This script never got a reliable email delivery path of its own:
+// it depends on this GitHub Actions workflow actually running on schedule,
+// with FIREBASE_SERVICE_ACCOUNT_KEY correctly configured, before an email
+// would go out at all. Sending directly from the device that just made the
+// assignment removes that whole dependency chain. Push notifications stay
+// here (see raiseAssignmentAlertForNewAssignees below) since those still
+// need something that runs even when the assigning device isn't the one
+// receiving the notification.
+
 initializeApp({
   credential: cert(JSON.parse(serviceAccountJson)),
   databaseURL: RTDB_URL,
@@ -145,6 +157,58 @@ async function raiseTaskAlertForAssignees({ message, type, assignees, title, bod
 
   if (anyPushed) console.log(`Task alert pushed to [${assignees.join(", ")}]: ${message}`);
   return anyPushed;
+}
+
+// FIX: this polling script never had an equivalent of functions/index.js's
+// onTaskAssigned — the push that tells a staff member the moment they're
+// individually assigned a task. onTaskAssigned detects "new" assignees by
+// diffing a write's before/after `assignedTo`, which only exists for a
+// real-time Firestore trigger; a poll only ever sees the current state, with
+// no "before". So instead of a before/after diff, dedup is a permanent
+// (no day component) per-task-per-assignee log doc: the first poll that
+// ever sees a given email on a given task's assignedTo list pushes to them
+// and writes the log doc; every poll after that is a no-op for that pair,
+// even once the task itself is done/deleted or the poll runs for months.
+// This intentionally does NOT reuse _taskPushLog (that log is scoped to one
+// calendar day, for "Missed Task" reminders that should be able to re-fire
+// on a later day) — assignment pushes must fire once ever per assignment.
+async function raiseAssignmentAlertForNewAssignees(taskId, data) {
+  const assignees = parseAssignedTo(data.assignedTo);
+  if (assignees.length === 0) return false;
+
+  const title = data.title || "Task";
+  const message = `New Task Assigned: ${title} (${taskId})`;
+
+  const newlyNotified = [];
+  for (const email of assignees) {
+    const logId = `${taskId}__${sanitize(email)}`;
+    const logRef = db.collection("farm_data").doc("shared").collection("_taskAssignPushLog").doc(logId);
+    try {
+      await logRef.create({ email, taskId, message, timestamp: FieldValue.serverTimestamp() });
+    } catch (e) {
+      if (e.code === 6 || e.code === "already-exists") continue; // already notified this assignee for this task
+      throw e;
+    }
+    newlyNotified.push(email);
+  }
+  if (newlyNotified.length === 0) return false;
+
+  for (const email of newlyNotified) {
+    await getMessaging().send({
+      topic: topicForUser(email),
+      data: {
+        title: "New Task Assigned",
+        body: `You've been assigned: ${title}`,
+        channel: CHANNEL_TASK_REMINDER,
+        notifId: String(stableId(message + email)),
+      },
+      android: { priority: "high" },
+    });
+  }
+
+  console.log(`Task assignment pushed to [${newlyNotified.join(", ")}]: ${message}`);
+
+  return true;
 }
 
 // ── Status auto-repair ────────────────────────────────────────────────────
@@ -262,11 +326,54 @@ async function checkOverdueTasks() {
   }
 }
 
+// Polling counterpart to onTaskAssigned: scans every Pending task's current
+// assignedTo list and pushes to whichever assignees haven't been notified
+// for that specific task yet (see raiseAssignmentAlertForNewAssignees).
+// Scoped to Pending, same as checkOverdueTasks, so a task stops being
+// scanned once it's Done — its assignees have already been notified by then
+// anyway, since notification happens on assignment, not on completion.
+async function checkTaskAssignments() {
+  const snapshot = await db
+    .collection("farm_data")
+    .doc("shared")
+    .collection("tasks")
+    .where("status", "==", "Pending")
+    .get();
+
+  for (const doc of snapshot.docs) {
+    await raiseAssignmentAlertForNewAssignees(doc.id, doc.data());
+  }
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────
+// Promise.allSettled (not Promise.all) is deliberate: if any one check
+// throws, Promise.all would reject immediately and process.exit() would run
+// right away — potentially cutting off one of the OTHER checks mid-flight
+// (e.g. an inventory alert's FCM send not yet finished) even though that
+// check was working fine. allSettled always waits for every check to
+// finish, success or failure, so one broken check can never take the others
+// down with it. The exit code still reflects failure so GitHub Actions
+// flags the run — but only after everything that *could* run, did.
 async function main() {
-  await Promise.all([checkInventory(), checkWaterLevel(), checkOverdueTasks()]);
-  console.log("Check complete.");
-  process.exit(0);
+  const checks = [
+    ["checkInventory", checkInventory],
+    ["checkWaterLevel", checkWaterLevel],
+    ["checkOverdueTasks", checkOverdueTasks],
+    ["checkTaskAssignments", checkTaskAssignments],
+  ];
+
+  const results = await Promise.allSettled(checks.map(([, fn]) => fn()));
+
+  let hadFailure = false;
+  results.forEach((result, i) => {
+    if (result.status === "rejected") {
+      hadFailure = true;
+      console.error(`${checks[i][0]} failed:`, result.reason);
+    }
+  });
+
+  console.log(hadFailure ? "Check complete, with errors (see above)." : "Check complete.");
+  process.exit(hadFailure ? 1 : 0);
 }
 
 main().catch((err) => {

@@ -64,6 +64,9 @@ import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import org.json.JSONObject;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.concurrent.Executors;
@@ -467,6 +470,90 @@ public class ScheduleActivity extends AppCompatActivity {
         data.put("workWindowMinutes",  task.workWindowMinutes);
         data.put("createdAt", com.google.firebase.firestore.FieldValue.serverTimestamp());
         return data;
+    }
+
+    // ── Direct task-assignment email (no Firebase/Cloud Functions involved) ──
+    // Calls the same Google Apps Script web app NavigationHelper's invite-email
+    // flow already uses — GmailApp.sendEmail() runs inside the script itself,
+    // so this app never needs Gmail SMTP credentials. Sent right here, the
+    // instant a task is actually saved with assignees, instead of relying on
+    // a Cloud Function (blocked on the Blaze plan) or a polling GitHub Action
+    // that only checks every few minutes and depends on its own separate
+    // infra staying up.
+    //
+    // One email per assignee per SAVE, not per task instance: a recurring
+    // task can create dozens of individual task documents in one save, and
+    // emailing once per document would flood the assignee's inbox (and risk
+    // hitting Gmail's daily send quota) for what is, from their point of
+    // view, a single assignment. The email summarizes the series (title,
+    // category, first date, time, who assigned it) rather than listing every
+    // date.
+    private static final String TASK_EMAIL_APPS_SCRIPT_URL =
+            "https://script.google.com/macros/s/AKfycbx-_H4Jy4KTuZQSPTMCxTAIKIAJxGMAaIzGF-uKB0m05YLWb1Flgdor-wGD-ieOym_0/exec";
+    private static final String TASK_EMAIL_APPS_SCRIPT_SECRET = "Red0455";
+
+    private void sendTaskAssignmentEmailsDirect(
+            List<String> emails, String taskTitle, String category, String dateStr, String timeStr, String assignedBy) {
+        if (emails == null || emails.isEmpty()) return;
+        // Defensive copy — the caller's list (e.g. selectedAssigneeEmails) can
+        // keep mutating on the UI thread after this call returns, and we're
+        // about to read it from a background thread.
+        List<String> emailsCopy = new ArrayList<>(emails);
+
+        Executors.newSingleThreadExecutor().execute(() -> {
+            for (String email : emailsCopy) {
+                if (email == null || email.trim().isEmpty()) continue;
+                try {
+                    URL url = new URL(TASK_EMAIL_APPS_SCRIPT_URL);
+                    HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                    conn.setRequestMethod("POST");
+                    conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+                    conn.setDoOutput(true);
+                    // Apps Script cold-starts can take well over 10s — see
+                    // NavigationHelper's sendInviteEmailViaAppsScript(), same
+                    // reasoning applies here.
+                    conn.setConnectTimeout(25000);
+                    conn.setReadTimeout(25000);
+
+                    JSONObject payload = new JSONObject();
+                    payload.put("secret", TASK_EMAIL_APPS_SCRIPT_SECRET);
+                    payload.put("type", "task_assigned");
+                    payload.put("email", email);
+                    payload.put("taskTitle", taskTitle);
+                    payload.put("category", category != null ? category : "");
+                    payload.put("date", dateStr != null ? dateStr : "");
+                    payload.put("time", timeStr != null ? timeStr : "");
+                    payload.put("assignedBy", assignedBy != null ? assignedBy : "");
+
+                    try (java.io.OutputStream os = conn.getOutputStream()) {
+                        os.write(payload.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    }
+
+                    int responseCode = conn.getResponseCode();
+                    String responseText;
+                    try (java.io.InputStream is = (responseCode >= 200 && responseCode < 300)
+                            ? conn.getInputStream() : conn.getErrorStream()) {
+                        responseText = is != null ? readStream(is) : "";
+                    }
+
+                    android.util.Log.d("TaskAssignEmail",
+                            "Apps Script response for " + email + " (" + responseCode + "): " + responseText);
+                } catch (Exception e) {
+                    // Best-effort — a failed email should never block or undo
+                    // the task save, which has already succeeded by the time
+                    // this runs.
+                    android.util.Log.e("TaskAssignEmail", "Failed to email " + email + ": " + e.getMessage());
+                }
+            }
+        });
+    }
+
+    private static String readStream(java.io.InputStream is) throws java.io.IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        byte[] buf = new byte[1024];
+        int n;
+        while ((n = is.read(buf)) != -1) out.write(buf, 0, n);
+        return out.toString("UTF-8");
     }
 
     private void updateTaskStatus(Task task) {
@@ -1227,6 +1314,21 @@ public class ScheduleActivity extends AppCompatActivity {
                                         progress.dismiss();
                                         Toast.makeText(this, getString(R.string.tasks_scheduled, totalTasks), Toast.LENGTH_SHORT).show();
                                         dialog.dismiss();
+
+                                        // Fire the assignment email(s) once the whole series is
+                                        // confirmed saved — direct call, no Firebase/Cloud Functions
+                                        // or polling script in the loop. One email per assignee for
+                                        // the whole series (see sendTaskAssignmentEmailsDirect doc).
+                                        if (!selectedDates.isEmpty()) {
+                                            Calendar firstDateCal = Calendar.getInstance();
+                                            firstDateCal.setTimeInMillis(selectedDates.get(0));
+                                            String firstDateStr = firstDateCal.get(Calendar.DAY_OF_MONTH) + "/"
+                                                    + (firstDateCal.get(Calendar.MONTH) + 1) + "/"
+                                                    + firstDateCal.get(Calendar.YEAR);
+                                            sendTaskAssignmentEmailsDirect(
+                                                    selectedAssigneeEmails, title, category, firstDateStr,
+                                                    selectedTime[0], currentUserEmail);
+                                        }
                                     }
                                 }).addOnFailureListener(e -> {
                                     progress.dismiss();

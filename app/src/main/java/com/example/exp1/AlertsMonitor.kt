@@ -98,6 +98,21 @@ object AlertsMonitor {
     // Dedup keys are now prefixed with the Firestore document id, so every
     // item gets its own independent notification regardless of what any
     // other item is named.
+    //
+    // FIX: that per-item dedup key was still day-based and, worse, never
+    // reset once an item recovered — "${doc.id}:depleted" stayed marked
+    // "alerted today" for the rest of the day even after the item was
+    // restocked, so a depleted → restocked → depleted-again cycle only
+    // ever notified the first time. Now tracks the item's *last alerted
+    // state* (mirroring raiseWaterLevelAlert's tier tracking below) with
+    // no day limit, and clears that state the moment the item recovers to
+    // "fine" — so the next depletion is treated as a fresh transition, not
+    // a repeat of the same day's alert.
+    private fun inventoryAlertState(qty: Long, status: String): String? {
+        if (qty == 0L) return "DEPLETED"
+        return if (status == "Low Stock" || status == "Medium") status else null
+    }
+
     private fun startInventoryListener() {
         inventoryListener?.remove()
         inventoryListener = FirebaseFirestore.getInstance()
@@ -105,31 +120,31 @@ object AlertsMonitor {
             .addSnapshotListener { snapshots, e ->
                 if (e != null || snapshots == null) return@addSnapshotListener
                 if (!AccountManager(appContext).isAlertsEnabled()) return@addSnapshotListener
+                val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 for (dc in snapshots.documentChanges) {
                     if (dc.type != DocumentChange.Type.ADDED && dc.type != DocumentChange.Type.MODIFIED) continue
                     val doc = dc.document
                     val qty = doc.getLong("quantity") ?: 0L
                     val name = doc.getString("name") ?: "Item"
-                    if (qty == 0L) {
-                        val dedupKey = "${doc.id}:depleted"
-                        val message = "Inventory Alert: $name is STOCK DEPLETED"
-                        if (!wasAlreadyAlertedToday(dedupKey)) {
-                            FarmRepository.addAlert(message, "Critical")
-                            markAsAlertedToday(dedupKey)
-                            showLocalNotification("Inventory Alert", message)
-                        }
-                    } else {
-                        val status = doc.getString("status") ?: ""
-                        if (status == "Low Stock" || status == "Medium") {
-                            val dedupKey = "${doc.id}:$status"
-                            val message = "Inventory Alert: $name is currently $status"
-                            if (!wasAlreadyAlertedToday(dedupKey)) {
-                                FarmRepository.addAlert(message, "Inventory")
-                                markAsAlertedToday(dedupKey)
-                                showLocalNotification("Inventory Update", message)
-                            }
-                        }
+                    val status = doc.getString("status") ?: ""
+                    val currentState = inventoryAlertState(qty, status)
+
+                    val stateKey = "inv_state_${doc.id}"
+                    val lastState = prefs.getString(stateKey, null)
+                    if (currentState != lastState) {
+                        prefs.edit().putString(stateKey, currentState).apply()
                     }
+                    if (currentState == null || currentState == lastState) continue
+
+                    val message = if (currentState == "DEPLETED")
+                        "Inventory Alert: $name is STOCK DEPLETED"
+                    else
+                        "Inventory Alert: $name is currently $currentState"
+                    val title = if (currentState == "DEPLETED") "Inventory Alert" else "Inventory Update"
+                    val type = if (currentState == "DEPLETED") "Critical" else "Inventory"
+
+                    FarmRepository.addAlert(message, type)
+                    showLocalNotification(title, message)
                 }
             }
     }
