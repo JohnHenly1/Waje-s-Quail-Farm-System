@@ -561,9 +561,11 @@ class FeedInventoryActivity : AppCompatActivity() {
     // Atomic feed update + audit log  (shared by staff quantity edits and owner
     // restocks/edits).  [fieldUpdates] carries any owner-only fields (name,
     // description, invNumber, location, unitPrice, category); quantity,
-    // initialQuantity, and updatedAt are always recomputed here. `status` is
-    // never touched by this function — the website is the single source of
-    // truth for status, so Android reads it but does not overwrite it here.
+    // initialQuantity, status, and updatedAt are always recomputed here.
+    // `status` is recomputed with calculateStatus() using the same
+    // qty/initialQuantity thresholds the website's handleUpdateQuantity() uses,
+    // so a quantity edit from either the app or the website keeps status
+    // correct immediately, rather than only one side owning it.
     // Uses a Firestore transaction so the stock write and the audit entry
     // always succeed or fail together. No audit entry is written when the
     // quantity is unchanged. Negative stock is rejected before any write.
@@ -601,13 +603,12 @@ class FeedInventoryActivity : AppCompatActivity() {
                 throw Exception("Item was modified concurrently. Please try again.")
             }
 
-            // Write 1: update stock quantity plus any owner-edited fields.
-            // Status is intentionally NOT recomputed/overwritten here — the
-            // website is the single source of truth for `status`, so an
-            // Android quantity edit must not clobber it.
+            // Write 1: update stock quantity, recomputed status, plus any
+            // owner-edited fields.
             val stockUpdate = fieldUpdates.toMutableMap()
             stockUpdate["quantity"]        = newQty
             stockUpdate["initialQuantity"] = newInitialQty
+            stockUpdate["status"]          = calculateStatus(newQty, newInitialQty)
             stockUpdate["updatedAt"]       = FieldValue.serverTimestamp()
             transaction.update(feedDocRef, stockUpdate)
 

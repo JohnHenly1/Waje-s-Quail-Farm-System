@@ -147,6 +147,21 @@ async function raiseTaskAlertForAssignees({ message, type, assignees, title, bod
   return anyPushed;
 }
 
+// ── Status auto-repair ────────────────────────────────────────────────────
+// Mirrors FeedInventoryActivity.kt's calculateStatus() exactly. The Android
+// app intentionally never rewrites `status` after an item is created (its
+// comments say a separate website owns that field) — but nothing was
+// reliably keeping `status` in sync with `quantity` on every edit path. This
+// recomputes it here so `status` self-heals every 15 minutes regardless of
+// which client (website, app, or manual Firestore edit) changed quantity.
+function calculateStatus(qty, initialQty) {
+  if (initialQty <= 0) return "In Stock";
+  const ratio = qty / initialQty;
+  if (ratio <= 0.2) return "Low Stock";
+  if (ratio <= 0.5) return "Medium";
+  return "In Stock";
+}
+
 // ── Checks (polling versions of the three Cloud Functions) ──────────────
 
 async function checkInventory() {
@@ -156,6 +171,16 @@ async function checkInventory() {
     const data = doc.data();
     const qty = data.quantity ?? 0;
     const name = data.name ?? "Item";
+
+    // Keep `status` in sync with quantity before evaluating alerts below,
+    // so alerts always react to the freshest, correct status.
+    const initialQty = data.initialQuantity ?? qty;
+    const correctStatus = calculateStatus(qty, initialQty);
+    if (data.status !== correctStatus) {
+      console.log(`Status corrected for ${name}: ${data.status ?? "(none)"} -> ${correctStatus}`);
+      await doc.ref.update({ status: correctStatus });
+      data.status = correctStatus;
+    }
 
     if (qty === 0) {
       const message = `Inventory Alert: ${name} is STOCK DEPLETED`;
