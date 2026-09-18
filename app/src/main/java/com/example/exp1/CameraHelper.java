@@ -34,6 +34,7 @@ public class CameraHelper {
     private YoloDetector yoloDetector;
 
     //  Single constructor
+
     public CameraHelper(AppCompatActivity activity, OnPhotoDetected callback) {
         this.activity = activity;
         this.detectionCallback = callback;

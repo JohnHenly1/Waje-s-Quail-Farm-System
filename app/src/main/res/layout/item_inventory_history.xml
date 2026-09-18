@@ -87,7 +87,7 @@
             android:layout_marginBottom="4dp"
             android:background="#F0F0F0" />
 
-        <!-- Stats Row: Quantity | Unit Price | Total Value -->
+        <!-- Stats Row: Quantity | Unit Amount | Total Value -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -128,7 +128,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/unit_price"
+                    android:text="Unit Amount"
                     android:textColor="#9E9E9E"
                     android:textSize="11sp" />
 

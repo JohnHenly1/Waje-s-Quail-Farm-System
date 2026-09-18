@@ -137,6 +137,63 @@
             android:textColor="@color/dark_gray" />
     </LinearLayout>
 
+    <!-- Time filter chips -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:paddingBottom="12dp">
+
+        <TextView
+            android:id="@+id/chipTimeAll"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:layout_marginEnd="8dp"
+            android:paddingHorizontal="16dp"
+            android:gravity="center"
+            android:text="All Time"
+            android:textSize="12sp"
+            android:background="@drawable/rounded_dark_green"
+            android:textColor="@android:color/white"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/chipTimeToday"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:layout_marginEnd="8dp"
+            android:paddingHorizontal="16dp"
+            android:gravity="center"
+            android:text="Today"
+            android:textSize="12sp"
+            android:background="@drawable/rounded_gray_bg"
+            android:textColor="@color/dark_gray" />
+
+        <TextView
+            android:id="@+id/chipTimeWeek"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:layout_marginEnd="8dp"
+            android:paddingHorizontal="16dp"
+            android:gravity="center"
+            android:text="This Week"
+            android:textSize="12sp"
+            android:background="@drawable/rounded_gray_bg"
+            android:textColor="@color/dark_gray" />
+
+        <TextView
+            android:id="@+id/chipTimeMonth"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:paddingHorizontal="16dp"
+            android:gravity="center"
+            android:text="This Month"
+            android:textSize="12sp"
+            android:background="@drawable/rounded_gray_bg"
+            android:textColor="@color/dark_gray" />
+    </LinearLayout>
+
     <!-- Scrollable history list -->
     <ScrollView
         android:layout_width="match_parent"

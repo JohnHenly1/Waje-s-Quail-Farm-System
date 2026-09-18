@@ -524,6 +524,10 @@ class FeedInventoryActivity : AppCompatActivity() {
                     qtyInput.error = "Quantity cannot be negative"
                     return@setOnClickListener
                 }
+                if (item.category == "Supplements" && newQty > 99) {
+                    qtyInput.error = "Quantity cannot exceed 99"
+                    return@setOnClickListener
+                }
                 if (newQty == item.quantity) {
                     // No change — nothing to write
                     dialog.dismiss()
@@ -1070,6 +1074,10 @@ class FeedInventoryActivity : AppCompatActivity() {
                 }
                 if (qtyIn < 0) {
                     qtyInput.error = "Quantity cannot be negative"
+                    return@setOnClickListener
+                }
+                if (targetCategory == "Supplements" && qtyIn > 99) {
+                    qtyInput.error = "Quantity cannot exceed 99"
                     return@setOnClickListener
                 }
 

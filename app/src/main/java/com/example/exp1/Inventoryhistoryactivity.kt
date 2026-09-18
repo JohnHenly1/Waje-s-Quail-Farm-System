@@ -41,8 +41,9 @@ class InventoryHistoryActivity : AppCompatActivity() {
     private val auditCol  = db.collection("inventory_history")
     private val dateFormat = SimpleDateFormat("MMM dd, yyyy  h:mm a", Locale.getDefault())
 
-    private var activeCategory = "All"
-    private var activeAction   = "All"
+    private var activeCategory  = "All"
+    private var activeAction    = "All"
+    private var activeTimeRange = "All"
     private var historyListener: ListenerRegistration? = null
     private val currentFilteredDocs = mutableListOf<DocumentSnapshot>()
 
@@ -52,6 +53,10 @@ class InventoryHistoryActivity : AppCompatActivity() {
     private lateinit var chipAll: TextView
     private lateinit var chipAdd: TextView
     private lateinit var chipDeduct: TextView
+    private lateinit var chipTimeAll: TextView
+    private lateinit var chipTimeToday: TextView
+    private lateinit var chipTimeWeek: TextView
+    private lateinit var chipTimeMonth: TextView
 
     private val createDocumentLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -163,6 +168,26 @@ class InventoryHistoryActivity : AppCompatActivity() {
             }
         }
         updateTabStyles(actionChips, activeAction)
+
+        chipTimeAll    = findViewById(R.id.chipTimeAll)
+        chipTimeToday  = findViewById(R.id.chipTimeToday)
+        chipTimeWeek   = findViewById(R.id.chipTimeWeek)
+        chipTimeMonth  = findViewById(R.id.chipTimeMonth)
+
+        val timeChips = mapOf(
+            "All"   to chipTimeAll,
+            "Today" to chipTimeToday,
+            "Week"  to chipTimeWeek,
+            "Month" to chipTimeMonth
+        )
+        timeChips.forEach { (name, tv) ->
+            tv.setOnClickListener {
+                activeTimeRange = name
+                updateTabStyles(timeChips, activeTimeRange)
+                renderFilteredList()
+            }
+        }
+        updateTabStyles(timeChips, activeTimeRange)
     }
 
     private fun updateTabStyles(map: Map<String, TextView>, active: String) {
@@ -203,9 +228,11 @@ class InventoryHistoryActivity : AppCompatActivity() {
         val filtered = currentFilteredDocs.filter { doc ->
             val cat    = doc.getString("category") ?: ""
             val action = doc.getString("action")   ?: ""
+            val ts     = doc.getTimestamp("timestamp")?.toDate()
             val catMatch    = activeCategory == "All" || cat == activeCategory
             val actionMatch = activeAction == "All" || action == activeAction
-            catMatch && actionMatch
+            val timeMatch   = isWithinTimeRange(ts, activeTimeRange)
+            catMatch && actionMatch && timeMatch
         }
 
         historyList.removeAllViews()
@@ -283,6 +310,24 @@ class InventoryHistoryActivity : AppCompatActivity() {
             applyBadgeStyle(badge, "#E8F5E9", "#2E7D32")
         } else {
             applyBadgeStyle(badge, "#FFF3E0", "#E65100")
+        }
+    }
+
+    // "Today"/"This Week"/"This Month" are calendar-based windows anchored to
+    // the current moment, not rolling 24h/7d/30d windows.
+    private fun isWithinTimeRange(date: Date?, range: String): Boolean {
+        if (range == "All" || date == null) return true
+        val now   = Calendar.getInstance()
+        val entry = Calendar.getInstance().apply { time = date }
+        return when (range) {
+            "Today" -> now.get(Calendar.DATE)  == entry.get(Calendar.DATE) &&
+                    now.get(Calendar.MONTH) == entry.get(Calendar.MONTH) &&
+                    now.get(Calendar.YEAR)  == entry.get(Calendar.YEAR)
+            "Week"  -> now.get(Calendar.WEEK_OF_YEAR) == entry.get(Calendar.WEEK_OF_YEAR) &&
+                    now.get(Calendar.YEAR) == entry.get(Calendar.YEAR)
+            "Month" -> now.get(Calendar.MONTH) == entry.get(Calendar.MONTH) &&
+                    now.get(Calendar.YEAR)  == entry.get(Calendar.YEAR)
+            else    -> true
         }
     }
 
