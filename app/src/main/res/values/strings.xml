@@ -537,4 +537,9 @@
     <string name="troubleshooting_body">• No internet? Ensure your WiFi or mobile data is connected\n• App crashes? Try clearing app cache or reinstalling\n• Sync issues? Check your internet connection and try refreshing\n• Invite code not working? Verify the email matches your registered account\n• Camera not opening? Grant camera permissions in app settings</string>
     <string name="contact_support_title">Contact Support</string>
     <string name="contact_support_body">If you encounter any issues not covered above, please contact our support team at support@wajequailfarm.com. Include details about your farm setup and the issue you\'re experiencing.</string>
+
+    <!-- Egg grade descriptions -->
+    <string name="grade_a_description">A healthy egg. The shell is smooth and whole, with light brown spots. It is a normal small oval with no cracks or dents. This is the grade you want most of your eggs to be.</string>
+    <string name="grade_b_description">A cracked egg. The shell has a thin crack or a small chip, and sometimes it is a soft shell. Look for a thin dark line on the shell. Not for eating or selling, but it can still be used for soils.</string>
+    <string name="grade_c_description">A rejected egg. The shell may have a strange color, be leaking, be crushed or badly misshapen, or have mold. Not for selling. Do not eat it if it is leaking or moldy.</string>
 </resources>

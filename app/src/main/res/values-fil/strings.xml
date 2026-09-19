@@ -550,5 +550,17 @@ Natukoy</string>
     <string name="contact_support_title">Makipag-ugnayan sa Suporta</string>
     <string name="contact_support_body">Kung nakakahanap ka ng anumang mga isyu na hindi saklaw sa itaas, mangyaring makipag-ugnayan sa aming koponan ng suporta sa support@wajequailfarm.com. Isama ang mga detalye tungkol sa iyong farm setup at ang isyu na iyong karanasan.</string>
 
+    <!-- New Profile Activity Strings -->
+    <string name="enter_name_hint">Ilagay ang iyong pangalan</string>
+    <string name="clear_all">I-clear Lahat</string>
+    <string name="clear_all_invite_codes_title">I-clear ang Lahat ng Invite Code?</string>
+    <string name="clear_all_invite_codes_msg">Permanenteng buburahin nito ang lahat ng %1$d nabuong invite code. Hindi na ito maibabalik.</string>
+    <string name="all_invite_codes_cleared">Na-clear na ang lahat ng invite code</string>
+    <string name="failed_to_clear_codes">Nabigong i-clear ang mga invite code: %1$s</string>
+
+    <!-- Egg grade descriptions -->
+    <string name="grade_a_description">Isang malusog na itlog. Makinis at buo ang balat, na may mapusyaw na kayumangging mga batik. Normal itong maliit na hugis-itlog na walang bitak o lukot. Ito ang grado na nais mong maging karamihan ng iyong mga itlog.</string>
+    <string name="grade_b_description">Isang basag na itlog. May manipis na bitak o maliit na uwang ang balat, at minsan ay malambot ang balat. Hanapin ang manipis at maitim na linya sa balat. Hindi ito para kainin o ibenta, ngunit maaari pa rin itong gamitin sa lupa bilang pataba.</string>
+    <string name="grade_c_description">Isang tinanggihang itlog. Maaaring kakaiba ang kulay ng balat, tumatagas, durog o labis na hindi maayos ang hugis, o may amag. Hindi para ibenta. Huwag kainin kung tumatagas o inaamag.</string>
 </resources>
 

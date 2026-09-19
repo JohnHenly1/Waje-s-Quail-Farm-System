@@ -181,6 +181,10 @@ public class ProfileActivity extends AppCompatActivity {
         if (helpSupportButton != null) {
             helpSupportButton.setOnClickListener(v -> showHelpSupportDialog());
         }
+        View languageRegionButton = findViewById(R.id.languageRegionButton);
+        if (languageRegionButton != null) {
+            languageRegionButton.setOnClickListener(v -> showLanguageRegionDialog());
+        }
 
         ImageButton backButton = findViewById(R.id.backButton);
         if (backButton != null) {
