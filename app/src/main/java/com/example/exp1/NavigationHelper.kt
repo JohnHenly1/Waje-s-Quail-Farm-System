@@ -1177,6 +1177,348 @@ object NavigationHelper {
         }
     }
 
+    // ─────────────────────────────────────────────────────────────────────
+    // EDIT PROFILE  (used from ProfileActivity so a logged-in user can
+    // update their own name / birthday / address. Reuses the exact same
+    // dialog_invite_user layout as Add User, but:
+    //  - email is locked (it's the Firestore doc id, never editable here)
+    //  - role selector is hidden (editing your own profile can't change role)
+    //  - it UPDATES the existing user_access/{email} doc instead of creating
+    //    a pending one, and never touches status/isActive/invite codes.
+    // ─────────────────────────────────────────────────────────────────────
+
+    fun showEditProfileDialog(activity: Activity, userEmail: String, onUpdated: (() -> Unit)? = null) {
+        val dp = activity.resources.displayMetrics.density
+        val dialogView = LayoutInflater.from(activity).inflate(R.layout.dialog_invite_user, null)
+        val editName = dialogView.findViewById<EditText>(R.id.inviteName)
+        val editEmail = dialogView.findViewById<EditText>(R.id.inviteEmail)
+        val editBirthday = dialogView.findViewById<EditText>(R.id.inviteBirthday)
+        val editStreet = dialogView.findViewById<EditText>(R.id.inviteAddressStreet)
+        val spinnerCity = dialogView.findViewById<Spinner>(R.id.inviteAddressCity)
+        val editState = dialogView.findViewById<EditText>(R.id.inviteAddressState)
+        val editPostal = dialogView.findViewById<EditText>(R.id.inviteAddressPostal)
+        val spinnerBarangay = dialogView.findViewById<Spinner>(R.id.inviteAddressBarangay)
+        val editBarangayCustom = dialogView.findViewById<EditText>(R.id.inviteAddressBarangayOther)
+
+        listOf(editName, editEmail, editBirthday, editStreet, editState, editPostal, editBarangayCustom)
+            .forEach { it.setTextColor(Color.BLACK) }
+
+        val nameErrorText = TextView(activity).apply {
+            setTextColor(Color.parseColor(Brand.DANGER))
+            textSize = 12f
+            visibility = View.GONE
+            setPadding((12 * dp).toInt(), (4 * dp).toInt(), (12 * dp).toInt(), 0)
+        }
+        (editName.parent as? ViewGroup)?.let { parent ->
+            val index = parent.indexOfChild(editName)
+            parent.addView(nameErrorText, index + 1)
+        }
+        fun showNameError(message: String?) {
+            nameErrorText.text = message ?: ""
+            nameErrorText.visibility = if (message != null) View.VISIBLE else View.GONE
+        }
+
+        listOf(editName, editEmail, editBirthday, editStreet, editState, editPostal, editBarangayCustom).forEach { field ->
+            field.setBackgroundColor(Color.TRANSPARENT)
+            field.background = GradientDrawable().apply {
+                cornerRadius = 12 * dp
+                setColor(Color.parseColor(Brand.SURFACE))
+                setStroke((1 * dp).toInt(), Color.parseColor(Brand.GREEN_LINE))
+            }
+            field.setPadding((12 * dp).toInt(), (10 * dp).toInt(), (12 * dp).toInt(), (10 * dp).toInt())
+            field.setHintTextColor(Color.parseColor(Brand.TEXT_SECONDARY))
+        }
+        dialogView.setBackgroundColor(Color.parseColor(Brand.SURFACE))
+
+        // Email is the Firestore doc key — never editable from this dialog.
+        editEmail.isEnabled = false
+        editEmail.alpha = 0.6f
+        editEmail.setText(userEmail)
+
+        // Role selection doesn't apply when editing your own profile — hide it.
+        dialogView.findViewById<View>(R.id.radioInviteStaff)?.let { rb ->
+            (rb.parent as? ViewGroup)?.visibility = View.GONE
+        }
+
+        val nameAllowedRegex = Regex("^[A-Za-z\\s,-]*$")
+        editName.filters = editName.filters + android.text.InputFilter { source, start, end, _, _, _ ->
+            val piece = source.subSequence(start, end)
+            if (nameAllowedRegex.matches(piece)) {
+                null
+            } else {
+                showNameError("Full name can only contain letters, spaces, hyphens (-) and commas (,). Numbers and other special characters are not allowed.")
+                ""
+            }
+        }
+        editName.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                showNameError(getNameValidationError(s.toString()))
+            }
+        })
+
+        editState.setText("Bataan")
+        editState.isEnabled = false
+        val cityPlaceholder = "Select City / Municipality"
+        val bataanCities = listOf(
+            cityPlaceholder,
+            "Abucay", "Bagac", "Balanga City", "Dinalupihan", "Hermosa",
+            "Limay", "Mariveles", "Morong", "Orani", "Orion", "Pilar", "Samal"
+        )
+        spinnerCity.adapter = blackTextArrayAdapter(activity, bataanCities)
+        fun updateBarangaySpinner(city: String, preselectBarangay: String? = null) {
+            val options = mutableListOf("Select Barangay")
+            bataanBarangays[city]?.let { options.addAll(it) }
+            options.add(OTHER_BARANGAY_LABEL)
+            spinnerBarangay.adapter = blackTextArrayAdapter(activity, options)
+            when {
+                preselectBarangay.isNullOrEmpty() -> {
+                    spinnerBarangay.setSelection(0)
+                    editBarangayCustom.visibility = View.GONE
+                    editBarangayCustom.setText("")
+                }
+                options.contains(preselectBarangay) -> {
+                    spinnerBarangay.setSelection(options.indexOf(preselectBarangay))
+                    editBarangayCustom.visibility = View.GONE
+                }
+                else -> {
+                    spinnerBarangay.setSelection(options.indexOf(OTHER_BARANGAY_LABEL))
+                    editBarangayCustom.visibility = View.VISIBLE
+                    editBarangayCustom.setText(preselectBarangay)
+                }
+            }
+        }
+
+        // Listeners are attached to the spinners ONLY AFTER prefill has
+        // finished setting the saved city/barangay. Spinner.setSelection()
+        // queues its onItemSelected callback rather than firing it
+        // synchronously, so if the listener is already attached while we
+        // prefill, that queued callback fires afterward and wipes the
+        // barangay we just set back to "Select Barangay". Attaching the
+        // listener later avoids the race entirely, since our own
+        // Handler.post() below is guaranteed to run after any callback
+        // queued by the prefill's setSelection() calls.
+        fun attachSpinnerListeners() {
+            spinnerBarangay.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                    val selected = parent?.getItemAtPosition(position)?.toString() ?: ""
+                    if (selected == OTHER_BARANGAY_LABEL) {
+                        editBarangayCustom.visibility = View.VISIBLE
+                    } else {
+                        editBarangayCustom.visibility = View.GONE
+                        editBarangayCustom.setText("")
+                    }
+                }
+                override fun onNothingSelected(parent: AdapterView<*>?) {}
+            }
+
+            spinnerCity.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                    if (position > 0) {
+                        val cityName = bataanCities[position]
+                        editPostal.setText(bataanPostalCodes[cityName] ?: "")
+                        updateBarangaySpinner(cityName)
+                    } else {
+                        editPostal.setText("")
+                        updateBarangaySpinner("")
+                    }
+                }
+                override fun onNothingSelected(parent: AdapterView<*>?) {}
+            }
+        }
+
+        val calendar = Calendar.getInstance()
+        editBirthday.setOnClickListener {
+            val maxBirthday = Calendar.getInstance().apply { add(Calendar.YEAR, -18) }
+            val listener = DatePickerDialog.OnDateSetListener { _, y, m, d ->
+                calendar.set(y, m, d)
+                val sdf = SimpleDateFormat("MM/dd/yyyy", Locale.US)
+                editBirthday.setText(sdf.format(calendar.time))
+            }
+            val picker = DatePickerDialog(
+                activity, listener,
+                maxBirthday.get(Calendar.YEAR), maxBirthday.get(Calendar.MONTH), maxBirthday.get(Calendar.DAY_OF_MONTH)
+            )
+            picker.datePicker.maxDate = maxBirthday.timeInMillis
+            picker.show()
+        }
+
+        val db = FirebaseFirestore.getInstance()
+
+        val builder = AlertDialog.Builder(activity)
+            .setView(dialogView)
+            .setPositiveButton("Save", null)
+            .setNegativeButton("Cancel", null)
+        val dialog = builder.create()
+        dialog.show()
+
+        dialog.window?.setBackgroundDrawable(GradientDrawable().apply {
+            cornerRadius = 24 * dp
+            setColor(Color.parseColor(Brand.SURFACE))
+        })
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.apply {
+            setTextColor(Color.parseColor(Brand.GREEN_PRIMARY))
+            setTypeface(typeface, Typeface.BOLD)
+        }
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.apply {
+            setTextColor(Color.parseColor(Brand.TEXT_SECONDARY))
+        }
+        dismissKeyboardOnOutsideTouch(dialog, dialogView)
+
+        // Prefill with the user's current saved data.
+        db.collection("user_access").document(userEmail).get()
+            .addOnSuccessListener { doc ->
+                if (doc.exists()) {
+                    editName.setText(doc.getString("name") ?: "")
+                    editBirthday.setText(doc.getString("birthday") ?: "")
+                    val address = doc.get("address") as? Map<*, *>
+                    val savedStreet = address?.get("street") as? String ?: ""
+                    val savedPostal = address?.get("postalCode") as? String ?: ""
+                    val savedCity = address?.get("city") as? String ?: ""
+                    val savedBarangay = address?.get("barangay") as? String ?: ""
+
+                    editStreet.setText(savedStreet)
+                    editPostal.setText(savedPostal)
+
+                    val cityIndex = bataanCities.indexOf(savedCity)
+                    if (cityIndex > 0) {
+                        spinnerCity.setSelection(cityIndex)
+                        updateBarangaySpinner(savedCity, savedBarangay)
+                    }
+                }
+                // Attach listeners only now — after this event loop turn's
+                // work is done, so any selection-change callback queued by
+                // the setSelection() calls above fires with NO listener
+                // attached yet, then we attach the real ones for user taps.
+                Handler(Looper.getMainLooper()).post { attachSpinnerListeners() }
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(activity, "Could not load your current info: ${e.message}", Toast.LENGTH_SHORT).show()
+                attachSpinnerListeners()
+            }
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val name = editName.text.toString().trim()
+            val birthday = editBirthday.text.toString().trim()
+            val street = editStreet.text.toString().trim()
+            val citySelected = spinnerCity.selectedItemPosition > 0
+            val city = if (citySelected) spinnerCity.selectedItem.toString() else ""
+            val postal = editPostal.text.toString().trim()
+            val barangaySelectedText = spinnerBarangay.selectedItem?.toString() ?: ""
+            val barangaySelected = spinnerBarangay.selectedItemPosition > 0 && barangaySelectedText != OTHER_BARANGAY_LABEL
+            val barangay = when {
+                barangaySelected -> barangaySelectedText
+                barangaySelectedText == OTHER_BARANGAY_LABEL -> editBarangayCustom.text.toString().trim()
+                else -> ""
+            }
+
+            if (name.isEmpty()) {
+                Toast.makeText(activity, "Please enter your name", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val nameError = getNameValidationError(name)
+            if (nameError != null) {
+                Toast.makeText(activity, nameError, Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            if (birthday.isNotEmpty() && !isAtLeast18(birthday)) {
+                Toast.makeText(activity, "You must be at least 18 years old", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            val anyAddress = street.isNotEmpty() || citySelected || postal.isNotEmpty() || barangay.isNotEmpty()
+            if (anyAddress) {
+                if (street.isEmpty()) {
+                    Toast.makeText(activity, "Please enter the street", Toast.LENGTH_SHORT).show(); return@setOnClickListener
+                }
+                if (!citySelected) {
+                    Toast.makeText(activity, "Please select a city / municipality", Toast.LENGTH_SHORT).show(); return@setOnClickListener
+                }
+                if (barangay.isEmpty()) {
+                    Toast.makeText(activity, "Please select or enter the barangay", Toast.LENGTH_SHORT).show(); return@setOnClickListener
+                }
+                if (postal.isEmpty()) {
+                    Toast.makeText(activity, "Please enter the postal code", Toast.LENGTH_SHORT).show(); return@setOnClickListener
+                }
+                val addressError = validateAddress(street, barangay, city, "Bataan", postal)
+                if (addressError != null) {
+                    Toast.makeText(activity, addressError, Toast.LENGTH_SHORT).show(); return@setOnClickListener
+                }
+            }
+
+            val updates = mutableMapOf<String, Any>("name" to name)
+            if (birthday.isNotEmpty()) updates["birthday"] = birthday
+            if (anyAddress) {
+                updates["address"] = mapOf(
+                    "street" to street, "barangay" to barangay,
+                    "city" to city, "state" to "Bataan", "postalCode" to postal
+                )
+            }
+
+            showEditProfileConfirmationDialog(activity) {
+                db.collection("user_access").document(userEmail)
+                    .set(updates, SetOptions.merge())
+                    .addOnSuccessListener {
+                        Toast.makeText(activity, "Profile updated.", Toast.LENGTH_SHORT).show()
+                        dialog.dismiss()
+                        onUpdated?.invoke()
+                    }
+                    .addOnFailureListener { e ->
+                        Toast.makeText(activity, "Failed to update profile: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+            }
+        }
+    }
+
+    /** White surface + green accents, styled to match the rest of this file. */
+    private fun showEditProfileConfirmationDialog(activity: Activity, onConfirm: () -> Unit) {
+        val dp = activity.resources.displayMetrics.density
+        val container = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor(Brand.SURFACE))
+            setPadding((20 * dp).toInt(), (20 * dp).toInt(), (20 * dp).toInt(), (12 * dp).toInt())
+        }
+        container.addView(TextView(activity).apply {
+            text = "Save Changes?"
+            setTextColor(Color.parseColor(Brand.TEXT_PRIMARY))
+            textSize = 18f
+            setTypeface(typeface, Typeface.BOLD)
+        })
+        container.addView(TextView(activity).apply {
+            text = "Do you want to save these changes to your profile?"
+            setTextColor(Color.parseColor(Brand.TEXT_SECONDARY))
+            textSize = 13.5f
+            setPadding(0, (8 * dp).toInt(), 0, 0)
+        })
+        container.addView(View(activity).apply {
+            setBackgroundColor(Color.parseColor(Brand.GREEN_LINE))
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, (1 * dp).toInt()
+            ).apply { topMargin = (14 * dp).toInt() }
+        })
+
+        val dialog = AlertDialog.Builder(activity)
+            .setView(container)
+            .setPositiveButton("Save Changes") { _, _ -> onConfirm() }
+            .setNegativeButton("Cancel", null)
+            .create()
+        dialog.show()
+
+        dialog.window?.setBackgroundDrawable(GradientDrawable().apply {
+            cornerRadius = 24 * dp
+            setColor(Color.parseColor(Brand.SURFACE))
+            setStroke((1 * dp).toInt(), Color.parseColor(Brand.GREEN_LINE))
+        })
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.apply {
+            setTextColor(Color.parseColor(Brand.GREEN_PRIMARY_DARK))
+            setTypeface(typeface, Typeface.BOLD)
+        }
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.apply {
+            setTextColor(Color.parseColor(Brand.TEXT_SECONDARY))
+        }
+    }
+
     private fun getNameValidationError(name: String): String? {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return null
