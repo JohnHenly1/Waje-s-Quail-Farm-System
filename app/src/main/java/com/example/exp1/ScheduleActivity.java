@@ -1,5 +1,6 @@
 package com.example.exp1;
 
+import android.graphics.drawable.GradientDrawable;
 import android.annotation.SuppressLint;
 import android.app.AlarmManager;
 import android.widget.HorizontalScrollView;
@@ -23,6 +24,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.text.InputType;
 import android.util.Base64;
+import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -57,6 +59,7 @@ import androidx.core.content.ContextCompat;
 
 import com.example.exp1.FarmRepository;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.android.material.chip.Chip;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
@@ -107,11 +110,13 @@ public class ScheduleActivity extends AppCompatActivity {
     private TextView doneCount, ongoingCount, pendingCount, missedCount;
     private List<Task> taskList = new ArrayList<>();
     // Filter buttons
-    private Button filterAssignedBtn, filterMissingBtn, filterDoneBtn;
-    private static final String FILTER_ASSIGNED = "ASSIGNED"; // pending
-    private static final String FILTER_MISSING = "MISSING";   // missed
-    private static final String FILTER_DONE = "DONE";         // done
-    private String activeFilter = FILTER_ASSIGNED;
+    private Chip filterPendingBtn, filterAssignedBtn, filterMissingBtn, filterDoneBtn;
+    private static final String FILTER_PENDING = "PENDING";
+    private static final String FILTER_ASSIGNED = "ASSIGNED";
+    private static final String FILTER_MISSING = "MISSING";
+    private static final String FILTER_DONE = "DONE";
+    private static final int MAX_WORK_WINDOW_MINUTES = 300; // 5 hours maximum
+    private String activeFilter = FILTER_PENDING;
 
     private FirebaseFirestore db;
     private String currentUserEmail;
@@ -304,18 +309,21 @@ public class ScheduleActivity extends AppCompatActivity {
         }
         findViewById(R.id.taskDetailsBtn).setOnClickListener(v -> showAllTaskDetails());
 
-        // Setup filter buttons (Assigned / Missing / Done)
+        // Setup filter chips (Awaiting Task / Assigned / Missing / Done)
+        filterPendingBtn = findViewById(R.id.filterPendingBtn);
         filterAssignedBtn = findViewById(R.id.filterAssignedBtn);
         filterMissingBtn = findViewById(R.id.filterMissingBtn);
         filterDoneBtn = findViewById(R.id.filterDoneBtn);
 
         View.OnClickListener filterClick = v -> {
-            if (v.getId() == R.id.filterAssignedBtn) activeFilter = FILTER_ASSIGNED;
+            if (v.getId() == R.id.filterPendingBtn) activeFilter = FILTER_PENDING;
+            else if (v.getId() == R.id.filterAssignedBtn) activeFilter = FILTER_ASSIGNED;
             else if (v.getId() == R.id.filterMissingBtn) activeFilter = FILTER_MISSING;
             else if (v.getId() == R.id.filterDoneBtn) activeFilter = FILTER_DONE;
             updateFilterButtonsUI();
             updateTasksUI();
         };
+        if (filterPendingBtn != null) filterPendingBtn.setOnClickListener(filterClick);
         if (filterAssignedBtn != null) filterAssignedBtn.setOnClickListener(filterClick);
         if (filterMissingBtn != null) filterMissingBtn.setOnClickListener(filterClick);
         if (filterDoneBtn != null) filterDoneBtn.setOnClickListener(filterClick);
@@ -386,6 +394,17 @@ public class ScheduleActivity extends AppCompatActivity {
                             task.pendingRescheduleMinutes = doc.getLong("pendingRescheduleMinutes") != null ? doc.getLong("pendingRescheduleMinutes").intValue() : 0;
                             task.pendingRescheduleReason = doc.getString("pendingRescheduleReason");
                             task.pendingRescheduleRequestedBy = doc.getString("pendingRescheduleRequestedBy");
+                            task.pendingDaysOffDates = parseLongList(doc.get("pendingDaysOffDates"));
+                            task.pendingDaysOffReason = doc.getString("pendingDaysOffReason");
+                            task.pendingDaysOffRequestedBy = doc.getString("pendingDaysOffRequestedBy");
+                            task.acceptedBy = doc.getString("acceptedBy");
+                            task.pendingResponseStatus = doc.getString("pendingResponseStatus");
+                            task.pendingResponseReason = doc.getString("pendingResponseReason");
+                            task.pendingResponseRequestedBy = doc.getString("pendingResponseRequestedBy");
+                            task.pendingResponseOwnerReason = doc.getString("pendingResponseOwnerReason");
+                            task.pendingResponseOwnerRequestedBy = doc.getString("pendingResponseOwnerRequestedBy");
+                            List<String> declined = (List<String>) doc.get("declinedStaff");
+                            task.declinedStaff = declined != null ? new ArrayList<>(declined) : new ArrayList<>();
                             taskList.add(task);
                         }
                     }
@@ -423,6 +442,17 @@ public class ScheduleActivity extends AppCompatActivity {
                         task.pendingRescheduleMinutes = doc.getLong("pendingRescheduleMinutes") != null ? doc.getLong("pendingRescheduleMinutes").intValue() : 0;
                         task.pendingRescheduleReason = doc.getString("pendingRescheduleReason");
                         task.pendingRescheduleRequestedBy = doc.getString("pendingRescheduleRequestedBy");
+                        task.pendingDaysOffDates = parseLongList(doc.get("pendingDaysOffDates"));
+                        task.pendingDaysOffReason = doc.getString("pendingDaysOffReason");
+                        task.pendingDaysOffRequestedBy = doc.getString("pendingDaysOffRequestedBy");
+                        task.acceptedBy = doc.getString("acceptedBy");
+                        task.pendingResponseStatus = doc.getString("pendingResponseStatus");
+                        task.pendingResponseReason = doc.getString("pendingResponseReason");
+                        task.pendingResponseRequestedBy = doc.getString("pendingResponseRequestedBy");
+                        task.pendingResponseOwnerReason = doc.getString("pendingResponseOwnerReason");
+                        task.pendingResponseOwnerRequestedBy = doc.getString("pendingResponseOwnerRequestedBy");
+                        List<String> declined = (List<String>) doc.get("declinedStaff");
+                        task.declinedStaff = declined != null ? new ArrayList<>(declined) : new ArrayList<>();
                         taskList.add(task);
                     }
                     updateTasksUI();
@@ -453,6 +483,18 @@ public class ScheduleActivity extends AppCompatActivity {
         return result;
     }
 
+    /** Normalizes a Firestore List of numbers into List<Long>. */
+    @SuppressWarnings("unchecked")
+    private List<Long> parseLongList(Object raw) {
+        List<Long> out = new ArrayList<>();
+        if (raw instanceof List) {
+            for (Object o : (List<Object>) raw) {
+                if (o instanceof Number) out.add(((Number) o).longValue());
+            }
+        }
+        return out;
+    }
+
     private Map<String, Object> buildTaskMap(Task task) {
         Map<String, Object> data = new HashMap<>();
         data.put("title",              task.title);
@@ -468,6 +510,10 @@ public class ScheduleActivity extends AppCompatActivity {
         data.put("assignedBy",         task.assignedBy != null ? task.assignedBy : "");
         data.put("extensionMinutes",   task.extensionMinutes);
         data.put("workWindowMinutes",  task.workWindowMinutes);
+        data.put("pendingResponseStatus", task.pendingResponseStatus != null ? task.pendingResponseStatus : "");
+        data.put("pendingResponseReason", task.pendingResponseReason != null ? task.pendingResponseReason : "");
+        data.put("pendingResponseRequestedBy", task.pendingResponseRequestedBy != null ? task.pendingResponseRequestedBy : "");
+        data.put("declinedStaff", new ArrayList<>(task.declinedStaff != null ? task.declinedStaff : new ArrayList<>()));
         data.put("createdAt", com.google.firebase.firestore.FieldValue.serverTimestamp());
         return data;
     }
@@ -746,9 +792,10 @@ public class ScheduleActivity extends AppCompatActivity {
             dialogView.requestFocus(); // parks focus on a neutral container instead of an input field
         };
         EditText    editTaskTitle        = dialogView.findViewById(R.id.editTaskTitle);
+        if (editTaskTitle != null) editTaskTitle.setVisibility(View.GONE);
         Spinner     spinnerCategory      = dialogView.findViewById(R.id.spinnerCategory);
         TextView    textTime             = dialogView.findViewById(R.id.textTime);
-        // Work window is now a Spinner (drop-down) offering fixed selections from 30 minutes to 2 hours
+        // Work window is now a Spinner (drop-down) offering fixed selections from 30 minutes to 5 hours
         Spinner     spinnerWorkWindow    = dialogView.findViewById(R.id.spinnerWorkWindow);
         TextView    txtCurrentMonth      = dialogView.findViewById(R.id.txtCurrentMonth);
         GridLayout  calendarGrid         = dialogView.findViewById(R.id.calendarGrid);
@@ -791,8 +838,8 @@ public class ScheduleActivity extends AppCompatActivity {
         spinnerCategory.setAdapter(catAdapter);
 
         // Populate work window spinner with friendly labels and corresponding minute values
-        final String[] workWindowLabels = new String[]{"30 minutes","45 minutes","60 minutes","75 minutes","90 minutes","105 minutes","120 minutes"};
-        final int[] workWindowValues = new int[]{30,45,60,75,90,105,120};
+        final String[] workWindowLabels = new String[]{"30 minutes","45 minutes","60 minutes","75 minutes","90 minutes","105 minutes","120 minutes","180 minutes (3 hours)","240 minutes (4 hours)","300 minutes (5 hours)"};
+        final int[] workWindowValues = new int[]{30,45,60,75,90,105,120,180,240,300};
         ArrayAdapter<String> wwAdapter = new ArrayAdapter<>(this, R.layout.spinner_item_black, workWindowLabels);
         wwAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item_black);
         spinnerWorkWindow.setAdapter(wwAdapter);
@@ -855,8 +902,11 @@ public class ScheduleActivity extends AppCompatActivity {
                         // Validate: work hours 6 AM (hour 6) to 8 PM (hour 20)
                         if (hour < 6 || hour > 20) {
                             Toast.makeText(this, "Please choose a time between 6:00 AM and 8:00 PM", Toast.LENGTH_SHORT).show();
-                            return;  // Keep dialog open
+                            return;
                         }
+
+                        // The final save step validates the 1-hour minimum gap
+                        // after the selected dates are known.
 
                         // Accept selection
                         selHour[0] = hour;
@@ -1247,106 +1297,466 @@ public class ScheduleActivity extends AppCompatActivity {
         dialog.show();
 
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-            String title = editTaskTitle.getText().toString().trim();
             String category = spinnerCategory.getSelectedItem().toString();
-            // Read selected work window minutes from spinner; fallback to category default if none selected
+            // The schedule form no longer has a separate title. Keep the legacy
+            // Firestore title field populated with the category for compatibility.
+            String title = category;
+
             int selPos = spinnerWorkWindow.getSelectedItemPosition();
-            int window = (selPos >= 0 && selPos < workWindowValues.length) ? workWindowValues[selPos] : getDefaultWorkWindow(category);
+            int window = (selPos >= 0 && selPos < workWindowValues.length)
+                    ? workWindowValues[selPos]
+                    : getDefaultWorkWindow(category);
 
-            if (title.isEmpty()) { Toast.makeText(this, getString(R.string.task_title_empty), Toast.LENGTH_SHORT).show(); return; }
-            if (selectedDates.isEmpty()) { Toast.makeText(this, getString(R.string.please_select_date), Toast.LENGTH_SHORT).show(); return; }
-
-            View previewView = LayoutInflater.from(this).inflate(R.layout.dialog_schedule_preview, null);
-
-            // Force a white background + dark text regardless of system dark mode.
-            // The layout's default colors come from theme attrs, which flip in dark
-            // mode; setting them explicitly here overrides that for this dialog only.
-            previewView.setBackgroundColor(Color.WHITE);
-            forceLightPreviewColors(previewView);
-
-            ((TextView) previewView.findViewById(R.id.previewTitle)).setText(title);
-            ((TextView) previewView.findViewById(R.id.previewCategory)).setText(category);
-            ((TextView) previewView.findViewById(R.id.previewTime)).setText(selectedTime[0]);
-            ((TextView) previewView.findViewById(R.id.previewTotalDates)).setText(selectedDates.size() + " " + getString(R.string.days_unit) + " (" + selectedRecurrence[0] + ")");
-
-            AlertDialog previewDialog = new AlertDialog.Builder(this)
-                    .setView(previewView)
-                    .setPositiveButton(getString(R.string.confirm_and_save), (dConfirm, wConfirm) -> {
-                        String groupId = UUID.randomUUID().toString();
-
-                        AlertDialog progress = new AlertDialog.Builder(this)
-                                .setMessage(getString(R.string.scheduling_tasks))
-                                .setCancelable(false)
-                                .show();
-
-                        int batchSize = 400;
-                        int totalTasks = selectedDates.size();
-                        final int[] completedBatches = {0};
-                        int numBatches = (totalTasks + batchSize - 1) / batchSize;
-
-                        ensureAuthThenRun(() -> {
-                            for (int i = 0; i < totalTasks; i += batchSize) {
-                                com.google.firebase.firestore.WriteBatch batch = db.batch();
-                                int end = Math.min(i + batchSize, totalTasks);
-
-                                for (int j = i; j < end; j++) {
-                                    Long time = selectedDates.get(j);
-                                    Calendar cal = Calendar.getInstance();
-                                    cal.setTimeInMillis(time);
-
-                                    DocumentReference ref = db.collection("farm_data").document("shared")
-                                            .collection("tasks").document();
-
-                                    Task t = new Task(ref.getId(), title, category, selectedTime[0], "Pending",
-                                            cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH),
-                                            selectedRecurrence[0], groupId);
-                                    t.workWindowMinutes = window;
-                                    t.assignedTo = new ArrayList<>(selectedAssigneeEmails);
-                                    t.assignedBy = currentUserEmail;
-
-                                    batch.set(ref, buildTaskMap(t));
-                                    scheduleNotification(t, selHour[0], selMinute[0]);
-                                }
-
-                                batch.commit().addOnCompleteListener(taskResult -> {
-                                    completedBatches[0]++;
-                                    if (completedBatches[0] >= numBatches) {
-                                        progress.dismiss();
-                                        Toast.makeText(this, getString(R.string.tasks_scheduled, totalTasks), Toast.LENGTH_SHORT).show();
-                                        dialog.dismiss();
-
-                                        // Fire the assignment email(s) once the whole series is
-                                        // confirmed saved — direct call, no Firebase/Cloud Functions
-                                        // or polling script in the loop. One email per assignee for
-                                        // the whole series (see sendTaskAssignmentEmailsDirect doc).
-                                        if (!selectedDates.isEmpty()) {
-                                            Calendar firstDateCal = Calendar.getInstance();
-                                            firstDateCal.setTimeInMillis(selectedDates.get(0));
-                                            String firstDateStr = firstDateCal.get(Calendar.DAY_OF_MONTH) + "/"
-                                                    + (firstDateCal.get(Calendar.MONTH) + 1) + "/"
-                                                    + firstDateCal.get(Calendar.YEAR);
-                                            sendTaskAssignmentEmailsDirect(
-                                                    selectedAssigneeEmails, title, category, firstDateStr,
-                                                    selectedTime[0], currentUserEmail);
-                                        }
-                                    }
-                                }).addOnFailureListener(e -> {
-                                    progress.dismiss();
-                                    Toast.makeText(this, getString(R.string.save_failed, e.getMessage()), Toast.LENGTH_LONG).show();
-                                });
-                            }
-                        });
-                    })
-                    .setNegativeButton(getString(R.string.back), null)
-                    .create();
-
-            previewDialog.show();
-            // AlertDialog's own window background also follows the system theme in dark
-            // mode (a dark panel behind/around previewView); force that white too.
-            if (previewDialog.getWindow() != null) {
-                previewDialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.WHITE));
+            if (window > MAX_WORK_WINDOW_MINUTES) {
+                Toast.makeText(this, "Work window cannot exceed 5 hours.", Toast.LENGTH_SHORT).show();
+                return;
             }
+
+            if (selectedDates.isEmpty()) {
+                Toast.makeText(this, getString(R.string.please_select_date), Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (!validateOwnerStartTime(selectedDates, selHour[0], selMinute[0])) return;
+
+            // Similar tasks are allowed. We warn when the same task/category is
+            // assigned to overlapping staff on the same date and the work windows
+            // overlap. The owner can still intentionally create the task.
+            checkForExactDuplicateTasks(
+                    selectedDates,
+                    title,
+                    category,
+                    selectedTime[0],
+                    selectedAssigneeEmails,
+                    window,
+                    () -> showSchedulePreviewAndSave(
+                            dialog,
+                            title,
+                            category,
+                            selectedTime[0],
+                            selectedDates,
+                            selectedRecurrence[0],
+                            window,
+                            selHour[0],
+                            selMinute[0],
+                            selectedAssigneeEmails
+                    )
+            );
         });
+    }
+
+    /**
+     * Checks existing task documents for conflicting duplicate schedules.
+     *
+     * A conflict is now based on the work window, not just the start time:
+     * same task/category + same date + at least one overlapping staff member +
+     * overlapping work windows. Similar tasks with a different date, different
+     * staff, or a non-overlapping time window remain allowed.
+     *
+     * The owner can still intentionally create the conflicting task.
+     */
+    /**
+     * Prevents a staff member from being assigned to task categories too close
+     * together on the same date. A minimum 7-hour gap is required between the
+     * END of one work window and the START of the next work window.
+     *
+     * Examples:
+     *   Existing: 8:00 AM-10:00 AM, requested 5:00 PM -> allowed (7-hour gap).
+     *   Existing: 8:00 AM-10:00 AM, requested 4:59 PM -> blocked (<7-hour gap).
+     *   Existing: 8:00 AM-10:00 AM, requested 9:00 AM -> blocked (overlap).
+     *
+     * The rule applies to most task categories for the same staff member.
+     * Feeding, Watering, and Lighting are a special routine group and do not
+     * require the 7-hour gap when both tasks are from that group. Different
+     * staff or different dates remain independent.
+     */
+    private void checkForExactDuplicateTasks(
+            List<Long> dates,
+            String title,
+            String category,
+            String time,
+            List<String> assignees,
+            int requestedWorkWindowMinutes,
+            Runnable onNoDuplicate) {
+
+        final int requestedStartMinutes = timeToMinutes(time);
+        if (requestedStartMinutes == Integer.MIN_VALUE) {
+            onNoDuplicate.run();
+            return;
+        }
+
+        final int requestedWindow = Math.max(1,
+                Math.min(requestedWorkWindowMinutes, MAX_WORK_WINDOW_MINUTES));
+        final int requestedEndMinutes = requestedStartMinutes + requestedWindow;
+        final int requiredGapMinutes = 7 * 60;
+
+        db.collection("farm_data")
+                .document("shared")
+                .collection("tasks")
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    List<String> conflicts = new ArrayList<>();
+                    List<String> seenKeys = new ArrayList<>();
+
+                    for (QueryDocumentSnapshot doc : snapshot) {
+                        List<String> existingAssignees = parseAssignedTo(doc.get("assignedTo"));
+                        if (!hasStaffOverlap(existingAssignees, assignees)) continue;
+
+                        String existingTime = doc.getString("time");
+                        int existingStartMinutes = timeToMinutes(existingTime);
+                        if (existingStartMinutes == Integer.MIN_VALUE) continue;
+
+                        int existingWindow = doc.getLong("workWindowMinutes") != null
+                                ? doc.getLong("workWindowMinutes").intValue()
+                                : 60;
+                        existingWindow = Math.max(1,
+                                Math.min(existingWindow, MAX_WORK_WINDOW_MINUTES));
+                        int existingEndMinutes = existingStartMinutes + existingWindow;
+
+                        // Feeding, Watering, and Lighting are exempt from the
+                        // 7-hour staff gap rule when BOTH the existing task and
+                        // the requested task belong to this special group.
+                        // This allows these routine farm tasks to be assigned
+                        // close together (or even overlap) for the same staff.
+                        String existingCategory = doc.getString("category");
+                        if (areFlexibleScheduleCategories(category, existingCategory)) {
+                            continue;
+                        }
+
+                        int year = doc.getLong("year") != null
+                                ? doc.getLong("year").intValue() : Integer.MIN_VALUE;
+                        int month = doc.getLong("month") != null
+                                ? doc.getLong("month").intValue() : Integer.MIN_VALUE;
+                        int day = doc.getLong("day") != null
+                                ? doc.getLong("day").intValue() : Integer.MIN_VALUE;
+
+                        Calendar matchingDate = null;
+                        for (Long dateMillis : dates) {
+                            Calendar requested = Calendar.getInstance();
+                            requested.setTimeInMillis(dateMillis);
+                            if (requested.get(Calendar.YEAR) == year
+                                    && requested.get(Calendar.MONTH) == month
+                                    && requested.get(Calendar.DAY_OF_MONTH) == day) {
+                                matchingDate = requested;
+                                break;
+                            }
+                        }
+                        if (matchingDate == null) continue;
+
+                        // Require at least 7 hours between work windows.
+                        // If windows overlap, the gap is negative and conflicts.
+                        int gapMinutes;
+                        if (requestedStartMinutes >= existingEndMinutes) {
+                            gapMinutes = requestedStartMinutes - existingEndMinutes;
+                        } else if (existingStartMinutes >= requestedEndMinutes) {
+                            gapMinutes = existingStartMinutes - requestedEndMinutes;
+                        } else {
+                            gapMinutes = -1;
+                        }
+
+                        if (gapMinutes >= requiredGapMinutes) continue;
+
+                        String duplicateKey = year + "-" + month + "-" + day + "|"
+                                + existingStartMinutes + "|" + existingWindow + "|"
+                                + normalizeStaffSet(existingAssignees);
+                        if (!seenKeys.add(duplicateKey)) continue;
+
+                        String staffLabel = existingAssignees.isEmpty()
+                                ? "No specific staff"
+                                : resolveStaffNamesFromEmails(existingAssignees);
+
+                        String dateLabel = new SimpleDateFormat(
+                                "EEE, MMM d, yyyy", Locale.getDefault())
+                                .format(matchingDate.getTime());
+
+                        String existingInterval = formatMinutesRange(
+                                existingStartMinutes, existingEndMinutes);
+
+                        String gapLabel = gapMinutes < 0
+                                ? "overlaps"
+                                : formatGapDuration(gapMinutes) + " gap";
+
+                        conflicts.add(dateLabel + ": " + staffLabel
+                                + " (" + existingInterval + ")"
+                                + " — " + gapLabel);
+                    }
+
+                    if (conflicts.isEmpty()) {
+                        onNoDuplicate.run();
+                        return;
+                    }
+
+                    StringBuilder message = new StringBuilder();
+                    message.append("A staff member already has a scheduled task too close to this assignment:")
+                            .append("\n\n");
+
+                    int maxShown = Math.min(conflicts.size(), 8);
+                    for (int i = 0; i < maxShown; i++) {
+                        message.append("• ").append(conflicts.get(i)).append("\n");
+                    }
+                    if (conflicts.size() > maxShown) {
+                        message.append("\n+")
+                                .append(conflicts.size() - maxShown)
+                                .append(" more conflict(s).");
+                    }
+
+                    message.append("\n\n")
+                            .append("Each staff member must have at least a 7-hour gap ")
+                            .append("between task work windows on the same date for other categories.")
+                            .append(" Feeding, Watering, and Lighting are exempt from this gap rule when paired with one another.")
+                            .append("\n\n")
+                            .append("Different staff members and different dates are still allowed.")
+                            .append("\n\n")
+                            .append("Do you still want to create this task?");
+
+                    // This is a hard scheduling rule: the owner cannot bypass
+                    // the 7-hour gap for a staff member on the same date.
+                    new AlertDialog.Builder(this)
+                            .setTitle("7-Hour Assignment Gap")
+                            .setMessage(message.toString())
+                            .setPositiveButton("OK", null)
+                            .show();
+                })
+                .addOnFailureListener(e -> {
+                    // Keep the original scheduling flow available if this read-only
+                    // validation query fails.
+                    onNoDuplicate.run();
+                });
+    }
+
+    private String formatGapDuration(int minutes) {
+        int safeMinutes = Math.max(0, minutes);
+        int hours = safeMinutes / 60;
+        int mins = safeMinutes % 60;
+
+        if (hours == 0) return mins + " min";
+        if (mins == 0) return hours + " hour" + (hours == 1 ? "" : "s");
+        return hours + "h " + mins + "m";
+    }
+
+    /**
+     * Returns true only when both task categories are part of the routine-task
+     * group that is exempt from the 7-hour staff gap rule.
+     *
+     * Allowed close-together combinations include:
+     *   Feeding + Feeding
+     *   Feeding + Watering
+     *   Feeding + Lighting
+     *   Watering + Watering
+     *   Watering + Lighting
+     *   Lighting + Lighting
+     *
+     * All other category combinations continue to require the 7-hour gap.
+     */
+    private boolean areFlexibleScheduleCategories(String requestedCategory, String existingCategory) {
+        return isFlexibleRoutineCategory(requestedCategory)
+                && isFlexibleRoutineCategory(existingCategory);
+    }
+
+    private boolean isFlexibleRoutineCategory(String category) {
+        if (category == null) return false;
+        String value = category.trim();
+        return value.equalsIgnoreCase("Feeding")
+                || value.equalsIgnoreCase("Watering")
+                || value.equalsIgnoreCase("Lighting");
+    }
+
+    private boolean hasStaffOverlap(List<String> first, List<String> second) {
+        if (first == null || first.isEmpty() || second == null || second.isEmpty()) {
+            return false;
+        }
+        for (String a : first) {
+            if (a == null) continue;
+            for (String b : second) {
+                if (b != null && a.trim().equalsIgnoreCase(b.trim())) return true;
+            }
+        }
+        return false;
+    }
+
+    private String formatMinutesRange(int startMinutes, int endMinutes) {
+        return formatClockMinutes(startMinutes) + "-" + formatClockMinutes(endMinutes);
+    }
+
+    private String formatClockMinutes(int totalMinutes) {
+        int normalized = Math.max(0, totalMinutes);
+        int hour = (normalized / 60) % 24;
+        int minute = normalized % 60;
+        String amPm = hour < 12 ? "AM" : "PM";
+        int displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+        return String.format(Locale.getDefault(), "%d:%02d %s", displayHour, minute, amPm);
+    }
+
+    private boolean safeEqualsIgnoreCase(String a, String b) {
+        if (a == null && b == null) return true;
+        if (a == null || b == null) return false;
+        return a.trim().equalsIgnoreCase(b.trim());
+    }
+
+    /** Converts supported 12-hour time strings such as 08:00 AM into minutes since midnight. */
+    private int timeToMinutes(String time) {
+        if (time == null || time.trim().isEmpty()) return Integer.MIN_VALUE;
+        String[] patterns = {"hh:mm a", "h:mm a", "HH:mm"};
+        for (String pattern : patterns) {
+            try {
+                SimpleDateFormat sdf = new SimpleDateFormat(pattern, Locale.getDefault());
+                sdf.setLenient(false);
+                Date parsed = sdf.parse(time.trim());
+                if (parsed != null) {
+                    Calendar c = Calendar.getInstance();
+                    c.setTime(parsed);
+                    return c.get(Calendar.HOUR_OF_DAY) * 60 + c.get(Calendar.MINUTE);
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return Integer.MIN_VALUE;
+    }
+
+    private boolean sameStaffSet(List<String> a, List<String> b) {
+        return normalizeStaffSet(a).equals(normalizeStaffSet(b));
+    }
+
+    private String normalizeStaffSet(List<String> emails) {
+        List<String> normalized = new ArrayList<>();
+        if (emails != null) {
+            for (String email : emails) {
+                if (email != null && !email.trim().isEmpty()) {
+                    normalized.add(email.trim().toLowerCase(Locale.ROOT));
+                }
+            }
+        }
+        Collections.sort(normalized);
+        return android.text.TextUtils.join("|", normalized);
+    }
+
+    /**
+     * Shows the existing schedule preview and performs the original Firestore
+     * save. Kept separate so duplicate checking does not alter the save flow.
+     */
+    private void showSchedulePreviewAndSave(
+            AlertDialog addDialog,
+            String title,
+            String category,
+            String selectedTime,
+            List<Long> selectedDates,
+            String selectedRecurrence,
+            int window,
+            int selHour,
+            int selMinute,
+            List<String> selectedAssigneeEmails) {
+
+        View previewView = LayoutInflater.from(this).inflate(R.layout.dialog_schedule_preview, null);
+        previewView.setBackgroundColor(Color.WHITE);
+        forceLightPreviewColors(previewView);
+
+        // The confirmation preview should not show a separate "Task" line.
+        TextView previewTask = previewView.findViewById(R.id.previewTitle);
+        if (previewTask != null) previewTask.setVisibility(View.GONE);
+        ((TextView) previewView.findViewById(R.id.previewCategory)).setText(category);
+        ((TextView) previewView.findViewById(R.id.previewTime)).setText(selectedTime);
+        ((TextView) previewView.findViewById(R.id.previewTotalDates)).setText(
+                selectedDates.size() + " " + getString(R.string.days_unit) + " (" + selectedRecurrence + ")");
+
+        AlertDialog previewDialog = new AlertDialog.Builder(this)
+                .setView(previewView)
+                .setPositiveButton(getString(R.string.confirm_and_save), (dConfirm, wConfirm) -> {
+                    String groupId = UUID.randomUUID().toString();
+
+                    AlertDialog progress = new AlertDialog.Builder(this)
+                            .setMessage(getString(R.string.scheduling_tasks))
+                            .setCancelable(false)
+                            .show();
+
+                    int batchSize = 400;
+                    int totalTasks = selectedDates.size();
+                    final int[] completedBatches = {0};
+                    int numBatches = (totalTasks + batchSize - 1) / batchSize;
+
+                    ensureAuthThenRun(() -> {
+                        for (int i = 0; i < totalTasks; i += batchSize) {
+                            com.google.firebase.firestore.WriteBatch batch = db.batch();
+                            int end = Math.min(i + batchSize, totalTasks);
+
+                            for (int j = i; j < end; j++) {
+                                Long dateMillis = selectedDates.get(j);
+                                Calendar cal = Calendar.getInstance();
+                                cal.setTimeInMillis(dateMillis);
+
+                                DocumentReference ref = db.collection("farm_data").document("shared")
+                                        .collection("tasks").document();
+
+                                Task t = new Task(
+                                        ref.getId(),
+                                        title,
+                                        category,
+                                        selectedTime,
+                                        "Pending",
+                                        cal.get(Calendar.YEAR),
+                                        cal.get(Calendar.MONTH),
+                                        cal.get(Calendar.DAY_OF_MONTH),
+                                        selectedRecurrence,
+                                        groupId);
+
+                                t.workWindowMinutes = window;
+                                t.assignedTo = new ArrayList<>(selectedAssigneeEmails);
+                                t.assignedBy = currentUserEmail;
+
+                                // New tasks always start with a completely fresh response state.
+                                // A previous task's declinedStaff/pending-response history is never inherited.
+                                t.pendingResponseStatus = null;
+                                t.pendingResponseReason = null;
+                                t.pendingResponseRequestedBy = null;
+                                t.pendingResponseOwnerReason = null;
+                                t.pendingResponseOwnerRequestedBy = null;
+                                t.pendingDaysOffDates = new ArrayList<>();
+                                t.pendingDaysOffReason = null;
+                                t.pendingDaysOffRequestedBy = null;
+                                t.pendingRescheduleMinutes = 0;
+                                t.pendingRescheduleReason = null;
+                                t.pendingRescheduleRequestedBy = null;
+                                t.acceptedBy = null;
+                                t.declinedStaff = new ArrayList<>();
+
+                                batch.set(ref, buildTaskMap(t));
+                                scheduleNotification(t, selHour, selMinute);
+                            }
+
+                            batch.commit().addOnCompleteListener(taskResult -> {
+                                completedBatches[0]++;
+                                if (completedBatches[0] >= numBatches) {
+                                    progress.dismiss();
+                                    Toast.makeText(this, getString(R.string.tasks_scheduled, totalTasks), Toast.LENGTH_SHORT).show();
+                                    addDialog.dismiss();
+
+                                    if (!selectedDates.isEmpty()) {
+                                        Calendar firstDateCal = Calendar.getInstance();
+                                        firstDateCal.setTimeInMillis(selectedDates.get(0));
+                                        String firstDateStr = firstDateCal.get(Calendar.DAY_OF_MONTH) + "/"
+                                                + (firstDateCal.get(Calendar.MONTH) + 1) + "/"
+                                                + firstDateCal.get(Calendar.YEAR);
+                                        sendTaskAssignmentEmailsDirect(
+                                                selectedAssigneeEmails,
+                                                title,
+                                                category,
+                                                firstDateStr,
+                                                selectedTime,
+                                                currentUserEmail);
+                                    }
+                                }
+                            }).addOnFailureListener(e -> {
+                                progress.dismiss();
+                                Toast.makeText(this, getString(R.string.save_failed, e.getMessage()), Toast.LENGTH_LONG).show();
+                            });
+                        }
+                    });
+                })
+                .setNegativeButton(getString(R.string.back), null)
+                .create();
+
+        previewDialog.show();
+        if (previewDialog.getWindow() != null) {
+            previewDialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.WHITE));
+        }
     }
 
     private int getDefaultWorkWindow(String category) {
@@ -1918,10 +2328,27 @@ public class ScheduleActivity extends AppCompatActivity {
             else if (sMissed.equals(task.status)) missed++;   // new
             else pending++;
 
-            // Apply active filter: ASSIGNED -> pending or ongoing, MISSING -> missed, DONE -> done
+            // Pending is an explicit assignment-response state. Staff see assignments
+            // waiting for their response (including an open day-off request),
+            // while the owner sees every unaccepted/declined/requested task.
+            boolean assignedToMe = isAssignedToMe(task);
+            boolean hasOpenDaysOff = hasPendingDaysOff(task);
+            boolean declined = "DECLINED".equalsIgnoreCase(task.pendingResponseStatus);
+            boolean acceptedByAny = task.acceptedBy != null && !task.acceptedBy.trim().isEmpty();
+            boolean acceptedByMe = acceptedByAny && task.acceptedBy.equalsIgnoreCase(currentUserEmail);
+            boolean pendingForOwner = isOwner && task.assignedTo != null && !task.assignedTo.isEmpty()
+                    && (!acceptedByAny || declined || hasOpenDaysOff);
+            boolean pendingForStaff = !isOwner && assignedToMe && !acceptedByMe
+                    && (!declined || hasOpenDaysOff);
+
             boolean includeByFilter = true;
-            if (FILTER_ASSIGNED.equals(activeFilter)) includeByFilter = sPending.equals(task.status) || sOngoing.equals(task.status);
-            else if (FILTER_MISSING.equals(activeFilter)) includeByFilter = sMissed.equals(task.status);
+            if (FILTER_PENDING.equals(activeFilter)) includeByFilter = isOwner ? pendingForOwner : pendingForStaff;
+            else if (FILTER_ASSIGNED.equals(activeFilter)) {
+                // Assigned excludes tasks waiting for a response and shows ongoing
+                // work plus accepted pending assignments.
+                includeByFilter = (isOwner ? (!pendingForOwner && (sPending.equals(task.status) || sOngoing.equals(task.status)))
+                        : (acceptedByMe && (sPending.equals(task.status) || sOngoing.equals(task.status))));
+            } else if (FILTER_MISSING.equals(activeFilter)) includeByFilter = sMissed.equals(task.status) && (!isOwner ? assignedToMe : true);
             else if (FILTER_DONE.equals(activeFilter)) includeByFilter = sDone.equals(task.status);
             if (!includeByFilter) continue;
 
@@ -1989,18 +2416,29 @@ public class ScheduleActivity extends AppCompatActivity {
                 boolean isOngoing = getString(R.string.status_ongoing).equals(task.status);
                 boolean isMissed = getString(R.string.status_missed).equals(task.status);
 
-                // Owner-only indicator: staff has an open reschedule request waiting on this task.
+                // Owner-only indicator: staff has an open reschedule/day-off request waiting on this task.
                 boolean hasPendingReschedule = task.pendingRescheduleMinutes > 0
                         && task.pendingRescheduleReason != null && !task.pendingRescheduleReason.trim().isEmpty();
+                boolean hasPendingDaysOff = task.pendingDaysOffReason != null
+                        && !task.pendingDaysOffReason.trim().isEmpty()
+                        && task.pendingDaysOffDates != null
+                        && !task.pendingDaysOffDates.isEmpty();
 
-                if (isOwner && hasPendingReschedule) {
+                if (isOwner && (hasPendingReschedule || hasPendingDaysOff)) {
                     deadlineTv.setVisibility(View.VISIBLE);
                     deadlineTv.setTextColor(Color.parseColor("#DC2626"));
                     deadlineTv.setTypeface(null, Typeface.BOLD);
-                    String requester = task.pendingRescheduleRequestedBy != null
-                            ? staffNameCache.getOrDefault(task.pendingRescheduleRequestedBy, task.pendingRescheduleRequestedBy)
-                            : "Staff";
-                    deadlineTv.setText("🔔 " + requester + " requested +" + task.pendingRescheduleMinutes + " min");
+                    if (hasPendingDaysOff) {
+                        String requester = task.pendingDaysOffRequestedBy != null
+                                ? staffNameCache.getOrDefault(task.pendingDaysOffRequestedBy, task.pendingDaysOffRequestedBy)
+                                : "Staff";
+                        deadlineTv.setText("🔔 " + requester + " requested " + task.pendingDaysOffDates.size() + " day(s) off");
+                    } else {
+                        String requester = task.pendingRescheduleRequestedBy != null
+                                ? staffNameCache.getOrDefault(task.pendingRescheduleRequestedBy, task.pendingRescheduleRequestedBy)
+                                : "Staff";
+                        deadlineTv.setText("🔔 " + requester + " requested +" + task.pendingRescheduleMinutes + " min");
+                    }
                 } else if (isOngoing || isMissed) {
                     deadlineTv.setVisibility(View.VISIBLE);
                     deadlineTv.setTextColor(Color.parseColor("#6B7280")); // restore normal deadline color
@@ -2015,7 +2453,13 @@ public class ScheduleActivity extends AppCompatActivity {
                 if (statusIndicator != null) statusIndicator.setVisibility(View.GONE);
                 if (statusPill != null) {
                     String pillBg, pillText, pillLabel;
-                    if (isMissed) {
+                    if (isOwner && FILTER_PENDING.equals(activeFilter) && "DECLINED".equalsIgnoreCase(task.pendingResponseStatus)) {
+                        pillBg = "#FEE2E2"; pillText = "#DC2626"; pillLabel = "Declined";
+                    } else if (isOwner && FILTER_PENDING.equals(activeFilter) && hasPendingDaysOff(task)) {
+                        pillBg = "#FEF3C7"; pillText = "#B45309"; pillLabel = "Day-Off Request";
+                    } else if (isOwner && FILTER_PENDING.equals(activeFilter) && (task.acceptedBy == null || task.acceptedBy.trim().isEmpty())) {
+                        pillBg = "#FFEDD5"; pillText = "#EA580C"; pillLabel = "Awaiting Response";
+                    } else if (isMissed) {
                         pillBg = "#FEE2E2"; pillText = "#DC2626"; pillLabel = getString(R.string.status_missed);
                     } else if (isDone) {
                         pillBg = "#DCFCE7"; pillText = "#16A34A"; pillLabel = getString(R.string.status_done);
@@ -2037,6 +2481,29 @@ public class ScheduleActivity extends AppCompatActivity {
                 }
 
                 taskView.setOnClickListener(v -> {
+                    boolean hasPendingDaysOffForOwner = hasPendingDaysOff(task);
+                    boolean hasPendingRescheduleForOwner = task.pendingRescheduleMinutes > 0
+                            && task.pendingRescheduleReason != null
+                            && !task.pendingRescheduleReason.trim().isEmpty();
+                    boolean hasDeclinedResponse = "DECLINED".equalsIgnoreCase(task.pendingResponseStatus);
+                    boolean assignedToMe = isAssignedToMe(task);
+                    boolean acceptedByAny = task.acceptedBy != null && !task.acceptedBy.trim().isEmpty();
+                    boolean staffAwaitingResponse = !roleManager.isOwner() && assignedToMe
+                            && !acceptedByAny && !hasDeclinedResponse;
+                    boolean ownerPendingResponse = roleManager.isOwner() && task.assignedTo != null
+                            && !task.assignedTo.isEmpty()
+                            && (!acceptedByAny || hasDeclinedResponse || hasPendingDaysOffForOwner || hasPendingRescheduleForOwner);
+
+                    // Response workflow has priority over the automatic time status.
+                    if (staffAwaitingResponse) {
+                        showPendingTaskActionsDialog(task);
+                        return;
+                    }
+                    if (ownerPendingResponse) {
+                        showOwnerPendingReviewDialog(task);
+                        return;
+                    }
+
                     if (isDone) {
                         showDoneActionsDialog(task);
                         return;
@@ -2045,6 +2512,7 @@ public class ScheduleActivity extends AppCompatActivity {
                         showMissedActionsDialog(task);
                         return;
                     }
+
                     if (!isOngoing) {
                         Toast.makeText(this, "Can only update status when Ongoing (at " + task.time + ")", Toast.LENGTH_SHORT).show();
                         return;
@@ -2052,7 +2520,6 @@ public class ScheduleActivity extends AppCompatActivity {
 
                     showTaskActionsDialog(task);
                 });
-
                 boolean canDelete = roleManager.canDeleteTask();
                 deleteBtn.setVisibility(canDelete ? View.VISIBLE : View.GONE);
                 if (deleteBtnCard != null) deleteBtnCard.setVisibility(canDelete ? View.VISIBLE : View.GONE);
@@ -2230,8 +2697,9 @@ public class ScheduleActivity extends AppCompatActivity {
         container.addView(reasonLabel);
 
         final EditText reasonInput = new EditText(this);
-        reasonInput.setHint("Why do you need more time?");
+        reasonInput.setHint("Why do you need more time?\nMaximum 300 characters");
         reasonInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        reasonInput.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(300)});
         reasonInput.setMinLines(2);
         reasonInput.setTextColor(Color.parseColor("#111827"));
         reasonInput.setHintTextColor(Color.parseColor("#9CA3AF"));
@@ -2240,6 +2708,7 @@ public class ScheduleActivity extends AppCompatActivity {
         reasonParams.setMargins(0, dpToPx(6), 0, dpToPx(8));
         reasonInput.setLayoutParams(reasonParams);
         container.addView(reasonInput);
+        add300CharacterCounter(container, reasonInput);
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setView(container)                 // ← no more .setTitle(...)
@@ -2576,6 +3045,20 @@ public class ScheduleActivity extends AppCompatActivity {
         LinearLayout root = buildActionSheetHeader(task);
         final AlertDialog[] dialogRef = new AlertDialog[1];
 
+        boolean hasPendingDaysOff = task.pendingDaysOffReason != null
+                && !task.pendingDaysOffReason.trim().isEmpty()
+                && task.pendingDaysOffDates != null
+                && !task.pendingDaysOffDates.isEmpty();
+
+        if (roleManager.isOwner() && hasPendingDaysOff) {
+            String requester = task.pendingDaysOffRequestedBy != null
+                    ? staffNameCache.getOrDefault(task.pendingDaysOffRequestedBy, task.pendingDaysOffRequestedBy)
+                    : "Staff";
+            addModernActionRow(root, R.drawable.ic_calendar, "#B98900", "#FBF3DC",
+                    "Review Time-Off Request", requester + " asked for " + task.pendingDaysOffDates.size() + " day(s) off",
+                    v -> { dialogRef[0].dismiss(); showDaysOffApprovalDialog(task); });
+        }
+
         if (!roleManager.isOwner()) {
             addModernActionRow(root, R.drawable.ic_check_circle, "#16A34A", "#DCFCE7",
                     "Submit", "Mark this task as complete",
@@ -2592,6 +3075,1253 @@ public class ScheduleActivity extends AppCompatActivity {
                 v -> { dialogRef[0].dismiss(); showTaskDetailDialog(task); });
 
         dialogRef[0] = showActionSheetDialog(root);
+    }
+
+    private boolean isAssignedToMe(Task task) {
+        if (task == null || task.assignedTo == null) return false;
+        for (String email : task.assignedTo) {
+            if (email != null && email.equalsIgnoreCase(currentUserEmail)) return true;
+        }
+        return false;
+    }
+
+    private boolean hasPendingDaysOff(Task task) {
+        return task != null && task.pendingDaysOffReason != null
+                && !task.pendingDaysOffReason.trim().isEmpty()
+                && task.pendingDaysOffDates != null && !task.pendingDaysOffDates.isEmpty();
+    }
+
+    /**
+     * Clean owner Pending review dialog.
+     * No colored action icons. The staff request/reason is shown prominently.
+     */
+    private void showOwnerPendingReviewDialog(Task task) {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dpToPx(20), dpToPx(18), dpToPx(20), dpToPx(8));
+        root.setBackgroundColor(Color.WHITE);
+
+        TextView title = new TextView(this);
+        title.setText("Pending Task Details");
+        title.setTextColor(Color.parseColor("#245B20"));
+        title.setTextSize(21);
+        title.setTypeface(null, Typeface.BOLD);
+        root.addView(title);
+
+        LinearLayout requestCard = new LinearLayout(this);
+        requestCard.setOrientation(LinearLayout.VERTICAL);
+        requestCard.setPadding(dpToPx(16), dpToPx(14), dpToPx(16), dpToPx(14));
+        LinearLayout.LayoutParams requestCardParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        requestCardParams.setMargins(0, dpToPx(14), 0, dpToPx(8));
+        requestCard.setLayoutParams(requestCardParams);
+        GradientDrawable requestBg = new GradientDrawable();
+        requestBg.setColor(Color.parseColor("#F1F8EE"));
+        requestBg.setCornerRadius(dpToPx(14));
+        requestCard.setBackground(requestBg);
+
+        String requester = "Staff";
+        if (task.pendingDaysOffRequestedBy != null && !task.pendingDaysOffRequestedBy.trim().isEmpty()) {
+            requester = staffNameCache.getOrDefault(task.pendingDaysOffRequestedBy, task.pendingDaysOffRequestedBy);
+        } else if (task.pendingResponseRequestedBy != null && !task.pendingResponseRequestedBy.trim().isEmpty()) {
+            requester = staffNameCache.getOrDefault(task.pendingResponseRequestedBy, task.pendingResponseRequestedBy);
+        } else if (task.assignedTo != null && !task.assignedTo.isEmpty()) {
+            requester = staffNameCache.getOrDefault(task.assignedTo.get(0), task.assignedTo.get(0));
+        }
+
+        boolean hasDayOff = hasPendingDaysOff(task);
+        boolean hasDecline = "DECLINED".equalsIgnoreCase(task.pendingResponseStatus);
+
+        String requestText;
+        String reasonText = "";
+        if (hasDayOff) {
+            int count = task.pendingDaysOffDates.size();
+            requestText = requester + " requested " + count + " day(s) off.";
+            reasonText = "Reason: " + (task.pendingDaysOffReason != null && !task.pendingDaysOffReason.trim().isEmpty()
+                    ? limitReason(task.pendingDaysOffReason) : "No reason provided");
+        } else if (hasDecline) {
+            requestText = requester + " declined this task.";
+            reasonText = "Reason: " + (task.pendingResponseReason != null && !task.pendingResponseReason.trim().isEmpty()
+                    ? limitReason(task.pendingResponseReason) : "No reason provided");
+        } else {
+            requestText = requester + " has not accepted this task yet.";
+            reasonText = "Waiting for the staff member to respond.";
+        }
+
+        TextView requestTextView = new TextView(this);
+        requestTextView.setText(requestText);
+        requestTextView.setTextColor(Color.parseColor("#245B20"));
+        requestTextView.setTextSize(16);
+        requestTextView.setTypeface(null, Typeface.BOLD);
+        requestTextView.setLineSpacing(0, 1.08f);
+        requestCard.addView(requestTextView);
+
+        TextView reasonView = new TextView(this);
+        reasonView.setText(reasonText);
+        reasonView.setTextColor(Color.parseColor("#263238"));
+        reasonView.setTextSize(14.5f);
+        reasonView.setLineSpacing(0, 1.1f);
+        LinearLayout.LayoutParams reasonParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        reasonParams.setMargins(0, dpToPx(5), 0, 0);
+        reasonView.setLayoutParams(reasonParams);
+        requestCard.addView(reasonView);
+        root.addView(requestCard);
+
+        View divider = new View(this);
+        divider.setBackgroundColor(Color.parseColor("#E5E7EB"));
+        root.addView(divider, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(1)));
+
+        final AlertDialog[] dialogRef = new AlertDialog[1];
+
+        if (hasDayOff) {
+            addCleanPendingActionRow(root,
+                    "Approve Day(s) Off",
+                    "Remove staff only on the requested dates",
+                    v -> {
+                        dialogRef[0].dismiss();
+                        approveDaysOff(task);
+                    });
+
+            addCleanPendingActionRow(root,
+                    "Decline Day-Off Request",
+                    "Keep the staff assignment unchanged",
+                    v -> {
+                        dialogRef[0].dismiss();
+                        clearDaysOffRequest(task, () -> Toast.makeText(this,
+                                "Day-off request declined.", Toast.LENGTH_SHORT).show());
+                    });
+        }
+
+        if (hasDecline) {
+            addCleanPendingActionRow(root,
+                    "Accept Request & Reassign",
+                    "Accept the decline request and choose another eligible staff member",
+                    v -> {
+                        dialogRef[0].dismiss();
+                        showOwnerPendingRescheduleDialog(task);
+                    });
+
+            addCleanPendingActionRow(root,
+                    "Reject Request",
+                    "Keep the current assignment and explain why the request was rejected",
+                    v -> {
+                        dialogRef[0].dismiss();
+                        showOwnerRejectDeclineDialog(task);
+                    });
+        } else {
+            addCleanPendingActionRow(root,
+                    "Reschedule / Reassign",
+                    "Change staff, date(s), time, or work window",
+                    v -> {
+                        dialogRef[0].dismiss();
+                        showOwnerPendingRescheduleDialog(task);
+                    });
+        }
+
+        addCleanPendingActionRow(root,
+                "Task Details",
+                "View the task information",
+                v -> {
+                    dialogRef[0].dismiss();
+                    showTaskDetailDialog(task);
+                });
+
+        dialogRef[0] = new AlertDialog.Builder(this)
+                .setView(root)
+                .create();
+        dialogRef[0].show();
+        styleCleanDialogWindow(dialogRef[0], 360);
+    }
+
+    /** Adds a persistent 300-character notice and live counter below a reason field. */
+    private TextView add300CharacterCounter(LinearLayout parent, final EditText input) {
+        TextView counter = new TextView(this);
+        counter.setText("0/300 characters · Maximum 300 characters");
+        counter.setTextColor(Color.parseColor("#6B7280"));
+        counter.setTextSize(12);
+        counter.setPadding(dpToPx(2), dpToPx(3), dpToPx(2), 0);
+        parent.addView(counter);
+
+        input.addTextChangedListener(new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                int used = s == null ? 0 : s.length();
+                counter.setText(used + "/300 characters · Maximum 300 characters");
+                counter.setTextColor(used >= 300
+                        ? Color.parseColor("#B45309")
+                        : Color.parseColor("#6B7280"));
+            }
+            @Override public void afterTextChanged(android.text.Editable s) {}
+        });
+        return counter;
+    }
+
+    /** Owner rejects a staff decline request: required 300-character explanation is shown back to the staff. */
+    private void showOwnerRejectDeclineDialog(Task task) {
+        final EditText reasonInput = new EditText(this);
+        reasonInput.setHint("Explanation for the staff (required)");
+        reasonInput.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+                | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        reasonInput.setFilters(new android.text.InputFilter[]{
+                new android.text.InputFilter.LengthFilter(300)
+        });
+        reasonInput.setMinLines(3);
+        reasonInput.setTextColor(Color.parseColor("#111827"));
+        reasonInput.setHintTextColor(Color.parseColor("#9CA3AF"));
+        reasonInput.setPadding(dpToPx(12), dpToPx(10), dpToPx(12), dpToPx(10));
+
+        LinearLayout ownerReasonContainer = new LinearLayout(this);
+        ownerReasonContainer.setOrientation(LinearLayout.VERTICAL);
+        ownerReasonContainer.setPadding(dpToPx(8), 0, dpToPx(8), 0);
+        ownerReasonContainer.addView(reasonInput, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        add300CharacterCounter(ownerReasonContainer, reasonInput);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Reject Decline Request")
+                .setMessage("The task stays assigned to the staff member. Give them a clear explanation for rejecting their request.\n\nMaximum 300 characters.")
+                .setView(ownerReasonContainer)
+                .setPositiveButton("Reject Request", null)
+                .setNegativeButton("Back", null)
+                .create();
+        dialog.show();
+
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener(v -> {
+            dialog.dismiss();
+            showOwnerPendingReviewDialog(task);
+        });
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String reason = reasonInput.getText().toString().trim();
+            if (reason.isEmpty()) {
+                reasonInput.setError("An explanation is required");
+                return;
+            }
+
+            String requester = task.pendingResponseRequestedBy != null
+                    ? task.pendingResponseRequestedBy : "";
+            if (requester.trim().isEmpty()) {
+                Toast.makeText(this, "Unable to identify the requesting staff member.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            Map<String, Object> updates = new HashMap<>();
+            updates.put("pendingResponseOwnerReason", reason);
+            updates.put("pendingResponseOwnerRequestedBy", currentUserEmail);
+            updates.put("pendingResponseStatus", com.google.firebase.firestore.FieldValue.delete());
+            updates.put("pendingResponseReason", com.google.firebase.firestore.FieldValue.delete());
+            updates.put("pendingResponseRequestedBy", com.google.firebase.firestore.FieldValue.delete());
+            // The original assignee stays in assignedTo. They can respond again.
+
+            dialog.dismiss();
+            applyToTaskSeries(task, updates, () -> {
+                String staffName = staffNameCache.getOrDefault(requester, requester);
+                FarmRepository.INSTANCE.addAlert(
+                        "Owner rejected your decline request for: " + task.title
+                                + " - Explanation: " + reason,
+                        "Schedule", null);
+
+                Map<String, Object> meta = new HashMap<>();
+                meta.put("taskTitle", task.title);
+                meta.put("staffEmail", requester);
+                meta.put("explanation", reason);
+                String owner = accountManager.getCurrentUsername();
+                FarmRepository.INSTANCE.logTaskUpdated(
+                        owner, accountManager.getEmail(owner), "owner",
+                        "Rejected " + staffName + "'s decline request for \"" + task.title + "\"",
+                        reason, meta, null);
+
+                Toast.makeText(this,
+                        "Decline request rejected. The explanation was sent to " + staffName + ".",
+                        Toast.LENGTH_LONG).show();
+            });
+        });
+    }
+
+    /** Clean text-only action row. No icon circles. */
+    private void addCleanPendingActionRow(LinearLayout parent, String title, String subtitle,
+                                          View.OnClickListener onClick) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, dpToPx(13), 0, dpToPx(13));
+        row.setClickable(true);
+        row.setFocusable(true);
+        row.setOnClickListener(onClick);
+
+        LinearLayout textCol = new LinearLayout(this);
+        textCol.setOrientation(LinearLayout.VERTICAL);
+        textCol.setLayoutParams(new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView titleView = new TextView(this);
+        titleView.setText(title);
+        titleView.setTextColor(Color.parseColor("#245B20"));
+        titleView.setTextSize(15.5f);
+        titleView.setTypeface(null, Typeface.BOLD);
+        textCol.addView(titleView);
+
+        TextView subtitleView = new TextView(this);
+        subtitleView.setText(subtitle);
+        subtitleView.setTextColor(Color.parseColor("#5F6368"));
+        subtitleView.setTextSize(12.5f);
+        LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        subtitleParams.setMargins(0, dpToPx(3), 0, 0);
+        subtitleView.setLayoutParams(subtitleParams);
+        textCol.addView(subtitleView);
+        row.addView(textCol);
+
+        TextView arrow = new TextView(this);
+        arrow.setText("›");
+        arrow.setTextColor(Color.parseColor("#A3A3A3"));
+        arrow.setTextSize(23);
+        arrow.setGravity(Gravity.CENTER);
+        row.addView(arrow, new LinearLayout.LayoutParams(dpToPx(28), dpToPx(50)));
+
+        parent.addView(row);
+    }
+
+    /**
+     * Resolve dialog styled like Add New Task:
+     * green labels, rounded outlined fields, no category, no task title,
+     * and a full-width green Save button.
+     */
+    private void showOwnerPendingRescheduleDialog(Task task) {
+        // Use a real XML layout based on dialog_add_schedule.xml so the dialog
+        // is not squeezed into a programmatically-built layout. Task Title and
+        // Category are intentionally omitted because they cannot be changed here.
+        View dialogView = LayoutInflater.from(this)
+                .inflate(R.layout.dialog_resolve_pending_task, null);
+
+        androidx.core.widget.NestedScrollView scroll =
+                dialogView.findViewById(R.id.resolvePendingScrollView);
+
+        TextView staffButton = dialogView.findViewById(R.id.resolveAssigneeSelector);
+        TextView timeView = dialogView.findViewById(R.id.resolveTextTime);
+        Spinner workWindowSpinner = dialogView.findViewById(R.id.resolveSpinnerWorkWindow);
+        ImageButton btnPrevMonth = dialogView.findViewById(R.id.resolveBtnPrevMonth);
+        ImageButton btnNextMonth = dialogView.findViewById(R.id.resolveBtnNextMonth);
+        Button btnWeekdays = dialogView.findViewById(R.id.resolveBtnWeekdays);
+        Button btnWeekends = dialogView.findViewById(R.id.resolveBtnWeekends);
+        Button btnFullMonth = dialogView.findViewById(R.id.resolveBtnFullMonth);
+        Button btnFullYear = dialogView.findViewById(R.id.resolveBtnFullYear);
+        Button btnClearSelection = dialogView.findViewById(R.id.resolveBtnClearSelection);
+        TextView txtPatternSuggestion = dialogView.findViewById(R.id.resolveTxtPatternSuggestion);
+        TextView txtCurrentMonth = dialogView.findViewById(R.id.resolveTxtCurrentMonth);
+        GridLayout calendarGrid = dialogView.findViewById(R.id.resolveCalendarGrid);
+        TextView txtScheduleSummary = dialogView.findViewById(R.id.resolveTxtScheduleSummary);
+        Button saveButton = dialogView.findViewById(R.id.resolveBtnSave);
+        Button cancelButton = dialogView.findViewById(R.id.resolveBtnCancel);
+
+        final List<String> declinedStaff = task.declinedStaff != null
+                ? new ArrayList<>(task.declinedStaff) : new ArrayList<>();
+        final List<String> selectedStaff = new ArrayList<>();
+
+        // Keep currently assigned eligible staff selected. Anyone who already
+        // declined this task is permanently excluded from this reassignment.
+        if (task.assignedTo != null) {
+            for (String email : task.assignedTo) {
+                if (email != null && !containsIgnoreCase(declinedStaff, email)) {
+                    selectedStaff.add(email);
+                }
+            }
+        }
+
+        staffButton.setText(selectedStaff.isEmpty()
+                ? "Select staff"
+                : resolveStaffNamesFromEmails(selectedStaff));
+
+        // Load the exact staff names immediately so the Assign To field never
+        // uses the staff member's Gmail address as the display value.
+        if (!selectedStaff.isEmpty()) {
+            db.collection("user_access")
+                    .whereEqualTo("role", "staff")
+                    .whereEqualTo("status", "approved")
+                    .get()
+                    .addOnSuccessListener(snapshot -> {
+                        for (QueryDocumentSnapshot doc : snapshot) {
+                            String email = doc.getId();
+                            String name = doc.getString("name");
+                            if (email == null || email.trim().isEmpty()) continue;
+                            String cleanName = name != null ? name.trim() : "";
+                            staffNameCache.put(email.trim(),
+                                    cleanName.isEmpty() ? getString(R.string.unnamed_staff) : cleanName);
+                        }
+                        staffButton.setText(resolveStaffNamesFromEmails(selectedStaff));
+                    });
+        }
+
+        staffButton.setOnClickListener(v -> {
+            db.collection("user_access")
+                    .whereEqualTo("role", "staff")
+                    .whereEqualTo("status", "approved")
+                    .get()
+                    .addOnSuccessListener(snapshot -> {
+                        List<String> staffEmails = new ArrayList<>();
+                        List<String> staffNames = new ArrayList<>();
+
+                        for (QueryDocumentSnapshot doc : snapshot) {
+                            String email = doc.getId();
+                            if (containsIgnoreCase(declinedStaff, email)) continue;
+
+                            staffEmails.add(email);
+                            String name = doc.getString("name");
+                            staffNames.add(name != null && !name.trim().isEmpty()
+                                    ? name : email);
+                        }
+
+                        if (staffEmails.isEmpty()) {
+                            Toast.makeText(this,
+                                    "No eligible staff available for reassignment.",
+                                    Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+
+                        showStaffChoiceDialog(
+                                staffButton,
+                                staffEmails,
+                                staffNames,
+                                selectedStaff
+                        );
+                    })
+                    .addOnFailureListener(e -> Toast.makeText(this,
+                            "Unable to load staff: " + e.getMessage(),
+                            Toast.LENGTH_SHORT).show());
+        });
+
+        // Time remains editable.
+        final int[] chosenHour = {parseTaskHour(task)};
+        final int[] chosenMinute = {parseTaskMinute(task)};
+        timeView.setText(task.time == null ? "Select time" : task.time);
+        timeView.setOnClickListener(v ->
+                showOwnerTimePicker(task, timeView, chosenHour, chosenMinute));
+
+        final String[] workWindowLabels = new String[]{
+                "30 minutes", "45 minutes", "60 minutes", "75 minutes",
+                "90 minutes", "105 minutes", "120 minutes",
+                "180 minutes (3 hours)", "240 minutes (4 hours)",
+                "300 minutes (5 hours)"
+        };
+        final int[] workWindowValues = new int[]{30, 45, 60, 75, 90, 105, 120, 180, 240, 300};
+
+        ArrayAdapter<String> windowAdapter = new ArrayAdapter<>(
+                this, R.layout.spinner_item_black, workWindowLabels);
+        windowAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item_black);
+        workWindowSpinner.setAdapter(windowAdapter);
+
+        int selectedWindowIndex = 2;
+        for (int i = 0; i < workWindowValues.length; i++) {
+            if (workWindowValues[i] == task.workWindowMinutes) {
+                selectedWindowIndex = i;
+                break;
+            }
+        }
+        workWindowSpinner.setSelection(selectedWindowIndex);
+
+        // Existing scheduled series becomes the initial calendar selection.
+        List<Task> series = getTaskSeries(task);
+        series.sort((a, b) -> Long.compare(taskMillis(a), taskMillis(b)));
+
+        final List<Long> selectedDates = new ArrayList<>();
+        for (Task t : series) {
+            long millis = taskMillis(t);
+            if (!selectedDates.contains(millis)) selectedDates.add(millis);
+        }
+
+        final Calendar viewCalendar = Calendar.getInstance();
+        if (!selectedDates.isEmpty()) {
+            viewCalendar.setTimeInMillis(selectedDates.get(0));
+        }
+        viewCalendar.set(Calendar.DAY_OF_MONTH, 1);
+        viewCalendar.set(Calendar.HOUR_OF_DAY, 0);
+        viewCalendar.set(Calendar.MINUTE, 0);
+        viewCalendar.set(Calendar.SECOND, 0);
+        viewCalendar.set(Calendar.MILLISECOND, 0);
+
+        final int[] patternGap = {0};
+
+        final Runnable[] updateCalendar = new Runnable[1];
+        updateCalendar[0] = new Runnable() {
+            @Override
+            public void run() {
+                calendarGrid.removeAllViews();
+                txtCurrentMonth.setText(new SimpleDateFormat(
+                        "MMMM yyyy", Locale.getDefault()).format(viewCalendar.getTime()));
+                txtScheduleSummary.setText(
+                        "Total: " + selectedDates.size() + " date(s) selected");
+
+                if (selectedDates.size() >= 2) {
+                    List<Long> sorted = new ArrayList<>(selectedDates);
+                    Collections.sort(sorted);
+                    long diff = sorted.get(1) - sorted.get(0);
+                    int days = (int) (diff / (1000L * 60L * 60L * 24L));
+                    patternGap[0] = days;
+                    if (days > 1) {
+                        txtPatternSuggestion.setVisibility(View.VISIBLE);
+                        txtPatternSuggestion.setText("Repeat every " + days + " days?");
+                    } else {
+                        txtPatternSuggestion.setVisibility(View.GONE);
+                    }
+                } else {
+                    patternGap[0] = 0;
+                    txtPatternSuggestion.setVisibility(View.GONE);
+                }
+
+                String[] headers = {"S", "M", "T", "W", "Th", "F", "S"};
+                for (String header : headers) {
+                    calendarGrid.addView(makeHeaderCell(header));
+                }
+
+                Calendar cal = (Calendar) viewCalendar.clone();
+                int firstDow = cal.get(Calendar.DAY_OF_WEEK) - 1;
+                for (int i = 0; i < firstDow; i++) {
+                    calendarGrid.addView(makeSpacer());
+                }
+
+                Calendar today = Calendar.getInstance();
+                today.set(Calendar.HOUR_OF_DAY, 0);
+                today.set(Calendar.MINUTE, 0);
+                today.set(Calendar.SECOND, 0);
+                today.set(Calendar.MILLISECOND, 0);
+                long todayKey = today.getTimeInMillis();
+
+                int daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
+                for (int day = 1; day <= daysInMonth; day++) {
+                    final int selectedDay = day;
+                    final int selectedMonth = cal.get(Calendar.MONTH);
+                    final int selectedYear = cal.get(Calendar.YEAR);
+
+                    Calendar dateCal = Calendar.getInstance();
+                    dateCal.set(selectedYear, selectedMonth, selectedDay, 0, 0, 0);
+                    dateCal.set(Calendar.MILLISECOND, 0);
+                    final long dateKey = dateCal.getTimeInMillis();
+
+                    TextView dayView = makeDayCell(String.valueOf(day));
+
+                    if (dateKey < todayKey) {
+                        dayView.setAlpha(0.35f);
+                        dayView.setEnabled(false);
+                        dayView.setTextColor(Color.parseColor("#9CA3AF"));
+                    } else {
+                        if (selectedDates.contains(dateKey)) {
+                            dayView.setBackgroundResource(R.drawable.bg_dayselected);
+                            dayView.setTextColor(Color.WHITE);
+                        }
+
+                        dayView.setOnClickListener(v -> {
+                            if (selectedDates.contains(dateKey)) {
+                                selectedDates.remove(dateKey);
+                            } else {
+                                selectedDates.add(dateKey);
+                            }
+                            Collections.sort(selectedDates);
+                            updateCalendar[0].run();
+                        });
+                    }
+
+                    calendarGrid.addView(dayView);
+                }
+            }
+        };
+
+        btnPrevMonth.setOnClickListener(v -> {
+            viewCalendar.add(Calendar.MONTH, -1);
+            updateCalendar[0].run();
+        });
+
+        btnNextMonth.setOnClickListener(v -> {
+            viewCalendar.add(Calendar.MONTH, 1);
+            updateCalendar[0].run();
+        });
+
+        // Quick selection tools follow the Add Schedule calendar design.
+        btnWeekdays.setOnClickListener(v -> {
+            Calendar cal = (Calendar) viewCalendar.clone();
+            int days = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
+            for (int i = 1; i <= days; i++) {
+                cal.set(Calendar.DAY_OF_MONTH, i);
+                int dow = cal.get(Calendar.DAY_OF_WEEK);
+                if (dow != Calendar.SATURDAY && dow != Calendar.SUNDAY) {
+                    long key = cal.getTimeInMillis();
+                    if (!selectedDates.contains(key)) selectedDates.add(key);
+                }
+            }
+            Collections.sort(selectedDates);
+            updateCalendar[0].run();
+        });
+
+        btnWeekends.setOnClickListener(v -> {
+            Calendar cal = (Calendar) viewCalendar.clone();
+            int days = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
+            for (int i = 1; i <= days; i++) {
+                cal.set(Calendar.DAY_OF_MONTH, i);
+                int dow = cal.get(Calendar.DAY_OF_WEEK);
+                if (dow == Calendar.SATURDAY || dow == Calendar.SUNDAY) {
+                    long key = cal.getTimeInMillis();
+                    if (!selectedDates.contains(key)) selectedDates.add(key);
+                }
+            }
+            Collections.sort(selectedDates);
+            updateCalendar[0].run();
+        });
+
+        btnFullMonth.setOnClickListener(v -> {
+            Calendar cal = (Calendar) viewCalendar.clone();
+            int days = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
+            for (int i = 1; i <= days; i++) {
+                cal.set(Calendar.DAY_OF_MONTH, i);
+                long key = cal.getTimeInMillis();
+                if (!selectedDates.contains(key)) selectedDates.add(key);
+            }
+            Collections.sort(selectedDates);
+            updateCalendar[0].run();
+        });
+
+        btnFullYear.setOnClickListener(v -> {
+            Calendar cal = (Calendar) viewCalendar.clone();
+            cal.set(Calendar.MONTH, Calendar.JANUARY);
+            cal.set(Calendar.DAY_OF_MONTH, 1);
+            int year = cal.get(Calendar.YEAR);
+            while (cal.get(Calendar.YEAR) == year) {
+                long key = cal.getTimeInMillis();
+                if (!selectedDates.contains(key)) selectedDates.add(key);
+                cal.add(Calendar.DAY_OF_MONTH, 1);
+            }
+            Collections.sort(selectedDates);
+            updateCalendar[0].run();
+        });
+
+        btnClearSelection.setOnClickListener(v -> {
+            selectedDates.clear();
+            updateCalendar[0].run();
+        });
+
+        txtPatternSuggestion.setOnClickListener(v -> {
+            if (patternGap[0] <= 1 || selectedDates.isEmpty()) return;
+            Calendar cur = Calendar.getInstance();
+            cur.setTimeInMillis(selectedDates.get(0));
+            int yearLimit = cur.get(Calendar.YEAR) + 1;
+            while (cur.get(Calendar.YEAR) <= yearLimit) {
+                long key = cur.getTimeInMillis();
+                if (!selectedDates.contains(key)) selectedDates.add(key);
+                cur.add(Calendar.DAY_OF_MONTH, patternGap[0]);
+            }
+            Collections.sort(selectedDates);
+            updateCalendar[0].run();
+        });
+
+        updateCalendar[0].run();
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(dialogView)
+                .create();
+        dialog.show();
+        // Wider than the previous programmatic dialog so the calendar and fields
+        // have the same breathing room as dialog_add_schedule.xml.
+        styleResolveDialogWindow(dialog);
+
+        cancelButton.setOnClickListener(v -> {
+            dialog.dismiss();
+            showOwnerPendingReviewDialog(task);
+        });
+
+        saveButton.setOnClickListener(v -> {
+            if (selectedStaff.isEmpty()) {
+                Toast.makeText(this,
+                        "Select at least one staff member.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            if (selectedDates.isEmpty()) {
+                Toast.makeText(this,
+                        "Select at least one date.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            if (selectedDates.size() != series.size()) {
+                Toast.makeText(this,
+                        "Select the same number of dates as the current task series.",
+                        Toast.LENGTH_LONG).show();
+                return;
+            }
+
+            int selectedWindow =
+                    workWindowValues[workWindowSpinner.getSelectedItemPosition()];
+
+            if (selectedWindow <= 0 || selectedWindow > MAX_WORK_WINDOW_MINUTES) {
+                Toast.makeText(this,
+                        "Work window must be between 30 minutes and 5 hours.",
+                        Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            if (!validateOwnerStartTime(
+                    selectedDates, chosenHour[0], chosenMinute[0])) {
+                return;
+            }
+
+            dialog.dismiss();
+            resolvePendingTask(
+                    task,
+                    series,
+                    selectedDates,
+                    selectedStaff,
+                    chosenHour[0],
+                    chosenMinute[0],
+                    selectedWindow
+            );
+        });
+    }
+    private void addCleanFieldLabel(LinearLayout parent, String text) {
+        TextView label = new TextView(this);
+        label.setText(text);
+        label.setTextColor(Color.parseColor("#245B20"));
+        label.setTextSize(15);
+        label.setTypeface(null, Typeface.BOLD);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.setMargins(0, dpToPx(10), 0, dpToPx(5));
+        label.setLayoutParams(params);
+        parent.addView(label);
+    }
+
+    private Button createCleanFieldButton(String text) {
+        Button button = new Button(this);
+        button.setText(text);
+        button.setTextColor(Color.parseColor("#111827"));
+        button.setTextSize(15);
+        button.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
+        button.setPadding(dpToPx(14), 0, dpToPx(14), 0);
+        button.setAllCaps(false);
+        styleCleanFieldBackground(button);
+        button.setMinHeight(0);
+        return button;
+    }
+
+    private TextView createCleanFieldText(String text) {
+        TextView view = new TextView(this);
+        view.setText(text);
+        view.setTextColor(Color.parseColor("#111827"));
+        view.setTextSize(15);
+        view.setGravity(Gravity.CENTER_VERTICAL);
+        view.setPadding(dpToPx(14), 0, dpToPx(14), 0);
+        styleCleanFieldBackground(view);
+        view.setMinHeight(0);
+        return view;
+    }
+
+    private void styleCleanFieldBackground(View view) {
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.WHITE);
+        bg.setCornerRadius(dpToPx(28));
+        bg.setStroke(dpToPx(1), Color.parseColor("#477A3F"));
+        view.setBackground(bg);
+    }
+
+    private void styleCleanDialogWindow(AlertDialog dialog, int widthDp) {
+        if (dialog.getWindow() == null) return;
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.WHITE);
+        bg.setCornerRadius(dpToPx(22));
+        dialog.getWindow().setBackgroundDrawable(bg);
+        dialog.getWindow().setLayout(dpToPx(widthDp),
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+    }
+
+    private void styleResolveDialogWindow(AlertDialog dialog) {
+        if (dialog.getWindow() == null) return;
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.WHITE);
+        bg.setCornerRadius(dpToPx(22));
+        dialog.getWindow().setBackgroundDrawable(bg);
+
+        DisplayMetrics metrics = getResources().getDisplayMetrics();
+        int screenWidth = metrics.widthPixels;
+        int targetWidth = (int) (screenWidth * 0.92f);
+        int maxWidth = dpToPx(520);
+        targetWidth = Math.min(targetWidth, maxWidth);
+
+        dialog.getWindow().setLayout(targetWidth,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+    }
+
+    private String limitReason(String reason) {
+        if (reason == null) return "";
+        reason = reason.trim();
+        return reason.length() > 300 ? reason.substring(0, 300) + "..." : reason;
+    }
+
+    private boolean containsIgnoreCase(List<String> values, String target) {
+        if (values == null || target == null) return false;
+        for (String value : values) if (target.equalsIgnoreCase(value)) return true;
+        return false;
+    }
+
+    private void showStaffChoiceDialog(TextView button, List<String> emails, List<String> names, List<String> selected) {
+        boolean[] checked = new boolean[emails.size()];
+        for(int i=0;i<emails.size();i++) checked[i]=selected.contains(emails.get(i));
+        new AlertDialog.Builder(this).setTitle("Assign Staff").setMultiChoiceItems(names.toArray(new String[0]),checked,(d,w,c)->{
+            if(c && !selected.contains(emails.get(w))) selected.add(emails.get(w));
+            if(!c) selected.remove(emails.get(w));
+        }).setPositiveButton("Done",(d,w)->button.setText(selected.isEmpty()?"Select staff":resolveStaffNames(selected,emails,names))).setNegativeButton("Cancel",null).show();
+    }
+
+    private String resolveStaffNamesFromEmails(List<String> emails) {
+        if (emails == null || emails.isEmpty()) return "Select staff";
+
+        List<String> names = new ArrayList<>();
+        for (String email : emails) {
+            if (email == null || email.trim().isEmpty()) continue;
+            String key = email.trim();
+            String name = staffNameCache.get(key);
+
+            // Never expose the Gmail address in the Assign To field.
+            // The exact name stored in user_access.name is the display value.
+            if (name == null || name.trim().isEmpty() || name.equalsIgnoreCase(key)) {
+                name = getString(R.string.unnamed_staff);
+            }
+            names.add(name);
+        }
+
+        return names.isEmpty()
+                ? "Select staff"
+                : android.text.TextUtils.join(", ", names);
+    }
+
+    private String resolveStaffNames(List<String> selected, List<String> emails, List<String> names){
+        List<String> out = new ArrayList<>();
+        for (String email : selected) {
+            int i = emails.indexOf(email);
+            if (i >= 0 && i < names.size()) {
+                out.add(names.get(i));
+            } else {
+                String cached = staffNameCache.get(email);
+                out.add(cached != null && !cached.trim().isEmpty()
+                        ? cached
+                        : getString(R.string.unnamed_staff));
+            }
+        }
+        return out.isEmpty()
+                ? "Select staff"
+                : android.text.TextUtils.join(", ", out);
+    }
+
+    private int parseTaskHour(Task task){ try{Date d=new SimpleDateFormat("hh:mm a",Locale.getDefault()).parse(task.time); Calendar c=Calendar.getInstance();c.setTime(d);return c.get(Calendar.HOUR_OF_DAY);}catch(Exception e){return 8;} }
+    private int parseTaskMinute(Task task){ try{Date d=new SimpleDateFormat("hh:mm a",Locale.getDefault()).parse(task.time); Calendar c=Calendar.getInstance();c.setTime(d);return c.get(Calendar.MINUTE);}catch(Exception e){return 0;} }
+    private long taskMillis(Task t){Calendar c=Calendar.getInstance();c.set(t.year,t.month,t.day,0,0,0);c.set(Calendar.MILLISECOND,0);return c.getTimeInMillis();}
+    private String formatTaskDate(Task t){Calendar c=Calendar.getInstance();c.set(t.year,t.month,t.day);return new SimpleDateFormat("EEE, MMM d, yyyy",Locale.getDefault()).format(c.getTime());}
+    private List<Task> getTaskSeries(Task task){List<Task> out=new ArrayList<>(); for(Task t:taskList){if(task.recurrenceGroupId!=null && task.recurrenceGroupId.equals(t.recurrenceGroupId)) out.add(t);} if(out.isEmpty()) out.add(task); return out;}
+
+    private void showOwnerTimePicker(Task task, TextView target, int[] hour, int[] minute) {
+        TimePickerDialog td=new TimePickerDialog(this,(v,h,m)->{ if(h<6||h>20){Toast.makeText(this,"Choose a time between 6:00 AM and 8:00 PM",Toast.LENGTH_SHORT).show();return;} hour[0]=h;minute[0]=m; Calendar c=Calendar.getInstance();c.set(Calendar.HOUR_OF_DAY,h);c.set(Calendar.MINUTE,m);target.setText(new SimpleDateFormat("hh:mm a",Locale.getDefault()).format(c.getTime())); },hour[0],minute[0],false); td.show();
+    }
+
+    private boolean validateOwnerStartTime(List<Long> dates,int hour,int minute){
+        Calendar now=Calendar.getInstance(); Calendar earliest=(Calendar)now.clone(); earliest.add(Calendar.HOUR_OF_DAY,1);
+        for(Long k:dates){Calendar d=Calendar.getInstance();d.setTimeInMillis(k);if(d.get(Calendar.YEAR)==now.get(Calendar.YEAR)&&d.get(Calendar.DAY_OF_YEAR)==now.get(Calendar.DAY_OF_YEAR)){Calendar chosen=(Calendar)now.clone();chosen.set(Calendar.HOUR_OF_DAY,hour);chosen.set(Calendar.MINUTE,minute);chosen.set(Calendar.SECOND,0);chosen.set(Calendar.MILLISECOND,0);if(chosen.before(earliest)){Toast.makeText(this,"For today, the earliest assignable time is "+new SimpleDateFormat("hh:mm a",Locale.getDefault()).format(earliest.getTime())+".",Toast.LENGTH_LONG).show();return false;}}} return true;
+    }
+
+    private void resolvePendingTask(Task task,List<Task> series,List<Long> newDates,List<String> staff,int hour,int minute,int window){
+        Collections.sort(series,(a,b)->Long.compare(taskMillis(a),taskMillis(b))); Collections.sort(newDates);
+        String ampm=hour<12?"AM":"PM"; int h=hour>12?hour-12:(hour==0?12:hour); String newTime=String.format(Locale.getDefault(),"%02d:%02d %s",h,minute,ampm);
+        ensureAuthThenRun(()->{
+            com.google.firebase.firestore.WriteBatch batch=db.batch();
+            int count=Math.min(series.size(),newDates.size());
+            for(int i=0;i<count;i++){
+                Task t=series.get(i); Calendar c=Calendar.getInstance();c.setTimeInMillis(newDates.get(i));
+                Map<String,Object> up=new HashMap<>(); up.put("year",c.get(Calendar.YEAR));up.put("month",c.get(Calendar.MONTH));up.put("day",c.get(Calendar.DAY_OF_MONTH));up.put("time",newTime);up.put("workWindowMinutes",window);up.put("assignedTo",new ArrayList<>(staff));up.put("acceptedBy",com.google.firebase.firestore.FieldValue.delete());up.put("pendingResponseStatus",com.google.firebase.firestore.FieldValue.delete());up.put("pendingResponseReason",com.google.firebase.firestore.FieldValue.delete());up.put("pendingResponseRequestedBy",com.google.firebase.firestore.FieldValue.delete());up.put("pendingDaysOffDates",com.google.firebase.firestore.FieldValue.delete());up.put("pendingDaysOffReason",com.google.firebase.firestore.FieldValue.delete());up.put("pendingDaysOffRequestedBy",com.google.firebase.firestore.FieldValue.delete());up.put("pendingResponseOwnerReason",com.google.firebase.firestore.FieldValue.delete());up.put("pendingResponseOwnerRequestedBy",com.google.firebase.firestore.FieldValue.delete());
+                batch.update(db.collection("farm_data").document("shared").collection("tasks").document(t.firestoreId),up);
+            }
+            batch.commit().addOnSuccessListener(v->{Toast.makeText(this,"Pending task resolved and reassigned.",Toast.LENGTH_LONG).show();}).addOnFailureListener(e->Toast.makeText(this,"Failed to resolve task: "+e.getMessage(),Toast.LENGTH_LONG).show());
+        });
+    }
+
+    /**
+     * Staff, Awaiting Task: clean action sheet styled like the owner Pending Task Details dialog.
+     * Request Day(s) Off is only shown when this assignment contains more than one
+     * upcoming scheduled date. For a one-day task, requesting that same day off would
+     * be equivalent to declining the task, so the option is intentionally hidden.
+     */
+    private void showPendingTaskActionsDialog(Task task) {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dpToPx(20), dpToPx(18), dpToPx(20), dpToPx(8));
+        root.setBackgroundColor(Color.WHITE);
+
+        TextView title = new TextView(this);
+        title.setText("Awaiting Task");
+        title.setTextColor(Color.parseColor("#245B20"));
+        title.setTextSize(21);
+        title.setTypeface(null, Typeface.BOLD);
+        root.addView(title);
+
+        TextView taskInfo = new TextView(this);
+        taskInfo.setText(task.category + "   ·   " + task.time);
+        taskInfo.setTextColor(Color.parseColor("#6B7280"));
+        taskInfo.setTextSize(13.5f);
+        LinearLayout.LayoutParams taskInfoParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        taskInfoParams.setMargins(0, dpToPx(3), 0, 0);
+        taskInfo.setLayoutParams(taskInfoParams);
+        root.addView(taskInfo);
+
+        // Prominent assignment information, matching the owner's request/reason card.
+        LinearLayout infoCard = new LinearLayout(this);
+        infoCard.setOrientation(LinearLayout.VERTICAL);
+        infoCard.setPadding(dpToPx(16), dpToPx(14), dpToPx(16), dpToPx(14));
+        LinearLayout.LayoutParams infoCardParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        infoCardParams.setMargins(0, dpToPx(14), 0, dpToPx(8));
+        infoCard.setLayoutParams(infoCardParams);
+
+        GradientDrawable infoBg = new GradientDrawable();
+        infoBg.setColor(Color.parseColor("#F1F8EE"));
+        infoBg.setCornerRadius(dpToPx(14));
+        infoCard.setBackground(infoBg);
+
+        TextView assignedText = new TextView(this);
+        assignedText.setText("You were assigned this task.");
+        assignedText.setTextColor(Color.parseColor("#245B20"));
+        assignedText.setTextSize(16);
+        assignedText.setTypeface(null, Typeface.BOLD);
+        infoCard.addView(assignedText);
+
+        int upcomingCount = getUpcomingTaskDateCount(task);
+        String infoSubtitle;
+        if (upcomingCount > 1) {
+            infoSubtitle = "This assignment includes " + upcomingCount + " scheduled day(s).";
+        } else {
+            infoSubtitle = "Please choose how you want to respond.";
+        }
+
+        TextView infoSubtitleView = new TextView(this);
+        infoSubtitleView.setText(infoSubtitle);
+        infoSubtitleView.setTextColor(Color.parseColor("#263238"));
+        infoSubtitleView.setTextSize(14.5f);
+        LinearLayout.LayoutParams infoSubtitleParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        infoSubtitleParams.setMargins(0, dpToPx(5), 0, 0);
+        infoSubtitleView.setLayoutParams(infoSubtitleParams);
+        infoCard.addView(infoSubtitleView);
+
+        root.addView(infoCard);
+
+        if (task.pendingResponseOwnerReason != null
+                && !task.pendingResponseOwnerReason.trim().isEmpty()) {
+            LinearLayout ownerResponseCard = new LinearLayout(this);
+            ownerResponseCard.setOrientation(LinearLayout.VERTICAL);
+            ownerResponseCard.setPadding(dpToPx(16), dpToPx(14), dpToPx(16), dpToPx(14));
+            LinearLayout.LayoutParams ownerResponseParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            ownerResponseParams.setMargins(0, 0, 0, dpToPx(8));
+            ownerResponseCard.setLayoutParams(ownerResponseParams);
+
+            GradientDrawable ownerResponseBg = new GradientDrawable();
+            ownerResponseBg.setColor(Color.parseColor("#FFF7ED"));
+            ownerResponseBg.setCornerRadius(dpToPx(14));
+            ownerResponseBg.setStroke(dpToPx(1), Color.parseColor("#FED7AA"));
+            ownerResponseCard.setBackground(ownerResponseBg);
+
+            TextView ownerResponseTitle = new TextView(this);
+            ownerResponseTitle.setText("Your decline request was rejected by the owner.");
+            ownerResponseTitle.setTextColor(Color.parseColor("#9A3412"));
+            ownerResponseTitle.setTextSize(15.5f);
+            ownerResponseTitle.setTypeface(null, Typeface.BOLD);
+            ownerResponseCard.addView(ownerResponseTitle);
+
+            TextView ownerResponseReason = new TextView(this);
+            ownerResponseReason.setText("Explanation: " + limitReason(task.pendingResponseOwnerReason));
+            ownerResponseReason.setTextColor(Color.parseColor("#7C2D12"));
+            ownerResponseReason.setTextSize(14);
+            LinearLayout.LayoutParams ownerReasonParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            ownerReasonParams.setMargins(0, dpToPx(5), 0, 0);
+            ownerResponseReason.setLayoutParams(ownerReasonParams);
+            ownerResponseCard.addView(ownerResponseReason);
+
+            root.addView(ownerResponseCard);
+        }
+
+        View divider = new View(this);
+        divider.setBackgroundColor(Color.parseColor("#E5E7EB"));
+        root.addView(divider, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(1)));
+
+        final AlertDialog[] dialogRef = new AlertDialog[1];
+
+        addCleanPendingActionRow(root,
+                "Accept Task",
+                "Confirm you'll handle this assignment",
+                v -> {
+                    dialogRef[0].dismiss();
+                    showAcceptTaskConfirmDialog(task);
+                });
+
+        // Only meaningful for multi-day assignments. If there is only one date,
+        // requesting that date off is effectively the same as declining the task.
+        if (upcomingCount > 1) {
+            addCleanPendingActionRow(root,
+                    "Request Day(s) Off",
+                    "Ask for specific dates off while keeping the rest",
+                    v -> {
+                        dialogRef[0].dismiss();
+                        showRequestDaysOffDialog(task);
+                    });
+        }
+
+        addCleanPendingActionRow(root,
+                "Decline Task",
+                "Unable to take this assignment (reason required)",
+                v -> {
+                    dialogRef[0].dismiss();
+                    showDeclineTaskDialog(task);
+                });
+
+        addCleanPendingActionRow(root,
+                "Task Details",
+                "View the task information",
+                v -> {
+                    dialogRef[0].dismiss();
+                    showTaskDetailDialog(task);
+                });
+
+        dialogRef[0] = new AlertDialog.Builder(this)
+                .setView(root)
+                .create();
+        dialogRef[0].show();
+        styleCleanDialogWindow(dialogRef[0], 360);
+    }
+
+    /** Returns the number of upcoming dates belonging to this assignment/recurrence. */
+    private int getUpcomingTaskDateCount(Task task) {
+        if (task == null) return 0;
+
+        Calendar today = Calendar.getInstance();
+        today.set(Calendar.HOUR_OF_DAY, 0);
+        today.set(Calendar.MINUTE, 0);
+        today.set(Calendar.SECOND, 0);
+        today.set(Calendar.MILLISECOND, 0);
+        long todayMillis = today.getTimeInMillis();
+
+        java.util.Set<String> uniqueDates = new java.util.HashSet<>();
+
+        if (task.recurrenceGroupId != null && !task.recurrenceGroupId.trim().isEmpty()) {
+            for (Task t : taskList) {
+                if (t == null || t.recurrenceGroupId == null
+                        || !task.recurrenceGroupId.equals(t.recurrenceGroupId)) continue;
+
+                Calendar d = Calendar.getInstance();
+                d.set(t.year, t.month, t.day, 0, 0, 0);
+                d.set(Calendar.MILLISECOND, 0);
+                if (d.getTimeInMillis() >= todayMillis) {
+                    uniqueDates.add(t.year + "-" + t.month + "-" + t.day);
+                }
+            }
+        }
+
+        // A task without a recurrence group is a single-date assignment.
+        if (uniqueDates.isEmpty()) {
+            Calendar d = Calendar.getInstance();
+            d.set(task.year, task.month, task.day, 0, 0, 0);
+            d.set(Calendar.MILLISECOND, 0);
+            if (d.getTimeInMillis() >= todayMillis) return 1;
+        }
+
+        return uniqueDates.size();
+    }
+
+    /** Accept: stamps acceptedBy across the whole recurring series. */
+    private void showAcceptTaskConfirmDialog(Task task) {
+        new AlertDialog.Builder(this)
+                .setTitle("Accept task?")
+                .setMessage("Accept \"" + task.title + "\"? You'll be responsible for it on the scheduled day(s).")
+                .setPositiveButton("Accept", (d, w) -> {
+                    Map<String, Object> upd = new HashMap<>();
+                    upd.put("acceptedBy", currentUserEmail);
+                    upd.put("pendingResponseStatus", com.google.firebase.firestore.FieldValue.delete());
+                    upd.put("pendingResponseReason", com.google.firebase.firestore.FieldValue.delete());
+                    upd.put("pendingResponseRequestedBy", com.google.firebase.firestore.FieldValue.delete());
+                    upd.put("pendingResponseOwnerReason", com.google.firebase.firestore.FieldValue.delete());
+                    upd.put("pendingResponseOwnerRequestedBy", com.google.firebase.firestore.FieldValue.delete());
+                    applyToTaskSeries(task, upd, () ->
+                            Toast.makeText(this, "Task accepted.", Toast.LENGTH_SHORT).show());
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    /** Decline: required reason, then remove the staff member from assignedTo for the whole series. */
+    private void showDeclineTaskDialog(Task task) {
+        final EditText reasonInput = new EditText(this);
+        reasonInput.setHint("Reason for declining (required)\nMaximum 300 characters");
+        reasonInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES |
+                InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        reasonInput.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(300)});
+        reasonInput.setMinLines(2);
+        reasonInput.setPadding(dpToPx(20), dpToPx(12), dpToPx(20), dpToPx(12));
+
+        LinearLayout staffDeclineContainer = new LinearLayout(this);
+        staffDeclineContainer.setOrientation(LinearLayout.VERTICAL);
+        staffDeclineContainer.setPadding(dpToPx(8), 0, dpToPx(8), 0);
+        staffDeclineContainer.addView(reasonInput, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        add300CharacterCounter(staffDeclineContainer, reasonInput);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Decline \"" + task.title + "\"")
+                .setMessage("Your decline reason is limited to 300 characters.")
+                .setView(staffDeclineContainer)
+                .setPositiveButton("Decline", null)
+                .setNegativeButton("Back", null)
+                .create();
+        dialog.show();
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String reason = reasonInput.getText().toString().trim();
+            if (reason.length() < 3) {
+                reasonInput.setError("Please give a short reason");
+                return;
+            }
+            dialog.dismiss();
+
+            Map<String, Object> declineUpdates = new HashMap<>();
+            declineUpdates.put("pendingResponseStatus", "DECLINED");
+            declineUpdates.put("pendingResponseReason", reason);
+            declineUpdates.put("pendingResponseRequestedBy", currentUserEmail);
+            declineUpdates.put("declinedStaff", com.google.firebase.firestore.FieldValue.arrayUnion(currentUserEmail));
+            declineUpdates.put("acceptedBy", com.google.firebase.firestore.FieldValue.delete());
+            applyToTaskSeries(task, declineUpdates, () -> {
+                String name = accountManager.getCachedName(currentUserEmail);
+                FarmRepository.INSTANCE.addAlert(
+                        name + " declined: " + task.title + " - Reason: " + reason,
+                        "Schedule", null);
+                java.util.Map<String, Object> meta = new HashMap<>();
+                meta.put("taskTitle", task.title);
+                meta.put("reason", reason);
+                FarmRepository.INSTANCE.logTaskUpdated(
+                        name, currentUserEmail, "staff",
+                        name + " declined task \"" + task.title + "\" - reason: " + reason,
+                        reason, meta, null);
+                Toast.makeText(this, "Task declined. The owner can review and reassign it.", Toast.LENGTH_SHORT).show();
+            });
+        });
+    }
+
+    /** Staff picks specific future dates off; the rest of the recurring series remains assigned. */
+    private void showRequestDaysOffDialog(Task task) {
+        List<Task> series = new ArrayList<>();
+        if (task.recurrenceGroupId != null) {
+            for (Task t : taskList) {
+                if (task.recurrenceGroupId.equals(t.recurrenceGroupId)) series.add(t);
+            }
+        }
+        if (series.isEmpty()) series.add(task);
+        series.sort((a, b) -> a.year != b.year ? a.year - b.year
+                : a.month != b.month ? a.month - b.month : a.day - b.day);
+
+        Calendar todayMid = Calendar.getInstance();
+        todayMid.set(Calendar.HOUR_OF_DAY, 0);
+        todayMid.set(Calendar.MINUTE, 0);
+        todayMid.set(Calendar.SECOND, 0);
+        todayMid.set(Calendar.MILLISECOND, 0);
+
+        List<String> dateLabels = new ArrayList<>();
+        List<Long> dateKeys = new ArrayList<>();
+        for (Task t : series) {
+            Calendar c = Calendar.getInstance();
+            c.set(t.year, t.month, t.day, 0, 0, 0);
+            c.set(Calendar.MILLISECOND, 0);
+            if (c.getTimeInMillis() < todayMid.getTimeInMillis()) continue;
+            dateKeys.add(c.getTimeInMillis());
+            dateLabels.add(new SimpleDateFormat("EEE, MMM d, yyyy", Locale.getDefault()).format(c.getTime()));
+        }
+
+        if (dateLabels.isEmpty()) {
+            Toast.makeText(this, "No upcoming dates to request off.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        boolean[] checked = new boolean[dateLabels.size()];
+        List<Long> selected = new ArrayList<>();
+
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(dpToPx(20), dpToPx(8), dpToPx(20), 0);
+
+        TextView hint = new TextView(this);
+        hint.setText("Pick the date(s) you can't cover. You stay assigned on all other dates.");
+        hint.setTextColor(Color.parseColor("#6B7280"));
+        hint.setTextSize(13);
+        container.addView(hint);
+
+        final EditText reasonInput = new EditText(this);
+        reasonInput.setHint("Reason (required)\nMaximum 300 characters");
+        reasonInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES |
+                InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        reasonInput.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(300)});
+        reasonInput.setMinLines(2);
+        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        rp.setMargins(0, dpToPx(8), 0, 0);
+        reasonInput.setLayoutParams(rp);
+
+        android.widget.ListView lv = new android.widget.ListView(this);
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this,
+                android.R.layout.simple_list_item_multiple_choice, dateLabels);
+        lv.setAdapter(adapter);
+        lv.setChoiceMode(android.widget.ListView.CHOICE_MODE_MULTIPLE);
+        lv.setOnItemClickListener((p, v, pos, id) -> {
+            long key = dateKeys.get(pos);
+            if (selected.contains(key)) selected.remove(key); else selected.add(key);
+        });
+        LinearLayout.LayoutParams listParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(220));
+        listParams.setMargins(0, dpToPx(8), 0, 0);
+        lv.setLayoutParams(listParams);
+        container.addView(lv);
+        container.addView(reasonInput);
+        add300CharacterCounter(container, reasonInput);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Request Day(s) Off - " + task.title)
+                .setView(container)
+                .setPositiveButton("Send Request", null)
+                .setNegativeButton("Cancel", null)
+                .create();
+        dialog.show();
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String reason = reasonInput.getText().toString().trim();
+            if (selected.isEmpty()) {
+                Toast.makeText(this, "Select at least one date", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (selected.size() >= dateKeys.size()) {
+                Toast.makeText(this,
+                        "You are requesting every scheduled date off. Use Decline Task instead.",
+                        Toast.LENGTH_LONG).show();
+                return;
+            }
+            if (reason.length() < 3) {
+                reasonInput.setError("A reason is required");
+                return;
+            }
+            dialog.dismiss();
+
+            Map<String, Object> upd = new HashMap<>();
+            upd.put("pendingDaysOffDates", new ArrayList<>(selected));
+            upd.put("pendingDaysOffReason", reason);
+            upd.put("pendingDaysOffRequestedBy", currentUserEmail);
+            upd.put("pendingResponseStatus", com.google.firebase.firestore.FieldValue.delete());
+            upd.put("pendingResponseReason", com.google.firebase.firestore.FieldValue.delete());
+            upd.put("pendingResponseRequestedBy", com.google.firebase.firestore.FieldValue.delete());
+            applyToTaskSeries(task, upd, () ->
+                    Toast.makeText(this, "Request sent to your manager for approval.", Toast.LENGTH_LONG).show());
+        });
     }
 
     /** Done tasks: just the Task Detail row (view comment/photos submitted). */
@@ -3523,17 +5253,12 @@ public class ScheduleActivity extends AppCompatActivity {
         while (cal.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) cal.add(Calendar.DAY_OF_MONTH, -1);
     }
 
-    /** Syncs the Assigned/Missing/Done chip selection with {@link #activeFilter}. */
+    /** Syncs the Pending/Assigned/Missing/Done chip selection with {@link #activeFilter}. */
     private void updateFilterButtonsUI() {
-        if (filterAssignedBtn instanceof com.google.android.material.chip.Chip) {
-            ((com.google.android.material.chip.Chip) filterAssignedBtn).setChecked(FILTER_ASSIGNED.equals(activeFilter));
-        }
-        if (filterMissingBtn instanceof com.google.android.material.chip.Chip) {
-            ((com.google.android.material.chip.Chip) filterMissingBtn).setChecked(FILTER_MISSING.equals(activeFilter));
-        }
-        if (filterDoneBtn instanceof com.google.android.material.chip.Chip) {
-            ((com.google.android.material.chip.Chip) filterDoneBtn).setChecked(FILTER_DONE.equals(activeFilter));
-        }
+        if (filterPendingBtn != null) filterPendingBtn.setChecked(FILTER_PENDING.equals(activeFilter));
+        if (filterAssignedBtn != null) filterAssignedBtn.setChecked(FILTER_ASSIGNED.equals(activeFilter));
+        if (filterMissingBtn != null) filterMissingBtn.setChecked(FILTER_MISSING.equals(activeFilter));
+        if (filterDoneBtn != null) filterDoneBtn.setChecked(FILTER_DONE.equals(activeFilter));
     }
 
     /**
@@ -4104,6 +5829,152 @@ public class ScheduleActivity extends AppCompatActivity {
         return v;
     }
 
+    /** Owner review: approve removes the requester only on the requested dates; decline clears the request. */
+    private void showDaysOffApprovalDialog(Task task) {
+        String requester = task.pendingDaysOffRequestedBy != null
+                ? staffNameCache.getOrDefault(task.pendingDaysOffRequestedBy, task.pendingDaysOffRequestedBy)
+                : "Staff";
+
+        SimpleDateFormat df = new SimpleDateFormat("EEE, MMM d, yyyy", Locale.getDefault());
+        StringBuilder datesText = new StringBuilder();
+        List<Long> sorted = new ArrayList<>(task.pendingDaysOffDates);
+        Collections.sort(sorted);
+        for (Long k : sorted) {
+            if (datesText.length() > 0) datesText.append("\n");
+            datesText.append("• ").append(df.format(new Date(k)));
+        }
+
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(dpToPx(20), dpToPx(16), dpToPx(20), dpToPx(4));
+
+        TextView body = new TextView(this);
+        body.setText(requester + " requested these day(s) off from \"" + task.title + "\":\n\n"
+                + datesText + "\n\nReason: " + task.pendingDaysOffReason
+                + "\n\nApprove will remove " + requester + " from these dates only and keep the assignment on all other dates.");
+        body.setTextColor(Color.parseColor("#111827"));
+        body.setTextSize(14);
+        container.addView(body);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(container)
+                .setTitle("Time-Off Request")
+                .setPositiveButton("Approve", (d, w) -> approveDaysOff(task))
+                .setNegativeButton("Decline", (d, w) -> clearDaysOffRequest(task, () ->
+                        Toast.makeText(this, "Request declined.", Toast.LENGTH_SHORT).show()))
+                .setNeutralButton("Later", null)
+                .create();
+        dialog.show();
+    }
+
+    /** Approve: remove the requester from assignedTo only on the requested date documents. */
+    private void approveDaysOff(Task task) {
+        String requester = task.pendingDaysOffRequestedBy;
+        if (requester == null || requester.trim().isEmpty()) {
+            clearDaysOffRequest(task, null);
+            return;
+        }
+
+        List<Long> wanted = new ArrayList<>(task.pendingDaysOffDates);
+        ensureAuthThenRun(() -> {
+            com.google.firebase.firestore.Query q = (task.recurrenceGroupId != null)
+                    ? db.collection("farm_data").document("shared").collection("tasks")
+                    .whereEqualTo("recurrenceGroupId", task.recurrenceGroupId)
+                    : db.collection("farm_data").document("shared").collection("tasks")
+                    .whereEqualTo(com.google.firebase.firestore.FieldPath.documentId(), task.firestoreId);
+
+            q.get().addOnSuccessListener(snaps -> {
+                com.google.firebase.firestore.WriteBatch batch = db.batch();
+                int removed = 0;
+                for (QueryDocumentSnapshot doc : snaps) {
+                    Map<String, Object> upd = new HashMap<>();
+                    upd.put("pendingDaysOffDates", com.google.firebase.firestore.FieldValue.delete());
+                    upd.put("pendingDaysOffReason", com.google.firebase.firestore.FieldValue.delete());
+                    upd.put("pendingDaysOffRequestedBy", com.google.firebase.firestore.FieldValue.delete());
+
+                    long y = doc.getLong("year") != null ? doc.getLong("year") : 0;
+                    long m = doc.getLong("month") != null ? doc.getLong("month") : 0;
+                    long day = doc.getLong("day") != null ? doc.getLong("day") : 0;
+                    Calendar c = Calendar.getInstance();
+                    c.set((int)y, (int)m, (int)day, 0, 0, 0);
+                    c.set(Calendar.MILLISECOND, 0);
+
+                    if (wanted.contains(c.getTimeInMillis())) {
+                        List<String> assignees = parseAssignedTo(doc.get("assignedTo"));
+                        assignees.removeIf(a -> a.equalsIgnoreCase(requester));
+                        upd.put("assignedTo", assignees);
+                        removed++;
+                    }
+                    batch.update(doc.getReference(), upd);
+                }
+
+                final int removedCount = removed;
+                batch.commit().addOnSuccessListener(a -> {
+                    String name = staffNameCache.getOrDefault(requester, requester);
+                    java.util.Map<String, Object> meta = new HashMap<>();
+                    meta.put("taskTitle", task.title);
+                    meta.put("approvedDates", removedCount);
+                    String owner = accountManager.getCurrentUsername();
+                    FarmRepository.INSTANCE.logTaskUpdated(
+                            owner, accountManager.getEmail(owner), "owner",
+                            "Approved " + name + "'s time-off for \"" + task.title + "\" (" + removedCount + " date(s))",
+                            "Staff unassigned on approved dates only", meta, null);
+                    Toast.makeText(this, "Approved — " + name + " unassigned on " + removedCount + " requested date(s), still assigned on the rest.", Toast.LENGTH_LONG).show();
+                }).addOnFailureListener(e ->
+                        Toast.makeText(this, "Failed to approve: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+            }).addOnFailureListener(e ->
+                    Toast.makeText(this, "Failed to load task series: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+        });
+    }
+
+    /** Clears a pending day-off request without changing any assignment. */
+    private void clearDaysOffRequest(Task task, Runnable onDone) {
+        Map<String, Object> upd = new HashMap<>();
+        upd.put("pendingDaysOffDates", com.google.firebase.firestore.FieldValue.delete());
+        upd.put("pendingDaysOffReason", com.google.firebase.firestore.FieldValue.delete());
+        upd.put("pendingDaysOffRequestedBy", com.google.firebase.firestore.FieldValue.delete());
+        applyToTaskSeries(task, upd, onDone);
+    }
+
+    /** Applies updates to every task document in the recurring series, or this document when there is no group. */
+    private void applyToTaskSeries(Task task, Map<String, Object> updates, Runnable onDone) {
+        applyToTaskSeries(task, updates, onDone, null);
+    }
+
+    /** Same helper, with an optional assignee email to remove from assignedTo on every series document. */
+    private void applyToTaskSeries(Task task, Map<String, Object> updates, Runnable onDone, String removeAssignee) {
+        ensureAuthThenRun(() -> {
+            com.google.firebase.firestore.Query q = (task.recurrenceGroupId != null)
+                    ? db.collection("farm_data").document("shared").collection("tasks")
+                    .whereEqualTo("recurrenceGroupId", task.recurrenceGroupId)
+                    : db.collection("farm_data").document("shared").collection("tasks")
+                    .whereEqualTo(com.google.firebase.firestore.FieldPath.documentId(), task.firestoreId);
+
+            q.get().addOnSuccessListener(snaps -> {
+                com.google.firebase.firestore.WriteBatch batch = db.batch();
+                for (QueryDocumentSnapshot doc : snaps) {
+                    Map<String, Object> upd = new HashMap<>(updates != null ? updates : new HashMap<>());
+                    if (removeAssignee != null) {
+                        List<String> assignees = parseAssignedTo(doc.get("assignedTo"));
+                        assignees.removeIf(a -> a.equalsIgnoreCase(removeAssignee));
+                        upd.put("assignedTo", assignees);
+                        String pendingRequester = doc.getString("pendingDaysOffRequestedBy");
+                        if (removeAssignee.equalsIgnoreCase(pendingRequester != null ? pendingRequester : "")) {
+                            upd.put("pendingDaysOffDates", com.google.firebase.firestore.FieldValue.delete());
+                            upd.put("pendingDaysOffReason", com.google.firebase.firestore.FieldValue.delete());
+                            upd.put("pendingDaysOffRequestedBy", com.google.firebase.firestore.FieldValue.delete());
+                        }
+                    }
+                    batch.update(doc.getReference(), upd);
+                }
+                batch.commit().addOnSuccessListener(a -> { if (onDone != null) onDone.run(); })
+                        .addOnFailureListener(e ->
+                                Toast.makeText(this, "Failed to update task series: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+            }).addOnFailureListener(e ->
+                    Toast.makeText(this, "Failed to load task series: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+        });
+    }
+
     private static class Task {
         String firestoreId;
         String title, category, time, status;
@@ -4118,6 +5989,19 @@ public class ScheduleActivity extends AppCompatActivity {
         int pendingRescheduleMinutes = 0;
         String pendingRescheduleReason;
         String pendingRescheduleRequestedBy;
+
+        // Staff day(s)-off request (staff-initiated, owner-approved).
+        // Stored on every document in the recurring series so the owner can review it from any date.
+        List<Long> pendingDaysOffDates = new ArrayList<>();
+        String pendingDaysOffReason;
+        String pendingDaysOffRequestedBy;
+        String acceptedBy; // set when the staff explicitly accepts a pending assignment
+        String pendingResponseStatus; // DECLINED when staff declined; cleared after owner resolves it
+        String pendingResponseReason;
+        String pendingResponseRequestedBy;
+        String pendingResponseOwnerReason;
+        String pendingResponseOwnerRequestedBy;
+        List<String> declinedStaff = new ArrayList<>();
 
         String doneComment;   // required comment proof, set only when marked Done via the proof flow
         List<String> doneImageUrls = new ArrayList<>(); // Base64-encoded JPEGs of the proof photos (stored directly on the task doc, not Firebase Storage)

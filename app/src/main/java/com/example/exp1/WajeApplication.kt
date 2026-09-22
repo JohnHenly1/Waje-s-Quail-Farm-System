@@ -42,6 +42,7 @@ class WajeApplication : Application() {
 
         MaintenanceGuard.start(this)
         AlertsMonitor.start(this)
+        AckRepository.startMonitor(this)
 
         // Make sure this device's FCM topic subscriptions match its current
         // Notification Preferences toggles (covers fresh installs and the

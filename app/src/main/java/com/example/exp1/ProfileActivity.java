@@ -181,10 +181,6 @@ public class ProfileActivity extends AppCompatActivity {
         if (helpSupportButton != null) {
             helpSupportButton.setOnClickListener(v -> showHelpSupportDialog());
         }
-        View languageRegionButton = findViewById(R.id.languageRegionButton);
-        if (languageRegionButton != null) {
-            languageRegionButton.setOnClickListener(v -> showLanguageRegionDialog());
-        }
 
         ImageButton backButton = findViewById(R.id.backButton);
         if (backButton != null) {
@@ -471,7 +467,9 @@ public class ProfileActivity extends AppCompatActivity {
         View editNameBtn       = view.findViewById(R.id.editNameBtn);
 
         changePasswordBtn.setOnClickListener(v -> showChangePasswordDialog());
-        editNameBtn.setOnClickListener(v -> NavigationHelper.INSTANCE.showEditProfileDialog(this, currentEmail, null));
+        editNameBtn.setOnClickListener(v -> showEditNameDialog());
+        View editPhoneBtn = view.findViewById(R.id.editPhoneBtn);
+        editPhoneBtn.setOnClickListener(v -> showEditPhoneDialog());
 
         builder.setPositiveButton("Close", null);
         builder.show();
@@ -767,6 +765,23 @@ public class ProfileActivity extends AppCompatActivity {
         if (!hasDigit) return "Password must contain at least one digit";
         if (!hasSymbol) return "Password must contain at least one special character";
         return null;
+    }
+
+    private void showDeleteAccountDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle(getString(R.string.delete_account))
+                .setMessage(getString(R.string.confirm_delete_account))
+                .setPositiveButton(getString(R.string.delete), (dialog, which) -> {
+                    String currentUser = accountManager.getCurrentUsername();
+                    if (currentUser != null && accountManager.deleteAccount(currentUser)) {
+                        Intent intent = new Intent(this, MainActivity.class);
+                        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                        startActivity(intent);
+                        finish();
+                    }
+                })
+                .setNegativeButton(getString(R.string.cancel), null)
+                .show();
     }
 
     // ── Language & Region ──────────────────────────────────────────────────────
@@ -1363,6 +1378,212 @@ public class ProfileActivity extends AppCompatActivity {
     private static final int COLOR_GREEN_DARK    = android.graphics.Color.parseColor("#1B5E20");
     private static final int COLOR_GREEN_LIGHT   = android.graphics.Color.parseColor("#A5D6A7");
     private static final int COLOR_ERROR_RED     = android.graphics.Color.parseColor("#D32F2F");
+
+    // ── Edit Mobile Number (used for SMS alerts) ──────────────────────────────
+    private void showEditPhoneDialog() {
+        if (currentEmail == null || currentEmail.isEmpty()) {
+            Toast.makeText(this, "Cannot identify your account. Please log out and back in.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(dp(24), dp(16), dp(24), 0);
+
+        TextView note = new TextView(this);
+        note.setText("We'll text this number for critical farm alerts and new task assignments. Philippine mobile numbers only, e.g. 0917 123 4567. Leave blank to turn SMS off.");
+        note.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        container.addView(note);
+
+        EditText input = new EditText(this);
+        input.setInputType(android.text.InputType.TYPE_CLASS_PHONE);
+        input.setHint("09XX XXX XXXX");
+        container.addView(input);
+
+        FirebaseFirestore.getInstance().collection("user_access").document(currentEmail).get()
+                .addOnSuccessListener(doc -> {
+                    String saved = doc.getString("phoneNumber");
+                    if (saved != null) input.setText(saved);
+                });
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Mobile Number")
+                .setView(container)
+                .setPositiveButton(getString(R.string.save), null)
+                .setNegativeButton(getString(R.string.cancel), null)
+                .create();
+        dialog.show();
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String raw = input.getText().toString().trim();
+            Object value;
+            if (raw.isEmpty()) {
+                value = com.google.firebase.firestore.FieldValue.delete();
+            } else {
+                value = SmsGateway.normalizePhone(raw);
+                if (value == null) {
+                    input.setError("Enter a valid PH mobile number, e.g. 09171234567");
+                    return;
+                }
+            }
+            FirebaseFirestore.getInstance().collection("user_access").document(currentEmail)
+                    .update("phoneNumber", value)
+                    .addOnSuccessListener(a -> {
+                        Toast.makeText(this, raw.isEmpty() ? "SMS alerts turned off" : "Mobile number saved", Toast.LENGTH_SHORT).show();
+                        dialog.dismiss();
+                    })
+                    .addOnFailureListener(e ->
+                            Toast.makeText(this, getString(R.string.failed_to_update), Toast.LENGTH_SHORT).show());
+        });
+    }
+
+    private void showEditNameDialog() {
+        int dp16 = dp(16);
+        int dp24 = dp(24);
+
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(dp24, dp24, dp24, dp16);
+        container.setBackgroundColor(android.graphics.Color.WHITE);
+
+        TextView titleTv = new TextView(this);
+        titleTv.setText(getString(R.string.edit_name));
+        titleTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
+        titleTv.setTypeface(null, android.graphics.Typeface.BOLD);
+        titleTv.setTextColor(COLOR_GREEN_DARK);
+        titleTv.setPadding(0, 0, 0, dp16);
+        container.addView(titleTv);
+
+        TextInputLayout nameLayout = new TextInputLayout(this);
+        nameLayout.setHint(getString(R.string.enter_name_hint));
+        nameLayout.setBoxBackgroundMode(TextInputLayout.BOX_BACKGROUND_OUTLINE);
+        nameLayout.setBoxStrokeColor(COLOR_GREEN_PRIMARY);
+        nameLayout.setBoxBackgroundColor(android.graphics.Color.WHITE);
+        nameLayout.setDefaultHintTextColor(
+                android.content.res.ColorStateList.valueOf(COLOR_GREEN_PRIMARY));
+        nameLayout.setErrorTextColor(
+                android.content.res.ColorStateList.valueOf(COLOR_ERROR_RED));
+        nameLayout.setErrorIconDrawable(null);
+
+        EditText nameInput = new EditText(this);
+        nameInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS);
+        nameInput.setTextColor(android.graphics.Color.BLACK);
+        nameInput.setHighlightColor(COLOR_GREEN_LIGHT);
+        if (userNameTv.getText() != null) {
+            nameInput.setText(userNameTv.getText());
+            nameInput.setSelection(nameInput.getText().length());
+        }
+        nameLayout.addView(nameInput);
+        container.addView(nameLayout);
+
+        // Live validation as the user types
+        nameInput.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable s) {
+                String text = s.toString().trim();
+                if (text.isEmpty()) {
+                    nameLayout.setError(getString(R.string.name_empty));
+                } else {
+                    nameLayout.setError(getNameValidationError(text));
+                }
+            }
+        });
+
+        // Tapping empty space inside the dialog hides the keyboard without closing it
+        container.setOnTouchListener((v, event) -> {
+            hideKeyboard(nameInput);
+            return false;
+        });
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setView(container);
+        builder.setPositiveButton(getString(R.string.save), null);
+        builder.setNegativeButton(getString(R.string.cancel), null);
+
+        AlertDialog dialog = builder.create();
+
+        // Don't let a tap outside close the dialog — just dismiss the keyboard
+        dialog.setCanceledOnTouchOutside(false);
+
+        dialog.show();
+
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.white);
+        }
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(COLOR_GREEN_PRIMARY);
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(android.graphics.Color.GRAY);
+
+        // Background outside the card (dim scrim) also just hides the keyboard
+        View decorView = dialog.getWindow() != null ? dialog.getWindow().getDecorView() : null;
+        if (decorView != null) {
+            decorView.setOnTouchListener((v, event) -> {
+                hideKeyboard(nameInput);
+                return false;
+            });
+        }
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String newName = nameInput.getText().toString().trim();
+
+            if (newName.isEmpty()) {
+                nameLayout.setError(getString(R.string.name_empty));
+                return;
+            }
+
+            String nameError = getNameValidationError(newName);
+            if (nameError != null) {
+                nameLayout.setError(nameError);
+                return;
+            }
+
+            if (currentEmail == null || currentEmail.isEmpty()) {
+                Toast.makeText(this,
+                        "Cannot identify your account. Please log out and back in.",
+                        Toast.LENGTH_LONG).show();
+                return;
+            }
+
+            FirebaseFirestore.getInstance().collection("user_access").document(currentEmail)
+                    .update("name", newName)
+                    .addOnSuccessListener(a -> runOnUiThread(() -> {
+                        userNameTv.setText(newName);
+                        profileInitialTv.setText(String.valueOf(newName.charAt(0)).toUpperCase());
+                        accountManager.updateCachedName(currentEmail, newName);
+                        Toast.makeText(this, getString(R.string.name_updated), Toast.LENGTH_SHORT).show();
+                        hideKeyboard(nameInput);
+                        dialog.dismiss();
+                    }))
+                    .addOnFailureListener(e -> runOnUiThread(() ->
+                            Toast.makeText(this, getString(R.string.failed_to_update), Toast.LENGTH_SHORT).show()));
+        });
+    }
+
+    /**
+     * Typical "real name" restrictions:
+     * - letters only (unicode-aware, so accented names like "José" or "Muñoz" work)
+     * - spaces, hyphens, apostrophes, and periods allowed (e.g. "Mary-Jane", "O'Brien", "Jr.")
+     * - no digits, no other symbols
+     * - 2–50 characters
+     * - no doubled-up punctuation like "--" or "''"
+     */
+    private String getNameValidationError(String name) {
+        if (name.length() < 2) return "Name must be at least 2 characters";
+        if (name.length() > 50) return "Name must be less than 50 characters";
+
+        if (!name.matches("^[\\p{L} .'-]+$")) {
+            return "Only letters, spaces, hyphens, apostrophes, and periods allowed";
+        }
+        if (name.matches(".*[ .'-]{2,}.*")) {
+            return "Name contains an invalid character sequence";
+        }
+        if (name.startsWith(" ") || name.startsWith("-") || name.startsWith("'") || name.startsWith(".")
+                || name.endsWith(" ") || name.endsWith("-") || name.endsWith("'") || name.endsWith(".")) {
+            return "Name cannot start or end with punctuation";
+        }
+        return null;
+    }
+
     private int dp(int value) {
         return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value,
                 getResources().getDisplayMetrics());
@@ -1375,6 +1596,7 @@ public class ProfileActivity extends AppCompatActivity {
         }
     }
 
+    @SuppressWarnings("unchecked")
     private void showEditLocationDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         LinearLayout container = new LinearLayout(this);

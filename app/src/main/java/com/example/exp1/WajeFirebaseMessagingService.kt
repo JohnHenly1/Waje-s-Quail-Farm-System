@@ -39,6 +39,13 @@ class WajeFirebaseMessagingService : FirebaseMessagingService() {
         val data = message.data
         val title = data["title"] ?: message.notification?.title ?: "Waje's Quail Farm"
         val body = data["body"] ?: message.notification?.body ?: return
+
+        // Accept/Decline requests (critical alerts, task assignments) get the alarm/request UI.
+        val ackId = data["ackId"]
+        if (!ackId.isNullOrBlank()) {
+            AlarmNotifier.show(applicationContext, ackId, title, body, alarm = data["critical"] == "true")
+            return
+        }
         val channelId = data["channel"].takeUnless { it.isNullOrBlank() } ?: "alerts_channel"
         val notifId = data["notifId"]?.toIntOrNull() ?: body.hashCode()
 

@@ -89,7 +89,76 @@ function parseAssignedTo(raw) {
   return [];
 }
 
-async function raiseAlert({ message, type, topic, title, body, channel }) {
+// ── Acknowledgment requests + SMS ─────────────────────────────────────────
+// SMS goes through the same Apps Script web app the Android app already uses.
+const APPS_SCRIPT_URL = process.env.APPS_SCRIPT_URL;
+const APPS_SCRIPT_SECRET = process.env.APPS_SCRIPT_SECRET;
+
+// Must match AckRepository.idFor() on the phone (`yyyy-MM-dd_<sanitized message>`, Manila date)
+// so a phone and this script never both raise (and SMS) the same alert.
+function ackIdFor(message) {
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
+  return `${day}_${sanitize(message)}`;
+}
+
+async function getRecipients(onlyEmails) {
+  const snap = await db.collection("user_access").where("status", "==", "approved").get();
+  const wanted = onlyEmails ? new Set(onlyEmails.map((e) => e.trim().toLowerCase())) : null;
+  return snap.docs
+    .filter((d) => d.get("isActive") !== false)
+    .filter((d) => !wanted || wanted.has(d.id.trim().toLowerCase()))
+    .map((d) => ({ email: d.id, phone: d.get("phoneNumber") || null }));
+}
+
+async function sendSms(numbers, message, priority) {
+  const list = [...new Set(numbers.filter(Boolean))];
+  if (list.length === 0) return;
+  if (!APPS_SCRIPT_URL || !APPS_SCRIPT_SECRET) {
+    console.log("SMS skipped: APPS_SCRIPT_URL / APPS_SCRIPT_SECRET not set.");
+    return;
+  }
+  try {
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ secret: APPS_SCRIPT_SECRET, type: "sms", numbers: list, message, priority }),
+    });
+    console.log(`SMS to ${list.length} number(s): ${res.status} ${(await res.text()).slice(0, 200)}`);
+  } catch (e) {
+    console.error("SMS failed:", e.message);
+  }
+}
+
+// Creates the accept/decline request once; the run that creates it also sends the SMS.
+async function raiseAckRequest({ message, title, recipients }) {
+  if (recipients.length === 0) return null;
+  const ackId = ackIdFor(message);
+  const ref = db.collection("farm_data").doc("shared").collection("ack_requests").doc(ackId);
+  try {
+    await ref.create({
+      kind: "alert",
+      severity: "critical",
+      mode: "any",
+      title,
+      message,
+      recipients: recipients.map((r) => r.email),
+      responses: {},
+      resolved: false,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+  } catch (e) {
+    if (e.code === 6 || e.code === "already-exists") return ackId; // a phone or earlier run already raised it
+    throw e;
+  }
+  await sendSms(
+    recipients.map((r) => r.phone),
+    `Waje's Quail Farm CRITICAL: ${message}. Open the app to Accept/Decline.`,
+    true
+  );
+  return ackId;
+}
+
+async function raiseAlert({ message, type, topic, title, body, channel, critical = false }) {
   const docId = `${todayKey()}_${sanitize(message)}`;
   const alertRef = db.collection("farm_data").doc("shared").collection("alert").doc(docId);
 
@@ -106,9 +175,15 @@ async function raiseAlert({ message, type, topic, title, body, channel }) {
     throw e;
   }
 
+  const extra = {};
+  if (critical) {
+    const ackId = await raiseAckRequest({ message, title, recipients: await getRecipients() });
+    if (ackId) Object.assign(extra, { ackId, critical: "true" });
+  }
+
   await getMessaging().send({
     topic,
-    data: { title, body, channel, notifId: String(stableId(message)) },
+    data: { title, body, channel, notifId: String(stableId(message)), ...extra },
     android: { priority: "high" },
   });
 
@@ -136,6 +211,7 @@ async function raiseTaskAlertForAssignees({ message, type, assignees, title, bod
     if (e.code !== 6 && e.code !== "already-exists") throw e;
   }
 
+  const extra = {};
   let anyPushed = false;
   for (const email of assignees) {
     const pushDocId = `${docId}__${sanitize(email)}`;
@@ -149,7 +225,7 @@ async function raiseTaskAlertForAssignees({ message, type, assignees, title, bod
 
     await getMessaging().send({
       topic: topicForUser(email),
-      data: { title, body, channel, notifId: String(stableId(message + email)) },
+      data: { title, body, channel, notifId: String(stableId(message + email)), ...extra },
       android: { priority: "high" },
     });
     anyPushed = true;
@@ -201,6 +277,7 @@ async function raiseAssignmentAlertForNewAssignees(taskId, data) {
         body: `You've been assigned: ${title}`,
         channel: CHANNEL_TASK_REMINDER,
         notifId: String(stableId(message + email)),
+        ...(data.recurrenceGroupId ? { ackId: `assign_${data.recurrenceGroupId}` } : {}),
       },
       android: { priority: "high" },
     });
@@ -279,7 +356,36 @@ async function checkWaterLevel() {
   if (!snapshot.exists()) return;
 
   const percent = Number(snapshot.val());
-  if (Number.isNaN(percent) || percent <= 50) return;
+  if (Number.isNaN(percent)) return;
+
+  // Mirrors AlertsMonitor.resolveWaterLevelAlert(). Only the Emergency tier
+  // (tank empty, <= 0%) rings the alarm; Critical (1..10%) is a plain alert.
+  if (percent <= 0) {
+    const description = "Water tank is empty. Refill immediately.";
+    await raiseAlert({
+      message: `Water Level Emergency: ${description}`,
+      type: "Water Level",
+      topic: TOPIC_FARM_ALERTS,
+      title: "Water Level Emergency",
+      body: description,
+      channel: CHANNEL_ALERTS,
+      critical: true,
+    });
+    return;
+  }
+  if (percent <= 10) {
+    const description = "Water tank is critically low. Refill immediately.";
+    await raiseAlert({
+      message: `Water Level Critical: ${description}`,
+      type: "Water Level",
+      topic: TOPIC_FARM_ALERTS,
+      title: "Water Level Critical",
+      body: description,
+      channel: CHANNEL_ALERTS,
+    });
+    return;
+  }
+  if (percent <= 50) return;
 
   const label = "Filled";
   const description = "Water tank is filled and at a healthy level.";

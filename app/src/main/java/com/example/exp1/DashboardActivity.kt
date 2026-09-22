@@ -171,6 +171,8 @@ class DashboardActivity : AppCompatActivity() {
         userRole = accountManager.getRole(username)
 
         requestNotificationPermissionIfNeeded()
+        window.decorView.postDelayed({ AlarmNotifier.promptFullScreenPermissionIfNeeded(this) }, 3000)
+        AckRepository.reevaluate(this)
 
         // ----------------------------
         // NEW: Force refresh token & sync role
@@ -443,12 +445,7 @@ class DashboardActivity : AppCompatActivity() {
     private fun setupButtons() {
         findViewById<LinearLayout?>(R.id.analyticsButton)?.setOnClickListener {
             showLoading(getString(R.string.generating_reports)) {
-                startActivity(
-                    Intent(this, AnalyticsActivity::class.java)
-                        .putExtra("username", username)
-                        .putExtra("displayName", displayName)
-                        .putExtra("role", userRole)
-                )
+                startActivity(Intent(this, AnalyticsActivity::class.java).putExtra("username", username))
             }
         }
 

@@ -1,25 +1,24 @@
-<?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:background="@color/white"
     android:orientation="vertical"
-    android:padding="24dp"
-    android:background="@color/white">
+    android:padding="24dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
+        android:layout_marginBottom="24dp"
         android:gravity="center_vertical"
-        android:layout_marginBottom="24dp">
+        android:orientation="horizontal">
 
         <ImageView
             android:layout_width="32dp"
             android:layout_height="32dp"
+            android:contentDescription="Settings Icon"
             android:src="@drawable/ic_settings"
-            app:tint="@color/dark_green"
-            android:contentDescription="Settings Icon" />
+            app:tint="@color/dark_green" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -30,8 +29,7 @@
             android:textSize="22sp"
             android:textStyle="bold" />
     </LinearLayout>
-
-    <!-- Change Password Option -->
+    <!--  Change Password Option  -->
     <LinearLayout
         android:id="@+id/changePasswordBtn"
         android:layout_width="match_parent"
@@ -51,8 +49,8 @@
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
             android:layout_marginStart="16dp"
+            android:layout_weight="1"
             android:text="Change Password"
             android:textColor="@color/black"
             android:textSize="16sp" />
@@ -68,8 +66,7 @@
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:background="#EEEEEE" />
-
-    <!-- Edit Birthday Option -->
+    <!--  Edit Birthday Option  -->
     <LinearLayout
         android:id="@+id/editNameBtn"
         android:layout_width="match_parent"
@@ -91,7 +88,7 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
             android:layout_weight="1"
-            android:text="Edit Profile"
+            android:text="Edit Name"
             android:textColor="@color/black"
             android:textSize="16sp" />
 
@@ -106,5 +103,41 @@
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:background="#EEEEEE" />
+    <!--  Edit Mobile Number Option (SMS alerts)  -->
+    <LinearLayout
+        android:id="@+id/editPhoneBtn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?android:attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:paddingVertical="16dp">
 
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_notifications"
+            app:tint="@color/dark_green" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_weight="1"
+            android:text="Mobile Number"
+            android:textColor="@color/black"
+            android:textSize="16sp" />
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:src="@drawable/ic_chevron_right"
+            app:tint="@color/gray" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#EEEEEE" />
 </LinearLayout>

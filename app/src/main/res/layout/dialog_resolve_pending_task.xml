@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/addScheduleScrollView"
+    android:id="@+id/resolvePendingScrollView"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:fillViewport="true"
     android:background="@color/white">
 
     <LinearLayout
@@ -19,71 +20,30 @@
             android:gravity="center_vertical"
             android:layout_marginBottom="20dp">
 
-            <ImageView
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:src="@drawable/ic_add2"
-                app:tint="@color/dark_green" />
-
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="12dp"
-                android:text="Add Schedule"
+                android:text="Resolve Pending Task"
                 android:textColor="@color/dark_green"
                 android:textSize="22sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- Task Title -->
+        <!-- Task Title and Category are intentionally NOT present here.
+             They are fixed from the original task and cannot be changed. -->
 
-        <!-- Task Title -->
-        <EditText
-            android:id="@+id/editTaskTitle"
-            android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/rounded_corner"
-            android:hint="e.g., Morning Feeding"
-            android:inputType="text"
-            android:padding="12dp"
-            android:textColor="@color/black"
-            android:textColorHint="@color/black"
-            android:textSize="16sp" />
-
-        <!-- Category -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Category"
-            android:textColor="@color/dark_green"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/rounded_corner">
-            <Spinner
-                android:id="@+id/spinnerCategory"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent" />
-        </FrameLayout>
-
-        <!-- Assign To (Managers can assign tasks to one or more staff) -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Assign To"
+            android:layout_marginTop="0dp"
+            android:text="Assign to"
             android:textColor="@color/dark_green"
             android:textSize="14sp"
             android:textStyle="bold" />
 
         <TextView
-            android:id="@+id/assigneeSelector"
+            android:id="@+id/resolveAssigneeSelector"
             android:layout_width="match_parent"
             android:layout_height="52dp"
             android:layout_marginTop="8dp"
@@ -96,12 +56,11 @@
             android:maxLines="1"
             android:paddingStart="12dp"
             android:paddingEnd="36dp"
-            android:text="(No specific staff)"
+            android:text="Select staff"
             android:textColor="@color/black"
             android:textSize="16sp"
             app:drawableTint="@color/dark_green" />
 
-        <!-- Time -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -111,21 +70,19 @@
             android:textSize="14sp"
             android:textStyle="bold" />
 
-        <!-- Time -->
         <TextView
-            android:id="@+id/textTime"
+            android:id="@+id/resolveTextTime"
             android:layout_width="match_parent"
             android:layout_height="52dp"
             android:layout_marginTop="8dp"
             android:background="@drawable/rounded_corner"
             android:gravity="center_vertical"
             android:hint="Select time"
+            android:paddingStart="12dp"
             android:textColor="@color/black"
             android:textColorHint="@color/dark_gray"
-            android:paddingStart="12dp"
             android:textSize="16sp" />
 
-        <!-- Work Window Selection -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -141,12 +98,21 @@
             android:layout_marginTop="8dp"
             android:background="@drawable/rounded_corner">
             <Spinner
-                android:id="@+id/spinnerWorkWindow"
+                android:id="@+id/resolveSpinnerWorkWindow"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent" />
         </FrameLayout>
 
-        <!-- Smart Selection Toolbox -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Assigned Date(s)"
+            android:textColor="@color/dark_green"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <!-- Same quick-selection controls used by Add Schedule. -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -167,77 +133,75 @@
                 android:orientation="horizontal">
 
                 <Button
-                    android:id="@+id/btnWeekdays"
+                    android:id="@+id/resolveBtnWeekdays"
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
                     android:text="Weekdays"
+                    android:textColor="@color/dark_green"
                     android:textSize="12sp"
-                    android:layout_marginEnd="8dp"
-                    app:strokeColor="@color/dark_green"
-                    android:textColor="@color/dark_green"/>
+                    app:strokeColor="@color/dark_green" />
 
                 <Button
-                    android:id="@+id/btnWeekends"
+                    android:id="@+id/resolveBtnWeekends"
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
                     android:text="Weekends"
+                    android:textColor="@color/dark_green"
                     android:textSize="12sp"
-                    android:layout_marginEnd="8dp"
-                    app:strokeColor="@color/dark_green"
-                    android:textColor="@color/dark_green"/>
+                    app:strokeColor="@color/dark_green" />
 
                 <Button
-                    android:id="@+id/btnFullMonth"
+                    android:id="@+id/resolveBtnFullMonth"
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
                     android:text="This Month"
+                    android:textColor="@color/dark_green"
                     android:textSize="12sp"
-                    android:layout_marginEnd="8dp"
-                    app:strokeColor="@color/dark_green"
-                    android:textColor="@color/dark_green"/>
+                    app:strokeColor="@color/dark_green" />
 
                 <Button
-                    android:id="@+id/btnFullYear"
+                    android:id="@+id/resolveBtnFullYear"
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="This Year"
-                    android:textSize="12sp"
                     android:layout_marginEnd="8dp"
-                    app:strokeColor="@color/dark_green"
-                    android:textColor="@color/dark_green"/>
+                    android:text="This Year"
+                    android:textColor="@color/dark_green"
+                    android:textSize="12sp"
+                    app:strokeColor="@color/dark_green" />
 
                 <Button
-                    android:id="@+id/btnClearSelection"
+                    android:id="@+id/resolveBtnClearSelection"
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Clear"
+                    android:textColor="@color/logout_red"
                     android:textSize="12sp"
-                    app:strokeColor="@color/logout_red"
-                    android:textColor="@color/logout_red"/>
+                    app:strokeColor="@color/logout_red" />
             </LinearLayout>
         </HorizontalScrollView>
 
-        <!-- Smart Pattern Detection Badge -->
         <TextView
-            android:id="@+id/txtPatternSuggestion"
+            android:id="@+id/resolveTxtPatternSuggestion"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:background="@drawable/bg_status_ongoing"
+            android:clickable="true"
+            android:focusable="true"
             android:padding="6dp"
             android:text="Repeat every 7 days?"
             android:textColor="@color/white"
             android:textSize="12sp"
-            android:visibility="gone"
-            android:clickable="true"
-            android:focusable="true"/>
+            android:visibility="gone" />
 
-        <!-- Date Visualizer -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -246,7 +210,7 @@
             android:orientation="horizontal">
 
             <ImageButton
-                android:id="@+id/btnPrevMonth"
+                android:id="@+id/resolveBtnPrevMonth"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
@@ -254,7 +218,7 @@
                 app:tint="@color/dark_green" />
 
             <TextView
-                android:id="@+id/txtCurrentMonth"
+                android:id="@+id/resolveTxtCurrentMonth"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -265,7 +229,7 @@
                 android:textStyle="bold" />
 
             <ImageButton
-                android:id="@+id/btnNextMonth"
+                android:id="@+id/resolveBtnNextMonth"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
@@ -274,14 +238,14 @@
         </LinearLayout>
 
         <GridLayout
-            android:id="@+id/calendarGrid"
+            android:id="@+id/resolveCalendarGrid"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:columnCount="7" />
 
         <TextView
-            android:id="@+id/txtScheduleSummary"
+            android:id="@+id/resolveTxtScheduleSummary"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
@@ -289,6 +253,30 @@
             android:textColor="@color/dark_gray"
             android:textSize="14sp"
             android:textStyle="italic" />
+
+        <Button
+            android:id="@+id/resolveBtnSave"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="18dp"
+            android:background="@drawable/rounded_corner"
+            app:backgroundTint="@color/dark_green"
+            android:text="Save"
+            android:textAllCaps="false"
+            android:textColor="@color/white"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/resolveBtnCancel"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@android:color/transparent"
+            android:text="Cancel"
+            android:textAllCaps="false"
+            android:textColor="@color/dark_green"
+            android:textSize="15sp"
+            android:textStyle="bold" />
 
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

@@ -182,7 +182,13 @@ object AlertsMonitor {
 
         val message = "Water Level $label: $description"
         FarmRepository.addAlert(message, "Water Level")
-        showLocalNotification("Water Level $label", description)
+        if (label == "Emergency") {
+            AckRepository.raiseCritical("Water Level $label", message) {
+                showLocalNotification("Water Level $label", description)
+            }
+        } else {
+            showLocalNotification("Water Level $label", description)
+        }
     }
 
     private fun startWaterLevelListener() {
