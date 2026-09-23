@@ -524,8 +524,8 @@ class FeedInventoryActivity : AppCompatActivity() {
                     qtyInput.error = "Quantity cannot be negative"
                     return@setOnClickListener
                 }
-                if (item.category == "Supplements" && newQty > 99) {
-                    qtyInput.error = "Quantity cannot exceed 99"
+                if (newQty > 999) {
+                    qtyInput.error = "Total stock cannot exceed 999"
                     return@setOnClickListener
                 }
                 if (newQty == item.quantity) {
@@ -535,6 +535,10 @@ class FeedInventoryActivity : AppCompatActivity() {
                 }
 
                 val diff = newQty - item.quantity
+                if (diff > 0 && diff > 99) {
+                    qtyInput.error = "Cannot add more than 99 at a time"
+                    return@setOnClickListener
+                }
                 showConfirmActionDialog(
                     itemName  = item.name,
                     isRestock = diff > 0,
@@ -1076,7 +1080,7 @@ class FeedInventoryActivity : AppCompatActivity() {
                     qtyInput.error = "Quantity cannot be negative"
                     return@setOnClickListener
                 }
-                if (targetCategory == "Supplements" && qtyIn > 99) {
+                if (qtyIn > 99) {
                     qtyInput.error = "Quantity cannot exceed 99"
                     return@setOnClickListener
                 }
@@ -1119,6 +1123,10 @@ class FeedInventoryActivity : AppCompatActivity() {
                     // Restocking an existing item found via the selector: add the
                     // entered quantity on top of what's already there.
                     val finalQty = matchingItem.quantity + qtyIn
+                    if (finalQty > 999) {
+                        qtyInput.error = "Total stock cannot exceed 999"
+                        return@setOnClickListener
+                    }
                     val finalTotalPrice = finalQty * price
 
                     val fieldUpdates = mapOf<String, Any>(
