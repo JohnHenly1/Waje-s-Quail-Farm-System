@@ -51,9 +51,23 @@
                     android:textSize="16sp"
                     android:textStyle="bold"
                     app:layout_constraintBottom_toBottomOf="parent"
-                    app:layout_constraintEnd_toStartOf="@id/newChatButton"
+                    app:layout_constraintEnd_toStartOf="@id/openAnalyticsButton"
                     app:layout_constraintStart_toEndOf="@id/backButton"
                     app:layout_constraintTop_toTopOf="parent" />
+
+                <ImageButton
+                    android:id="@+id/openAnalyticsButton"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/open_analytics"
+                    android:scaleType="centerInside"
+                    android:padding="9dp"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toStartOf="@id/newChatButton"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:srcCompat="@drawable/ic_chart"
+                    app:tint="@color/white" />
 
                 <ImageButton
                     android:id="@+id/newChatButton"
@@ -68,7 +82,6 @@
                     app:layout_constraintTop_toTopOf="parent"
                     app:srcCompat="@drawable/ic_new_chat"
                     app:tint="@color/white" />
-
                 <ImageButton
                     android:id="@+id/historyButton"
                     android:layout_width="40dp"

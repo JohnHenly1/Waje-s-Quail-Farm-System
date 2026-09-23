@@ -632,66 +632,6 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
             </LinearLayout>
-            <!--    ───────────── COLLECTION HISTORY HEADER ─────────────    -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/collection_history"
-                    android:textColor="@color/black"
-                    android:textSize="17sp"
-                    android:textStyle="bold" />
-
-                <ImageButton
-                    android:id="@+id/calendarBtn"
-                    android:layout_width="34dp"
-                    android:layout_height="34dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:padding="6dp"
-                    app:srcCompat="@android:drawable/ic_menu_my_calendar"
-                    app:tint="@color/dark_green" />
-
-                <ImageButton
-                    android:id="@+id/prevWeekBtn"
-                    android:layout_width="34dp"
-                    android:layout_height="34dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:padding="7dp"
-                    app:srcCompat="@drawable/ic_arrow_back"
-                    app:tint="@color/dark_green" />
-
-                <TextView
-                    android:id="@+id/weekRangeTxt"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginHorizontal="6dp"
-                    android:text="@string/this_week"
-                    android:textColor="@color/dark_gray"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
-
-                <ImageButton
-                    android:id="@+id/nextWeekBtn"
-                    android:layout_width="34dp"
-                    android:layout_height="34dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:padding="7dp"
-                    app:srcCompat="@drawable/ic_arrow_forward"
-                    app:tint="@color/dark_green" />
-            </LinearLayout>
-            <!--    Collection log rows injected here at runtime    -->
-            <LinearLayout
-                android:id="@+id/collectionLogList"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical" />
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
     <!--    ══════════════════════ BOTTOM NAV ══════════════════════    -->

@@ -179,7 +179,7 @@
                                 android:layout_marginEnd="16dp"
                                 android:background="@drawable/circle_white"
                                 android:backgroundTint="#E8F5E9"
-                                android:foreground="@drawable/lc_egg"
+                                android:foreground="@drawable/lc_quailbot"
                                 android:foregroundGravity="center"
                                 android:foregroundTint="@color/gray" />
 

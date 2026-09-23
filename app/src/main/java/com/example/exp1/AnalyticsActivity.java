@@ -4,6 +4,7 @@ import android.app.DatePickerDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.widget.ScrollView;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -89,6 +90,12 @@ public class AnalyticsActivity extends AppCompatActivity {
     private TextView filterChoiceText;
     private ConnectivityManager.NetworkCallback networkCallback;
     private int lastFilteredTotal, lastFilteredA, lastFilteredB, lastFilteredC;
+    private Calendar historyMonthCal;
+    private String selectedHistoryDate;
+    private LinearLayout historyCalendarContainer;
+    private TextView historyMonthYearLabel;
+    private TextView historyDetailTitle;
+    private LinearLayout historyDetailContent;
 
     private static final SimpleDateFormat DATE_KEY_FORMAT = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
     // Filters are loaded from resources so they can be translated / changed in XML
@@ -220,6 +227,21 @@ public class AnalyticsActivity extends AppCompatActivity {
         Button generateReportBtn = findViewById(R.id.generateReportButton);
         if (generateReportBtn != null) {
             generateReportBtn.setOnClickListener(v -> showReportDialog());
+        }
+        ImageButton openChatbotBtn = findViewById(R.id.openChatbotButton);
+        if (openChatbotBtn != null) {
+            openChatbotBtn.setOnClickListener(v -> {
+                Intent intent = new Intent(AnalyticsActivity.this, ChatBotActivity.class);
+                intent.putExtra("username", getIntent().getStringExtra("username"));
+                intent.putExtra("displayName", getIntent().getStringExtra("displayName"));
+                intent.putExtra("role", getIntent().getStringExtra("role"));
+                startActivity(intent);
+                finish();
+            });
+        }
+        LinearLayout historyBtn = findViewById(R.id.collectionHistoryButton);
+        if (historyBtn != null) {
+            historyBtn.setOnClickListener(v -> showCollectionHistoryDialog());
         }
     }
 
@@ -934,7 +956,268 @@ public class AnalyticsActivity extends AppCompatActivity {
 
         productionRateText.setText(String.format(Locale.getDefault(), "%.1f%%", gradeAPct));
     }
+    // ======================================================================
+    //  Collection History — calendar view
+    // ======================================================================
 
+    private void showCollectionHistoryDialog() {
+        historyMonthCal = Calendar.getInstance();
+        historyMonthCal.set(Calendar.DAY_OF_MONTH, 1);
+        selectedHistoryDate = null;
+
+        int pad = dpToPx(16);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(Color.WHITE);
+        root.setPadding(pad, pad, pad, pad);
+
+        TextView title = new TextView(this);
+        title.setText(getString(R.string.collection_history));
+        title.setTextColor(Color.BLACK);
+        title.setTextSize(18f);
+        title.setTypeface(title.getTypeface(), android.graphics.Typeface.BOLD);
+        title.setPadding(0, 0, 0, dpToPx(12));
+        root.addView(title);
+
+        // ── Month nav row ──
+        LinearLayout navRow = new LinearLayout(this);
+        navRow.setOrientation(LinearLayout.HORIZONTAL);
+        navRow.setGravity(Gravity.CENTER_VERTICAL);
+        navRow.setPadding(0, 0, 0, dpToPx(8));
+
+        ImageButton prevBtn = new ImageButton(this);
+        prevBtn.setImageResource(R.drawable.ic_arrow_back);
+        prevBtn.setBackground(null);
+        prevBtn.setColorFilter(Color.parseColor("#355E1A"));
+        LinearLayout.LayoutParams navBtnParams = new LinearLayout.LayoutParams(dpToPx(34), dpToPx(34));
+        navRow.addView(prevBtn, navBtnParams);
+
+        historyMonthYearLabel = new TextView(this);
+        historyMonthYearLabel.setGravity(Gravity.CENTER);
+        historyMonthYearLabel.setTextColor(Color.BLACK);
+        historyMonthYearLabel.setTextSize(15f);
+        historyMonthYearLabel.setTypeface(historyMonthYearLabel.getTypeface(), android.graphics.Typeface.BOLD);
+        navRow.addView(historyMonthYearLabel, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        ImageButton nextBtn = new ImageButton(this);
+        nextBtn.setImageResource(R.drawable.ic_arrow_forward);
+        nextBtn.setBackground(null);
+        nextBtn.setColorFilter(Color.parseColor("#355E1A"));
+        navRow.addView(nextBtn, navBtnParams);
+        root.addView(navRow);
+
+        // ── Weekday header ──
+        LinearLayout weekdayRow = new LinearLayout(this);
+        weekdayRow.setOrientation(LinearLayout.HORIZONTAL);
+        for (String d : new String[]{"S", "M", "T", "W", "T", "F", "S"}) {
+            TextView tv = new TextView(this);
+            tv.setText(d);
+            tv.setGravity(Gravity.CENTER);
+            tv.setTextColor(Color.parseColor("#888888"));
+            tv.setTextSize(11f);
+            weekdayRow.addView(tv, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        }
+        root.addView(weekdayRow);
+
+        historyCalendarContainer = new LinearLayout(this);
+        historyCalendarContainer.setOrientation(LinearLayout.VERTICAL);
+        historyCalendarContainer.setPadding(0, dpToPx(4), 0, dpToPx(8));
+        root.addView(historyCalendarContainer);
+
+        // ── Detail card ──
+        LinearLayout detailCard = new LinearLayout(this);
+        detailCard.setOrientation(LinearLayout.VERTICAL);
+        android.graphics.drawable.GradientDrawable detailBg = new android.graphics.drawable.GradientDrawable();
+        detailBg.setColor(Color.parseColor("#F4F6F4"));
+        detailBg.setCornerRadius(dpToPx(12));
+        detailCard.setBackground(detailBg);
+        detailCard.setPadding(dpToPx(14), dpToPx(14), dpToPx(14), dpToPx(14));
+
+        historyDetailTitle = new TextView(this);
+        historyDetailTitle.setText(getString(R.string.tap_a_day_to_view_details));
+        historyDetailTitle.setTextColor(Color.parseColor("#555555"));
+        historyDetailTitle.setTextSize(13f);
+        historyDetailTitle.setTypeface(historyDetailTitle.getTypeface(), android.graphics.Typeface.BOLD);
+        detailCard.addView(historyDetailTitle);
+
+        historyDetailContent = new LinearLayout(this);
+        historyDetailContent.setOrientation(LinearLayout.VERTICAL);
+        historyDetailContent.setPadding(0, dpToPx(8), 0, 0);
+        detailCard.addView(historyDetailContent);
+        root.addView(detailCard);
+
+        // ── Close button ──
+        Button closeBtn = new Button(this);
+        closeBtn.setText(getString(R.string.close));
+        closeBtn.setTextColor(Color.WHITE);
+        closeBtn.setBackgroundColor(Color.parseColor("#355E1A"));
+        LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        closeParams.topMargin = dpToPx(12);
+        root.addView(closeBtn, closeParams);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(root);
+
+        AlertDialog dialog = new AlertDialog.Builder(this).setView(scroll).create();
+        if (dialog.getWindow() != null) {
+            android.graphics.drawable.GradientDrawable winBg = new android.graphics.drawable.GradientDrawable();
+            winBg.setColor(Color.WHITE);
+            winBg.setCornerRadius(dpToPx(16));
+            dialog.getWindow().setBackgroundDrawable(winBg);
+        }
+
+        closeBtn.setOnClickListener(v -> dialog.dismiss());
+        prevBtn.setOnClickListener(v -> {
+            historyMonthCal.add(Calendar.MONTH, -1);
+            buildHistoryCalendarGrid();
+        });
+        nextBtn.setOnClickListener(v -> {
+            Calendar now = Calendar.getInstance();
+            boolean beforeCurrentMonth =
+                    historyMonthCal.get(Calendar.YEAR) < now.get(Calendar.YEAR) ||
+                            (historyMonthCal.get(Calendar.YEAR) == now.get(Calendar.YEAR)
+                                    && historyMonthCal.get(Calendar.MONTH) < now.get(Calendar.MONTH));
+            if (beforeCurrentMonth) {
+                historyMonthCal.add(Calendar.MONTH, 1);
+                buildHistoryCalendarGrid();
+            }
+        });
+
+        buildHistoryCalendarGrid();
+        dialog.show();
+    }
+
+    private void buildHistoryCalendarGrid() {
+        historyCalendarContainer.removeAllViews();
+        historyMonthYearLabel.setText(monthYearLabel(historyMonthCal.get(Calendar.MONTH), historyMonthCal.get(Calendar.YEAR)));
+
+        Calendar cal = (Calendar) historyMonthCal.clone();
+        cal.set(Calendar.DAY_OF_MONTH, 1);
+        int firstDayOfWeek = cal.get(Calendar.DAY_OF_WEEK); // 1 = Sunday
+        int daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
+        String todayKey = DATE_KEY_FORMAT.format(new Date());
+
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        int col = 0;
+        for (int i = 1; i < firstDayOfWeek; i++) {
+            row.addView(new View(this), new LinearLayout.LayoutParams(0, dpToPx(40), 1f));
+            col++;
+        }
+
+        for (int dayNum = 1; dayNum <= daysInMonth; dayNum++) {
+            if (col == 7) {
+                historyCalendarContainer.addView(row);
+                row = new LinearLayout(this);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                col = 0;
+            }
+            Calendar dayCal = (Calendar) cal.clone();
+            dayCal.set(Calendar.DAY_OF_MONTH, dayNum);
+            String dateKey = DATE_KEY_FORMAT.format(dayCal.getTime());
+            DailyEggData data = allData.get(dateKey);
+            boolean hasEggs = data != null && data.total > 0;
+
+            TextView cell = new TextView(this);
+            cell.setText(String.valueOf(dayNum));
+            cell.setGravity(Gravity.CENTER);
+            cell.setTextSize(13f);
+
+            android.graphics.drawable.GradientDrawable cellBg = new android.graphics.drawable.GradientDrawable();
+            cellBg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            if (dateKey.equals(selectedHistoryDate)) {
+                cellBg.setColor(Color.parseColor("#355E1A"));
+                cell.setTextColor(Color.WHITE);
+                cell.setTypeface(cell.getTypeface(), android.graphics.Typeface.BOLD);
+            } else if (hasEggs) {
+                cellBg.setColor(Color.parseColor("#C8E6C9")); // light green
+                cell.setTextColor(Color.parseColor("#1B5E20"));
+                cell.setTypeface(cell.getTypeface(), android.graphics.Typeface.BOLD);
+            } else {
+                cellBg.setColor(Color.TRANSPARENT);
+                cell.setTextColor(Color.parseColor("#333333"));
+            }
+            if (dateKey.equals(todayKey) && !dateKey.equals(selectedHistoryDate)) {
+                cellBg.setStroke(dpToPx(1), Color.parseColor("#355E1A"));
+            }
+            cell.setBackground(cellBg);
+
+            LinearLayout.LayoutParams cellParams = new LinearLayout.LayoutParams(0, dpToPx(40), 1f);
+            cellParams.setMargins(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2));
+            cell.setLayoutParams(cellParams);
+
+            cell.setOnClickListener(v -> {
+                selectedHistoryDate = dateKey;
+                showHistoryDetail(dateKey);
+                buildHistoryCalendarGrid();
+            });
+
+            row.addView(cell);
+            col++;
+        }
+        while (col < 7 && col != 0) {
+            row.addView(new View(this), new LinearLayout.LayoutParams(0, dpToPx(40), 1f));
+            col++;
+        }
+        historyCalendarContainer.addView(row);
+    }
+
+    private void showHistoryDetail(String dateKey) {
+        DailyEggData data = allData.get(dateKey);
+        historyDetailContent.removeAllViews();
+        historyDetailTitle.setText(displayDate(dateKey));
+
+        int total = data != null ? data.total : 0;
+        int a = data != null ? data.gradeA : 0;
+        int b = data != null ? data.gradeB : 0;
+        int c = data != null ? data.gradeC : 0;
+
+        if (total == 0) {
+            TextView none = new TextView(this);
+            none.setText(getString(R.string.no_eggs_collected_this_day));
+            none.setTextColor(Color.parseColor("#888888"));
+            none.setTextSize(13f);
+            historyDetailContent.addView(none);
+            return;
+        }
+
+        historyDetailContent.addView(buildHistoryDetailRow(getString(R.string.total_eggs_collected), String.valueOf(total), Color.BLACK));
+        historyDetailContent.addView(buildHistoryDetailRow(getString(R.string.grade_a_normal), String.valueOf(a), COLOR_GRADE_A));
+        historyDetailContent.addView(buildHistoryDetailRow(getString(R.string.grade_b_cracked), String.valueOf(b), COLOR_GRADE_B));
+        historyDetailContent.addView(buildHistoryDetailRow(getString(R.string.grade_c_reject), String.valueOf(c), COLOR_GRADE_C));
+    }
+
+    private LinearLayout buildHistoryDetailRow(String label, String value, int accentColor) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, dpToPx(4), 0, dpToPx(4));
+
+        View dot = new View(this);
+        android.graphics.drawable.GradientDrawable dotBg = new android.graphics.drawable.GradientDrawable();
+        dotBg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        dotBg.setColor(accentColor);
+        dot.setBackground(dotBg);
+        LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(dpToPx(8), dpToPx(8));
+        dotParams.setMarginEnd(dpToPx(8));
+        row.addView(dot, dotParams);
+
+        TextView labelTv = new TextView(this);
+        labelTv.setText(label);
+        labelTv.setTextColor(Color.parseColor("#333333"));
+        labelTv.setTextSize(13f);
+        row.addView(labelTv, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView valueTv = new TextView(this);
+        valueTv.setText(value);
+        valueTv.setTextColor(accentColor);
+        valueTv.setTextSize(13f);
+        valueTv.setTypeface(valueTv.getTypeface(), android.graphics.Typeface.BOLD);
+        row.addView(valueTv);
+
+        return row;
+    }
     private void showReportDialog() {
         int total = 0, a = 0, b = 0, c = 0;
         for (DailyEggData d : getFilteredData().values()) {

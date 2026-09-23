@@ -445,7 +445,12 @@ class DashboardActivity : AppCompatActivity() {
     private fun setupButtons() {
         findViewById<LinearLayout?>(R.id.analyticsButton)?.setOnClickListener {
             showLoading(getString(R.string.generating_reports)) {
-                startActivity(Intent(this, AnalyticsActivity::class.java).putExtra("username", username))
+                startActivity(
+                    Intent(this, AnalyticsActivity::class.java)
+                        .putExtra("username", username)
+                        .putExtra("displayName", displayName)
+                        .putExtra("role", userRole)
+                )
             }
         }
 

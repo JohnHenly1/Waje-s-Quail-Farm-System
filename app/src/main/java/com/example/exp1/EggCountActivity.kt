@@ -61,8 +61,6 @@ class EggCountActivity : AppCompatActivity() {
     private var batchShotCount = 0
 
     // ── Week navigation ───────────────────────────────────────────────────────
-    private var weekOffset = 0
-    private val sdf = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
     private val dbDateFmt = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
     // ── YOLO detector (null = failed to load, camera still works) ─────────────
@@ -122,9 +120,6 @@ class EggCountActivity : AppCompatActivity() {
     // ── Firebase Realtime Database ────────────────────────────────────────────
     private val database by lazy { FirebaseDatabase.getInstance() }
     private val auth by lazy { FirebaseAuth.getInstance() }
-    private var historyListener: ValueEventListener? = null
-    private var historyRef: com.google.firebase.database.DatabaseReference? = null
-    private var collectionRecords = mutableMapOf<String, Map<String, Any>>()
 
     // ── Cached views ──────────────────────────────────────────────────────────
     private lateinit var previewView: PreviewView
@@ -333,12 +328,6 @@ class EggCountActivity : AppCompatActivity() {
         doneBatchBtn.setOnClickListener { finishBatchAndScan() }
 
         saveBtn.setOnClickListener { confirmSaveCollection() }
-
-        findViewById<View>(R.id.calendarBtn).setOnClickListener { openCalendarPicker() }
-        findViewById<View>(R.id.prevWeekBtn).setOnClickListener { weekOffset--; setupUI() }
-        findViewById<View>(R.id.nextWeekBtn).setOnClickListener {
-            if (weekOffset < 0) { weekOffset++; setupUI() }
-        }
 
         gradeARow.setOnClickListener { showGradeDetailDialog("A") }
         gradeBRow.setOnClickListener { showGradeDetailDialog("B") }
@@ -1327,101 +1316,6 @@ class EggCountActivity : AppCompatActivity() {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  Firebase: Load collection history for the displayed week
-    // ─────────────────────────────────────────────────────────────────────────
-
-    private fun loadCollectionHistory() {
-        historyListener?.let { historyRef?.removeEventListener(it) }
-
-        val ref = database.getReference("egg_collections")
-        historyRef = ref
-
-        val listener = object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val records = mutableMapOf<String, Map<String, Any>>()
-                for (child in snapshot.children) {
-                    val key  = child.key ?: continue
-                    @Suppress("UNCHECKED_CAST")
-                    val data = child.value as? Map<String, Any> ?: continue
-                    records[key] = data
-                }
-                collectionRecords = records
-                runOnUiThread { populateCollectionLog(records) }
-            }
-
-            override fun onCancelled(error: DatabaseError) {
-                Log.w(TAG, "History load cancelled: ${error.message}")
-            }
-        }
-
-        ref.addValueEventListener(listener)
-        historyListener = listener
-    }
-
-    private fun openCalendarPicker() {
-        val cal = Calendar.getInstance()
-        val datePicker = DatePickerDialog(this, { _, year, month, day ->
-            val selectedCal = Calendar.getInstance().apply { set(year, month, day) }
-            val currentWeekMonday = Calendar.getInstance().apply {
-                set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
-            }
-            val selectedWeekMonday = selectedCal.clone() as Calendar
-            selectedWeekMonday.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
-            val diff = ((selectedWeekMonday.timeInMillis - currentWeekMonday.timeInMillis) /
-                    (7 * 24 * 60 * 60 * 1000)).toInt()
-            weekOffset = diff
-            setupUI()
-        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH))
-        datePicker.show()
-    }
-
-    private fun populateCollectionLog(records: Map<String, Map<String, Any>>) {
-        val container = findViewById<LinearLayout>(R.id.collectionLogList)
-        container.removeAllViews()
-        val inflater = LayoutInflater.from(this)
-        val todayStr = sdf.format(Calendar.getInstance().time)
-
-        val cal = Calendar.getInstance().apply {
-            set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
-            add(Calendar.WEEK_OF_YEAR, weekOffset)
-        }
-        val dayNames = arrayOf("Sunday", "Monday", "Tuesday", "Wednesday",
-            "Thursday", "Friday", "Saturday")
-
-        repeat(7) {
-            val displayDate  = sdf.format(cal.time)
-            val dayOfWeek    = dayNames[cal.get(Calendar.DAY_OF_WEEK) - 1]
-            val fullDateText = "$dayOfWeek, $displayDate"
-            val dbDate  = dbDateFmt.format(cal.time)
-            val record  = records[dbDate]
-
-            val total = (record?.get("total")  as? Long)?.toInt() ?: 0
-            val gA    = (record?.get("gradeA") as? Long)?.toInt() ?: 0
-            val gB    = (record?.get("gradeB") as? Long)?.toInt() ?: 0
-            val gC    = (record?.get("gradeC") as? Long)?.toInt() ?: 0
-
-            val item = inflater.inflate(R.layout.item_collection_log, container, false)
-            item.findViewById<TextView>(R.id.logDate).text  = fullDateText
-            item.findViewById<TextView>(R.id.logTotal).text = total.toString()
-
-            item.findViewById<TextView>(R.id.logGradeA).text           = "$gA"
-            item.findViewById<TextView>(R.id.logGradeALabel)?.text     = "Normal"
-
-            item.findViewById<TextView>(R.id.logGradeB).text           = "$gB"
-            item.findViewById<TextView>(R.id.logGradeBLabel)?.text     = "Cracked"
-
-            item.findViewById<TextView>(R.id.logGradeC).text           = "$gC"
-            item.findViewById<TextView>(R.id.logGradeCLabel)?.text     = "Reject"
-
-            item.findViewById<TextView>(R.id.todayBadge).visibility =
-                if (displayDate == todayStr) View.VISIBLE else View.GONE
-
-            container.addView(item)
-            cal.add(Calendar.DAY_OF_YEAR, 1)
-        }
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
     //  Detection helpers
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -1503,20 +1397,10 @@ class EggCountActivity : AppCompatActivity() {
 
     private fun setupUI() {
         updateCountUI()
-        updateWeekLabel()
-        populateCollectionLog(collectionRecords)
         saveBtn.visibility = View.GONE
         discardBtn.visibility = View.GONE
         captureModeToggleBtn.text =
             if (captureMode == CaptureMode.BATCH) "Mode: Batch" else "Mode: Single"
-    }
-
-    private fun updateWeekLabel() {
-        findViewById<TextView>(R.id.weekRangeTxt).text = when (weekOffset) {
-            0  -> "This Week"
-            -1 -> "Last Week"
-            else -> "${kotlin.math.abs(weekOffset)} Weeks Ago"
-        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -1818,14 +1702,11 @@ class EggCountActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        loadCollectionHistory()
         handler.post(timeUpdateRunnable)
     }
 
     override fun onPause() {
         super.onPause()
-        historyListener?.let { historyRef?.removeEventListener(it) }
-        historyListener = null
         handler.removeCallbacks(timeUpdateRunnable)
     }
 
@@ -1834,7 +1715,6 @@ class EggCountActivity : AppCompatActivity() {
         cameraExecutor.shutdown()
         detector?.close()
         cameraProvider?.unbindAll()
-        historyListener?.let { historyRef?.removeEventListener(it) }
     }
 
     companion object {

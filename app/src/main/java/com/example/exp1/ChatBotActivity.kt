@@ -1,6 +1,7 @@
 package com.example.exp1
 
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -186,6 +187,7 @@ class ChatBotActivity : AppCompatActivity() {
         val modelSelectorButton = findViewById<View>(R.id.modelSelectorButton)
         val newChatButton = findViewById<ImageButton>(R.id.newChatButton)
         val historyButton = findViewById<ImageButton>(R.id.historyButton)
+        val openAnalyticsButton = findViewById<ImageButton>(R.id.openAnalyticsButton)
 
         backBtn.setOnClickListener { finish() }
 
@@ -202,6 +204,14 @@ class ChatBotActivity : AppCompatActivity() {
         modelSelectorButton.setOnClickListener { showModelPicker(it) }
         newChatButton.setOnClickListener { startNewConversation(persistImmediately = false) }
         historyButton.setOnClickListener { showHistoryPopup(it) }
+        openAnalyticsButton.setOnClickListener {
+            val intent = Intent(this, AnalyticsActivity::class.java)
+            intent.putExtra("username", getIntent().getStringExtra("username"))
+            intent.putExtra("displayName", getIntent().getStringExtra("displayName"))
+            intent.putExtra("role", getIntent().getStringExtra("role"))
+            startActivity(intent)
+            finish()
+        }
 
         fun sendCurrentInput() {
             if (isSending) return

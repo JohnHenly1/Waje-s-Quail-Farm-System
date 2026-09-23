@@ -57,7 +57,7 @@
     <string name="report">Report</string>
     <string name="tasks">Tasks</string>
     <!--  Quick Stats  -->
-    <string name="total_eggs_today">Total Eggs Today</string>
+    <string name="total_eggs_today">Total Quail Eggs Today</string>
     <string name="eggs_count">0</string>
     <string name="feed_remaining">Inventory Remaining</string>
     <string name="feed_weight">0</string>
@@ -156,12 +156,12 @@
     <string name="view_by">View by</string>
     <string name="select_period">Select period</string>
     <string name="change_label">Change ›</string>
-    <string name="total_no_of_eggs_label">Total no.of Eggs</string>
+    <string name="total_no_of_eggs_label">Total no.of Quail Eggs</string>
     <string name="overall_quality">Overall quality</string>
     <string name="egg_grade_distribution">Egg Grade Distribution</string>
     <string name="grade_breakdown">Grade Breakdown</string>
     <string name="generate_report">Generate Report</string>
-    <string name="no_of_eggs_label">no. of eggs : 0</string>
+    <string name="no_of_eggs_label">no. of Quail eggs : 0</string>
     <!-- Chat bot / UI labels -->
     <string name="quail_assistant">Quail Assistant</string>
     <string name="quail_assistant_typing">Quail Assistant is typing&#8230;</string>
@@ -180,8 +180,7 @@
     <string name="pick_photo">Pick Photo</string>
     <string name="discard">✕ Discard</string>
     <string name="save_collection">💾 Save Collection</string>
-    <string name="total_eggs_detected">Total Eggs\nDetected</string>
-    <string name="collection_history">Collection History</string>
+    <string name="total_eggs_detected">Total Quail Eggs\nDetected</string>
     <string name="this_week">This Week</string>
     <string name="grade_normal">Normal</string>
     <string name="grade_cracked">Cracked</string>
@@ -207,6 +206,7 @@
     <string name="location_label">Location</string>
     <string name="stock_label">Stock</string>
     <string name="edit">Edit</string>
+    <string name="ask_ai_assistant">Ask AI Assistant</string>
     <!-- single 'delete' entry kept earlier; duplicate removed -->
     <string name="unit_price">Unit Price</string>
     <string name="total_value"> Unit Type</string>
@@ -229,7 +229,7 @@
     <string name="clear_history">Clear History</string>
     <!--  Profile Dialog Strings  -->
     <string name="syncing_profile">Syncing Profile…</string>
-    <string name="detected_eggs">Detected %1$d eggs!</string>
+    <string name="detected_eggs">Detected %1$d Quail eggs!</string>
     <string name="error_loading_farm_data">Error loading farm data</string>
     <string name="edit_name">Edit Name</string>
     <string name="save">Save</string>
@@ -478,7 +478,7 @@
     <string name="generated">Generated: %1$s</string>
     <string name="period">Period: %1$s</string>
     <string name="egg_production">EGG PRODUCTION</string>
-    <string name="total_eggs_collected">Total No. of Eggs Collected</string>
+    <string name="total_eggs_collected">Total No. of Quail Eggs Collected</string>
     <string name="grade_a">Grade A</string>
     <string name="grade_b">Grade B</string>
     <string name="grade_c">Grade C</string>
@@ -502,7 +502,7 @@
     <string name="failed_generate_image">Failed to generate image: %1$s</string>
     <string name="database_connection_error">Database Connection Error</string>
     <string name="refresh_failed">Refresh failed</string>
-    <string name="total_no_of_eggs_format">Total No. of Eggs : %1$d</string>
+    <string name="total_no_of_eggs_format">Total No. of Quail Eggs : %1$d</string>
     <string name="na">N/A</string>
     <!-- Privacy & Security dialog strings (extracted from layout) -->
     <string name="system_policies">System Policies</string>
@@ -520,7 +520,7 @@
     <string name="help_support_title">Help &amp; Support</string>
     <string name="cd_help_circle_icon">Help Circle Icon</string>
     <string name="getting_started_title">Getting Started</string>
-    <string name="getting_started_body">Welcome to Waje\'s Quail Farm System. This app helps you manage your quail farm efficiently by tracking birds, eggs, feed, and tasks.</string>
+    <string name="getting_started_body">Welcome to Waje\'s Quail Farm System. This app helps you manage your quail farm efficiently by tracking birds, quail eggs, feed, and tasks.</string>
     <string name="dashboard_title">Dashboard</string>
     <string name="dashboard_body">The dashboard provides a quick overview of your farm. Access shortcuts for inventory, egg counts, water levels, and tasks.</string>
     <string name="tasks_inventory_title">Tasks &amp; Inventory</string>
@@ -539,7 +539,12 @@
     <string name="contact_support_body">If you encounter any issues not covered above, please contact our support team at support@wajequailfarm.com. Include details about your farm setup and the issue you\'re experiencing.</string>
 
     <!-- Egg grade descriptions -->
-    <string name="grade_a_description">A healthy egg. The shell is smooth and whole, with light brown spots. It is a normal small oval with no cracks or dents. This is the grade you want most of your eggs to be.</string>
+    <string name="grade_a_description">A healthy egg. The shell is smooth and whole, with light brown spots. It is a normal small oval with no cracks or dents. This is the grade you want most of your quail eggs to be.</string>
     <string name="grade_b_description">A cracked egg. The shell has a thin crack or a small chip, and sometimes it is a soft shell. Look for a thin dark line on the shell. Not for eating or selling, but it can still be used for soils.</string>
     <string name="grade_c_description">A rejected egg. The shell may have a strange color, be leaking, be crushed or badly misshapen, or have mold. Not for selling. Do not eat it if it is leaking or moldy.</string>
+    <string name="open_analytics">Open Analytics</string>
+    <string name="collection_history">Collection History</string>
+    <string name="view_by_day_calendar">Tap to view by day on a calendar</string>
+    <string name="tap_a_day_to_view_details">Tap a day to view details</string>
+    <string name="no_eggs_collected_this_day">No quail eggs collected on this day</string>
 </resources>

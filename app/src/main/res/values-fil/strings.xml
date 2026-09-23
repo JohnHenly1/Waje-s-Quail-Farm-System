@@ -195,6 +195,7 @@ Apr 7, 2026</string>
     <string name="save_collection">💾 I-save ang Koleksiyon</string>
     <string name="total_eggs_detected">Kabuuang Itlog
 Natukoy</string>
+    <string name="open_analytics">Buksan ang Analytics</string>
     <string name="collection_history">Kasaysayan ng Koleksyon</string>
     <string name="this_week">Ngayong Linggo</string>
     <string name="grade_normal">Normal</string>
@@ -222,6 +223,7 @@ Natukoy</string>
     <string name="location_label">Lokasyon</string>
     <string name="stock_label">Stock</string>
     <string name="edit">I-edit</string>
+    <string name="ask_ai_assistant">Tanungin ang AI Assistant</string>
     <string name="delete">Burahin</string>
     <string name="unit_price">Presyong yunit</string>
     <string name="total_value">Klase ng Bagay</string>
@@ -272,7 +274,6 @@ Natukoy</string>
     <string name="incorrect_password">Maling kasalukuyang password</string>
     <string name="delete_account">Burahin ang Account</string>
     <string name="confirm_delete_account">Sigurado ka bang nais mong burahin ang iyong account?</string>
-    <!-- duplicate 'delete' removed (kept earlier definition) -->
     <string name="preferences_saved">Nai-save ang mga kagustuhan</string>
     <string name="user_removed">Natanggal ang user</string>
     <string name="failed_to_remove_user">Bigo sa pagtanggal ng user</string>
@@ -411,7 +412,6 @@ Natukoy</string>
     <string name="fill_all_address">Pakisuyong punan ang lahat ng field ng address</string>
     <string name="location_updated">Matagumpay na na-update ang lokasyon</string>
     <string name="location_update_failed">Nabigo sa pag-update ng lokasyon</string>
-    <!-- backup owner role removed -->
     <string name="max_staff_hint">Max Farm Staff</string>
     <string name="verification_code_msg">Verification Code para kay %1$s: %2$s</string>
     <string name="send_approval_email">Ipadala ang Approval at Code sa pamamagitan ng Gmail</string>
@@ -442,6 +442,14 @@ Natukoy</string>
     <string name="active_invite_codes_count_placeholder">Aktibong Invite Codes: %1$d</string>
     <string name="active_invite_codes_loading">Aktibong Invite Codes: Naglo-load&#8230;</string>
     <string name="analyzing_farm_yield">Sinusuri ang Ani ng Farm&#8230;</string>
+    <string-array name="filters">
+        <item>Lahat ng Panahon</item>
+        <item>Ngayon</item>
+        <item>Lingguhan</item>
+        <item>Buwanan</item>
+        <item>Taunan</item>
+        <item>Pasadya</item>
+    </string-array>
     <string name="approved_users_error">Inaprubahang Mga User: Error</string>
     <string name="birthday_hint">Kaarawan (MM/DD/YYYY)</string>
     <string name="chart_unavailable">Hindi magagamit ang tsart</string>
@@ -523,7 +531,8 @@ Natukoy</string>
     <string name="privacy_content_title">2. Nilalaman ng Privacy (Ang Paano)</string>
     <string name="privacy_content_body">&#8226; Pagmamay-ari: Pag-aari ng magsasaka ang lahat ng data na nilikha ng farm.&#10;&#8226; Paggamit: Ginagamit ang data para lamang sa mga ulat, pagsusuri ng trend, o konsultasyon sa beterinaryo.&#10;&#8226; Pagbabahagi: Ibinubunyag namin kapag napupunta ang data sa mga 3rd party (hal., pagsubaybay sa sakit ng gobyerno o mga mananaliksik).&#10;&#8226; Anonymity: Anumang ibabahaging data na pang-rehiyon ay inaalis ang pangalan ng farm at eksaktong lokasyon.</string>
     <string name="security_measures_title">3. Mga Hakbang sa Seguridad (Ang Kalasag)</string>
-    <string name="security_measures_body">&#8226; Encryption: Ang data ay ini-encrypt habang ina-upload at habang naka-imbak sa mga server.&#10;&#8226; Secure Login: Pinoprotektahan ang access ng mga password at/o biometric authentication.&#10;&#8226; Offline Safety: Ang data na naka-imbak sa device (kapag offline) ay protektado rin.&#10;&#8226; Access Control: Tanging awtorisadong mga user ang makakakita ng partikular na rekord ng farm.</string>    <string name="cd_privacy_icon">Icon ng Privacy</string>
+    <string name="security_measures_body">&#8226; Encryption: Ang data ay ini-encrypt habang ina-upload at habang naka-imbak sa mga server.&#10;&#8226; Secure Login: Pinoprotektahan ang access ng mga password at/o biometric authentication.&#10;&#8226; Offline Safety: Ang data na naka-imbak sa device (kapag offline) ay protektado rin.&#10;&#8226; Access Control: Tanging awtorisadong mga user ang makakakita ng partikular na rekord ng farm.</string>
+    <string name="cd_privacy_icon">Icon ng Privacy</string>
     <string name="cd_collection_icon">Icon ng Koleksyon</string>
     <string name="cd_privacy_policy_icon">Icon ng Patakaran sa Privacy</string>
     <string name="cd_security_armor_icon">Icon ng Kalasag ng Seguridad</string>
@@ -562,5 +571,7 @@ Natukoy</string>
     <string name="grade_a_description">Isang malusog na itlog. Makinis at buo ang balat, na may mapusyaw na kayumangging mga batik. Normal itong maliit na hugis-itlog na walang bitak o lukot. Ito ang grado na nais mong maging karamihan ng iyong mga itlog.</string>
     <string name="grade_b_description">Isang basag na itlog. May manipis na bitak o maliit na uwang ang balat, at minsan ay malambot ang balat. Hanapin ang manipis at maitim na linya sa balat. Hindi ito para kainin o ibenta, ngunit maaari pa rin itong gamitin sa lupa bilang pataba.</string>
     <string name="grade_c_description">Isang tinanggihang itlog. Maaaring kakaiba ang kulay ng balat, tumatagas, durog o labis na hindi maayos ang hugis, o may amag. Hindi para ibenta. Huwag kainin kung tumatagas o inaamag.</string>
+    <string name="view_by_day_calendar">I-tap para tingnan ayon sa araw sa kalendaryo</string>
+    <string name="tap_a_day_to_view_details">I-tap ang isang araw para makita ang mga detalye</string>
+    <string name="no_eggs_collected_this_day">Walang naipong itlog ng pugo sa araw na ito</string>
 </resources>
-
