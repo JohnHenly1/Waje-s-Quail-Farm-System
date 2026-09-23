@@ -64,8 +64,8 @@ class ChatBotActivity : AppCompatActivity() {
 
     // Flash-Lite first = fastest default. Order here also drives the picker menu order.
     private val availableModels = listOf(
-        AiModelOption("gemini-3.5-flash", "3.5 Flash"),
         AiModelOption("gemini-3.1-flash-lite", "3.1 Flash-Lite (Fastest)"),
+        AiModelOption("gemini-3.5-flash-lite", "3.5 Flash-Lite")
     )
     private var currentModelId = availableModels.first().id
     private var lastFarmContext: String = ""
@@ -318,7 +318,7 @@ class ChatBotActivity : AppCompatActivity() {
         var botMessageIndex = -1
         var accumulated = ""
 
-        val maxAttempts = 3
+        val maxAttempts = 2
         var attempt = 0
         var succeeded = false
 
