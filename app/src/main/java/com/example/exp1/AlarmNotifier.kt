@@ -26,6 +26,7 @@ object AlarmNotifier {
     const val EXTRA_MESSAGE = "ack_message"
     const val EXTRA_ALARM = "ack_alarm"
     const val EXTRA_DECLINE = "ack_decline"
+    const val EXTRA_QUICK_ACTIONS = "ack_quick_actions"
 
     private const val CHANNEL_ALARM = "critical_alarm_channel_v1"
     private const val CHANNEL_REQUEST = "ack_request_channel_v1"
@@ -65,9 +66,14 @@ object AlarmNotifier {
         )
     }
 
-    /** Posts (or updates in place) the notification for a request. [alarm] = loud, repeating, full-screen. */
+    /**
+     * Posts (or updates in place) the notification for a request. [alarm] = loud, repeating,
+     * full-screen. [quickActions] adds "Accept"/"Decline" buttons directly on the notification
+     * (skipped for schedule/task-assignment notifications - tapping the notification still opens
+     * the full Accept/Decline screen, so the response flow itself is unaffected).
+     */
     @Suppress("DEPRECATION")
-    fun show(ctx: Context, ackId: String, title: String, message: String, alarm: Boolean) {
+    fun show(ctx: Context, ackId: String, title: String, message: String, alarm: Boolean, quickActions: Boolean = true) {
         ensureChannels(ctx)
         val id = nid(ackId)
 
@@ -78,14 +84,10 @@ object AlarmNotifier {
             putExtra(EXTRA_MESSAGE, message)
             putExtra(EXTRA_ALARM, alarm)
             putExtra(EXTRA_DECLINE, decline)
+            putExtra(EXTRA_QUICK_ACTIONS, quickActions)
         }
         val pf = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         val open = PendingIntent.getActivity(ctx, id * 3, screen(false), pf)
-        val decline = PendingIntent.getActivity(ctx, id * 3 + 1, screen(true), pf)
-        val accept = PendingIntent.getBroadcast(
-            ctx, id * 3 + 2,
-            Intent(ctx, ActionReceiver::class.java).setAction(ACTION_ACCEPT).putExtra(EXTRA_ACK_ID, ackId), pf
-        )
 
         val builder = NotificationCompat.Builder(ctx, if (alarm) CHANNEL_ALARM else CHANNEL_REQUEST)
             .setSmallIcon(R.drawable.ic_notifications)
@@ -98,8 +100,16 @@ object AlarmNotifier {
             .setColor(if (alarm) Color.RED else Color.parseColor("#2E7D32"))
             .setContentIntent(open)
             .setOnlyAlertOnce(true)
-            .addAction(0, "Accept", accept)
-            .addAction(0, "Decline", decline)
+
+        if (quickActions) {
+            val decline = PendingIntent.getActivity(ctx, id * 3 + 1, screen(true), pf)
+            val accept = PendingIntent.getBroadcast(
+                ctx, id * 3 + 2,
+                Intent(ctx, ActionReceiver::class.java).setAction(ACTION_ACCEPT).putExtra(EXTRA_ACK_ID, ackId), pf
+            )
+            builder.addAction(0, "Accept", accept)
+                .addAction(0, "Decline", decline)
+        }
 
         if (alarm) {
             builder.setFullScreenIntent(open, true)

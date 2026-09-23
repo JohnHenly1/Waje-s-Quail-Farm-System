@@ -115,7 +115,7 @@ public class ScheduleActivity extends AppCompatActivity {
     private static final String FILTER_ASSIGNED = "ASSIGNED";
     private static final String FILTER_MISSING = "MISSING";
     private static final String FILTER_DONE = "DONE";
-    private static final int MAX_WORK_WINDOW_MINUTES = 300; // 5 hours maximum
+    private static final int MAX_WORK_WINDOW_MINUTES = 120; // 2 hours maximum
     private String activeFilter = FILTER_PENDING;
 
     private FirebaseFirestore db;
@@ -797,7 +797,7 @@ public class ScheduleActivity extends AppCompatActivity {
         // Lets the owner type a category that isn't in the preset list.
         EditText    editCustomCategory   = dialogView.findViewById(R.id.editCustomCategory);
         TextView    textTime             = dialogView.findViewById(R.id.textTime);
-        // Work window is now a Spinner (drop-down) offering fixed selections from 30 minutes to 5 hours
+        // Work window is now a Spinner (drop-down) offering fixed selections from 30 minutes to 2 hours
         Spinner     spinnerWorkWindow    = dialogView.findViewById(R.id.spinnerWorkWindow);
         TextView    txtCurrentMonth      = dialogView.findViewById(R.id.txtCurrentMonth);
         GridLayout  calendarGrid         = dialogView.findViewById(R.id.calendarGrid);
@@ -845,8 +845,8 @@ public class ScheduleActivity extends AppCompatActivity {
         spinnerCategory.setAdapter(catAdapter);
 
         // Populate work window spinner with friendly labels and corresponding minute values
-        final String[] workWindowLabels = new String[]{"30 minutes","45 minutes","60 minutes","75 minutes","90 minutes","105 minutes","120 minutes","180 minutes (3 hours)","240 minutes (4 hours)","300 minutes (5 hours)"};
-        final int[] workWindowValues = new int[]{30,45,60,75,90,105,120,180,240,300};
+        final String[] workWindowLabels = new String[]{"30 minutes","45 minutes","60 minutes","75 minutes","90 minutes","105 minutes","120 minutes"};
+        final int[] workWindowValues = new int[]{30,45,60,75,90,105,120};
         ArrayAdapter<String> wwAdapter = new ArrayAdapter<>(this, R.layout.spinner_item_black, workWindowLabels);
         wwAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item_black);
         spinnerWorkWindow.setAdapter(wwAdapter);
@@ -1335,7 +1335,7 @@ public class ScheduleActivity extends AppCompatActivity {
                     : getDefaultWorkWindow(category);
 
             if (window > MAX_WORK_WINDOW_MINUTES) {
-                Toast.makeText(this, "Work window cannot exceed 5 hours.", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Work window cannot exceed 2 hours.", Toast.LENGTH_SHORT).show();
                 return;
             }
 
@@ -1824,6 +1824,7 @@ public class ScheduleActivity extends AppCompatActivity {
                                 t.pendingResponseRequestedBy = null;
                                 t.pendingResponseOwnerReason = null;
                                 t.pendingResponseOwnerRequestedBy = null;
+                                t.pendingResponseOwnerReasonFor = null;
                                 t.pendingDaysOffDates = new ArrayList<>();
                                 t.pendingDaysOffReason = null;
                                 t.pendingDaysOffRequestedBy = null;
@@ -3302,6 +3303,54 @@ public class ScheduleActivity extends AppCompatActivity {
         requestCard.addView(reasonView);
         root.addView(requestCard);
 
+        // Show the full date range for this pending task/series.
+        List<Task> pendingSeries = getTaskSeries(task);
+        pendingSeries.sort((a, b) -> Long.compare(taskMillis(a), taskMillis(b)));
+        Task startTask = pendingSeries.isEmpty() ? task : pendingSeries.get(0);
+        Task endTask = pendingSeries.isEmpty() ? task : pendingSeries.get(pendingSeries.size() - 1);
+
+        LinearLayout dateRangeCard = new LinearLayout(this);
+        dateRangeCard.setOrientation(LinearLayout.VERTICAL);
+        dateRangeCard.setPadding(dpToPx(14), dpToPx(12), dpToPx(14), dpToPx(12));
+        GradientDrawable dateBg = new GradientDrawable();
+        dateBg.setColor(Color.parseColor("#F8FAFC"));
+        dateBg.setCornerRadius(dpToPx(12));
+        dateBg.setStroke(dpToPx(1), Color.parseColor("#E5E7EB"));
+        dateRangeCard.setBackground(dateBg);
+
+        TextView dateTitle = new TextView(this);
+        dateTitle.setText("Assigned Date Range");
+        dateTitle.setTextColor(Color.parseColor("#245B20"));
+        dateTitle.setTextSize(13.5f);
+        dateTitle.setTypeface(null, Typeface.BOLD);
+        dateRangeCard.addView(dateTitle);
+
+        TextView startDateView = new TextView(this);
+        startDateView.setText("Start Date: " + formatTaskDate(startTask));
+        startDateView.setTextColor(Color.parseColor("#374151"));
+        startDateView.setTextSize(13.5f);
+        LinearLayout.LayoutParams startParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        startParams.setMargins(0, dpToPx(6), 0, 0);
+        startDateView.setLayoutParams(startParams);
+        dateRangeCard.addView(startDateView);
+
+        TextView endDateView = new TextView(this);
+        endDateView.setText("End Date: " + formatTaskDate(endTask));
+        endDateView.setTextColor(Color.parseColor("#374151"));
+        endDateView.setTextSize(13.5f);
+        LinearLayout.LayoutParams endParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        endParams.setMargins(0, dpToPx(3), 0, 0);
+        endDateView.setLayoutParams(endParams);
+        dateRangeCard.addView(endDateView);
+
+        LinearLayout.LayoutParams dateCardParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        dateCardParams.setMargins(0, 0, 0, dpToPx(8));
+        dateRangeCard.setLayoutParams(dateCardParams);
+        root.addView(dateRangeCard);
+
         View divider = new View(this);
         divider.setBackgroundColor(Color.parseColor("#E5E7EB"));
         root.addView(divider, new LinearLayout.LayoutParams(
@@ -3445,6 +3494,10 @@ public class ScheduleActivity extends AppCompatActivity {
             Map<String, Object> updates = new HashMap<>();
             updates.put("pendingResponseOwnerReason", reason);
             updates.put("pendingResponseOwnerRequestedBy", currentUserEmail);
+            // Kept (not deleted like pendingResponseRequestedBy below) so every device's
+            // notification listener still knows which staff member to notify about this
+            // explanation after pendingResponseRequestedBy is cleared.
+            updates.put("pendingResponseOwnerReasonFor", requester);
             updates.put("pendingResponseStatus", com.google.firebase.firestore.FieldValue.delete());
             updates.put("pendingResponseReason", com.google.firebase.firestore.FieldValue.delete());
             updates.put("pendingResponseRequestedBy", com.google.firebase.firestore.FieldValue.delete());
@@ -3636,11 +3689,9 @@ public class ScheduleActivity extends AppCompatActivity {
 
         final String[] workWindowLabels = new String[]{
                 "30 minutes", "45 minutes", "60 minutes", "75 minutes",
-                "90 minutes", "105 minutes", "120 minutes",
-                "180 minutes (3 hours)", "240 minutes (4 hours)",
-                "300 minutes (5 hours)"
+                "90 minutes", "105 minutes", "120 minutes"
         };
-        final int[] workWindowValues = new int[]{30, 45, 60, 75, 90, 105, 120, 180, 240, 300};
+        final int[] workWindowValues = new int[]{30, 45, 60, 75, 90, 105, 120};
 
         ArrayAdapter<String> windowAdapter = new ArrayAdapter<>(
                 this, R.layout.spinner_item_black, workWindowLabels);
@@ -3888,7 +3939,7 @@ public class ScheduleActivity extends AppCompatActivity {
 
             if (selectedWindow <= 0 || selectedWindow > MAX_WORK_WINDOW_MINUTES) {
                 Toast.makeText(this,
-                        "Work window must be between 30 minutes and 5 hours.",
+                        "Work window must be between 30 minutes and 2 hours.",
                         Toast.LENGTH_SHORT).show();
                 return;
             }
@@ -4067,7 +4118,7 @@ public class ScheduleActivity extends AppCompatActivity {
             int count=Math.min(series.size(),newDates.size());
             for(int i=0;i<count;i++){
                 Task t=series.get(i); Calendar c=Calendar.getInstance();c.setTimeInMillis(newDates.get(i));
-                Map<String,Object> up=new HashMap<>(); up.put("year",c.get(Calendar.YEAR));up.put("month",c.get(Calendar.MONTH));up.put("day",c.get(Calendar.DAY_OF_MONTH));up.put("time",newTime);up.put("workWindowMinutes",window);up.put("assignedTo",new ArrayList<>(staff));up.put("acceptedBy",com.google.firebase.firestore.FieldValue.delete());up.put("pendingResponseStatus",com.google.firebase.firestore.FieldValue.delete());up.put("pendingResponseReason",com.google.firebase.firestore.FieldValue.delete());up.put("pendingResponseRequestedBy",com.google.firebase.firestore.FieldValue.delete());up.put("pendingDaysOffDates",com.google.firebase.firestore.FieldValue.delete());up.put("pendingDaysOffReason",com.google.firebase.firestore.FieldValue.delete());up.put("pendingDaysOffRequestedBy",com.google.firebase.firestore.FieldValue.delete());up.put("pendingResponseOwnerReason",com.google.firebase.firestore.FieldValue.delete());up.put("pendingResponseOwnerRequestedBy",com.google.firebase.firestore.FieldValue.delete());
+                Map<String,Object> up=new HashMap<>(); up.put("year",c.get(Calendar.YEAR));up.put("month",c.get(Calendar.MONTH));up.put("day",c.get(Calendar.DAY_OF_MONTH));up.put("time",newTime);up.put("workWindowMinutes",window);up.put("assignedTo",new ArrayList<>(staff));up.put("acceptedBy",com.google.firebase.firestore.FieldValue.delete());up.put("pendingResponseStatus",com.google.firebase.firestore.FieldValue.delete());up.put("pendingResponseReason",com.google.firebase.firestore.FieldValue.delete());up.put("pendingResponseRequestedBy",com.google.firebase.firestore.FieldValue.delete());up.put("pendingDaysOffDates",com.google.firebase.firestore.FieldValue.delete());up.put("pendingDaysOffReason",com.google.firebase.firestore.FieldValue.delete());up.put("pendingDaysOffRequestedBy",com.google.firebase.firestore.FieldValue.delete());up.put("pendingResponseOwnerReason",com.google.firebase.firestore.FieldValue.delete());up.put("pendingResponseOwnerRequestedBy",com.google.firebase.firestore.FieldValue.delete());up.put("pendingResponseOwnerReasonFor",com.google.firebase.firestore.FieldValue.delete());
                 batch.update(db.collection("farm_data").document("shared").collection("tasks").document(t.firestoreId),up);
             }
             batch.commit().addOnSuccessListener(v->{Toast.makeText(this,"Pending task resolved and reassigned.",Toast.LENGTH_LONG).show();}).addOnFailureListener(e->Toast.makeText(this,"Failed to resolve task: "+e.getMessage(),Toast.LENGTH_LONG).show());
@@ -4143,6 +4194,56 @@ public class ScheduleActivity extends AppCompatActivity {
         infoCard.addView(infoSubtitleView);
 
         root.addView(infoCard);
+
+        // Show the start and end dates so the staff member can clearly see the
+        // date range included in this assignment before responding.
+        List<Task> awaitingSeries = getTaskSeries(task);
+        awaitingSeries.sort((a, b) -> Long.compare(taskMillis(a), taskMillis(b)));
+        Task awaitingStart = awaitingSeries.isEmpty() ? task : awaitingSeries.get(0);
+        Task awaitingEnd = awaitingSeries.isEmpty() ? task : awaitingSeries.get(awaitingSeries.size() - 1);
+
+        LinearLayout awaitingDateCard = new LinearLayout(this);
+        awaitingDateCard.setOrientation(LinearLayout.VERTICAL);
+        awaitingDateCard.setPadding(dpToPx(14), dpToPx(11), dpToPx(14), dpToPx(11));
+        LinearLayout.LayoutParams awaitingDateParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        awaitingDateParams.setMargins(0, 0, 0, dpToPx(8));
+        awaitingDateCard.setLayoutParams(awaitingDateParams);
+
+        GradientDrawable awaitingDateBg = new GradientDrawable();
+        awaitingDateBg.setColor(Color.parseColor("#F8FAFC"));
+        awaitingDateBg.setCornerRadius(dpToPx(12));
+        awaitingDateBg.setStroke(dpToPx(1), Color.parseColor("#E5E7EB"));
+        awaitingDateCard.setBackground(awaitingDateBg);
+
+        TextView awaitingDateTitle = new TextView(this);
+        awaitingDateTitle.setText("Assigned Date Range");
+        awaitingDateTitle.setTextColor(Color.parseColor("#245B20"));
+        awaitingDateTitle.setTextSize(13.5f);
+        awaitingDateTitle.setTypeface(null, Typeface.BOLD);
+        awaitingDateCard.addView(awaitingDateTitle);
+
+        TextView awaitingStartView = new TextView(this);
+        awaitingStartView.setText("Start Date: " + formatTaskDate(awaitingStart));
+        awaitingStartView.setTextColor(Color.parseColor("#374151"));
+        awaitingStartView.setTextSize(13.5f);
+        LinearLayout.LayoutParams awaitingStartParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        awaitingStartParams.setMargins(0, dpToPx(5), 0, 0);
+        awaitingStartView.setLayoutParams(awaitingStartParams);
+        awaitingDateCard.addView(awaitingStartView);
+
+        TextView awaitingEndView = new TextView(this);
+        awaitingEndView.setText("End Date: " + formatTaskDate(awaitingEnd));
+        awaitingEndView.setTextColor(Color.parseColor("#374151"));
+        awaitingEndView.setTextSize(13.5f);
+        LinearLayout.LayoutParams awaitingEndParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        awaitingEndParams.setMargins(0, dpToPx(3), 0, 0);
+        awaitingEndView.setLayoutParams(awaitingEndParams);
+        awaitingDateCard.addView(awaitingEndView);
+
+        root.addView(awaitingDateCard);
 
         if (task.pendingResponseOwnerReason != null
                 && !task.pendingResponseOwnerReason.trim().isEmpty()) {
@@ -4281,6 +4382,7 @@ public class ScheduleActivity extends AppCompatActivity {
                     upd.put("pendingResponseRequestedBy", com.google.firebase.firestore.FieldValue.delete());
                     upd.put("pendingResponseOwnerReason", com.google.firebase.firestore.FieldValue.delete());
                     upd.put("pendingResponseOwnerRequestedBy", com.google.firebase.firestore.FieldValue.delete());
+                    upd.put("pendingResponseOwnerReasonFor", com.google.firebase.firestore.FieldValue.delete());
                     applyToTaskSeries(task, upd, () ->
                             Toast.makeText(this, "Task accepted.", Toast.LENGTH_SHORT).show());
                 })
@@ -6135,6 +6237,7 @@ public class ScheduleActivity extends AppCompatActivity {
         String pendingResponseRequestedBy;
         String pendingResponseOwnerReason;
         String pendingResponseOwnerRequestedBy;
+        String pendingResponseOwnerReasonFor; // staff email the explanation is for; survives pendingResponseRequestedBy being cleared
         List<String> declinedStaff = new ArrayList<>();
 
         String doneComment;   // required comment proof, set only when marked Done via the proof flow

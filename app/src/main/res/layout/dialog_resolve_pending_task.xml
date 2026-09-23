@@ -20,6 +20,12 @@
             android:gravity="center_vertical"
             android:layout_marginBottom="20dp">
 
+            <ImageView
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:src="@drawable/ic_add2"
+                app:tint="@color/dark_green" />
+
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -37,7 +43,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="0dp"
-            android:text="Assign to"
+            android:text="Assign To"
             android:textColor="@color/dark_green"
             android:textSize="14sp"
             android:textStyle="bold" />
@@ -87,7 +93,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="Work Window (Time to complete)"
+            android:text="Work Window (Time to complete, max 2 hours)"
             android:textColor="@color/dark_green"
             android:textSize="14sp"
             android:textStyle="bold" />

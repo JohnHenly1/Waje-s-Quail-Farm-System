@@ -57,6 +57,7 @@ object AlertsMonitor {
 
     private var inventoryListener: ListenerRegistration? = null
     private var tasksListener: ListenerRegistration? = null
+    private var taskResponseListener: ListenerRegistration? = null
     private var waterLevelRef: DatabaseReference? = null
     private var waterLevelListener: ValueEventListener? = null
 
@@ -70,6 +71,7 @@ object AlertsMonitor {
 
         startInventoryListener()
         startTasksListener()
+        startTaskResponseListener()
         startWaterLevelListener()
     }
 
@@ -248,6 +250,83 @@ object AlertsMonitor {
                             markAsAlertedToday(message)
                             showLocalNotification("Missed Task", message)
                         }
+                    }
+                }
+            }
+    }
+
+    // ── Decline / reject reasons ──────────────────────────────────────────
+    // Neither ScheduleActivity.showDeclineTaskDialog (staff declines an assigned
+    // task) nor showOwnerRejectDeclineDialog (owner rejects a staff's decline
+    // request) sends any cross-device notification of its own — they only write
+    // the Firestore task doc and log an in-app alert row on the *writer's own*
+    // device. Every device runs this same listener and decides locally whether
+    // the update is relevant to it, exactly like startTasksListener above, so
+    // the right person (the owner, or specifically the staff member who asked
+    // to be excused) actually gets notified instead of just the person who
+    // triggered the write.
+    //
+    // Dedup is state-based (like inventoryAlertState above) rather than
+    // day-based: the last-notified reason text is stored per task/series, and
+    // a notification only fires when that text changes to something new and
+    // non-blank. Recurring series share one key (recurrenceGroupId) because
+    // applyToTaskSeries() writes the same reason to every date in the series
+    // in one batch — without this a single decline would otherwise buzz once
+    // per remaining date.
+    private fun startTaskResponseListener() {
+        taskResponseListener?.remove()
+        taskResponseListener = FirebaseFirestore.getInstance()
+            .collection("farm_data").document("shared").collection("tasks")
+            .addSnapshotListener { snapshots, e ->
+                if (e != null || snapshots == null) return@addSnapshotListener
+                val accountManager = AccountManager(appContext)
+                if (!accountManager.isScheduleEnabled()) return@addSnapshotListener
+                val me = accountManager.getCurrentUsername() ?: return@addSnapshotListener
+                val isOwner = RoleManager(accountManager.getCurrentRole()).isOwner
+                val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+                for (dc in snapshots.documentChanges) {
+                    if (dc.type != DocumentChange.Type.ADDED && dc.type != DocumentChange.Type.MODIFIED) continue
+                    val doc = dc.document
+                    val seriesKey = doc.getString("recurrenceGroupId")?.takeIf { it.isNotBlank() } ?: doc.id
+                    val title = doc.getString("title") ?: "Task"
+
+                    // Staff declined with a reason -> notify the owner(s).
+                    if (isOwner) {
+                        val declineKey = "decline_reason_notified_$seriesKey"
+                        val status = doc.getString("pendingResponseStatus")
+                        val reason = doc.getString("pendingResponseReason")
+                        if ("DECLINED".equals(status, ignoreCase = true) && !reason.isNullOrBlank()) {
+                            if (prefs.getString(declineKey, null) != reason) {
+                                prefs.edit().putString(declineKey, reason).apply()
+                                val requester = doc.getString("pendingResponseRequestedBy")
+                                val staffName = requester?.let { accountManager.getCachedName(it) } ?: "A staff member"
+                                showLocalNotification(
+                                    "Task Declined",
+                                    "$staffName declined \"$title\" - Reason: $reason"
+                                )
+                            }
+                        } else {
+                            prefs.edit().remove(declineKey).apply()
+                        }
+                    }
+
+                    // Owner rejected the staff's decline request with an explanation -> notify
+                    // that specific staff member (pendingResponseOwnerReasonFor survives the
+                    // pendingResponseRequestedBy delete in showOwnerRejectDeclineDialog).
+                    val rejectKey = "owner_reject_reason_notified_$seriesKey"
+                    val ownerReason = doc.getString("pendingResponseOwnerReason")
+                    val notifyTarget = doc.getString("pendingResponseOwnerReasonFor")
+                    if (!ownerReason.isNullOrBlank() && notifyTarget != null && notifyTarget.equals(me, ignoreCase = true)) {
+                        if (prefs.getString(rejectKey, null) != ownerReason) {
+                            prefs.edit().putString(rejectKey, ownerReason).apply()
+                            showLocalNotification(
+                                "Decline Request Rejected",
+                                "Your decline request for \"$title\" was rejected - Reason: $ownerReason"
+                            )
+                        }
+                    } else if (ownerReason.isNullOrBlank()) {
+                        prefs.edit().remove(rejectKey).apply()
                     }
                 }
             }

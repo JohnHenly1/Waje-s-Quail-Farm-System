@@ -43,7 +43,16 @@ class WajeFirebaseMessagingService : FirebaseMessagingService() {
         // Accept/Decline requests (critical alerts, task assignments) get the alarm/request UI.
         val ackId = data["ackId"]
         if (!ackId.isNullOrBlank()) {
-            AlarmNotifier.show(applicationContext, ackId, title, body, alarm = data["critical"] == "true")
+            // Task-assignment requests use "assign_<groupId>" ack ids (see
+            // AckRepository.createTaskAssignmentRequest / checkAlerts.js) - these are schedule
+            // notifications and no longer get Accept/Decline buttons in the notification shade;
+            // tapping still opens the full Accept/Decline screen.
+            val isScheduleAssignment = ackId.startsWith("assign_")
+            AlarmNotifier.show(
+                applicationContext, ackId, title, body,
+                alarm = data["critical"] == "true",
+                quickActions = !isScheduleAssignment
+            )
             return
         }
         val channelId = data["channel"].takeUnless { it.isNullOrBlank() } ?: "alerts_channel"

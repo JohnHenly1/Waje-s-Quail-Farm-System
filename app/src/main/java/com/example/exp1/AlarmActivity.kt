@@ -32,6 +32,7 @@ class AlarmActivity : AppCompatActivity() {
     private var ackTitle = ""
     private var ackMessage = ""
     private var alarm = false
+    private var quickActions = true
     private var responded = false
 
     private var player: MediaPlayer? = null
@@ -50,7 +51,7 @@ class AlarmActivity : AppCompatActivity() {
         } else {
             window.addFlags(
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                        WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
             )
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -73,6 +74,7 @@ class AlarmActivity : AppCompatActivity() {
         ackTitle = i.getStringExtra(AlarmNotifier.EXTRA_TITLE) ?: "Waje's Quail Farm"
         ackMessage = i.getStringExtra(AlarmNotifier.EXTRA_MESSAGE) ?: ""
         alarm = i.getBooleanExtra(AlarmNotifier.EXTRA_ALARM, false)
+        quickActions = i.getBooleanExtra(AlarmNotifier.EXTRA_QUICK_ACTIONS, true)
         responded = false
 
         findViewById<TextView>(R.id.alarmTitle).text = ackTitle
@@ -217,7 +219,7 @@ class AlarmActivity : AppCompatActivity() {
         stopAlarm()
         // Left without answering: keep it as a quiet reminder with Accept/Decline in the shade.
         if (isFinishing && !responded && ackId.isNotEmpty()) {
-            AlarmNotifier.show(applicationContext, ackId, ackTitle, ackMessage, alarm = false)
+            AlarmNotifier.show(applicationContext, ackId, ackTitle, ackMessage, alarm = false, quickActions = quickActions)
         }
         super.onDestroy()
     }

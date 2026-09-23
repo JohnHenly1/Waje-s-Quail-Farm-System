@@ -62,8 +62,8 @@ object AckRepository {
 
     fun isPendingFor(req: AckRequest, email: String): Boolean =
         req.recipients.any { it.equals(email, ignoreCase = true) } &&
-            !req.responses.containsKey(userKey(email)) &&
-            !(req.mode == "any" && req.resolved)
+                !req.responses.containsKey(userKey(email)) &&
+                !(req.mode == "any" && req.resolved)
 
     // ── Creating requests ────────────────────────────────────────────────────
 
@@ -236,7 +236,10 @@ object AckRepository {
                 if (isPendingFor(req, me)) {
                     if (now - req.createdAtMillis < STALE_MS && shown.add(req.id)) {
                         val ring = req.severity == "critical" && now - req.createdAtMillis < ALARM_WINDOW_MS
-                        AlarmNotifier.show(ctx, req.id, req.title, req.message, ring)
+                        // Schedule/task-assignment notifications no longer offer Accept/Decline
+                        // directly in the notification shade; tapping still opens the full
+                        // Accept/Decline screen. Critical alerts keep the quick actions.
+                        AlarmNotifier.show(ctx, req.id, req.title, req.message, ring, quickActions = req.kind != "task")
                     }
                 } else {
                     AlarmNotifier.cancel(ctx, req.id)   // answered here/elsewhere, or someone else accepted
