@@ -794,6 +794,8 @@ public class ScheduleActivity extends AppCompatActivity {
         EditText    editTaskTitle        = dialogView.findViewById(R.id.editTaskTitle);
         if (editTaskTitle != null) editTaskTitle.setVisibility(View.GONE);
         Spinner     spinnerCategory      = dialogView.findViewById(R.id.spinnerCategory);
+        // Lets the owner type a category that isn't in the preset list.
+        EditText    editCustomCategory   = dialogView.findViewById(R.id.editCustomCategory);
         TextView    textTime             = dialogView.findViewById(R.id.textTime);
         // Work window is now a Spinner (drop-down) offering fixed selections from 30 minutes to 2 hours
         Spinner     spinnerWorkWindow    = dialogView.findViewById(R.id.spinnerWorkWindow);
@@ -831,12 +833,17 @@ public class ScheduleActivity extends AppCompatActivity {
             return false;
         });
 
-        String[] categories = getResources().getStringArray(R.array.task_categories);
+        // "Other" is appended in code (not in strings.xml) so the preset list
+        // stays untouched; picking it reveals editCustomCategory below.
+        String[] presetCategories = getResources().getStringArray(R.array.task_categories);
+        String[] categories = new String[presetCategories.length + 1];
+        System.arraycopy(presetCategories, 0, categories, 0, presetCategories.length);
+        categories[presetCategories.length] = "Other";
+
         ArrayAdapter<String> catAdapter = new ArrayAdapter<>(this,
                 R.layout.spinner_item_black, categories);
         catAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item_black);
         spinnerCategory.setAdapter(catAdapter);
-
         // Populate work window spinner with friendly labels and corresponding minute values
         final String[] workWindowLabels = new String[]{"30 minutes","45 minutes","60 minutes","75 minutes","90 minutes","105 minutes","120 minutes"};
         final int[] workWindowValues = new int[]{30,45,60,75,90,105,120};
@@ -857,6 +864,12 @@ public class ScheduleActivity extends AppCompatActivity {
                 int def = getDefaultWorkWindow(cat);
                 for (int k = 0; k < workWindowValues.length; k++) {
                     if (workWindowValues[k] == def) { spinnerWorkWindow.setSelection(k); break; }
+                }
+
+                boolean isOther = "Other".equals(cat);
+                if (editCustomCategory != null) {
+                    editCustomCategory.setVisibility(isOther ? View.VISIBLE : View.GONE);
+                    if (!isOther) editCustomCategory.setText("");
                 }
             }
 
@@ -1297,10 +1310,24 @@ public class ScheduleActivity extends AppCompatActivity {
         dialog.show();
 
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-            String category = spinnerCategory.getSelectedItem().toString();
-            // The schedule form no longer has a separate title. Keep the legacy
-            // Firestore title field populated with the category for compatibility.
-            String title = category;
+            String pickedCategory = spinnerCategory.getSelectedItem().toString();
+            if ("Other".equals(pickedCategory)) {
+                String customCategory = editCustomCategory != null
+                        ? editCustomCategory.getText().toString().trim() : "";
+                if (customCategory.isEmpty()) {
+                    Toast.makeText(this, "Please enter a category name", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                pickedCategory = customCategory;
+            }
+            // Copied into a final variable so it can be safely captured by the
+            // nested lambda below (a reassigned local can't be captured).
+            final String category = pickedCategory;
+
+            // Auto-name the task from the selected time of day + category
+            // (e.g. "Morning Feeding") instead of just the category, so tasks
+            // scheduled at different times of day are easier to tell apart.
+            String title = getTimeOfDayLabel(selHour[0]) + " " + category;
 
             int selPos = spinnerWorkWindow.getSelectedItemPosition();
             int window = (selPos >= 0 && selPos < workWindowValues.length)
@@ -1657,8 +1684,21 @@ public class ScheduleActivity extends AppCompatActivity {
         ((TextView) previewView.findViewById(R.id.previewTotalDates)).setText(
                 selectedDates.size() + " " + getString(R.string.days_unit) + " (" + selectedRecurrence + ")");
 
+        // Below the summary fields, show one mini calendar per month that has
+        // a scheduled date, with those dates painted green, so the owner can
+        // visually confirm the exact days before saving. Wrapped in a
+        // ScrollView since a long date range can span many months.
+        LinearLayout previewWrapper = new LinearLayout(this);
+        previewWrapper.setOrientation(LinearLayout.VERTICAL);
+        previewWrapper.setBackgroundColor(Color.WHITE);
+        previewWrapper.addView(previewView);
+        previewWrapper.addView(buildMonthlyCalendarPreview(selectedDates));
+
+        ScrollView previewScroll = new ScrollView(this);
+        previewScroll.addView(previewWrapper);
+
         AlertDialog previewDialog = new AlertDialog.Builder(this)
-                .setView(previewView)
+                .setView(previewScroll)
                 .setPositiveButton(getString(R.string.confirm_and_save), (dConfirm, wConfirm) -> {
                     String groupId = UUID.randomUUID().toString();
 
@@ -1769,6 +1809,164 @@ public class ScheduleActivity extends AppCompatActivity {
             case "Watering": return 45;
             default: return 60;
         }
+    }
+
+    /**
+     * Buckets a 24-hour hour value (6-20, matching the enforced work-hour
+     * range in the time picker) into a friendly time-of-day label used to
+     * auto-name tasks, e.g. "Morning Feeding", "Afternoon Cleaning".
+     */
+    private String getTimeOfDayLabel(int hour) {
+        if (hour >= 6 && hour <= 10)  return "Morning";
+        if (hour >= 11 && hour <= 12) return "Noon";
+        if (hour >= 13 && hour <= 17) return "Afternoon";
+        return "Night"; // 18:00–20:00
+    }
+
+    /**
+     * Builds one mini calendar table per distinct month present in
+     * selectedDates, with the scheduled dates painted green — lets the owner
+     * visually confirm exactly which days are about to be created before
+     * saving. Multiple months stack vertically; the caller wraps this in a
+     * ScrollView since a long date range can span many months.
+     */
+    private LinearLayout buildMonthlyCalendarPreview(List<Long> selectedDates) {
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        int pad = dpToPx(20);
+        container.setPadding(pad, dpToPx(4), pad, dpToPx(16));
+
+        if (selectedDates == null || selectedDates.isEmpty()) return container;
+
+        TextView sectionTitle = new TextView(this);
+        sectionTitle.setText("Scheduled Dates");
+        sectionTitle.setTextColor(Color.parseColor("#111827"));
+        sectionTitle.setTextSize(15);
+        sectionTitle.setTypeface(null, Typeface.BOLD);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        titleParams.setMargins(0, dpToPx(4), 0, dpToPx(10));
+        sectionTitle.setLayoutParams(titleParams);
+        container.addView(sectionTitle);
+
+        // Group selected midnight-millis keys by year-month, sorted chronologically.
+        java.util.Set<Long> selectedSet = new java.util.HashSet<>(selectedDates);
+        Map<String, List<Long>> byMonth = new TreeMap<>();
+        for (Long key : selectedDates) {
+            Calendar c = Calendar.getInstance();
+            c.setTimeInMillis(key);
+            String monthKey = String.format(Locale.US, "%04d-%02d", c.get(Calendar.YEAR), c.get(Calendar.MONTH));
+            List<Long> bucket = byMonth.get(monthKey);
+            if (bucket == null) { bucket = new ArrayList<>(); byMonth.put(monthKey, bucket); }
+            bucket.add(key);
+        }
+
+        for (Map.Entry<String, List<Long>> entry : byMonth.entrySet()) {
+            String[] parts = entry.getKey().split("-");
+            int year = Integer.parseInt(parts[0]);
+            int month = Integer.parseInt(parts[1]);
+
+            LinearLayout monthCard = new LinearLayout(this);
+            monthCard.setOrientation(LinearLayout.VERTICAL);
+            GradientDrawable monthBg = new GradientDrawable();
+            monthBg.setColor(Color.parseColor("#F9FAFB"));
+            monthBg.setCornerRadius(dpToPx(14));
+            monthBg.setStroke(dpToPx(1), Color.parseColor("#E5E7EB"));
+            monthCard.setBackground(monthBg);
+            monthCard.setPadding(dpToPx(12), dpToPx(12), dpToPx(12), dpToPx(12));
+            LinearLayout.LayoutParams monthCardParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            monthCardParams.setMargins(0, 0, 0, dpToPx(14));
+            monthCard.setLayoutParams(monthCardParams);
+
+            Calendar monthCal = Calendar.getInstance();
+            monthCal.set(year, month, 1, 0, 0, 0);
+            monthCal.set(Calendar.MILLISECOND, 0);
+
+            TextView monthLabel = new TextView(this);
+            int countInMonth = entry.getValue().size();
+            monthLabel.setText(new SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(monthCal.getTime())
+                    + "  ·  " + countInMonth + " " + getString(R.string.days_unit));
+            monthLabel.setTextColor(Color.parseColor("#16A34A"));
+            monthLabel.setTextSize(14.5f);
+            monthLabel.setTypeface(null, Typeface.BOLD);
+            LinearLayout.LayoutParams monthLabelParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            monthLabelParams.setMargins(0, 0, 0, dpToPx(8));
+            monthLabel.setLayoutParams(monthLabelParams);
+            monthCard.addView(monthLabel);
+
+            GridLayout grid = new GridLayout(this);
+            grid.setColumnCount(7);
+            monthCard.addView(grid);
+
+            String[] headers = {"S", "M", "T", "W", "Th", "F", "S"};
+            for (String h : headers) grid.addView(makeMiniHeaderCell(h));
+
+            Calendar cursor = (Calendar) monthCal.clone();
+            int firstDow = cursor.get(Calendar.DAY_OF_WEEK) - 1;
+            for (int i = 0; i < firstDow; i++) grid.addView(makeMiniSpacer());
+
+            int daysInMonth = cursor.getActualMaximum(Calendar.DAY_OF_MONTH);
+            for (int d = 1; d <= daysInMonth; d++) {
+                Calendar dayCal = Calendar.getInstance();
+                dayCal.set(year, month, d, 0, 0, 0);
+                dayCal.set(Calendar.MILLISECOND, 0);
+                boolean isAssigned = selectedSet.contains(dayCal.getTimeInMillis());
+                grid.addView(makeMiniDayCell(String.valueOf(d), isAssigned));
+            }
+
+            container.addView(monthCard);
+        }
+
+        return container;
+    }
+
+    private TextView makeMiniHeaderCell(String label) {
+        TextView tv = new TextView(this);
+        tv.setText(label);
+        tv.setGravity(Gravity.CENTER);
+        tv.setPadding(0, dpToPx(4), 0, dpToPx(4));
+        tv.setTypeface(null, Typeface.BOLD);
+        tv.setTextColor(Color.parseColor("#9CA3AF"));
+        tv.setTextSize(11);
+        GridLayout.LayoutParams p = new GridLayout.LayoutParams();
+        p.width = 0; p.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+        p.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f);
+        tv.setLayoutParams(p);
+        return tv;
+    }
+
+    private View makeMiniSpacer() {
+        View v = new View(this);
+        GridLayout.LayoutParams p = new GridLayout.LayoutParams();
+        p.width = 0; p.height = 1;
+        p.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f);
+        v.setLayoutParams(p);
+        return v;
+    }
+
+    /** Day cell for the confirmation preview's mini calendars — green fill when the date is scheduled. */
+    private TextView makeMiniDayCell(String label, boolean assigned) {
+        TextView tv = new TextView(this);
+        tv.setText(label);
+        tv.setGravity(Gravity.CENTER);
+        tv.setPadding(0, dpToPx(6), 0, dpToPx(6));
+        tv.setTextSize(12.5f);
+        GridLayout.LayoutParams p = new GridLayout.LayoutParams();
+        p.width = 0; p.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+        p.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f);
+        p.setMargins(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2));
+        tv.setLayoutParams(p);
+
+        if (assigned) {
+            tv.setBackgroundResource(R.drawable.bg_dayselected); // same green used by the Add Schedule calendar
+            tv.setTextColor(Color.WHITE);
+            tv.setTypeface(null, Typeface.BOLD);
+        } else {
+            tv.setTextColor(Color.parseColor("#D1D5DB"));
+        }
+        return tv;
     }
 
     private void showDeleteOptions(Task task) {
