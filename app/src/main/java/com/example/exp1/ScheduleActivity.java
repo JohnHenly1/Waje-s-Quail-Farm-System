@@ -794,8 +794,6 @@ public class ScheduleActivity extends AppCompatActivity {
         EditText    editTaskTitle        = dialogView.findViewById(R.id.editTaskTitle);
         if (editTaskTitle != null) editTaskTitle.setVisibility(View.GONE);
         Spinner     spinnerCategory      = dialogView.findViewById(R.id.spinnerCategory);
-        // Lets the owner type a category that isn't in the preset list.
-        EditText    editCustomCategory   = dialogView.findViewById(R.id.editCustomCategory);
         TextView    textTime             = dialogView.findViewById(R.id.textTime);
         // Work window is now a Spinner (drop-down) offering fixed selections from 30 minutes to 2 hours
         Spinner     spinnerWorkWindow    = dialogView.findViewById(R.id.spinnerWorkWindow);
@@ -832,13 +830,8 @@ public class ScheduleActivity extends AppCompatActivity {
             }
             return false;
         });
-        // "Other" is appended in code (not in strings.xml) so the preset list
-        // stays untouched; picking it reveals editCustomCategory below.
-        String[] presetCategories = getResources().getStringArray(R.array.task_categories);
-        String[] categories = new String[presetCategories.length + 1];
-        System.arraycopy(presetCategories, 0, categories, 0, presetCategories.length);
-        categories[presetCategories.length] = "Other";
 
+        String[] categories = getResources().getStringArray(R.array.task_categories);
         ArrayAdapter<String> catAdapter = new ArrayAdapter<>(this,
                 R.layout.spinner_item_black, categories);
         catAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item_black);
@@ -864,12 +857,6 @@ public class ScheduleActivity extends AppCompatActivity {
                 int def = getDefaultWorkWindow(cat);
                 for (int k = 0; k < workWindowValues.length; k++) {
                     if (workWindowValues[k] == def) { spinnerWorkWindow.setSelection(k); break; }
-                }
-
-                boolean isOther = "Other".equals(cat);
-                if (editCustomCategory != null) {
-                    editCustomCategory.setVisibility(isOther ? View.VISIBLE : View.GONE);
-                    if (!isOther) editCustomCategory.setText("");
                 }
             }
 
@@ -1310,24 +1297,10 @@ public class ScheduleActivity extends AppCompatActivity {
         dialog.show();
 
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-            String pickedCategory = spinnerCategory.getSelectedItem().toString();
-            if ("Other".equals(pickedCategory)) {
-                String customCategory = editCustomCategory != null
-                        ? editCustomCategory.getText().toString().trim() : "";
-                if (customCategory.isEmpty()) {
-                    Toast.makeText(this, "Please enter a category name", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                pickedCategory = customCategory;
-            }
-            // Copied into a final variable so it can be safely captured by the
-            // nested lambda below (a reassigned local can't be captured).
-            final String category = pickedCategory;
-
-            // Auto-name the task from the selected time of day + category
-            // (e.g. "Morning Feeding") instead of just the category, so tasks
-            // scheduled at different times of day are easier to tell apart.
-            String title = getTimeOfDayLabel(selHour[0]) + " " + category;
+            String category = spinnerCategory.getSelectedItem().toString();
+            // The schedule form no longer has a separate title. Keep the legacy
+            // Firestore title field populated with the category for compatibility.
+            String title = category;
 
             int selPos = spinnerWorkWindow.getSelectedItemPosition();
             int window = (selPos >= 0 && selPos < workWindowValues.length)
@@ -1657,94 +1630,6 @@ public class ScheduleActivity extends AppCompatActivity {
     }
 
     /**
-     * Groups the selected dates by month and renders one small table per month:
-     * a bold "Month Year" header followed by a wrapping grid of day chips.
-     * Used in the schedule confirmation preview so a large date selection stays
-     * readable instead of a single long flat list.
-     */
-    private void buildMonthlyDatesPreview(LinearLayout container, List<Long> selectedDates) {
-        container.removeAllViews();
-
-        // Group by "yyyy-MM" key, keeping each group's dates sorted.
-        Map<String, List<Long>> monthGroups = new TreeMap<>(); // yyyy-MM sorts chronologically as a string
-        Map<String, Calendar> monthKeyToCalendar = new HashMap<>();
-        for (Long millis : selectedDates) {
-            Calendar c = Calendar.getInstance();
-            c.setTimeInMillis(millis);
-            String key = String.format(Locale.US, "%04d-%02d", c.get(Calendar.YEAR), c.get(Calendar.MONTH));
-            if (!monthGroups.containsKey(key)) {
-                monthGroups.put(key, new ArrayList<>());
-                monthKeyToCalendar.put(key, c);
-            }
-            monthGroups.get(key).add(millis);
-        }
-
-        SimpleDateFormat monthHeaderFormat = new SimpleDateFormat("MMMM yyyy", Locale.getDefault());
-
-        for (Map.Entry<String, List<Long>> entry : monthGroups.entrySet()) {
-            List<Long> datesInMonth = entry.getValue();
-            Collections.sort(datesInMonth);
-
-            // Month header, e.g. "September 2026"
-            TextView monthHeader = new TextView(this);
-            monthHeader.setText(monthHeaderFormat.format(monthKeyToCalendar.get(entry.getKey()).getTime()));
-            monthHeader.setTextColor(Color.parseColor("#111827"));
-            monthHeader.setTextSize(14);
-            monthHeader.setTypeface(null, Typeface.BOLD);
-            LinearLayout.LayoutParams headerParams = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            headerParams.setMargins(0, dpToPx(14), 0, dpToPx(6));
-            monthHeader.setLayoutParams(headerParams);
-            container.addView(monthHeader);
-
-            // Wrapping grid of day chips, 7 per row (mirrors the week layout used elsewhere).
-            LinearLayout gridWrapper = new LinearLayout(this);
-            gridWrapper.setOrientation(LinearLayout.VERTICAL);
-            container.addView(gridWrapper);
-
-            final int chipsPerRow = 7;
-            LinearLayout currentRow = null;
-            for (int i = 0; i < datesInMonth.size(); i++) {
-                if (i % chipsPerRow == 0) {
-                    currentRow = new LinearLayout(this);
-                    currentRow.setOrientation(LinearLayout.HORIZONTAL);
-                    LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-                    rowParams.setMargins(0, 0, 0, dpToPx(6));
-                    currentRow.setLayoutParams(rowParams);
-                    gridWrapper.addView(currentRow);
-                }
-
-                Calendar dayCal = Calendar.getInstance();
-                dayCal.setTimeInMillis(datesInMonth.get(i));
-
-                TextView chip = new TextView(this);
-                chip.setText(String.valueOf(dayCal.get(Calendar.DAY_OF_MONTH)));
-                chip.setTextColor(Color.parseColor("#16A34A"));
-                chip.setTextSize(13);
-                chip.setTypeface(null, Typeface.BOLD);
-                chip.setGravity(Gravity.CENTER);
-                int chipSize = dpToPx(28);
-                LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(chipSize, chipSize);
-                chipParams.setMargins(0, 0, dpToPx(6), 0);
-                chip.setLayoutParams(chipParams);
-                android.graphics.drawable.GradientDrawable chipBg = new android.graphics.drawable.GradientDrawable();
-                chipBg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-                chipBg.setColor(Color.parseColor("#DCFCE7"));
-                chip.setBackground(chipBg);
-
-                currentRow.addView(chip);
-            }
-
-            // Month subtotal, e.g. "5 dates in September"
-            TextView monthCount = new TextView(this);
-            monthCount.setText(datesInMonth.size() + " " + getString(R.string.days_unit));
-            monthCount.setTextColor(Color.parseColor("#6B7280"));
-            monthCount.setTextSize(11.5f);
-            container.addView(monthCount);
-        }
-    }
-    /**
      * Shows the existing schedule preview and performs the original Firestore
      * save. Kept separate so duplicate checking does not alter the save flow.
      */
@@ -1771,7 +1656,6 @@ public class ScheduleActivity extends AppCompatActivity {
         ((TextView) previewView.findViewById(R.id.previewTime)).setText(selectedTime);
         ((TextView) previewView.findViewById(R.id.previewTotalDates)).setText(
                 selectedDates.size() + " " + getString(R.string.days_unit) + " (" + selectedRecurrence + ")");
-        buildMonthlyDatesPreview((LinearLayout) previewView.findViewById(R.id.previewDatesContainer), selectedDates);
 
         AlertDialog previewDialog = new AlertDialog.Builder(this)
                 .setView(previewView)
@@ -1873,12 +1757,6 @@ public class ScheduleActivity extends AppCompatActivity {
         previewDialog.show();
         if (previewDialog.getWindow() != null) {
             previewDialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.WHITE));
-
-            // Cap the dialog height so a long date list scrolls inside the ScrollView
-            // instead of pushing the window (and its buttons) off-screen.
-            android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
-            int maxHeight = (int) (dm.heightPixels * 0.75f);
-            previewDialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, maxHeight);
         }
     }
 
@@ -1891,18 +1769,6 @@ public class ScheduleActivity extends AppCompatActivity {
             case "Watering": return 45;
             default: return 60;
         }
-    }
-
-    /**
-     * Buckets a 24-hour hour value (6-20, matching the enforced work-hour
-     * range in the time picker) into a friendly time-of-day label used to
-     * auto-name tasks, e.g. "Morning Feeding", "Afternoon Cleaning".
-     */
-    private String getTimeOfDayLabel(int hour) {
-        if (hour >= 6 && hour <= 10)  return "Morning";
-        if (hour >= 11 && hour <= 12) return "Noon";
-        if (hour >= 13 && hour <= 17) return "Afternoon";
-        return "Night"; // 18:00–20:00
     }
 
     private void showDeleteOptions(Task task) {

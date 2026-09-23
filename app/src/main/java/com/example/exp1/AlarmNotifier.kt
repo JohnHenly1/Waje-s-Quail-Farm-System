@@ -68,9 +68,14 @@ object AlarmNotifier {
 
     /**
      * Posts (or updates in place) the notification for a request. [alarm] = loud, repeating,
-     * full-screen. [quickActions] adds "Accept"/"Decline" buttons directly on the notification
-     * (skipped for schedule/task-assignment notifications - tapping the notification still opens
-     * the full Accept/Decline screen, so the response flow itself is unaffected).
+     * full-screen. [quickActions] controls the whole Accept/Decline experience for this
+     * notification, not just the tray buttons:
+     *  - true (critical alerts / requests): tray "Accept"/"Decline" buttons, and tapping the
+     *    notification opens the full-screen Accept/Decline screen (AlarmActivity).
+     *  - false (schedule/task-assignment notifications): no tray buttons, and tapping the
+     *    notification just opens the app's Notifications screen (AlertsActivity) - it no longer
+     *    routes through AlarmActivity at all, so there is nowhere left for Accept/Decline to
+     *    happen from this notification. Responding still happens from the Schedule screen itself.
      */
     @Suppress("DEPRECATION")
     fun show(ctx: Context, ackId: String, title: String, message: String, alarm: Boolean, quickActions: Boolean = true) {
@@ -87,7 +92,10 @@ object AlarmNotifier {
             putExtra(EXTRA_QUICK_ACTIONS, quickActions)
         }
         val pf = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        val open = PendingIntent.getActivity(ctx, id * 3, screen(false), pf)
+        val openIntent = if (quickActions) screen(false) else Intent(ctx, AlertsActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val open = PendingIntent.getActivity(ctx, id * 3, openIntent, pf)
 
         val builder = NotificationCompat.Builder(ctx, if (alarm) CHANNEL_ALARM else CHANNEL_REQUEST)
             .setSmallIcon(R.drawable.ic_notifications)
@@ -109,6 +117,11 @@ object AlarmNotifier {
             )
             builder.addAction(0, "Accept", accept)
                 .addAction(0, "Decline", decline)
+        } else {
+            // Nothing left to respond to from this notification - dismiss it on tap like an
+            // ordinary notification instead of leaving it sitting in the shade (AlarmActivity
+            // is the only thing that used to cancel it via AlarmNotifier.cancel()).
+            builder.setAutoCancel(true)
         }
 
         if (alarm) {
