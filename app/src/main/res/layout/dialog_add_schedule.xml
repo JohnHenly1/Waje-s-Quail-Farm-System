@@ -35,27 +35,19 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- Task Title -->
-
-        <!-- Task Title -->
+        <!-- Kept for backward compatibility; hidden in code (setVisibility GONE) -->
         <EditText
             android:id="@+id/editTaskTitle"
             android:layout_width="match_parent"
             android:layout_height="52dp"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/rounded_corner"
-            android:hint="e.g., Morning Feeding"
+            android:visibility="gone"
             android:inputType="text"
-            android:padding="12dp"
-            android:textColor="@color/black"
-            android:textColorHint="@color/black"
-            android:textSize="16sp" />
+            android:textColor="@color/black" />
 
         <!-- Category -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
             android:text="Category"
             android:textColor="@color/dark_green"
             android:textSize="14sp"
@@ -72,7 +64,22 @@
                 android:layout_height="match_parent" />
         </FrameLayout>
 
-        <!-- Assign To (Managers can assign tasks to one or more staff) -->
+        <!-- Shown only when "Other" is picked in spinnerCategory -->
+        <EditText
+            android:id="@+id/editCustomCategory"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/rounded_corner"
+            android:hint="Enter category name"
+            android:inputType="text"
+            android:padding="12dp"
+            android:textColor="@color/black"
+            android:textColorHint="@color/dark_gray"
+            android:textSize="16sp"
+            android:visibility="gone" />
+
+        <!-- Assign To -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -101,52 +108,7 @@
             android:textSize="16sp"
             app:drawableTint="@color/dark_green" />
 
-        <!-- Time -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Time"
-            android:textColor="@color/dark_green"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-
-        <!-- Time -->
-        <TextView
-            android:id="@+id/textTime"
-            android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/rounded_corner"
-            android:gravity="center_vertical"
-            android:hint="Select time"
-            android:textColor="@color/black"
-            android:textColorHint="@color/dark_gray"
-            android:paddingStart="12dp"
-            android:textSize="16sp" />
-
-        <!-- Work Window Selection -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Work Window (Time to complete)"
-            android:textColor="@color/dark_green"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/rounded_corner">
-            <Spinner
-                android:id="@+id/spinnerWorkWindow"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent" />
-        </FrameLayout>
-
-        <!-- Smart Selection Toolbox -->
+        <!-- Quick Selection Tools -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -289,6 +251,50 @@
             android:textColor="@color/dark_gray"
             android:textSize="14sp"
             android:textStyle="italic" />
+
+        <!-- Time -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Time"
+            android:textColor="@color/dark_green"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/textTime"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/rounded_corner"
+            android:gravity="center_vertical"
+            android:hint="Select time"
+            android:textColor="@color/black"
+            android:textColorHint="@color/dark_gray"
+            android:paddingStart="12dp"
+            android:textSize="16sp" />
+
+        <!-- Work Window Selection -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Work Window (Time to complete)"
+            android:textColor="@color/dark_green"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/rounded_corner">
+            <Spinner
+                android:id="@+id/spinnerWorkWindow"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+        </FrameLayout>
 
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

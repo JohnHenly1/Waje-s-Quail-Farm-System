@@ -376,7 +376,7 @@ object NavigationHelper {
             setTypeface(typeface, Typeface.BOLD)
         })
         headerColumn.addView(TextView(activity).apply {
-            text = "Pending accounts waiting to be activated"
+            text = "Recently added users"
             setTextColor(Color.parseColor(Brand.GREEN_PRIMARY_DARK))
             textSize = 12.5f
             setPadding(0, (2 * dp).toInt(), 0, 0)
@@ -407,7 +407,7 @@ object NavigationHelper {
 
         // Empty state: soft green rounded panel instead of plain gray text.
         val emptyText = TextView(activity).apply {
-            text = "No pending invites.\nTap \"Add User\" to invite your first team member."
+            text = "No users added yet.\nTap \"Add User\" to add your first team member."
             setTextColor(Color.parseColor(Brand.GREEN_PRIMARY_DARK))
             textSize = 13.5f
             gravity = Gravity.CENTER
@@ -463,26 +463,6 @@ object NavigationHelper {
         adapter = PendingUserAdapter(
             activity = activity,
             items = items,
-            onActivateClicked = { user ->
-                showUnlockConfirmationDialog(activity, ownerEmail, user) {
-                    user.let {
-                        val idx = items.indexOf(it)
-                        if (idx != -1) {
-                            items[idx] = it.copy(isActive = true)
-                            adapter.notifyDataSetChanged()
-                        }
-                    }
-                }
-            },
-            onDeactivateClicked = { user ->
-                showDeactivateConfirmationDialog(activity, ownerEmail, user) {
-                    val idx = items.indexOf(user)
-                    if (idx != -1) {
-                        items[idx] = user.copy(isActive = false)
-                        adapter.notifyDataSetChanged()
-                    }
-                }
-            },
             onDeleteClicked = { user ->
                 showDeletePendingUserConfirmationDialog(activity, ownerEmail, user) {
                     items.remove(user)
@@ -494,20 +474,23 @@ object NavigationHelper {
         listView.adapter = adapter
 
         FirebaseFirestore.getInstance().collection("user_access")
-            .whereEqualTo("status", "invited")
+            .whereEqualTo("role", "staff")
             .get()
             .addOnSuccessListener { docs ->
                 items.clear()
-                docs.documents.forEach { doc ->
-                    items.add(
-                        PendingUser(
-                            email = doc.id,
-                            name = doc.getString("name") ?: doc.id,
-                            role = doc.getString("role") ?: "staff",
-                            isActive = doc.getBoolean("isActive") ?: false
+                docs.documents
+                    .sortedByDescending { it.getTimestamp("invitedAt")?.toDate()?.time ?: 0L }
+                    .take(20)
+                    .forEach { doc ->
+                        items.add(
+                            PendingUser(
+                                email = doc.id,
+                                name = doc.getString("name") ?: doc.id,
+                                role = doc.getString("role") ?: "staff",
+                                isActive = doc.getBoolean("isActive") ?: false
+                            )
                         )
-                    )
-                }
+                    }
                 adapter.notifyDataSetChanged()
                 refreshEmptyState()
             }
@@ -520,8 +503,6 @@ object NavigationHelper {
     private class PendingUserAdapter(
         private val activity: Activity,
         private val items: MutableList<PendingUser>,
-        private val onActivateClicked: (PendingUser) -> Unit,
-        private val onDeactivateClicked: (PendingUser) -> Unit,
         private val onDeleteClicked: (PendingUser) -> Unit
     ) : BaseAdapter() {
 
@@ -617,32 +598,6 @@ object NavigationHelper {
 
             // Activate = solid green pill; Deactivate = outlined green pill,
             // so the primary/positive action always reads as "green filled".
-            val toggleButton: View = try {
-                MaterialButton(activity).apply {
-                    text = if (user.isActive) "Deactivate" else "Activate"
-                    textSize = 12f
-                    cornerRadius = (14 * dp).toInt()
-                    setPadding((12 * dp).toInt(), 0, (12 * dp).toInt(), 0)
-                    if (user.isActive) {
-                        setBackgroundColor(Color.parseColor(Brand.SURFACE))
-                        setTextColor(Color.parseColor(Brand.GREEN_PRIMARY_DARK))
-                        strokeColor = android.content.res.ColorStateList.valueOf(Color.parseColor(Brand.GREEN_PRIMARY))
-                        strokeWidth = (1 * dp).toInt()
-                    } else {
-                        setBackgroundColor(Color.parseColor(Brand.GREEN_PRIMARY))
-                        setTextColor(Color.WHITE)
-                    }
-                }
-            } catch (e: Throwable) {
-                android.widget.Button(activity).apply {
-                    text = if (user.isActive) "Deactivate" else "Activate"
-                }
-            }
-            toggleButton.setOnClickListener {
-                if (user.isActive) onDeactivateClicked(user) else onActivateClicked(user)
-            }
-            actionColumn.addView(toggleButton)
-
             val deleteButton = TextView(activity).apply {
                 text = "Delete"
                 setTextColor(Color.parseColor(Brand.DANGER))
@@ -914,14 +869,13 @@ object NavigationHelper {
         // Full Name: hard-block digits (and any other disallowed symbol) at
         // the keystroke level, instead of only flagging them after the fact
         // via the TextWatcher error below. Only letters, spaces, hyphens and
-        // commas are allowed — no numbers, no other special characters.
-        val nameAllowedRegex = Regex("^[A-Za-z\\s,-]*$")
+        val nameAllowedRegex = Regex("^[A-Za-z\\s,.-]*$")
         editName.filters = editName.filters + android.text.InputFilter { source, start, end, _, _, _ ->
             val piece = source.subSequence(start, end)
             if (nameAllowedRegex.matches(piece)) {
                 null
             } else {
-                showNameError("Full name can only contain letters, spaces, hyphens (-) and commas (,). Numbers and other special characters are not allowed.")
+                showNameError("Full name can only contain letters, spaces, hyphens (-), periods (.) and commas (,). Numbers and other special characters are not allowed.")
                 ""
             }
         }
@@ -1164,10 +1118,12 @@ object NavigationHelper {
                         Toast.makeText(activity, "This email already belongs to an active user.", Toast.LENGTH_SHORT).show()
                     } else {
                         showAddUserConfirmationDialog(activity, invitedEmail, selectedRole) {
-                            savePendingUser(
-                                activity, db, ownerEmail, invitedEmail, selectedRole,
-                                name, birthday, addressMap, dialog
-                            )
+                            showSendVerificationCodeConfirmationDialog(activity, invitedEmail) {
+                                saveUserAndSendVerificationCode(
+                                    activity, db, ownerEmail, invitedEmail, selectedRole,
+                                    name, birthday, addressMap, dialog
+                                )
+                            }
                         }
                     }
                 }
@@ -1522,9 +1478,9 @@ object NavigationHelper {
     private fun getNameValidationError(name: String): String? {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return null
-        val nameRegex = Regex("^[A-Za-z\\s,-]+$")
+        val nameRegex = Regex("^[A-Za-z\\s,.-]+$")
         if (!nameRegex.matches(trimmed)) {
-            return "Name may contain only letters, spaces, hyphens and commas (no digits or other symbols)"
+            return "Name may contain only letters, spaces, hyphens, periods and commas (no digits or other symbols)"
         }
         return null
     }
@@ -1559,7 +1515,14 @@ object NavigationHelper {
             false
         }
     }
-
+    private fun showSendVerificationCodeConfirmationDialog(activity: Activity, email: String, onConfirm: () -> Unit) {
+        AlertDialog.Builder(activity)
+            .setTitle("Send Verification Code?")
+            .setMessage("A verification code will be generated and emailed to $email so they can set up their account. Proceed?")
+            .setPositiveButton("Send Code") { _, _ -> onConfirm() }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
     /**
      * Asks the owner to confirm before saving the pending profile. Note this
      * step no longer sends anything — it only writes the pre-fill data.
@@ -1568,20 +1531,18 @@ object NavigationHelper {
         val roleDisplayName = RoleManager.displayName(role)
         AlertDialog.Builder(activity)
             .setTitle("Confirm Add User")
-            .setMessage("Add $email as $roleDisplayName?\n\nThis only saves their profile as pending. You'll unlock them (and send their setup code) separately from the Farm Users list.")
-            .setPositiveButton("Save") { _, _ -> onConfirm() }
+            .setMessage("Add $email as $roleDisplayName?")
+            .setPositiveButton("Continue") { _, _ -> onConfirm() }
             .setNegativeButton("Cancel", null)
             .show()
     }
 
     /**
-     * Writes the owner-provided profile straight into user_access/{email}
-     * with status "invited" (so it shows up in the pending list and
-     * SetupAccountActivity can find/pre-fill it later). Deliberately does
-     * NOT generate an invite code or send an email — that's the Unlock
-     * action's job.
+     * Saves the owner-provided profile as an active user, then immediately
+     * generates and emails a verification code so they can set up their
+     * account. Runs only after both confirmation dialogs are accepted.
      */
-    private fun savePendingUser(
+    private fun saveUserAndSendVerificationCode(
         activity: Activity,
         db: FirebaseFirestore,
         ownerEmail: String,
@@ -1592,82 +1553,29 @@ object NavigationHelper {
         addressMap: Map<String, String>?,
         parentDialog: AlertDialog
     ) {
-        val prefillData = mutableMapOf<String, Any>(
+        val userData = mutableMapOf<String, Any>(
             "name" to name,
             "email" to invitedEmail,
             "role" to selectedRole,
-            "status" to "invited",
-            "isActive" to false,
+            "status" to "approved",
+            "isActive" to true,
             "setupCompleted" to false,
             "invitedBy" to ownerEmail,
             "invitedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
         )
-        if (birthday.isNotEmpty()) prefillData["birthday"] = birthday
-        if (addressMap != null) prefillData["address"] = addressMap
+        if (birthday.isNotEmpty()) userData["birthday"] = birthday
+        if (addressMap != null) userData["address"] = addressMap
 
         db.collection("user_access").document(invitedEmail)
-            .set(prefillData, SetOptions.merge())
+            .set(userData, SetOptions.merge())
             .addOnSuccessListener {
                 FarmRepository.logStaffCreated(ownerEmail, ownerEmail, "owner", name, invitedEmail)
-                Toast.makeText(
-                    activity,
-                    "$name added as pending. Open Farm Users and tap Unlock when you're ready to send their setup code.",
-                    Toast.LENGTH_LONG
-                ).show()
                 parentDialog.dismiss()
+                unlockAndSendVerificationCode(activity, db, ownerEmail, invitedEmail, selectedRole) {}
             }
             .addOnFailureListener { e ->
                 Toast.makeText(activity, "Failed to save user info: ${e.message}", Toast.LENGTH_LONG).show()
             }
-    }
-
-    // ─────────────────────────────────────────────────────────────────────
-    // UNLOCK  (per-row action in the pending-users list — this is where the
-    // verification code is actually generated and emailed.)
-    // ─────────────────────────────────────────────────────────────────────
-
-    /**
-     * Confirms before running the verification-code procedure, since it
-     * immediately emails the user and isn't easily undone.
-     */
-    private fun showUnlockConfirmationDialog(activity: Activity, ownerEmail: String, user: PendingUser, onActivated: () -> Unit) {
-        AlertDialog.Builder(activity)
-            .setTitle("Activate ${user.name}?")
-            .setMessage("This will generate a verification code and email it to ${user.email} so they can set up their account. Their account will be marked Active and able to access the mobile app once set up.\n\nProceed?")
-            .setPositiveButton("Activate") { _, _ ->
-                unlockAndSendVerificationCode(activity, FirebaseFirestore.getInstance(), ownerEmail, user.email, user.role, onActivated)
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
-
-    /**
-     * Confirms before flipping an already-activated pending account back to
-     * Inactive. This revokes their ability to access the mobile app without
-     * deleting their saved profile.
-     */
-    private fun showDeactivateConfirmationDialog(activity: Activity, ownerEmail: String, user: PendingUser, onDeactivated: () -> Unit) {
-        AlertDialog.Builder(activity)
-            .setTitle("Deactivate ${user.name}?")
-            .setMessage("${user.name} (${user.email}) will no longer be able to access the mobile application until reactivated.\n\nProceed?")
-            .setPositiveButton("Deactivate") { _, _ ->
-                FirebaseFirestore.getInstance().collection("user_access").document(user.email)
-                    .update("isActive", false)
-                    .addOnSuccessListener {
-                        FarmRepository.logStaffUpdated(
-                            ownerEmail, ownerEmail, "owner",
-                            user.name, user.email,
-                            details = "Deactivated staff account for ${user.email}"
-                        )
-                        Toast.makeText(activity, "${user.name} is now Inactive.", Toast.LENGTH_SHORT).show()
-                        onDeactivated()
-                    }
-                    .addOnFailureListener { e ->
-                        Toast.makeText(activity, "Failed to deactivate user: ${e.message}", Toast.LENGTH_LONG).show()
-                    }
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
     }
 
     /**
@@ -1904,7 +1812,7 @@ object NavigationHelper {
         // later as the toast from that function.
         val message = "Sending an invite email to $email now — a toast will confirm once it's done.\n\nCode: $code\nRole: $roleDisplayName\n\nIt will expire in 24 hours.\n\nTheir name, birthday and address are already saved — they'll only be asked to set a password."
         AlertDialog.Builder(activity)
-            .setTitle("User Unlocked")
+            .setTitle("User Added")
             .setMessage(message)
             .setPositiveButton("Close", null)
             .show()

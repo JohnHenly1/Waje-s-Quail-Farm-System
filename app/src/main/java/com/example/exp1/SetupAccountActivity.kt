@@ -316,8 +316,8 @@ class SetupAccountActivity : AppCompatActivity() {
         FirebaseFirestore.getInstance().collection("user_access").document(email).get()
             .addOnSuccessListener { doc ->
                 if (!doc.exists()) return@addOnSuccessListener
-                val status = doc.getString("status")
-                if (status != "invited") return@addOnSuccessListener // already approved, or unknown state — leave fields editable
+                val setupCompleted = doc.getBoolean("setupCompleted") ?: false
+                if (setupCompleted) return@addOnSuccessListener // setup already finished — leave fields editable
 
                 val ownerName = doc.getString("name")
                 val ownerBirthday = doc.getString("birthday")

@@ -57,6 +57,7 @@ dependencies {
     implementation(libs.firebase.storage)
     implementation(libs.firebase.messaging)
 
+
     // Firebase Enforce and integrity for the app
     implementation("com.google.firebase:firebase-appcheck-playintegrity:19.0.1")
     implementation("com.google.firebase:firebase-appcheck-debug:19.0.1") // debug builds only

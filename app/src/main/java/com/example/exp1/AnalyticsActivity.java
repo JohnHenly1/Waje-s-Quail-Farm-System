@@ -329,6 +329,7 @@ public class AnalyticsActivity extends AppCompatActivity {
         root.addView(chartContainer);
 
         populatePieChart(enlargedChart, lastFilteredTotal, lastFilteredA, lastFilteredB, lastFilteredC, true);
+        root.addView(buildEnlargedChartLegend(lastFilteredTotal, lastFilteredA, lastFilteredB, lastFilteredC));
 
         // Custom green title on a white bar (replaces default setTitle)
         TextView titleView = new TextView(this);
@@ -356,6 +357,64 @@ public class AnalyticsActivity extends AppCompatActivity {
             }
         });
         dialog.show();
+    }
+    /**
+     * Builds a horizontal legend row (colored square + label) for the enlarged pie chart
+     * dialog, matching the grade colors used everywhere else (dashboard chart, PDF/image
+     * exports). Skips any grade with zero eggs; falls back to a single "No Data" swatch
+     * when the whole filtered range is empty.
+     */
+    private LinearLayout buildEnlargedChartLegend(int total, int a, int b, int c) {
+        LinearLayout legendRow = new LinearLayout(this);
+        legendRow.setOrientation(LinearLayout.HORIZONTAL);
+        legendRow.setGravity(Gravity.CENTER);
+        int topPad = dpToPx(12);
+        legendRow.setPadding(0, topPad, 0, 0);
+
+        List<String> labels = new ArrayList<>();
+        List<Integer> colors = new ArrayList<>();
+        if (total > 0) {
+            if (a > 0) { labels.add(getString(R.string.grade_a)); colors.add(COLOR_GRADE_A); }
+            if (b > 0) { labels.add(getString(R.string.grade_b)); colors.add(COLOR_GRADE_B); }
+            if (c > 0) { labels.add(getString(R.string.grade_c)); colors.add(COLOR_GRADE_C); }
+        } else {
+            labels.add(getString(R.string.no_data));
+            colors.add(COLOR_NO_DATA);
+        }
+
+        int swatchSize = dpToPx(14);
+        int gapAfterSwatch = dpToPx(6);
+        int gapBetweenItems = dpToPx(16);
+
+        for (int i = 0; i < labels.size(); i++) {
+            LinearLayout item = new LinearLayout(this);
+            item.setOrientation(LinearLayout.HORIZONTAL);
+            item.setGravity(Gravity.CENTER_VERTICAL);
+            LinearLayout.LayoutParams itemParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            itemParams.setMarginEnd(i == labels.size() - 1 ? 0 : gapBetweenItems);
+            item.setLayoutParams(itemParams);
+
+            View swatch = new View(this);
+            android.graphics.drawable.GradientDrawable swatchBg = new android.graphics.drawable.GradientDrawable();
+            swatchBg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+            swatchBg.setColor(colors.get(i));
+            swatchBg.setCornerRadius(dpToPx(3));
+            swatch.setBackground(swatchBg);
+            LinearLayout.LayoutParams swatchParams = new LinearLayout.LayoutParams(swatchSize, swatchSize);
+            swatchParams.setMarginEnd(gapAfterSwatch);
+            item.addView(swatch, swatchParams);
+
+            TextView label = new TextView(this);
+            label.setText(labels.get(i));
+            label.setTextColor(Color.BLACK);
+            label.setTextSize(14f);
+            item.addView(label);
+
+            legendRow.addView(item);
+        }
+
+        return legendRow;
     }
 
     private void setupFilterSpinner() {

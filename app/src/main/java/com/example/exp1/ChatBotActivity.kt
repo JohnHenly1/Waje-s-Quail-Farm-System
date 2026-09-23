@@ -33,7 +33,12 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
-data class ChatMessage(val text: String, val isUser: Boolean)
+data class ChatMessage(
+    val text: String,
+    val isUser: Boolean,
+    val chart: List<ChartSlice>? = null,
+    val chartTitle: String? = null
+)
 data class AiModelOption(val id: String, val label: String)
 data class SavedConversation(
     val id: String,
@@ -57,11 +62,19 @@ class ChatBotActivity : AppCompatActivity() {
         AiModelOption("gemini-3.1-flash-lite", "3.1 Flash-Lite (Fastest)"),
         AiModelOption("gemini-3.5-flash", "3.5 Flash"),
         AiModelOption("gemini-3-flash", "3 Flash"),
-        AiModelOption("gemini-2.5-flash", "2.5 Flash (legacy)")
+        AiModelOption("gemini-2.5-flash", "2.5 Flash (legacy)"),
+        AiModelOption("gemini-3.8-flash", "Gemini 3.8 Flash")
     )
     private var currentModelId = availableModels.first().id
+    private var lastFarmContext: String = ""
+    private var isSending: Boolean = false
 
-    private val samplePool = listOf(
+    // Cooldown after each AI reply, in seconds. Change this one number to adjust it.
+    private val cooldownSeconds: Int = 15
+    private var cooldownJob: kotlinx.coroutines.Job? = null
+
+
+    private val generalQuestions = listOf(
         "How long is the incubation period for quail eggs?",
         "What's the ideal temperature for hatching quail eggs?",
         "How many eggs does a quail lay per week?",
@@ -73,23 +86,58 @@ class ChatBotActivity : AppCompatActivity() {
         "How long does it take quail to start laying eggs?",
         "What's the best way to store quail eggs before hatching?",
         "How can I improve my hatch rate?",
-        "What's a normal quail egg weight?"
+        "What's a normal quail egg weight?",
+        "How often should I clean the quail cages?",
+        "What's the ideal male to female quail ratio?",
+        "How long do quail typically lay eggs before production drops?",
+        "What causes soft-shelled or thin-shelled quail eggs?",
+        "How do I reduce stress in my quail flock?",
+        "What lighting schedule is best for egg-laying quail?"
+    )
+
+    private val dataQuestions = listOf(
+        "What's my laying rate today?",
+        "Analyze my egg production this week",
+        "Why might my Grade B (cracked) eggs be high?",
+        "How does this week compare to last week?",
+        "What should I improve based on my egg quality?",
+        "Are my cages crowded for my bird count?",
+        "What's my Grade A percentage this month?",
+        "Is my egg production trending up or down?",
+        "How many eggs per cage am I averaging?",
+        "What was my best day this month?"
     )
 
     private val systemPrompt = """
-        You are Quail Assistant, a friendly and knowledgeable expert on quail 
-        (specifically Coturnix quail) farming and egg production. You help farm 
-        staff with questions about incubation, egg-laying cycles, feed, housing, 
-        temperature/humidity requirements, common diseases, hatch rates, and 
-        general quail husbandry. Keep answers practical, concise, and easy to 
-        read on a mobile screen. If a question is unrelated to quail/poultry 
-        farming, politely redirect the conversation back to quail farming topics.
-    """.trimIndent()
+    You are Quail Assistant, a friendly and knowledgeable expert on quail
+    (specifically Coturnix quail) farming and quail egg production. You help
+    farm staff with questions about incubation, quail egg-laying cycles, feed,
+    housing, temperature/humidity requirements, common quail diseases, hatch
+    rates, and general quail husbandry. Keep answers practical, concise, and
+    easy to read on a mobile screen. If a question is unrelated to quail/quail
+    egg farming, politely redirect the conversation back to quail topics.
+
+    You are given live QUAIL FARM DATA (egg collection records) and FLOCK INFO
+    (bird count, cages) from this farm's database.
+    Egg grades: Grade A = normal/good quail eggs, Grade B = cracked, Grade C = rejected.
+    Base answers about this farm's production, quality, or laying rate on the
+    provided data and quote the specific numbers. Never invent numbers that
+    aren't in the data.
+    The total bird count is entered manually by the farm owner and can be out
+    of date. If a laying rate looks unusually high or low, or exceeds 100%,
+    say the bird count may be inaccurate before concluding anything else about
+    the birds' health or the feed.
+    If FLOCK INFO is marked not available, don't guess a laying rate — ask the
+    user for their current bird count, or answer only about totals and grades.
+""".trimIndent()
 
     private lateinit var generativeModel: GenerativeModel
     private lateinit var chatSession: Chat
 
     private lateinit var typingLayout: View
+    private lateinit var typingStatusText: TextView
+    private lateinit var chatInputRef: EditText
+    private lateinit var sendButtonRef: ImageButton
     private lateinit var suggestedContainer: GridLayout
     private lateinit var modelSelectorText: TextView
     private lateinit var conversationTitleText: TextView
@@ -125,12 +173,15 @@ class ChatBotActivity : AppCompatActivity() {
         recyclerView.adapter = adapter
 
         typingLayout = findViewById(R.id.typingIndicatorLayout)
+        typingStatusText = typingLayout.findViewById(R.id.typingStatusText)
         suggestedContainer = findViewById(R.id.suggestedQuestionsContainer)
         modelSelectorText = findViewById(R.id.modelSelectorText)
         conversationTitleText = findViewById(R.id.conversationTitleText)
 
         val input = findViewById<EditText>(R.id.chatInput)
         val sendBtn = findViewById<ImageButton>(R.id.sendButton)
+        chatInputRef = input
+        sendButtonRef = sendBtn
         val backBtn = findViewById<ImageButton>(R.id.backButton)
         val modelSelectorButton = findViewById<View>(R.id.modelSelectorButton)
         val newChatButton = findViewById<ImageButton>(R.id.newChatButton)
@@ -153,6 +204,7 @@ class ChatBotActivity : AppCompatActivity() {
         historyButton.setOnClickListener { showHistoryPopup(it) }
 
         fun sendCurrentInput() {
+            if (isSending) return
             val text = input.text.toString().trim()
             if (text.isEmpty()) return
 
@@ -208,13 +260,63 @@ class ChatBotActivity : AppCompatActivity() {
     // ---------- Streaming reply ----------
 
     private suspend fun streamReply(text: String) {
+        if (isSending) return
+        isSending = true
+        cooldownJob?.cancel()              // cancel any leftover cooldown from before
+        chatInputRef.isEnabled = false     // lock immediately, not just after reply
+        sendButtonRef.isEnabled = false
         typingLayout.visibility = View.VISIBLE
+        typingStatusText.text = getString(R.string.quail_assistant_typing)
+
+        val (days, farmStats) = FarmDataContext.getSnapshot()
+        if (days != null) {
+            lastFarmContext = FarmDataContext.buildSummary(days, farmStats)
+
+            val period = QueryPeriodParser.parse(text)
+            if (period != null) {
+                val stat = FarmDataContext.computePeriodStats(days, period)
+                lastFarmContext += "\n\nEXACT ANSWER FOR THIS QUESTION — use these numbers verbatim, do not recalculate:\n" +
+                        "Period: ${stat.label} (${stat.start} to ${stat.end})\n" +
+                        "Total eggs: ${stat.total} over ${stat.daysWithData} recorded days\n" +
+                        "Grade A: ${stat.a}, Grade B: ${stat.b}, Grade C: ${stat.c}\n" +
+                        if (stat.total == 0) "No records exist for this period — say so plainly, don't estimate.\n" else ""
+
+                // Chart only appears if the user actually asked for one.
+                if (stat.total > 0 && QueryPeriodParser.wantsChart(text)) {
+                    messages.add(
+                        ChatMessage(
+                            text = "",
+                            isUser = false,
+                            chartTitle = "${stat.label} — Grade Distribution",
+                            chart = listOf(
+                                ChartSlice("Grade A", stat.a, "#355E1A"),
+                                ChartSlice("Grade B", stat.b, "#7C3AED"),
+                                ChartSlice("Grade C", stat.c, "#F4B400")
+                            ).filter { it.value > 0 }
+                        )
+                    )
+                    adapter.notifyItemInserted(messages.size - 1)
+                    recyclerView.scrollToPosition(messages.size - 1)
+                }
+            }
+        }
+
+        val historyForSession = messages.filter { it.chart == null }
+        startSession(historyForSession.dropLast(1), lastFarmContext)
 
         var botMessageIndex = -1
         var accumulated = ""
 
-        try {
-            chatSession.sendMessageStream(text).collect { chunk ->
+        val maxAttempts = 3
+        var attempt = 0
+        var succeeded = false
+
+        while (attempt < maxAttempts && !succeeded) {
+            attempt++
+            try {
+                botMessageIndex = -1
+                accumulated = ""
+                chatSession.sendMessageStream(text).collect { chunk ->
                 val piece = chunk.text ?: return@collect
 
                 if (botMessageIndex == -1) {
@@ -242,33 +344,66 @@ class ChatBotActivity : AppCompatActivity() {
                 }
                 persistCurrentConversation()
             }
-        } catch (e: Exception) {
-            typingLayout.visibility = View.GONE
-            if (botMessageIndex == -1) {
-                addMessage("Oops, something went wrong: ${e.localizedMessage}", isUser = false)
-            } else {
-                persistCurrentConversation()
+                succeeded = true
+            } catch (e: Exception) {
+                val msg = e.localizedMessage ?: ""
+                val isOverloaded = msg.contains("overloaded", ignoreCase = true) ||
+                        msg.contains("503") || msg.contains("UNAVAILABLE", ignoreCase = true)
+
+                if (isOverloaded && attempt < maxAttempts) {
+                    typingStatusText.text = "AI is busy, retrying (${attempt}/${maxAttempts - 1})…"
+                    kotlinx.coroutines.delay(1500L * attempt) // 1.5s, then 3s
+                    typingStatusText.text = getString(R.string.quail_assistant_typing)
+                } else {
+                    typingLayout.visibility = View.GONE
+                    if (botMessageIndex == -1) {
+                        val friendly = if (isOverloaded)
+                            "The AI is a bit busy right now — please try asking again in a moment."
+                        else
+                            "Oops, something went wrong: $msg"
+                        addMessage(friendly, isUser = false)
+                    } else {
+                        persistCurrentConversation()
+                    }
+                    succeeded = true // stop looping, we've shown an error
+                }
             }
-        } finally {
-            typingLayout.visibility = View.GONE
+        }
+        typingLayout.visibility = View.GONE
+        isSending = false
+        startCooldown()
+    }
+    private var defaultInputHint: CharSequence? = null
+
+    private fun startCooldown() {
+        cooldownJob?.cancel()
+        if (defaultInputHint == null) defaultInputHint = chatInputRef.hint
+        cooldownJob = lifecycleScope.launch {
+            chatInputRef.isEnabled = false
+            sendButtonRef.isEnabled = false
+            for (remaining in cooldownSeconds downTo 1) {
+                chatInputRef.hint = "Please wait ${remaining}s…"
+                kotlinx.coroutines.delay(1000)
+            }
+            chatInputRef.hint = defaultInputHint
+            chatInputRef.isEnabled = true
+            sendButtonRef.isEnabled = true
         }
     }
-
     // ---------- Model handling ----------
 
     private fun labelFor(modelId: String) =
         availableModels.find { it.id == modelId }?.label ?: modelId
 
-    private fun startSession(history: List<ChatMessage>) {
+    private fun startSession(history: List<ChatMessage>, farmContext: String = lastFarmContext) {
+        val instruction = if (farmContext.isBlank()) systemPrompt else "$systemPrompt\n\n$farmContext"
+
         generativeModel = Firebase.ai(backend = GenerativeBackend.googleAI())
             .generativeModel(
                 modelName = currentModelId,
-                systemInstruction = content { text(systemPrompt) }
+                systemInstruction = content { text(instruction) }
             )
-        // Only replay the most recent turns — keeps requests fast as conversations grow.
-        // Full history still displays on-screen and stays saved; this only trims what's
-        // sent to the model on each call.
-        val trimmedHistory = history.takeLast(12)
+        val trimmedHistory = history.takeLast(12).dropWhile { !it.isUser }
         val historyContent: List<Content> = trimmedHistory.map { msg ->
             content(role = if (msg.isUser) "user" else "model") { text(msg.text) }
         }
@@ -399,7 +534,7 @@ class ChatBotActivity : AppCompatActivity() {
     private fun showSuggestedQuestions() {
         suggestedContainer.removeAllViews()
         suggestedContainer.columnCount = 2
-        val picks = samplePool.shuffled().take(4)
+        val picks = (generalQuestions.shuffled().take(2) + dataQuestions.shuffled().take(2)).shuffled()
 
         picks.forEachIndexed { index, question ->
             val chip = TextView(this).apply {
@@ -434,6 +569,7 @@ class ChatBotActivity : AppCompatActivity() {
     }
 
     private fun sendSuggested(question: String) {
+        if (isSending) return
         addMessage(question, isUser = true)
         recyclerView.scrollToPosition(messages.size - 1)
 
@@ -555,4 +691,5 @@ class ChatBotActivity : AppCompatActivity() {
             emptyList()
         }
     }
+
 }

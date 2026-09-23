@@ -264,8 +264,8 @@
                 android:id="@+id/btnExportImage"
                 android:layout_width="0dp"
                 android:layout_height="52dp"
-                android:layout_weight="1"
                 android:layout_marginStart="6dp"
+                android:layout_weight="1"
                 android:background="@drawable/bg_pill_tonal"
                 android:drawableStart="@drawable/ic_image"
                 android:drawablePadding="8dp"
@@ -274,9 +274,9 @@
                 android:paddingEnd="14dp"
                 android:text="Image"
                 android:textAllCaps="false"
-                android:textColor="#355E1A"
-                android:textStyle="bold"
-                android:textSize="15sp" />
+                android:textColor="#FFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold" />
 
         </LinearLayout>
 
