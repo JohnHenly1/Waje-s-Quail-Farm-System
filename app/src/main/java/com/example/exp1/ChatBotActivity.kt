@@ -33,6 +33,10 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.os.Build
+import android.widget.Toast
 
 data class ChatMessage(
     val text: String,
@@ -60,11 +64,8 @@ class ChatBotActivity : AppCompatActivity() {
 
     // Flash-Lite first = fastest default. Order here also drives the picker menu order.
     private val availableModels = listOf(
-        AiModelOption("gemini-3.1-flash-lite", "3.1 Flash-Lite (Fastest)"),
         AiModelOption("gemini-3.5-flash", "3.5 Flash"),
-        AiModelOption("gemini-3-flash", "3 Flash"),
-        AiModelOption("gemini-2.5-flash", "2.5 Flash (legacy)"),
-        AiModelOption("gemini-3.8-flash", "Gemini 3.8 Flash")
+        AiModelOption("gemini-3.1-flash-lite", "3.1 Flash-Lite (Fastest)"),
     )
     private var currentModelId = availableModels.first().id
     private var lastFarmContext: String = ""
@@ -168,7 +169,7 @@ class ChatBotActivity : AppCompatActivity() {
 
         recyclerView = findViewById(R.id.chatRecyclerView)
         adapter = ChatAdapter(messages) { position ->
-            showDeleteMessageDialog(position)
+            showMessageActionsDialog(position)
         }
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = adapter
@@ -652,6 +653,71 @@ class ChatBotActivity : AppCompatActivity() {
         prefs.edit().putString("conversations_list", arr.toString()).apply()
     }
 
+    private fun showMessageActionsDialog(position: Int) {
+        if (position < 0 || position >= messages.size) return
+        val message = messages[position]
+
+        val view = layoutInflater.inflate(R.layout.dialog_message_actions, null)
+        val dialog = AlertDialog.Builder(this).setView(view).create()
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+
+        val copyRow = view.findViewById<View>(R.id.actionCopy)
+        val selectRow = view.findViewById<View>(R.id.actionSelect)
+        val deleteRow = view.findViewById<View>(R.id.actionDelete)
+
+        // Chart-only messages have no text to copy or select
+        if (message.text.isBlank()) {
+            copyRow.visibility = View.GONE
+            selectRow.visibility = View.GONE
+        }
+
+        val plainText = if (message.isUser) message.text
+        else MarkdownFormatter.toSpannable(message.text).toString()
+
+        copyRow.setOnClickListener {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.setPrimaryClip(ClipData.newPlainText("Quail Assistant message", plainText))
+
+            // Android 13+ already shows its own "Copied" confirmation
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                Toast.makeText(this, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+            }
+            dialog.dismiss()
+        }
+
+        selectRow.setOnClickListener {
+            dialog.dismiss()
+            showSelectTextDialog(plainText)
+        }
+
+        deleteRow.setOnClickListener {
+            dialog.dismiss()
+            showDeleteMessageDialog(position)
+        }
+
+        dialog.show()
+    }
+
+    private fun showSelectTextDialog(text: String) {
+        val view = layoutInflater.inflate(R.layout.dialog_select_text, null)
+        val dialog = AlertDialog.Builder(this).setView(view).create()
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+
+        view.findViewById<TextView>(R.id.selectableText).text = text
+        view.findViewById<View>(R.id.selectClose).setOnClickListener { dialog.dismiss() }
+
+        // Keep long messages scrollable instead of pushing "Close" off screen
+        val scroll = view.findViewById<View>(R.id.selectScroll)
+        val maxHeight = (resources.displayMetrics.heightPixels * 0.5).toInt()
+        scroll.post {
+            if (scroll.height > maxHeight) {
+                scroll.layoutParams.height = maxHeight
+                scroll.requestLayout()
+            }
+        }
+
+        dialog.show()
+    }
     private fun showDeleteMessageDialog(position: Int) {
         if (position < 0 || position >= messages.size) return
 

@@ -45,13 +45,18 @@ class ChatAdapter(
             titleView.text = message.chartTitle ?: "Grade Distribution"
             ChartHelper.configure(chartView)
             ChartHelper.populate(chartView, message.chart)
+
+            holder.itemView.setOnLongClickListener {
+                onLongPress(holder.bindingAdapterPosition)
+                true
+            }
             return
         }
 
         val messageView = holder.itemView.findViewById<TextView>(R.id.messageText)
         messageView.text = if (message.isUser) message.text else MarkdownFormatter.toSpannable(message.text)
         messageView.setOnLongClickListener {
-            onLongPress(holder.adapterPosition)
+            onLongPress(holder.bindingAdapterPosition)
             true
         }
     }
