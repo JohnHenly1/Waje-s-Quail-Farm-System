@@ -25,9 +25,8 @@ class DetectionOverlayView @JvmOverloads constructor(
 
     private var results: List<DetectionResult> = emptyList()
 
-    // Source frame size (the bitmap the normalized boxes were computed against).
-    // 0/0 = unknown -> fall back to naive 1:1 mapping (used for the live camera feed,
-    // where PreviewView's own centerCrop-equivalent scaling already roughly matches).
+    // Size of the bitmap the normalized boxes were computed against.
+    // 0/0 = unknown -> naive 1:1 mapping.
     private var sourceWidth: Int = 0
     private var sourceHeight: Int = 0
 
@@ -37,9 +36,13 @@ class DetectionOverlayView @JvmOverloads constructor(
         "Quail_Egg_Grade_C" to Color.parseColor("#F44336")
     )
 
-    /** Call this BEFORE setResults() whenever showing a static bitmap (captured photo or
-     *  gallery pick) whose ImageView uses centerCrop, so boxes line up with the visible crop.
-     *  Pass (0, 0) to clear it and go back to naive 1:1 mapping (e.g. for live camera). */
+    private fun shortLabel(label: String): String = when {
+        label.endsWith("_A", ignoreCase = true) -> "A"
+        label.endsWith("_B", ignoreCase = true) -> "B"
+        label.endsWith("_C", ignoreCase = true) -> "C"
+        else -> label
+    }
+
     fun setImageSize(width: Int, height: Int) {
         sourceWidth = width
         sourceHeight = height
@@ -54,8 +57,6 @@ class DetectionOverlayView @JvmOverloads constructor(
         super.onDraw(canvas)
         if (width == 0 || height == 0) return
 
-        // Precompute the centerCrop transform (matches ImageView's scaleType="centerCrop")
-        // when we know the source bitmap size.
         var scale = 1f
         var offsetX = 0f
         var offsetY = 0f
@@ -65,10 +66,8 @@ class DetectionOverlayView @JvmOverloads constructor(
                 width.toFloat() / sourceWidth,
                 height.toFloat() / sourceHeight
             )
-            val scaledW = sourceWidth * scale
-            val scaledH = sourceHeight * scale
-            offsetX = (width - scaledW) / 2f
-            offsetY = (height - scaledH) / 2f
+            offsetX = (width - sourceWidth * scale) / 2f
+            offsetY = (height - sourceHeight * scale) / 2f
         }
 
         for (det in results) {
@@ -76,15 +75,11 @@ class DetectionOverlayView @JvmOverloads constructor(
 
             val left: Float; val top: Float; val right: Float; val bottom: Float
             if (useCenterCrop) {
-                // boundingBox is normalized [0,1] against the ORIGINAL bitmap.
-                // Convert to bitmap pixels, then apply the same scale+offset the
-                // ImageView used to centerCrop that bitmap into this view.
                 left   = det.boundingBox.left   * sourceWidth  * scale + offsetX
                 top    = det.boundingBox.top    * sourceHeight * scale + offsetY
                 right  = det.boundingBox.right  * sourceWidth  * scale + offsetX
                 bottom = det.boundingBox.bottom * sourceHeight * scale + offsetY
             } else {
-                // Naive 1:1 mapping (live camera feed).
                 left   = det.boundingBox.left   * width
                 top    = det.boundingBox.top    * height
                 right  = det.boundingBox.right  * width
@@ -94,12 +89,15 @@ class DetectionOverlayView @JvmOverloads constructor(
             boxPaint.color = color
             canvas.drawRect(left, top, right, bottom, boxPaint)
 
-            val label = "${det.label} ${"%.0f".format(det.confidence * 100)}%"
+            // Letter only: A / B / C, no percentage
+            val label = shortLabel(det.label)
             val textW = textPaint.measureText(label)
+            val chipH = 36f
+            val chipTop = (top - chipH).coerceAtLeast(0f)
             bgPaint.color = color
-            canvas.drawRect(left, top - 36f, left + textW + 8f, top, bgPaint)
+            canvas.drawRect(left, chipTop, left + textW + 16f, chipTop + chipH, bgPaint)
             textPaint.color = Color.WHITE
-            canvas.drawText(label, left + 4f, top - 8f, textPaint)
+            canvas.drawText(label, left + 8f, chipTop + chipH - 8f, textPaint)
         }
     }
 }

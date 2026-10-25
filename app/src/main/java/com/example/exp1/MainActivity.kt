@@ -15,12 +15,9 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.animation.AnimationUtils
 import android.widget.*
-import android.text.Editable
 import android.text.TextWatcher
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import com.google.android.gms.auth.api.signin.*
-import com.google.android.gms.common.api.ApiException
 import com.google.android.material.textfield.TextInputLayout
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -33,7 +30,6 @@ import kotlin.random.Random
 class MainActivity : AppCompatActivity() {
 
     private lateinit var accountManager: AccountManager
-    private lateinit var googleSignInClient: GoogleSignInClient
 
     private var firestoreListener: ListenerRegistration? = null
     private lateinit var cm: ConnectivityManager
@@ -60,7 +56,7 @@ class MainActivity : AppCompatActivity() {
     // should ever proceed past the gate.
     private var proceedingPastMaintenanceGate = false
 
-    private val GOOGLE_SIGN_IN_REQUEST = 9001
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
 
@@ -71,14 +67,6 @@ class MainActivity : AppCompatActivity() {
         val currentEmail = accountManager.getCurrentUsername()
 
         setContentView(R.layout.activity_login)
-
-        // GOOGLE ACCOUNT PICKER SETUP
-        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken("441160922275-03k03v695eo31hscn5dic9eh1o16hhka.apps.googleusercontent.com")
-            .requestEmail()
-            .build()
-
-        googleSignInClient = GoogleSignIn.getClient(this, gso)
 
         val editLoginEmail = findViewById<EditText>(R.id.editLoginEmail)
         editLoginEmail.setTextColor(android.graphics.Color.BLACK)
@@ -161,40 +149,11 @@ class MainActivity : AppCompatActivity() {
         return super.dispatchTouchEvent(ev)
     }
 
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Google Login Result Handler
-    // ─────────────────────────────────────────────────────────────────────────
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-
-        if (requestCode == GOOGLE_SIGN_IN_REQUEST) {
-            val task = GoogleSignIn.getSignedInAccountFromIntent(data)
-            try {
-                val account = task.getResult(ApiException::class.java)
-                val email = account.email ?: return
-
-                val credential = com.google.firebase.auth.GoogleAuthProvider
-                    .getCredential(account.idToken, null)
-
-                com.google.firebase.auth.FirebaseAuth.getInstance()
-                    .signInWithCredential(credential)
-                    .addOnSuccessListener { checkFirestoreAccessWithPassword(email) }
-                    .addOnFailureListener { checkFirestoreAccessWithPassword(email) }
-
-            } catch (e: ApiException) {
-                Toast.makeText(this, "Google sign-in cancelled", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-
     // ─────────────────────────────────────────────────────────────────────────
     // Shared password check (Google + manual login both flow through here)
     // ─────────────────────────────────────────────────────────────────────────
 
-    private fun checkFirestoreAccessWithPassword(email: String) {
+    private fun loginWithEmailAndPassword(email: String, enteredPassword: String) {
         loadingLayout.visibility = View.VISIBLE
 
         FirebaseFirestore.getInstance()
@@ -209,19 +168,26 @@ class MainActivity : AppCompatActivity() {
                     return@addOnSuccessListener
                 }
 
-                // Deactivated accounts (isActive == false) are locked out of
-                // the mobile app entirely, even if their setup was already
-                // completed and their password is known/cached.
                 if (doc.getBoolean("isActive") == false) {
                     showAccountInactiveDialog()
                     return@addOnSuccessListener
                 }
 
-                val password = doc.getString("password") ?: ""
+                val storedPassword = doc.getString("password") ?: ""
                 val name = doc.getString("name") ?: email
                 val role = doc.getString("role") ?: "staff"
 
-                showPasswordDialog(email, password, name, role)
+                if (enteredPassword == storedPassword) {
+                    // Genuine authentication, so record it as a Login
+                    enterApp(name, email, role, enteredPassword, true, isNewLogin = true)
+                } else {
+                    findViewById<EditText>(R.id.editLoginPassword).error = "Incorrect password"
+                    Toast.makeText(this, "Incorrect email or password", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .addOnFailureListener {
+                loadingLayout.visibility = View.GONE
+                Toast.makeText(this, "Error: ${it.message}", Toast.LENGTH_SHORT).show()
             }
     }
 
@@ -405,15 +371,6 @@ class MainActivity : AppCompatActivity() {
         tvEmail?.text = email
         editPassword.hint = getString(R.string.new_password_hint)
 
-        editPassword.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            override fun afterTextChanged(s: Editable?) {
-                val pass = s.toString()
-                passwordInputLayout.error = if (pass.isNotEmpty()) getPasswordStrengthError(pass) else null
-            }
-        })
-
         val dialog = AlertDialog.Builder(this)
             .setView(dialogView)
             .setPositiveButton(getString(R.string.update_password), null)
@@ -424,9 +381,8 @@ class MainActivity : AppCompatActivity() {
 
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             val newPass = editPassword.text.toString().trim()
-            val error = getPasswordStrengthError(newPass)
-            if (error != null) {
-                passwordInputLayout.error = error
+            if (newPass.isEmpty()) {
+                passwordInputLayout.error = "Password cannot be empty"
                 return@setOnClickListener
             }
             updatePasswordInFirestore(email, newPass, dialog)
@@ -601,11 +557,18 @@ class MainActivity : AppCompatActivity() {
         }
 
         val email = findViewById<EditText>(R.id.editLoginEmail).text.toString().trim().lowercase()
-        if (email.isEmpty()) {
+        val password = findViewById<EditText>(R.id.editLoginPassword).text.toString()
+
+        if (email.isEmpty() || !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
             Toast.makeText(this, "Enter valid email", Toast.LENGTH_SHORT).show()
             return
         }
-        checkFirestoreAccessWithPassword(email)
+        if (password.isEmpty()) {
+            Toast.makeText(this, "Enter your password", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        loginWithEmailAndPassword(email, password)
     }
 
     private fun showNotRegisteredDialog() {
@@ -623,63 +586,6 @@ class MainActivity : AppCompatActivity() {
             .setMessage("This account has been deactivated by the farm owner and cannot access the mobile application. Please contact the farm owner to reactivate it.")
             .setPositiveButton("OK", null)
             .show()
-    }
-
-    private fun showPasswordDialog(email: String, correctPass: String, name: String, role: String) {
-        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_password_entry, null)
-        val editPassword = dialogView.findViewById<EditText>(R.id.editLoginPassword)
-        val passwordInputLayout = dialogView.findViewById<TextInputLayout>(R.id.passwordInputLayout)
-        val tvEmail = dialogView.findViewById<TextView>(R.id.tvPasswordEmail)
-        tvEmail?.text = email
-
-        editPassword.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            override fun afterTextChanged(s: Editable?) {
-                val pass = s.toString()
-                passwordInputLayout.error = if (pass.isNotEmpty()) getPasswordStrengthError(pass) else null
-            }
-        })
-
-        val dialog = AlertDialog.Builder(this)
-            .setTitle("Verify Identity")
-            .setView(dialogView)
-            .setPositiveButton("Verify & Login", null)
-            .setNegativeButton("Cancel", null)
-            .create()
-
-        dialog.show()
-
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-            val entered = editPassword.text.toString().trim()
-            val formatError = getPasswordStrengthError(entered)
-
-            if (formatError != null) {
-                passwordInputLayout.error = formatError
-                Toast.makeText(this, formatError, Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-
-            if (entered == correctPass) {
-                // Real credential verification succeeded — this is a
-                // genuine authentication event, so record it as a Login.
-                enterApp(name, email, role, entered, true, isNewLogin = true)
-                dialog.dismiss()
-            } else {
-                passwordInputLayout.error = "Incorrect Password"
-                Toast.makeText(this, "Incorrect Password", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    private fun getPasswordStrengthError(password: String): String? {
-        if (password.length < 8) return "Password must be at least 8 characters long"
-        if (!password.any { it.isUpperCase() }) return "Password must contain at least one uppercase letter"
-        if (!password.any { it.isLowerCase() }) return "Password must contain at least one lowercase letter"
-        if (!password.any { it.isDigit() }) return "Password must contain at least one digit"
-        val symbols = "!@#$%^&*()_+-=[]{}|;':\",./<>?"
-        if (!password.any { it in symbols }) return "Password must contain at least one special character"
-        return null
     }
 
     private fun isInternetActuallyWorking(): Boolean {

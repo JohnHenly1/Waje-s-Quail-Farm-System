@@ -3,11 +3,12 @@ package com.example.exp1
 import android.Manifest
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
-import android.app.DatePickerDialog
+import com.google.android.material.progressindicator.LinearProgressIndicator
 import android.content.ContentValues
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.Matrix
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -22,11 +23,14 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
+import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
@@ -86,7 +90,10 @@ class EggCountActivity : AppCompatActivity() {
     private var gradeA = 0
     private var gradeB = 0
     private var gradeC = 0
-    private val countedBoxes = mutableListOf<android.graphics.RectF>()
+
+    // Consecutive live frames with zero detections; counts reset once this
+    // reaches EMPTY_FRAMES_RESET (debounces single missed detections).
+    private var emptyFrameStreak = 0
 
     // ── Deferred gallery save (SINGLE mode) — the shot + its detections are
     // stashed here after freezing/scanning, and only written to disk once the
@@ -126,10 +133,10 @@ class EggCountActivity : AppCompatActivity() {
     private lateinit var overlayView: DetectionOverlayView
     private lateinit var liveScanLabel: TextView
     private lateinit var statusBanner: TextView
-    private lateinit var captureBtn: Button
-    private lateinit var retakeBtn: Button
+    private lateinit var captureBtn: MaterialButton
+    private lateinit var retakeBtn: MaterialButton
     private lateinit var discardBtn: Button
-    private lateinit var modeSwitchBtn: Button
+    private lateinit var modeSwitchBtn: MaterialButton
     // True whenever modeSwitchBtn currently means "return to Live Mode" (and
     // therefore tapping it must go through confirmLiveModeSwitch). False
     // means it currently means "Pick Photo". Set explicitly everywhere the
@@ -143,6 +150,9 @@ class EggCountActivity : AppCompatActivity() {
     private lateinit var gradeARow: View
     private lateinit var gradeBRow: View
     private lateinit var gradeCRow: View
+    private lateinit var gradeABar: LinearProgressIndicator
+    private lateinit var gradeBBar: LinearProgressIndicator
+    private lateinit var gradeCBar: LinearProgressIndicator
 
     // ── Frozen/picked photo preview + scanning animation ─────────────────────
     private lateinit var frozenPreviewImage: ImageView
@@ -290,6 +300,9 @@ class EggCountActivity : AppCompatActivity() {
         gradeARow     = findViewById(R.id.gradeARow)
         gradeBRow     = findViewById(R.id.gradeBRow)
         gradeCRow     = findViewById(R.id.gradeCRow)
+        gradeABar     = findViewById(R.id.gradeABar)
+        gradeBBar     = findViewById(R.id.gradeBBar)
+        gradeCBar     = findViewById(R.id.gradeCBar)
 
         frozenPreviewImage = findViewById(R.id.frozenPreviewImage)
         scanLineView        = findViewById(R.id.scanLineView)
@@ -378,8 +391,8 @@ class EggCountActivity : AppCompatActivity() {
         captureMode = if (captureMode == CaptureMode.SINGLE) CaptureMode.BATCH else CaptureMode.SINGLE
         captureModeToggleBtn.text =
             if (captureMode == CaptureMode.BATCH) "Mode: Batch" else "Mode: Single"
-        captureBtn.text =
-            if (captureMode == CaptureMode.BATCH) "Capture (+)" else "Capture"
+        captureBtn.contentDescription =
+            if (captureMode == CaptureMode.BATCH) "Capture and add to batch" else "Capture"
 
         batchShotCount = 0
         pendingBatchShots.clear()
@@ -521,7 +534,7 @@ class EggCountActivity : AppCompatActivity() {
             == PackageManager.PERMISSION_GRANTED
         ) {
             isLiveMode = true
-            overlayView.setImageSize(0, 0) // back to naive 1:1 mapping for the live camera feed
+            overlayView.setImageSize(0, 0) // set per-frame once the first live frame arrives
             updateBatchLabel()
             frozenOverlay.visibility = View.GONE
             frozenPreviewImage.visibility = View.GONE
@@ -599,8 +612,7 @@ class EggCountActivity : AppCompatActivity() {
         captureBtn.isEnabled  = true
         retakeBtn.visibility  = View.GONE
         discardBtn.visibility = View.GONE
-        modeSwitchBtn.text    = "Pick Photo"
-        modeSwitchIsReturnToLive = false
+        setModeSwitchIcon(returnToLive = false)
         saveBtn.visibility    = View.GONE
         batchShotCount = 0
         resetCounts()
@@ -609,22 +621,59 @@ class EggCountActivity : AppCompatActivity() {
         showBanner("Camera stopped — tap preview to restart", isError = false, autoHide = true)
     }
 
+    // ── Icon-only button helpers ─────────────────────────────────────────────
+    /** modeSwitchBtn is either "Pick Photo" (gallery icon) or "back to Live Mode" (camera icon). */
+    private fun setModeSwitchIcon(returnToLive: Boolean) {
+        modeSwitchIsReturnToLive = returnToLive
+        modeSwitchBtn.setIconResource(
+            if (returnToLive) R.drawable.ic_btn_live else R.drawable.ic_btn_gallery
+        )
+        modeSwitchBtn.contentDescription =
+            if (returnToLive) "Back to live mode" else "Pick photos from gallery"
+    }
+
+    /** retakeBtn is either "Retake" (undo icon) or "Back to Camera" (arrow icon). */
+    private fun setRetakeIcon(backToCamera: Boolean) {
+        retakeBtn.setIconResource(
+            if (backToCamera) R.drawable.ic_btn_back else R.drawable.ic_btn_retake
+        )
+        retakeBtn.contentDescription = if (backToCamera) "Back to camera" else "Retake"
+    }
+
+    /** Rotates a bitmap by [degrees] (CameraX frames arrive in sensor orientation). */
+    private fun Bitmap.rotated(degrees: Int): Bitmap {
+        if (degrees == 0) return this
+        val m = Matrix().apply { postRotate(degrees.toFloat()) }
+        return Bitmap.createBitmap(this, 0, 0, width, height, m, true)
+    }
+
     private fun bindCamera() {
         val future = ProcessCameraProvider.getInstance(this)
         future.addListener({
             val provider = future.get()
             cameraProvider = provider
 
-            val preview = Preview.Builder().build().also {
-                it.setSurfaceProvider(previewView.surfaceProvider)
-            }
+            // Same aspect ratio for all use cases so the analyzed frame, the
+            // preview and the captured photo all cover the same field of view.
+            val resolutionSelector = ResolutionSelector.Builder()
+                .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
+                .build()
+
+            // Must match the overlay's centerCrop mapping.
+            previewView.scaleType = PreviewView.ScaleType.FILL_CENTER
+
+            val preview = Preview.Builder()
+                .setResolutionSelector(resolutionSelector)
+                .build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
 
             val capture = ImageCapture.Builder()
                 .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                .setResolutionSelector(resolutionSelector)
                 .build()
                 .also { imageCapture = it }
 
             val analyzer = ImageAnalysis.Builder()
+                .setResolutionSelector(resolutionSelector)
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                 .build().also { ia ->
@@ -647,21 +696,31 @@ class EggCountActivity : AppCompatActivity() {
 
     // ─────────────────────────────────────────────────────────────────────────
     //  Live frame processing
-    //  SINGLE mode runs live detection continuously and auto-accumulates
-    //  results (via IoU dedup). BATCH mode also shows live boxes as a framing
-    //  aid, but never auto-adds to the count — batch shots are only queued on
-    //  an explicit capture tap and only scanned when the user taps Done.
+    //  SINGLE mode runs live detection continuously; the counts mirror what is
+    //  currently in frame and reset to 0 once no eggs have been seen for a few
+    //  consecutive frames. BATCH mode also shows live boxes as a framing aid,
+    //  but never updates the count — batch shots are only queued on an explicit
+    //  capture tap and only scanned when the user taps Done.
     // ─────────────────────────────────────────────────────────────────────────
 
     private fun onLiveFrame(proxy: ImageProxy) {
         if (!isLiveMode || !analyzing.compareAndSet(false, true)) {
             proxy.close(); return
         }
-        val bmp: Bitmap = try { proxy.toBitmap() } finally { proxy.close() }
+        // Rotate upright so the detector and the overlay see the same
+        // orientation as the preview.
+        val bmp: Bitmap = try {
+            proxy.toBitmap().rotated(proxy.imageInfo.rotationDegrees)
+        } finally { proxy.close() }
+
         val results = runDetection(bmp)
         runOnUiThread {
-            overlayView.setResults(results)
-            if (isLiveMode && captureMode == CaptureMode.SINGLE) addNewEggs(results)
+            // Ignore stale frames that finish after we froze / left live mode.
+            if (isLiveMode) {
+                overlayView.setImageSize(bmp.width, bmp.height)
+                overlayView.setResults(results)
+                if (captureMode == CaptureMode.SINGLE) updateLiveCounts(results)
+            }
             analyzing.set(false)
         }
     }
@@ -713,7 +772,8 @@ class EggCountActivity : AppCompatActivity() {
 
         imageCapture!!.takePicture(cameraExecutor, object : ImageCapture.OnImageCapturedCallback() {
             override fun onCaptureSuccess(proxy: ImageProxy) {
-                val bmp = proxy.toBitmap(); proxy.close()
+                val bmp = proxy.toBitmap().rotated(proxy.imageInfo.rotationDegrees)
+                proxy.close()
                 if (captureMode == CaptureMode.BATCH) {
                     // Build the lightweight thumbnail here on the background
                     // executor, so the UI thread only ever handles small bitmaps.
@@ -752,10 +812,9 @@ class EggCountActivity : AppCompatActivity() {
         liveScanLabel.text = "● ANALYZING"
         captureBtn.visibility = View.GONE
         retakeBtn.visibility  = View.VISIBLE
-        retakeBtn.text        = "Retake"
+        setRetakeIcon(backToCamera = false)
         discardBtn.visibility = View.VISIBLE
-        modeSwitchBtn.text    = "↩ Live Mode"
-        modeSwitchIsReturnToLive = true
+        setModeSwitchIcon(returnToLive = true)
 
         startScanAnimation()
 
@@ -764,7 +823,8 @@ class EggCountActivity : AppCompatActivity() {
             runOnUiThread {
                 stopScanAnimation()
 
-                gradeA = 0; gradeB = 0; gradeC = 0; countedBoxes.clear()
+                gradeA = 0; gradeB = 0; gradeC = 0
+                emptyFrameStreak = 0
                 for (det in results) when (det.label) {
                     "Quail_Egg_Grade_A" -> gradeA++
                     "Quail_Egg_Grade_B" -> gradeB++
@@ -906,12 +966,14 @@ class EggCountActivity : AppCompatActivity() {
         frozenOverlay.visibility = View.VISIBLE
         frozenPreviewImage.setImageBitmap(shot.full)
         frozenPreviewImage.visibility = View.VISIBLE
-        overlayView.setImageSize(shot.full.width, shot.full.height) // Show this shot's boxes if Done has already scanned it; empty (no boxes) if // the user is browsing the queue before scanning.
+        overlayView.setImageSize(shot.full.width, shot.full.height)
+        // Show this shot's boxes if Done has already scanned it; empty (no boxes)
+        // if the user is browsing the queue before scanning.
         overlayView.setResults(shot.results)
         liveScanLabel.text = "● PREVIEW ${index + 1}/${pendingBatchShots.size}"
         captureBtn.visibility = View.GONE
         retakeBtn.visibility  = View.VISIBLE
-        retakeBtn.text        = "Back to Camera"
+        setRetakeIcon(backToCamera = true)
         // discardBtn stays visible/unchanged — the batch can still be discarded from here
     }
 
@@ -934,7 +996,7 @@ class EggCountActivity : AppCompatActivity() {
         // gallery-pick-before-camera-start case.
         captureBtn.alpha      = if (cameraActuallyLive) 1f else 0.4f
         retakeBtn.visibility  = View.GONE
-        retakeBtn.text        = if (captureMode == CaptureMode.BATCH) "Capture More" else "Retake"
+        setRetakeIcon(backToCamera = false)
         discardBtn.visibility = if (pendingBatchShots.isNotEmpty()) View.VISIBLE else View.GONE
     }
 
@@ -957,11 +1019,11 @@ class EggCountActivity : AppCompatActivity() {
         captureBtn.visibility = View.GONE
         retakeBtn.visibility  = View.GONE
         discardBtn.visibility = View.VISIBLE
-        modeSwitchBtn.text    = "↩ Live Mode"
-        modeSwitchIsReturnToLive = true
+        setModeSwitchIcon(returnToLive = true)
         liveScanLabel.text    = "● SCANNING (0/${pendingBatchShots.size})"
 
-        gradeA = 0; gradeB = 0; gradeC = 0; countedBoxes.clear()
+        gradeA = 0; gradeB = 0; gradeC = 0
+        emptyFrameStreak = 0
         overlayView.setResults(emptyList())
         startScanAnimation()
 
@@ -1096,8 +1158,7 @@ class EggCountActivity : AppCompatActivity() {
         captureBtn.alpha      = 1f
         retakeBtn.visibility  = View.GONE
         discardBtn.visibility = View.GONE
-        modeSwitchBtn.text    = "Pick Photo"
-        modeSwitchIsReturnToLive = false
+        setModeSwitchIcon(returnToLive = false)
         saveBtn.visibility    = View.GONE
         batchShotCount = 0
         resetCounts()
@@ -1136,7 +1197,7 @@ class EggCountActivity : AppCompatActivity() {
         isLiveMode = true
         frozenOverlay.visibility = View.GONE
         frozenPreviewImage.visibility = View.GONE
-        overlayView.setImageSize(0, 0) // back to naive 1:1 mapping for the live camera feed
+        overlayView.setImageSize(0, 0)
         overlayView.setResults(emptyList())
         updateBatchLabel()
         captureBtn.visibility = View.VISIBLE
@@ -1323,33 +1384,36 @@ class EggCountActivity : AppCompatActivity() {
         try { detector?.detect(bmp) ?: emptyList() }
         catch (e: Exception) { Log.e(TAG, "Detection error", e); emptyList() }
 
-    private fun addNewEggs(results: List<DetectionResult>) {
-        for (det in results) {
-            val box   = det.boundingBox
-            val isNew = countedBoxes.none { iou(box, it) > IOU_DEDUP }
-            if (isNew) {
-                countedBoxes += box
-                when (det.label) {
-                    "Quail_Egg_Grade_A" -> gradeA++
-                    "Quail_Egg_Grade_B" -> gradeB++
-                    "Quail_Egg_Grade_C" -> gradeC++
-                }
+    /** Live counts mirror what is currently in frame (not an ever-growing
+     * total). After EMPTY_FRAMES_RESET consecutive frames with no eggs, the
+     * counts reset to 0; the small streak avoids flicker from a single missed
+     * detection. */
+    private fun updateLiveCounts(results: List<DetectionResult>) {
+        if (results.isEmpty()) {
+            emptyFrameStreak++
+            if (emptyFrameStreak >= EMPTY_FRAMES_RESET && (gradeA + gradeB + gradeC) > 0) {
+                gradeA = 0; gradeB = 0; gradeC = 0
                 updateCountUI()
             }
+            return
+        }
+        emptyFrameStreak = 0
+
+        var a = 0; var b = 0; var c = 0
+        for (det in results) when (det.label) {
+            "Quail_Egg_Grade_A" -> a++
+            "Quail_Egg_Grade_B" -> b++
+            "Quail_Egg_Grade_C" -> c++
+        }
+        if (a != gradeA || b != gradeB || c != gradeC) {
+            gradeA = a; gradeB = b; gradeC = c
+            updateCountUI()
         }
     }
 
-    private fun iou(a: android.graphics.RectF, b: android.graphics.RectF): Float {
-        val il = maxOf(a.left, b.left); val it = maxOf(a.top, b.top)
-        val ir = minOf(a.right, b.right); val ib = minOf(a.bottom, b.bottom)
-        val inter = maxOf(0f, ir - il) * maxOf(0f, ib - it)
-        if (inter == 0f) return 0f
-        return inter / ((a.right - a.left) * (a.bottom - a.top) +
-                (b.right - b.left) * (b.bottom - b.top) - inter)
-    }
-
     private fun resetCounts() {
-        gradeA = 0; gradeB = 0; gradeC = 0; countedBoxes.clear()
+        gradeA = 0; gradeB = 0; gradeC = 0
+        emptyFrameStreak = 0
         overlayView.setResults(emptyList())
         updateCountUI()
     }
@@ -1375,11 +1439,15 @@ class EggCountActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.gradeCValue).text  = gradeC.toString()
         findViewById<TextView>(R.id.gradeCDesc)?.text  = "Reject"
 
-        val pct = if (total > 0) { a: Int -> "${"%.0f".format(a * 100f / total)}%" }
-        else { _: Int -> "0%" }
-        findViewById<TextView>(R.id.gradeAPercent).text = pct(gradeA)
-        findViewById<TextView>(R.id.gradeBPercent).text = pct(gradeB)
-        findViewById<TextView>(R.id.gradeCPercent).text = pct(gradeC)
+        val pctInt = { n: Int -> if (total > 0) Math.round(n * 100f / total) else 0 }
+
+        findViewById<TextView>(R.id.gradeAPercent).text = "${pctInt(gradeA)}%"
+        findViewById<TextView>(R.id.gradeBPercent).text = "${pctInt(gradeB)}%"
+        findViewById<TextView>(R.id.gradeCPercent).text = "${pctInt(gradeC)}%"
+
+        gradeABar.setProgressCompat(pctInt(gradeA), true)
+        gradeBBar.setProgressCompat(pctInt(gradeB), true)
+        gradeCBar.setProgressCompat(pctInt(gradeC), true)
     }
 
     private fun showBanner(msg: String, isError: Boolean, autoHide: Boolean) {
@@ -1719,7 +1787,7 @@ class EggCountActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG       = "EggCountActivity"
-        private const val IOU_DEDUP = 0.4f
+        private const val EMPTY_FRAMES_RESET = 3   // ~3 consecutive frames with no eggs → reset live counts
         private const val MAX_BATCH_PICK = 20
         private val FROZEN_DIM_COLOR = Color.parseColor("#55000000")
     }

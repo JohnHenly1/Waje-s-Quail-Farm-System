@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -6,6 +7,7 @@
     android:layout_height="match_parent"
     android:background="@color/light_gray"
     tools:context=".EggCountActivity">
+
     <!--     ══════════════════════  HEADER  ══════════════════════     -->
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
@@ -64,6 +66,7 @@
                 android:text="@string/live_time_placeholder"
                 android:textColor="@color/white"
                 android:textSize="11sp" />
+
             <!--     View already-scanned photos     -->
             <ImageButton
                 android:id="@+id/viewScannedBtn"
@@ -77,6 +80,7 @@
                 android:scaleType="centerInside"
                 app:srcCompat="@android:drawable/ic_menu_gallery"
                 app:tint="@color/white" />
+
             <!--     Reset / refresh counts     -->
             <ImageButton
                 android:id="@+id/refreshButton"
@@ -91,6 +95,7 @@
                 app:tint="@color/white" />
         </LinearLayout>
     </androidx.appcompat.widget.Toolbar>
+
     <!--     ══════════════════════  SCROLLABLE BODY  ══════════════════════     -->
     <androidx.core.widget.NestedScrollView
         android:id="@+id/scrollView"
@@ -107,6 +112,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:padding="16dp">
+
             <!--     ─────────────  STATUS BANNER (hidden by default)  ─────────────     -->
             <TextView
                 android:id="@+id/statusBanner"
@@ -121,6 +127,7 @@
                 android:textSize="13sp"
                 android:visibility="gone"
                 tools:text="Model loaded" />
+
             <!--     ─────────────  CAMERA CARD  ─────────────     -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
@@ -140,11 +147,13 @@
                     <FrameLayout
                         android:layout_width="match_parent"
                         android:layout_height="300dp">
+
                         <!--     Live camera preview     -->
                         <androidx.camera.view.PreviewView
                             android:id="@+id/cameraPreview"
                             android:layout_width="match_parent"
                             android:layout_height="match_parent" />
+
                         <!--     Frozen/picked photo preview     -->
                         <ImageView
                             android:id="@+id/frozenPreviewImage"
@@ -153,6 +162,7 @@
                             android:contentDescription="@string/captured_egg_photo_desc"
                             android:scaleType="centerCrop"
                             android:visibility="gone" />
+
                         <!--     Dim overlay when frame is frozen     -->
                         <View
                             android:id="@+id/frozenOverlay"
@@ -160,11 +170,13 @@
                             android:layout_height="match_parent"
                             android:background="#55000000"
                             android:visibility="gone" />
+
                         <!--     Bounding-box overlay     -->
                         <com.example.exp1.DetectionOverlayView
                             android:id="@+id/detectionOverlay"
                             android:layout_width="match_parent"
                             android:layout_height="match_parent" />
+
                         <!--     Scanning sweep line     -->
                         <View
                             android:id="@+id/scanLineView"
@@ -173,6 +185,7 @@
                             android:layout_gravity="top"
                             android:background="#00E676"
                             android:visibility="gone" />
+
                         <!--     LIVE / ANALYZING / CAPTURED badge (top-left)     -->
                         <TextView
                             android:id="@+id/liveScanLabel"
@@ -188,6 +201,7 @@
                             android:textColor="@color/white"
                             android:textSize="11sp"
                             android:textStyle="bold" />
+
                         <!--     Capture mode badge (Single / Batch) — top-right     -->
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/captureModeToggleBtn"
@@ -209,6 +223,7 @@
                             android:textSize="11sp"
                             android:textStyle="bold"
                             app:cornerRadius="14dp" />
+
                         <!--     Detection model badge (YOLOv3 / YOLOv4) — bottom-right     -->
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/modelSwitchBtn"
@@ -231,6 +246,7 @@
                             android:textStyle="bold"
                             app:cornerRadius="14dp" />
                     </FrameLayout>
+
                     <!--     Batch thumbnail strip     -->
                     <HorizontalScrollView
                         android:id="@+id/batchThumbnailScroll"
@@ -249,391 +265,342 @@
                     </HorizontalScrollView>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
-            <!--     ─────────────  CAMERA CONTROL ROW  ─────────────     -->
+
+            <!--     ─────────────  CAMERA CONTROL ROW (icon-only, one aligned row)  ─────────────     -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="10dp"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="24dp"
                 android:gravity="center"
                 android:orientation="horizontal">
 
+                <!-- Discard -->
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/captureBtn"
-                    android:layout_width="0dp"
+                    android:id="@+id/discardBtn"
+                    style="@style/Widget.App.IconButton"
+                    android:layout_width="52dp"
                     android:layout_height="52dp"
-                    android:layout_marginEnd="8dp"
-                    android:layout_weight="1"
-                    android:backgroundTint="@color/dark_green"
-                    android:text="@string/capture_and_analyze"
-                    android:textAllCaps="false"
-                    android:textColor="@color/white"
-                    android:textSize="13sp"
-                    android:textStyle="bold"
-                    app:cornerRadius="14dp"
-                    app:elevation="0dp" />
+                    android:layout_marginStart="6dp"
+                    android:layout_marginEnd="6dp"
+                    android:contentDescription="Discard"
+                    android:visibility="gone"
+                    app:icon="@drawable/ic_btn_discard" />
 
+                <!-- Retake / Back to camera (icon swapped in code) -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/retakeBtn"
-                    android:layout_width="0dp"
+                    style="@style/Widget.App.IconButton"
+                    android:layout_width="52dp"
                     android:layout_height="52dp"
-                    android:layout_marginEnd="8dp"
-                    android:layout_weight="1"
-                    android:backgroundTint="#E65100"
-                    android:text="@string/retake"
-                    android:textAllCaps="false"
-                    android:textColor="@color/white"
-                    android:textSize="13sp"
-                    android:textStyle="bold"
+                    android:layout_marginStart="6dp"
+                    android:layout_marginEnd="6dp"
+                    android:contentDescription="Retake"
                     android:visibility="gone"
-                    app:cornerRadius="14dp"
-                    app:elevation="0dp" />
+                    app:icon="@drawable/ic_btn_retake" />
 
+                <!-- Capture (primary) -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/captureBtn"
+                    style="@style/Widget.App.IconButton.Primary"
+                    android:layout_width="52dp"
+                    android:layout_height="52dp"
+                    android:layout_marginStart="6dp"
+                    android:layout_marginEnd="6dp"
+                    android:contentDescription="Capture"
+                    app:icon="@drawable/ic_btn_capture" />
+
+                <!-- Done — scan batch -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/doneBatchBtn"
+                    style="@style/Widget.App.IconButton"
+                    android:layout_width="52dp"
+                    android:layout_height="52dp"
+                    android:layout_marginStart="6dp"
+                    android:layout_marginEnd="6dp"
+                    android:contentDescription="Done, scan batch"
+                    android:visibility="gone"
+                    app:icon="@drawable/ic_btn_done" />
+
+                <!-- Pick photo / Back to live (icon swapped in code) -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/modeSwitchBtn"
-                    android:layout_width="0dp"
+                    style="@style/Widget.App.IconButton"
+                    android:layout_width="52dp"
                     android:layout_height="52dp"
-                    android:layout_weight="1"
-                    android:backgroundTint="#37474F"
-                    android:text="@string/pick_photo"
-                    android:textAllCaps="false"
-                    android:textColor="@color/white"
-                    android:textSize="12sp"
-                    app:cornerRadius="14dp"
-                    app:elevation="0dp" />
+                    android:layout_marginStart="6dp"
+                    android:layout_marginEnd="6dp"
+                    android:contentDescription="Pick photos from gallery"
+                    app:icon="@drawable/ic_btn_gallery" />
+
+                <!-- Save collection (primary) -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/saveCollectionBtn"
+                    style="@style/Widget.App.IconButton.Primary"
+                    android:layout_width="52dp"
+                    android:layout_height="52dp"
+                    android:layout_marginStart="6dp"
+                    android:layout_marginEnd="6dp"
+                    android:contentDescription="Save collection"
+                    android:visibility="gone"
+                    app:icon="@drawable/ic_btn_save" />
             </LinearLayout>
-            <!--  Done Button — hidden until a batch is completed  -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/doneBatchBtn"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginBottom="10dp"
-                android:backgroundTint="#00838F"
-                android:text="Done — Scan Batch"
-                android:textAllCaps="false"
-                android:textColor="@color/white"
-                android:textStyle="bold"
-                android:visibility="gone"
-                app:cornerRadius="14dp"
-                app:elevation="0dp" />
-            <!--     Discard     -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/discardBtn"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginBottom="10dp"
-                android:backgroundTint="#B71C1C"
-                android:text="@string/discard"
-                android:textAllCaps="false"
-                android:textColor="@color/white"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:visibility="gone"
-                app:cornerRadius="14dp"
-                app:elevation="0dp" />
-            <!--     Save Collection     -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/saveCollectionBtn"
-                android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:layout_marginHorizontal="8dp"
-                android:layout_marginTop="4dp"
-                android:layout_marginBottom="16dp"
-                android:backgroundTint="#2E7D32"
-                android:text="@string/save_collection"
-                android:textAllCaps="false"
-                android:textColor="@color/white"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                android:visibility="gone"
-                app:cornerRadius="16dp"
-                app:elevation="0dp" />
-            <!--    ═══════════════ COUNT + QUALITY ROW ═══════════════    -->
-            <LinearLayout
+
+            <!--    ═══════════════ TOTAL + GRADE DISTRIBUTION (minimal) ═══════════════    -->
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="24dp"
-                android:orientation="horizontal">
-                <!--     ─── LEFT: Today's Total ───     -->
-                <com.google.android.material.card.MaterialCardView
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_marginEnd="10dp"
-                    android:layout_weight="0.85"
-                    app:cardCornerRadius="28dp"
-                    app:cardElevation="0dp"
-                    app:strokeWidth="0dp">
+                app:cardBackgroundColor="@android:color/white"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0dp"
+                app:strokeColor="#ECEFEC"
+                app:strokeWidth="1dp">
 
-                    <LinearLayout
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="24dp">
+
+                    <!--    Total    -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:letterSpacing="0.08"
+                        android:text="@string/total_eggs_detected"
+                        android:textAllCaps="true"
+                        android:textColor="#8A918B"
+                        android:textSize="11sp" />
+
+                    <TextView
+                        android:id="@+id/todayTotalValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:fontFamily="sans-serif-light"
+                        android:text="@string/zero"
+                        android:textColor="#1A1A1A"
+                        android:textSize="52sp" />
+
+                    <View
                         android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:background="@drawable/bg_orange_gradient"
-                        android:gravity="center"
-                        android:orientation="vertical"
-                        android:padding="20dp">
+                        android:layout_height="1dp"
+                        android:layout_marginTop="16dp"
+                        android:layout_marginBottom="8dp"
+                        android:background="#EEF0EE" />
 
-                        <FrameLayout
-                            android:layout_width="44dp"
-                            android:layout_height="44dp"
-                            android:layout_marginBottom="8dp"
-                            android:background="@drawable/circle_white"
-                            android:backgroundTint="#33FFFFFF">
-
-                            <ImageView
-                                android:layout_width="22dp"
-                                android:layout_height="22dp"
-                                android:layout_gravity="center"
-                                app:srcCompat="@drawable/lc_egg"
-                                app:tint="@color/white" />
-                        </FrameLayout>
-
-                        <TextView
-                            android:id="@+id/todayTotalValue"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/zero"
-                            android:textColor="@color/white"
-                            android:textSize="40sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:alpha="0.9"
-                            android:gravity="center"
-                            android:text="@string/total_eggs_detected"
-                            android:textColor="@color/white"
-                            android:textSize="11sp" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
-                <!--     ─── RIGHT: Quality Distribution ───     -->
-                <com.google.android.material.card.MaterialCardView
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1.15"
-                    app:cardCornerRadius="28dp"
-                    app:cardElevation="0dp"
-                    app:strokeColor="#E3E7E4"
-                    app:strokeWidth="1dp">
-
+                    <!--    Grade A    -->
                     <LinearLayout
+                        android:id="@+id/gradeARow"
                         android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:background="@android:color/white"
+                        android:layout_height="wrap_content"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:contentDescription="@string/view_grade_a_details"
+                        android:focusable="true"
                         android:orientation="vertical"
-                        android:padding="16dp">
+                        android:paddingVertical="12dp">
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginBottom="10dp"
-                            android:letterSpacing="0.02"
-                            android:text="@string/grade_distribution"
-                            android:textColor="@color/black"
-                            android:textSize="12sp"
-                            android:textStyle="bold" />
-                        <!--    Grade A row    -->
                         <LinearLayout
-                            android:id="@+id/gradeARow"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginBottom="4dp"
-                            android:background="@drawable/bg_grade_row_a"
-                            android:clickable="true"
-                            android:contentDescription="@string/view_grade_a_details"
-                            android:focusable="true"
                             android:gravity="center_vertical"
-                            android:orientation="horizontal"
-                            android:paddingHorizontal="8dp"
-                            android:paddingVertical="8dp">
-
-                            <View
-                                android:layout_width="8dp"
-                                android:layout_height="8dp"
-                                android:layout_marginEnd="8dp"
-                                android:background="@drawable/circle_white"
-                                android:backgroundTint="#2E7D32" />
+                            android:orientation="horizontal">
 
                             <TextView
-                                android:layout_width="0dp"
+                                android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:maxLines="1"
                                 android:text="A"
-                                android:textColor="@color/stats_green_end"
-                                android:textSize="12sp"
+                                android:textColor="#1A1A1A"
+                                android:textSize="14sp"
                                 android:textStyle="bold" />
 
                             <TextView
                                 android:id="@+id/gradeADesc"
-                                android:layout_width="wrap_content"
+                                android:layout_width="0dp"
                                 android:layout_height="wrap_content"
-                                android:layout_marginEnd="8dp"
+                                android:layout_marginStart="10dp"
+                                android:layout_weight="1"
+                                android:ellipsize="end"
+                                android:maxLines="1"
                                 android:text="@string/grade_normal"
-                                android:textColor="@color/dark_gray"
-                                android:textSize="10sp"
-                                android:textStyle="italic" />
+                                android:textColor="#8A918B"
+                                android:textSize="12sp" />
 
                             <TextView
                                 android:id="@+id/gradeAValue"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/zero"
-                                android:textColor="#2E7D32"
-                                android:textSize="15sp"
-                                android:textStyle="bold" />
+                                android:textColor="#1A1A1A"
+                                android:textSize="16sp" />
 
                             <TextView
                                 android:id="@+id/gradeAPercent"
-                                android:layout_width="36dp"
+                                android:layout_width="40dp"
                                 android:layout_height="wrap_content"
-                                android:layout_marginStart="4dp"
                                 android:gravity="end"
                                 android:text="@string/zero_percent"
-                                android:textColor="#2E7D32"
-                                android:textSize="11sp"
-                                android:textStyle="bold" />
+                                android:textColor="#8A918B"
+                                android:textSize="12sp" />
                         </LinearLayout>
 
-                        <View
-                            android:layout_width="match_parent"
-                            android:layout_height="1dp"
-                            android:layout_marginBottom="4dp"
-                            android:background="#EEF0EE" />
-                        <!--    Grade B row    -->
-                        <LinearLayout
-                            android:id="@+id/gradeBRow"
+                        <com.google.android.material.progressindicator.LinearProgressIndicator
+                            android:id="@+id/gradeABar"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginBottom="4dp"
-                            android:background="@drawable/bg_grade_row_b"
-                            android:clickable="true"
-                            android:contentDescription="@string/view_grade_b_details"
-                            android:focusable="true"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal"
-                            android:paddingHorizontal="8dp"
-                            android:paddingVertical="8dp">
+                            android:layout_marginTop="10dp"
+                            android:max="100"
+                            android:progress="0"
+                            app:indicatorColor="#2E7D32"
+                            app:trackColor="#F1F3F1"
+                            app:trackCornerRadius="2dp"
+                            app:trackThickness="4dp" />
+                    </LinearLayout>
 
-                            <View
-                                android:layout_width="8dp"
-                                android:layout_height="8dp"
-                                android:layout_marginEnd="8dp"
-                                android:background="@drawable/circle_white"
-                                android:backgroundTint="#F57F17" />
+                    <!--    Grade B    -->
+                    <LinearLayout
+                        android:id="@+id/gradeBRow"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:contentDescription="@string/view_grade_b_details"
+                        android:focusable="true"
+                        android:orientation="vertical"
+                        android:paddingVertical="12dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
 
                             <TextView
-                                android:layout_width="0dp"
+                                android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:maxLines="1"
                                 android:text="B"
-                                android:textColor="@color/orange"
-                                android:textSize="12sp"
+                                android:textColor="#1A1A1A"
+                                android:textSize="14sp"
                                 android:textStyle="bold" />
 
                             <TextView
                                 android:id="@+id/gradeBDesc"
-                                android:layout_width="wrap_content"
+                                android:layout_width="0dp"
                                 android:layout_height="wrap_content"
-                                android:layout_marginEnd="8dp"
+                                android:layout_marginStart="10dp"
+                                android:layout_weight="1"
+                                android:ellipsize="end"
+                                android:maxLines="1"
                                 android:text="@string/grade_cracked"
-                                android:textColor="@color/dark_gray"
-                                android:textSize="10sp"
-                                android:textStyle="italic" />
+                                android:textColor="#8A918B"
+                                android:textSize="12sp" />
 
                             <TextView
                                 android:id="@+id/gradeBValue"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/zero"
-                                android:textColor="#F57F17"
-                                android:textSize="15sp"
-                                android:textStyle="bold" />
+                                android:textColor="#1A1A1A"
+                                android:textSize="16sp" />
 
                             <TextView
                                 android:id="@+id/gradeBPercent"
-                                android:layout_width="36dp"
+                                android:layout_width="40dp"
                                 android:layout_height="wrap_content"
-                                android:layout_marginStart="4dp"
                                 android:gravity="end"
                                 android:text="@string/zero_percent"
-                                android:textColor="#F57F17"
-                                android:textSize="11sp"
-                                android:textStyle="bold" />
+                                android:textColor="#8A918B"
+                                android:textSize="12sp" />
                         </LinearLayout>
 
-                        <View
-                            android:layout_width="match_parent"
-                            android:layout_height="1dp"
-                            android:layout_marginBottom="4dp"
-                            android:background="#EEF0EE" />
-                        <!--    Grade C row    -->
-                        <LinearLayout
-                            android:id="@+id/gradeCRow"
+                        <com.google.android.material.progressindicator.LinearProgressIndicator
+                            android:id="@+id/gradeBBar"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:background="@drawable/bg_grade_row_c"
-                            android:clickable="true"
-                            android:contentDescription="@string/view_grade_c_details"
-                            android:focusable="true"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal"
-                            android:paddingHorizontal="8dp"
-                            android:paddingVertical="8dp">
+                            android:layout_marginTop="10dp"
+                            android:max="100"
+                            android:progress="0"
+                            app:indicatorColor="#F57F17"
+                            app:trackColor="#F1F3F1"
+                            app:trackCornerRadius="2dp"
+                            app:trackThickness="4dp" />
+                    </LinearLayout>
 
-                            <View
-                                android:layout_width="8dp"
-                                android:layout_height="8dp"
-                                android:layout_marginEnd="8dp"
-                                android:background="@drawable/circle_white"
-                                android:backgroundTint="#C62828" />
+                    <!--    Grade C    -->
+                    <LinearLayout
+                        android:id="@+id/gradeCRow"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:contentDescription="@string/view_grade_c_details"
+                        android:focusable="true"
+                        android:orientation="vertical"
+                        android:paddingVertical="12dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
 
                             <TextView
-                                android:layout_width="0dp"
+                                android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:maxLines="1"
                                 android:text="C"
-                                android:textColor="@color/red"
-                                android:textSize="12sp"
+                                android:textColor="#1A1A1A"
+                                android:textSize="14sp"
                                 android:textStyle="bold" />
 
                             <TextView
                                 android:id="@+id/gradeCDesc"
-                                android:layout_width="wrap_content"
+                                android:layout_width="0dp"
                                 android:layout_height="wrap_content"
-                                android:layout_marginEnd="8dp"
+                                android:layout_marginStart="10dp"
+                                android:layout_weight="1"
+                                android:ellipsize="end"
+                                android:maxLines="1"
                                 android:text="@string/grade_reject"
-                                android:textColor="@color/dark_gray"
-                                android:textSize="10sp"
-                                android:textStyle="italic" />
+                                android:textColor="#8A918B"
+                                android:textSize="12sp" />
 
                             <TextView
                                 android:id="@+id/gradeCValue"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/zero"
-                                android:textColor="#C62828"
-                                android:textSize="15sp"
-                                android:textStyle="bold" />
+                                android:textColor="#1A1A1A"
+                                android:textSize="16sp" />
 
                             <TextView
                                 android:id="@+id/gradeCPercent"
-                                android:layout_width="36dp"
+                                android:layout_width="40dp"
                                 android:layout_height="wrap_content"
-                                android:layout_marginStart="4dp"
                                 android:gravity="end"
                                 android:text="@string/zero_percent"
-                                android:textColor="#C62828"
-                                android:textSize="11sp"
-                                android:textStyle="bold" />
+                                android:textColor="#8A918B"
+                                android:textSize="12sp" />
                         </LinearLayout>
+
+                        <com.google.android.material.progressindicator.LinearProgressIndicator
+                            android:id="@+id/gradeCBar"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:max="100"
+                            android:progress="0"
+                            app:indicatorColor="#C62828"
+                            app:trackColor="#F1F3F1"
+                            app:trackCornerRadius="2dp"
+                            app:trackThickness="4dp" />
                     </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
-            </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
+
     <!--    ══════════════════════ BOTTOM NAV ══════════════════════    -->
     <View
         android:layout_width="match_parent"
@@ -654,6 +621,7 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
+
         <!--    Home    -->
         <LinearLayout
             android:id="@+id/homeButton"
@@ -678,6 +646,7 @@
                 android:textColor="@color/white"
                 android:textSize="10sp" />
         </LinearLayout>
+
         <!--    Analytics    -->
         <LinearLayout
             android:id="@+id/analyticsButton"
@@ -702,6 +671,7 @@
                 android:textColor="@color/white"
                 android:textSize="10sp" />
         </LinearLayout>
+
         <!--    Schedule    -->
         <LinearLayout
             android:id="@+id/scheduleButton"
@@ -726,6 +696,7 @@
                 android:textColor="@color/white"
                 android:textSize="10sp" />
         </LinearLayout>
+
         <!--    Profile    -->
         <LinearLayout
             android:id="@+id/profileButton"
