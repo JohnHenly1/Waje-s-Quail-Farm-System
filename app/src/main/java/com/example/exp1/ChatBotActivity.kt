@@ -75,7 +75,23 @@ class ChatBotActivity : AppCompatActivity() {
     private val cooldownSeconds: Int = 15
     private var cooldownJob: kotlinx.coroutines.Job? = null
 
+    private var userWritesTagalog = false
 
+    private fun looksTagalog(text: String): Boolean {
+        val markers = listOf(
+            "ano", "ang", "ng", "mga", "ako", "ko", "mo", "ba", "po", "opo",
+            "paano", "bakit", "magkano", "ilan", "kailan", "saan", "gaano",
+            "itlog", "pugo", "kanina", "ngayon", "kahapon", "linggo", "buwan",
+            "ilang", "nasa", "sa", "na", "ay", "ito", "iyan", "yung", "kung",
+            "pwede", "puwede", "gusto", "kailangan", "hindi", "oo", "salamat"
+        )
+        val words = text.lowercase().split(Regex("[^a-zñ]+")).filter { it.isNotBlank() }
+        if (words.isEmpty()) return false
+        val hits = words.count { it in markers }
+        return hits >= 2 || (words.size <= 3 && hits >= 1)
+    }
+
+    private fun t(en: String, tl: String) = if (userWritesTagalog) tl else en
     private val generalQuestions = listOf(
         "How long is the incubation period for quail eggs?",
         "What's the ideal temperature for hatching quail eggs?",
@@ -109,7 +125,14 @@ class ChatBotActivity : AppCompatActivity() {
         "How many eggs per cage am I averaging?",
         "What was my best day this month?"
     )
-
+    private val tagalogQuestions = listOf(
+        "Ilang araw ang incubation ng itlog ng pugo?",
+        "Ano ang tamang temperatura sa pagpisa ng itlog ng pugo?",
+        "Ano ang dapat kong ipakain para dumami ang itlog?",
+        "Paano malalaman kung fertile ang itlog ng pugo?",
+        "Ilan ang itlog ko ngayong linggo?",
+        "Bakit marami ang Grade B (basag) kong itlog?"
+    )
     private val systemPrompt = """
     You are Quail Assistant, a friendly and knowledgeable expert on quail
     (specifically Coturnix quail) farming and quail egg production. You help
@@ -118,6 +141,19 @@ class ChatBotActivity : AppCompatActivity() {
     rates, and general quail husbandry. Keep answers practical, concise, and
     easy to read on a mobile screen. If a question is unrelated to quail/quail
     egg farming, politely redirect the conversation back to quail topics.
+
+    LANGUAGE RULES:
+    - Always reply in the same language the user writes in.
+    - If the user writes in Tagalog (Filipino), reply in natural, simple Tagalog.
+    - If the user writes in Taglish (mixed Tagalog and English), reply in Taglish
+      with the same casual tone.
+    - If the user writes in English, reply in English.
+    - If the user switches language mid-conversation, switch with them.
+    - Keep common farming terms in English when Filipino farmers normally use
+      them (e.g. "Grade A", "incubator", "feed", "humidity", "laying rate"), but
+      explain them in Tagalog.
+    - Use "po" and "opo" only if the user uses polite forms first.
+    - Numbers, units, and data values must stay exactly as given in the farm data.
 
     You are given live QUAIL FARM DATA (egg collection records) and FLOCK INFO
     (bird count, cages) from this farm's database.
@@ -273,6 +309,7 @@ class ChatBotActivity : AppCompatActivity() {
     private suspend fun streamReply(text: String) {
         if (isSending) return
         isSending = true
+        userWritesTagalog = looksTagalog(text)
         cooldownJob?.cancel()              // cancel any leftover cooldown from before
         chatInputRef.isEnabled = false     // lock immediately, not just after reply
         sendButtonRef.isEnabled = false
@@ -286,7 +323,7 @@ class ChatBotActivity : AppCompatActivity() {
             val period = QueryPeriodParser.parse(text)
             if (period != null) {
                 val stat = FarmDataContext.computePeriodStats(days, period)
-                lastFarmContext += "\n\nEXACT ANSWER FOR THIS QUESTION — use these numbers verbatim, do not recalculate:\n" +
+                lastFarmContext += "\n\nEXACT ANSWER FOR THIS QUESTION — use these numbers verbatim, do not recalculate (reply in the user's language):\n" +
                         "Period: ${stat.label} (${stat.start} to ${stat.end})\n" +
                         "Total eggs: ${stat.total} over ${stat.daysWithData} recorded days\n" +
                         "Grade A: ${stat.a}, Grade B: ${stat.b}, Grade C: ${stat.c}\n" +
@@ -346,7 +383,11 @@ class ChatBotActivity : AppCompatActivity() {
             }
 
             if (botMessageIndex == -1) {
-                addMessage("Sorry, I couldn't come up with an answer for that.", isUser = false)
+                addMessage(
+                    t("Sorry, I couldn't come up with an answer for that.",
+                        "Pasensya na, wala akong maisagot diyan."),
+                    isUser = false
+                )
             } else {
                 // First user message may become the title — keep that logic intact
                 if (conversationTitleText.text == "Quail Assistant" && messages.isNotEmpty()) {
@@ -362,16 +403,21 @@ class ChatBotActivity : AppCompatActivity() {
                         msg.contains("503") || msg.contains("UNAVAILABLE", ignoreCase = true)
 
                 if (isOverloaded && attempt < maxAttempts) {
-                    typingStatusText.text = "AI is busy, retrying (${attempt}/${maxAttempts - 1})…"
+                    typingStatusText.text = t(
+                        "AI is busy, retrying (${attempt}/${maxAttempts - 1})…",
+                        "Busy ang AI, sinusubukan ulit (${attempt}/${maxAttempts - 1})…"
+                    )
                     kotlinx.coroutines.delay(1500L * attempt) // 1.5s, then 3s
                     typingStatusText.text = getString(R.string.quail_assistant_typing)
                 } else {
                     typingLayout.visibility = View.GONE
                     if (botMessageIndex == -1) {
                         val friendly = if (isOverloaded)
-                            "The AI is a bit busy right now — please try asking again in a moment."
+                            t("The AI is a bit busy right now — please try asking again in a moment.",
+                                "Medyo busy ang AI ngayon — pakisubukan ulit sa ilang sandali.")
                         else
-                            "Oops, something went wrong: $msg"
+                            t("Oops, something went wrong: $msg",
+                                "Ay, may nangyaring problema: $msg")
                         addMessage(friendly, isUser = false)
                     } else {
                         persistCurrentConversation()
@@ -393,7 +439,7 @@ class ChatBotActivity : AppCompatActivity() {
             chatInputRef.isEnabled = false
             sendButtonRef.isEnabled = false
             for (remaining in cooldownSeconds downTo 1) {
-                chatInputRef.hint = "Please wait ${remaining}s…"
+                chatInputRef.hint = t("Please wait ${remaining}s…", "Maghintay muna ng ${remaining}s…")
                 kotlinx.coroutines.delay(1000)
             }
             chatInputRef.hint = defaultInputHint
@@ -545,7 +591,9 @@ class ChatBotActivity : AppCompatActivity() {
     private fun showSuggestedQuestions() {
         suggestedContainer.removeAllViews()
         suggestedContainer.columnCount = 2
-        val picks = (generalQuestions.shuffled().take(2) + dataQuestions.shuffled().take(2)).shuffled()
+        val picks = (generalQuestions.shuffled().take(1) +
+                dataQuestions.shuffled().take(1) +
+                tagalogQuestions.shuffled().take(2)).shuffled()
 
         picks.forEachIndexed { index, question ->
             val chip = TextView(this).apply {

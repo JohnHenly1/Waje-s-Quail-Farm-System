@@ -8,6 +8,9 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
+import android.graphics.drawable.ColorDrawable
+import android.view.ViewGroup
+import androidx.appcompat.widget.ListPopupWindow
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
@@ -44,6 +47,14 @@ class AlertsActivity : AppCompatActivity() {
     private val pendingListUpdate = Runnable { updateAlertsList() }
 
     private var activeFilter = "All"
+    private var activeSeverity: Severity? = null   // null = no severity filter
+    private enum class DateFilter { TODAY, WEEK, MONTH, YEAR, CUSTOM }
+    private var activeDate: DateFilter? = null
+    private var rangeStart = 0L    // inclusive
+    private var rangeEnd = 0L      // exclusive
+    private var dateLabel = ""     // text shown in the date dropdown
+    private val alertDateFormat = SimpleDateFormat("yyyy/MM/dd hh:mm a", Locale.getDefault())
+    private var severityCounts: Map<Severity, Int> = emptyMap()
 
     companion object {
         // Cloud alert history can grow unbounded. Rendering every single alert ever
@@ -81,7 +92,7 @@ class AlertsActivity : AppCompatActivity() {
         alertsAdapter = AlertsAdapter()
         alertsRecyclerView.layoutManager = LinearLayoutManager(this)
         alertsRecyclerView.adapter = alertsAdapter
-        alertsRecyclerView.setHasFixedSize(true)
+        alertsRecyclerView.setHasFixedSize(false)
         // Disabling the built-in add/remove/change animations. With potentially
         // hundreds of rows changing (read-state flips, new alerts, filter switches),
         // animating every change is expensive for no real benefit here. Re-enable
@@ -124,6 +135,7 @@ class AlertsActivity : AppCompatActivity() {
         }
 
         setupFilters()
+        setupDropdowns()
         updateAlertsList()
         // Refresh button just re-renders the current alert list from
         // GlobalData/cloud — the underlying detection (inventory, tasks,
@@ -172,6 +184,403 @@ class AlertsActivity : AppCompatActivity() {
         // Keep Egg Count tab hidden regardless of selection
         findViewById<TextView>(R.id.filterEggCount)?.visibility = View.GONE
     }
+    private fun severityLabels(): List<String> = when (activeFilter) {
+        "Inventory"   -> listOf("Depleted / Low", "Reorder Soon", "Info", "Others")
+        "Schedule"    -> listOf("Overdue", "Pending", "Due Today", "Others")
+        "Water Level" -> listOf("Emergency / Critical", "Warning", "Notice / Update", "Refilled")
+        else          -> listOf("Red Alerts", "Orange Alerts", "Blue Alerts", "Others")
+    }
+    // Generic white dropdown anchored under a view
+    private fun showDropdown(anchor: View, options: List<String>, onPick: (Int) -> Unit) {
+        val popup = ListPopupWindow(this)
+        popup.anchorView = anchor
+        popup.width = anchor.width
+        popup.isModal = true
+        popup.setBackgroundDrawable(ColorDrawable(Color.WHITE))
+        popup.setAdapter(object : ArrayAdapter<String>(
+            this, android.R.layout.simple_list_item_1, options
+        ) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val tv = super.getView(position, convertView, parent) as TextView
+                tv.setTextColor(Color.parseColor("#212121"))
+                tv.textSize = 14f
+                return tv
+            }
+        })
+        popup.setOnItemClickListener { _, _, pos, _ ->
+            popup.dismiss()
+            onPick(pos)
+        }
+        popup.show()
+    }
+
+    private fun setupDropdowns() {
+        findViewById<TextView>(R.id.severityDropdown).setOnClickListener { v ->
+            val labels = severityLabels()
+            val sevs = Severity.values()
+            val options = listOf("All status") +
+                    sevs.mapIndexed { i, s -> "${labels[i]} (${severityCounts[s] ?: 0})" }
+            showDropdown(v, options) { pos ->
+                activeSeverity = if (pos == 0) null else sevs[pos - 1]
+                updateAlertsList()
+            }
+        }
+
+        findViewById<TextView>(R.id.dateDropdown).setOnClickListener { v ->
+            val options = listOf("Any date", "Today", "Weekly…", "Monthly…", "Yearly…", "Custom range…")
+            showDropdown(v, options) { pos ->
+                when (pos) {
+                    0 -> { activeDate = null; updateAlertsList() }
+                    1 -> { activeDate = DateFilter.TODAY; updateAlertsList() }
+                    2 -> showWeekPicker()
+                    3 -> showMonthPicker()
+                    4 -> showYearPicker()
+                    5 -> showCustomPicker()
+                }
+            }
+        }
+    }
+
+    private fun updateDropdownLabels(scope: List<GlobalData.AlertItem>) {
+        severityCounts = scope.groupingBy { severityOf(it) }.eachCount()
+
+        val green = ContextCompat.getColor(this, R.color.dark_green)
+        val normal = Color.parseColor("#212121")
+
+        val sevView = findViewById<TextView>(R.id.severityDropdown)
+        val sevText = activeSeverity?.let { severityLabels()[it.ordinal] } ?: "All status"
+        sevView.text = "$sevText  ▾"
+        sevView.setTextColor(if (activeSeverity != null) green else normal)
+        sevView.setTypeface(null, if (activeSeverity != null) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+
+        val dateText = when (activeDate) {
+            null -> "Any date"
+            DateFilter.TODAY -> "Today"
+            else -> dateLabel
+        }
+        val dateView = findViewById<TextView>(R.id.dateDropdown)
+        dateView.text = "$dateText  ▾"
+        dateView.setTextColor(if (activeDate != null) green else normal)
+        dateView.setTypeface(null, if (activeDate != null) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+    }
+
+    // Returns [start, end) in millis for the selected date filter.
+// ---------- Date filter: ranges + minimalist white / green-edge pickers ----------
+
+    private val greenColor: Int get() = ContextCompat.getColor(this, R.color.dark_green)
+
+    private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
+
+    private fun dateRangeFor(f: DateFilter): Pair<Long, Long> {
+        if (f == DateFilter.TODAY) {
+            val cal = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val s = cal.timeInMillis
+            cal.add(Calendar.DAY_OF_YEAR, 1)
+            return s to cal.timeInMillis
+        }
+        return rangeStart to rangeEnd   // WEEK / MONTH / YEAR / CUSTOM use the picked range
+    }
+
+    private fun setRange(f: DateFilter, start: Long, endExclusive: Long, label: String) {
+        activeDate = f
+        rangeStart = start
+        rangeEnd = endExclusive
+        dateLabel = label
+        updateAlertsList()
+    }
+
+    private fun rangeLabel(startMs: Long, endInclusiveMs: Long): String {
+        val thisYear = Calendar.getInstance().get(Calendar.YEAR)
+        val sameYear =
+            Calendar.getInstance().apply { timeInMillis = startMs }.get(Calendar.YEAR) == thisYear &&
+                    Calendar.getInstance().apply { timeInMillis = endInclusiveMs }.get(Calendar.YEAR) == thisYear
+        val f = SimpleDateFormat(if (sameYear) "MMM d" else "MMM d, yyyy", Locale.getDefault())
+        return "${f.format(Date(startMs))} – ${f.format(Date(endInclusiveMs))}"
+    }
+
+    // White box, optional green edge
+    private fun boxBg(
+        filled: Boolean,
+        edge: Int = Color.parseColor("#D0D5DD"),
+        radius: Int = 10,
+        strokeDp: Int = 1
+    ) = android.graphics.drawable.GradientDrawable().apply {
+        setColor(if (filled) greenColor else Color.WHITE)
+        setStroke(dp(strokeDp), if (filled) greenColor else edge)
+        cornerRadius = dp(radius).toFloat()
+    }
+
+    private fun pickCell(text: String, selected: Boolean, onClick: () -> Unit) = TextView(this).apply {
+        this.text = text
+        gravity = android.view.Gravity.CENTER
+        textSize = 14f
+        setTextColor(if (selected) Color.WHITE else Color.parseColor("#212121"))
+        setTypeface(null, if (selected) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+        background = boxBg(selected)
+        layoutParams = LinearLayout.LayoutParams(0, dp(44), 1f).apply {
+            setMargins(dp(4), dp(4), dp(4), dp(4))
+        }
+        setOnClickListener { onClick() }
+    }
+
+    private fun cellGrid(cells: List<TextView>, columns: Int = 3): LinearLayout {
+        val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        cells.chunked(columns).forEach { rowCells ->
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            rowCells.forEach { row.addView(it) }
+            col.addView(row)
+        }
+        return col
+    }
+
+    // Shared dialog: white background, green edge, green title, text buttons
+    private fun showGreenDialog(
+        title: String,
+        applyText: String? = null,
+        onApply: (() -> Unit)? = null,
+        content: (AlertDialog) -> View
+    ) {
+        val dialog = AlertDialog.Builder(this).create()
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(18), dp(20), dp(12))
+        }
+        root.addView(TextView(this).apply {
+            text = title
+            textSize = 16f
+            setTextColor(greenColor)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding(0, 0, 0, dp(12))
+        })
+        root.addView(content(dialog))
+
+        val actions = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.END
+            setPadding(0, dp(8), 0, 0)
+        }
+        fun action(label: String, color: Int, bold: Boolean, onClick: () -> Unit) {
+            actions.addView(TextView(this).apply {
+                text = label
+                textSize = 14f
+                setTextColor(color)
+                if (bold) setTypeface(null, android.graphics.Typeface.BOLD)
+                setPadding(dp(16), dp(10), dp(8), dp(10))
+                setOnClickListener { onClick() }
+            })
+        }
+        action("Cancel", Color.parseColor("#757575"), false) { dialog.dismiss() }
+        if (applyText != null && onApply != null) {
+            action(applyText, greenColor, true) { onApply(); dialog.dismiss() }
+        }
+        root.addView(actions)
+
+        dialog.setView(root)
+        dialog.show()
+        dialog.window?.setBackgroundDrawable(boxBg(false, greenColor, 16, 2))
+    }
+
+    // ---- Weekly: pick a week (Mon–Sun) ----
+    private fun showWeekPicker() {
+        val fmt = SimpleDateFormat("MMM d", Locale.getDefault())
+        val cal = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+            add(Calendar.DAY_OF_YEAR, -((get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY + 7) % 7))
+        }
+        showGreenDialog("Select week") { dialog ->
+            val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            repeat(26) { i ->
+                val start = cal.timeInMillis
+                val endIncl = (cal.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, 6) }
+                val endExcl = (cal.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, 7) }.timeInMillis
+                val range = "${fmt.format(cal.time)} – ${fmt.format(endIncl.time)}"
+                val selected = activeDate == DateFilter.WEEK && rangeStart == start
+                val tag = when (i) { 0 -> "This week · "; 1 -> "Last week · "; else -> "" }
+
+                list.addView(TextView(this).apply {
+                    text = "$tag$range"
+                    textSize = 14f
+                    setTextColor(if (selected) Color.WHITE else Color.parseColor("#212121"))
+                    if (selected) setTypeface(null, android.graphics.Typeface.BOLD)
+                    background = if (selected) boxBg(true) else null
+                    setPadding(dp(12), dp(12), dp(12), dp(12))
+                    setOnClickListener {
+                        setRange(DateFilter.WEEK, start, endExcl, range)
+                        dialog.dismiss()
+                    }
+                })
+                cal.add(Calendar.DAY_OF_YEAR, -7)
+            }
+            ScrollView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(320))
+                addView(list)
+            }
+        }
+    }
+
+    // ---- Monthly: pick a year, then a month ----
+    private fun showMonthPicker() {
+        var year = Calendar.getInstance().apply {
+            if (activeDate == DateFilter.MONTH) timeInMillis = rangeStart
+        }.get(Calendar.YEAR)
+        val months = java.text.DateFormatSymbols.getInstance().shortMonths
+
+        showGreenDialog("Select month") { dialog ->
+            val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            val gridHolder = FrameLayout(this)
+            val yearText = TextView(this).apply {
+                textSize = 16f
+                gravity = android.view.Gravity.CENTER
+                setTextColor(Color.parseColor("#212121"))
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            }
+
+            fun render() {
+                yearText.text = year.toString()
+                val cells = (0 until 12).map { m ->
+                    val picked = Calendar.getInstance().apply {
+                        if (activeDate == DateFilter.MONTH) timeInMillis = rangeStart
+                    }
+                    val selected = activeDate == DateFilter.MONTH &&
+                            picked.get(Calendar.YEAR) == year && picked.get(Calendar.MONTH) == m
+                    pickCell(months[m], selected) {
+                        val s = Calendar.getInstance().apply { clear(); set(year, m, 1) }
+                        val e = (s.clone() as Calendar).apply { add(Calendar.MONTH, 1) }
+                        val label = SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(s.time)
+                        setRange(DateFilter.MONTH, s.timeInMillis, e.timeInMillis, label)
+                        dialog.dismiss()
+                    }
+                }
+                gridHolder.removeAllViews()
+                gridHolder.addView(cellGrid(cells))
+            }
+
+            fun arrow(symbol: String, delta: Int) = TextView(this).apply {
+                text = symbol
+                textSize = 22f
+                setTextColor(greenColor)
+                gravity = android.view.Gravity.CENTER
+                setPadding(dp(16), dp(4), dp(16), dp(4))
+                setOnClickListener { year += delta; render() }
+            }
+
+            val header = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setPadding(0, 0, 0, dp(8))
+                addView(arrow("‹", -1))
+                addView(yearText)
+                addView(arrow("›", 1))
+            }
+
+            render()
+            box.addView(header)
+            box.addView(gridHolder)
+            box
+        }
+    }
+
+    // ---- Yearly: pick a year ----
+    private fun showYearPicker() {
+        val thisYear = Calendar.getInstance().get(Calendar.YEAR)
+        showGreenDialog("Select year") { dialog ->
+            val cells = (0 until 12).map { i ->
+                val y = thisYear - i
+                val selected = activeDate == DateFilter.YEAR &&
+                        Calendar.getInstance().apply { timeInMillis = rangeStart }.get(Calendar.YEAR) == y
+                pickCell(y.toString(), selected) {
+                    val s = Calendar.getInstance().apply { clear(); set(y, Calendar.JANUARY, 1) }
+                    val e = (s.clone() as Calendar).apply { add(Calendar.YEAR, 1) }
+                    setRange(DateFilter.YEAR, s.timeInMillis, e.timeInMillis, y.toString())
+                    dialog.dismiss()
+                }
+            }
+            cellGrid(cells)
+        }
+    }
+
+    // ---- Custom: From / To boxes with green edge ----
+    private fun showCustomPicker() {
+        fun dayStart(ms: Long) = Calendar.getInstance().apply {
+            timeInMillis = ms
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+
+        val today = dayStart(System.currentTimeMillis())
+        var from = if (activeDate == DateFilter.CUSTOM) rangeStart else today
+        var to = if (activeDate == DateFilter.CUSTOM) dayStart(rangeEnd - 1) else today
+        val fmt = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
+
+        showGreenDialog("Custom range", "Apply", {
+            val s = minOf(from, to)
+            val e = maxOf(from, to)
+            val endExcl = Calendar.getInstance().apply {
+                timeInMillis = e
+                add(Calendar.DAY_OF_YEAR, 1)
+            }.timeInMillis
+            setRange(DateFilter.CUSTOM, s, endExcl, rangeLabel(s, e))
+        }) { _ ->
+            fun dateBox(caption: String, getter: () -> Long, setter: (Long) -> Unit): View {
+                val value = TextView(this).apply {
+                    text = fmt.format(Date(getter()))
+                    textSize = 15f
+                    setTextColor(Color.parseColor("#212121"))
+                    gravity = android.view.Gravity.CENTER_VERTICAL
+                    setPadding(dp(14), 0, dp(14), 0)
+                    background = boxBg(false, greenColor, 10, 1)
+                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(46))
+                }
+                value.setOnClickListener {
+                    val c = Calendar.getInstance().apply { timeInMillis = getter() }
+                    android.app.DatePickerDialog(
+                        this, R.style.GreenDatePicker,
+                        { _, y, m, d ->
+                            val picked = Calendar.getInstance().apply { clear(); set(y, m, d) }.timeInMillis
+                            setter(picked)
+                            value.text = fmt.format(Date(picked))
+                        },
+                        c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)
+                    ).show()
+                }
+                return LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(0, 0, 0, dp(10))
+                    addView(TextView(context).apply {
+                        text = caption
+                        textSize = 12f
+                        setTextColor(Color.parseColor("#757575"))
+                        setPadding(dp(2), 0, 0, dp(4))
+                    })
+                    addView(value)
+                }
+            }
+
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(dateBox("From", { from }, { from = it }))
+                addView(dateBox("To", { to }, { to = it }))
+            }
+        }
+    }
+    private fun inRange(alert: GlobalData.AlertItem, range: Pair<Long, Long>): Boolean {
+        // "Just now" / unparseable timestamps are treated as brand-new alerts
+        val t = try { alertDateFormat.parse(alert.timestamp)?.time } catch (e: Exception) { null }
+            ?: System.currentTimeMillis()
+        return t >= range.first && t < range.second
+    }
+
 
     // Tracker to prevent auto-alerts from reappearing on the same day once cleared.
     // Same SharedPreferences file/keys AlertsMonitor uses, so an alert already
@@ -308,7 +717,7 @@ class AlertsActivity : AppCompatActivity() {
         val allAlerts = GlobalData.getAlerts(accountManager.getAlertsClearedBefore())
 
         // Filter logic updated to correctly handle category separation
-        val alerts = if (activeFilter == "All") {
+        val categoryFiltered = if (activeFilter == "All") {
             allAlerts
         } else {
             allAlerts.filter {
@@ -320,6 +729,17 @@ class AlertsActivity : AppCompatActivity() {
                 }
             }
         }
+
+
+        val range = activeDate?.let { dateRangeFor(it) }
+        val dateFiltered = if (range == null) categoryFiltered
+        else categoryFiltered.filter { inRange(it, range) }
+
+        updateDropdownLabels(dateFiltered)   // status counts respect the date range
+
+        val alerts = activeSeverity
+            ?.let { s -> dateFiltered.filter { severityOf(it) == s } }
+            ?: dateFiltered
 
         // Parse each timestamp ONCE and reuse it for both sorting and the relative-time
         // label below, instead of parsing the same string twice per alert on every
@@ -339,9 +759,8 @@ class AlertsActivity : AppCompatActivity() {
         val sortedAlerts = capped.map { it.first }
 
         // Summary Cards - Count based on current filtered view and priority
-        val urgentCount = sortedAlerts.count { it.type == "Critical" || it.message.contains("EMPTY", true) || it.message.contains("DEPLETED", true) }
-        val generalCount = sortedAlerts.count { it.type != "Critical" && !it.message.contains("EMPTY", true) && !it.message.contains("DEPLETED", true) }
-
+        val urgentCount = sortedAlerts.count { severityOf(it) == Severity.RED }
+        val generalCount = sortedAlerts.size - urgentCount
         findViewById<TextView>(R.id.criticalCount)?.text = urgentCount.toString()
         findViewById<TextView>(R.id.warningCount)?.text = generalCount.toString()
         findViewById<TextView>(R.id.totalCount)?.text = sortedAlerts.size.toString()
@@ -349,7 +768,10 @@ class AlertsActivity : AppCompatActivity() {
         updateSummaryLabels()
 
         val displayList: List<DisplayAlert> = if (capped.isEmpty()) {
-            listOf(AlertsAdapter.emptyPlaceholder("No $activeFilter alerts available"))
+            listOf(AlertsAdapter.emptyPlaceholder(
+                if (activeSeverity != null || activeDate != null) "No alerts match these filters"
+                else "No $activeFilter alerts available"
+            ))
         } else {
             capped.map { (alert, parsedDate) ->
                 DisplayAlert(
@@ -363,7 +785,10 @@ class AlertsActivity : AppCompatActivity() {
         // ListAdapter.submitList() diffs the old/new lists on a background thread and
         // only rebinds the rows that actually changed — this is what replaces the old
         // removeAllViews() + re-inflate-everything-from-scratch approach.
-        alertsAdapter.submitList(displayList)
+        alertsAdapter.submitList(displayList) {
+            // runs after the list is committed, so the RecyclerView resizes to the new row count
+            alertsRecyclerView.requestLayout()
+        }
     }
 
     private fun updateSummaryLabels() {

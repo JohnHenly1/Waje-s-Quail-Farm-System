@@ -504,6 +504,21 @@
     <string name="refresh_failed">Refresh failed</string>
     <string name="total_no_of_eggs_format">Total No. of Quail Eggs : %1$d</string>
     <string name="na">N/A</string>
+
+    s<!-- Report: summary + Egg Classes table -->
+    <string name="report_summary">Summary</string>
+    <string name="daily_average">Daily Average</string>
+    <string name="grade_a_rate">Grade A Rate</string>
+    <string name="egg_classes_table">Egg Classes</string>
+    <string name="col_egg_class">Egg Class</string>
+    <string name="col_description">Description</string>
+    <string name="col_count">Count</string>
+    <string name="col_percentage">Percentage</string>
+    <string name="desc_normal">Normal</string>
+    <string name="desc_cracked">Cracked</string>
+    <string name="desc_reject">Reject</string>
+    <string name="total_row_label">Total</string>
+
     <!-- Privacy & Security dialog strings (extracted from layout) -->
     <string name="system_policies">System Policies</string>
     <string name="data_collection_title">1. Data Collection (The What)</string>
