@@ -2,6 +2,7 @@ package com.example.exp1;
 
 import android.graphics.drawable.GradientDrawable;
 import android.annotation.SuppressLint;
+import androidx.appcompat.widget.TooltipCompat;
 import android.app.AlarmManager;
 import android.widget.HorizontalScrollView;
 import android.widget.FrameLayout;
@@ -3249,29 +3250,35 @@ public class ScheduleActivity extends AppCompatActivity {
                 && task.pendingDaysOffDates != null
                 && !task.pendingDaysOffDates.isEmpty();
 
+        LinearLayout row = createIconButtonRow();
+
+        // Owner: review a staff day-off request
         if (roleManager.isOwner() && hasPendingDaysOff) {
-            String requester = task.pendingDaysOffRequestedBy != null
-                    ? staffNameCache.getOrDefault(task.pendingDaysOffRequestedBy, task.pendingDaysOffRequestedBy)
-                    : "Staff";
-            addModernActionRow(root, R.drawable.ic_calendar, "#B98900", "#FBF3DC",
-                    "Review Time-Off Request", requester + " asked for " + task.pendingDaysOffDates.size() + " day(s) off",
+            addIconActionButton(row, R.drawable.ic_event_busy, "#B98900", "#FBF3DC",
+                    "Review Time-Off Request",
                     v -> { dialogRef[0].dismiss(); showDaysOffApprovalDialog(task); });
         }
 
+        // Staff: submit task as done
         if (!roleManager.isOwner()) {
-            addModernActionRow(root, R.drawable.ic_check_circle, "#16A34A", "#DCFCE7",
-                    "Submit", "Mark this task as complete",
+            addIconActionButton(row, R.drawable.ic_check_circle, "#16A34A", "#DCFCE7",
+                    "Submit",
                     v -> { dialogRef[0].dismiss(); showMarkDoneProofDialog(task); });
         }
+
+        // Reschedule (today's tasks only)
         if (isTaskToday(task)) {
-            addModernActionRow(root, R.drawable.ic_alert_circle, "#2563EB", "#DBEAFE",
-                    "Reschedule", roleManager.isOwner() ? "Approve or set a custom extension" : "Request more time from your manager",
+            addIconActionButton(row, R.drawable.ic_clock, "#2563EB", "#DBEAFE",
+                    "Reschedule",
                     v -> { dialogRef[0].dismiss(); showRescheduleDialog(task); });
         }
 
-        addModernActionRow(root, R.drawable.ic_calendar, "#6B7280", "#F3F4F6",
-                "Task Detail", "View info, comment & photos",
+        // Task detail
+        addIconActionButton(row, R.drawable.ic_info, "#6B7280", "#F3F4F6",
+                "Task Detail",
                 v -> { dialogRef[0].dismiss(); showTaskDetailDialog(task); });
+
+        root.addView(row);
 
         dialogRef[0] = showActionSheetDialog(root);
     }
@@ -3421,19 +3428,15 @@ public class ScheduleActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(1)));
 
         final AlertDialog[] dialogRef = new AlertDialog[1];
+        LinearLayout iconRow = createIconButtonRow();
 
         if (hasDayOff) {
-            addCleanPendingActionRow(root,
+            addIconActionButton(iconRow, R.drawable.ic_check_circle, "#16A34A", "#DCFCE7",
                     "Approve Day(s) Off",
-                    "Remove staff only on the requested dates",
-                    v -> {
-                        dialogRef[0].dismiss();
-                        approveDaysOff(task);
-                    });
+                    v -> { dialogRef[0].dismiss(); approveDaysOff(task); });
 
-            addCleanPendingActionRow(root,
+            addIconActionButton(iconRow, R.drawable.ic_alert_triangle, "#DC2626", "#FEE2E2",
                     "Decline Day-Off Request",
-                    "Keep the staff assignment unchanged",
                     v -> {
                         dialogRef[0].dismiss();
                         clearDaysOffRequest(task, () -> Toast.makeText(this,
@@ -3442,38 +3445,24 @@ public class ScheduleActivity extends AppCompatActivity {
         }
 
         if (hasDecline) {
-            addCleanPendingActionRow(root,
+            addIconActionButton(iconRow, R.drawable.ic_check_circle, "#16A34A", "#DCFCE7",
                     "Accept Request & Reassign",
-                    "Accept the decline request and choose another eligible staff member",
-                    v -> {
-                        dialogRef[0].dismiss();
-                        showOwnerPendingRescheduleDialog(task);
-                    });
+                    v -> { dialogRef[0].dismiss(); showOwnerPendingRescheduleDialog(task); });
 
-            addCleanPendingActionRow(root,
+            addIconActionButton(iconRow, R.drawable.ic_close, "#DC2626", "#FEE2E2",
                     "Reject Request",
-                    "Keep the current assignment and explain why the request was rejected",
-                    v -> {
-                        dialogRef[0].dismiss();
-                        showOwnerRejectDeclineDialog(task);
-                    });
+                    v -> { dialogRef[0].dismiss(); showOwnerRejectDeclineDialog(task); });
         } else {
-            addCleanPendingActionRow(root,
+            addIconActionButton(iconRow, R.drawable.ic_swap, "#2563EB", "#DBEAFE",
                     "Reschedule / Reassign",
-                    "Change staff, date(s), time, or work window",
-                    v -> {
-                        dialogRef[0].dismiss();
-                        showOwnerPendingRescheduleDialog(task);
-                    });
+                    v -> { dialogRef[0].dismiss(); showOwnerPendingRescheduleDialog(task); });
         }
 
-        addCleanPendingActionRow(root,
+        addIconActionButton(iconRow, R.drawable.ic_info, "#6B7280", "#F3F4F6",
                 "Task Details",
-                "View the task information",
-                v -> {
-                    dialogRef[0].dismiss();
-                    showTaskDetailDialog(task);
-                });
+                v -> { dialogRef[0].dismiss(); showTaskDetailDialog(task); });
+
+        root.addView(iconRow);
 
         dialogRef[0] = new AlertDialog.Builder(this)
                 .setView(root)
@@ -4351,42 +4340,27 @@ public class ScheduleActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(1)));
 
         final AlertDialog[] dialogRef = new AlertDialog[1];
+        LinearLayout iconRow = createIconButtonRow();
 
-        addCleanPendingActionRow(root,
+        addIconActionButton(iconRow, R.drawable.ic_check_circle, "#16A34A", "#DCFCE7",
                 "Accept Task",
-                "Confirm you'll handle this assignment",
-                v -> {
-                    dialogRef[0].dismiss();
-                    showAcceptTaskConfirmDialog(task);
-                });
+                v -> { dialogRef[0].dismiss(); showAcceptTaskConfirmDialog(task); });
 
-        // Only meaningful for multi-day assignments. If there is only one date,
-        // requesting that date off is effectively the same as declining the task.
         if (upcomingCount > 1) {
-            addCleanPendingActionRow(root,
+            addIconActionButton(iconRow, R.drawable.ic_event_busy, "#B98900", "#FBF3DC",
                     "Request Day(s) Off",
-                    "Ask for specific dates off while keeping the rest",
-                    v -> {
-                        dialogRef[0].dismiss();
-                        showRequestDaysOffDialog(task);
-                    });
+                    v -> { dialogRef[0].dismiss(); showRequestDaysOffDialog(task); });
         }
 
-        addCleanPendingActionRow(root,
+        addIconActionButton(iconRow, R.drawable.ic_close, "#DC2626", "#FEE2E2",
                 "Decline Task",
-                "Unable to take this assignment (reason required)",
-                v -> {
-                    dialogRef[0].dismiss();
-                    showDeclineTaskDialog(task);
-                });
+                v -> { dialogRef[0].dismiss(); showDeclineTaskDialog(task); });
 
-        addCleanPendingActionRow(root,
+        addIconActionButton(iconRow, R.drawable.ic_info, "#6B7280", "#F3F4F6",
                 "Task Details",
-                "View the task information",
-                v -> {
-                    dialogRef[0].dismiss();
-                    showTaskDetailDialog(task);
-                });
+                v -> { dialogRef[0].dismiss(); showTaskDetailDialog(task); });
+
+        root.addView(iconRow);
 
         dialogRef[0] = new AlertDialog.Builder(this)
                 .setView(root)
@@ -4629,9 +4603,11 @@ public class ScheduleActivity extends AppCompatActivity {
         LinearLayout root = buildActionSheetHeader(task);
         final AlertDialog[] dialogRef = new AlertDialog[1];
 
-        addModernActionRow(root, R.drawable.ic_calendar, "#6B7280", "#F3F4F6",
-                "Task Detail", "View completion comment & photos",
+        LinearLayout row = createIconButtonRow();
+        addIconActionButton(row, R.drawable.ic_info, "#6B7280", "#F3F4F6",
+                "Task Detail",
                 v -> { dialogRef[0].dismiss(); showTaskDetailDialog(task); });
+        root.addView(row);
 
         dialogRef[0] = showActionSheetDialog(root);
     }
@@ -4641,15 +4617,16 @@ public class ScheduleActivity extends AppCompatActivity {
         LinearLayout root = buildActionSheetHeader(task);
         final AlertDialog[] dialogRef = new AlertDialog[1];
 
+        LinearLayout row = createIconButtonRow();
         if (isTaskToday(task)) {
-            addModernActionRow(root, R.drawable.ic_alert_triangle, "#DC2626", "#FEE2E2",
-                    "Reschedule", roleManager.isOwner() ? "Approve or reset this task to Ongoing" : "Request to reset this task to Ongoing",
+            addIconActionButton(row, R.drawable.ic_clock, "#2563EB", "#DBEAFE",
+                    "Reschedule",
                     v -> { dialogRef[0].dismiss(); showRescheduleDialog(task); });
         }
-
-        addModernActionRow(root, R.drawable.ic_calendar, "#6B7280", "#F3F4F6",
-                "Task Detail", "View task info",
+        addIconActionButton(row, R.drawable.ic_info, "#6B7280", "#F3F4F6",
+                "Task Detail",
                 v -> { dialogRef[0].dismiss(); showTaskDetailDialog(task); });
+        root.addView(row);
 
         dialogRef[0] = showActionSheetDialog(root);
     }
@@ -4735,7 +4712,44 @@ public class ScheduleActivity extends AppCompatActivity {
         }
         return dialog;
     }
+    private LinearLayout createIconButtonRow() {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER);
+        row.setPadding(0, dpToPx(18), 0, dpToPx(10));
+        row.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        return row;
+    }
 
+    private void addIconActionButton(LinearLayout row, int iconRes, String tintHex, String bgHex,
+                                     String description, View.OnClickListener onClick) {
+        ImageView btn = new ImageView(this);
+        int size = dpToPx(56);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(size, size);
+        lp.setMargins(dpToPx(10), 0, dpToPx(10), 0);
+        btn.setLayoutParams(lp);
+
+        btn.setImageResource(iconRes);
+        btn.setColorFilter(Color.parseColor(tintHex));
+        int pad = dpToPx(15);
+        btn.setPadding(pad, pad, pad, pad);
+        btn.setScaleType(ImageView.ScaleType.FIT_CENTER);
+
+        GradientDrawable circle = new GradientDrawable();
+        circle.setShape(GradientDrawable.OVAL);
+        circle.setColor(Color.parseColor(bgHex));
+        btn.setBackground(new android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(Color.parseColor("#22000000")),
+                circle, null));
+
+        btn.setClickable(true);
+        btn.setFocusable(true);
+        btn.setContentDescription(description);
+        TooltipCompat.setTooltipText(btn, description);
+        btn.setOnClickListener(onClick);
+        row.addView(btn);
+    }
     /**
      * Builds one modern action-sheet row: colored icon circle on the left,
      * title + subtitle in the middle, chevron on the right. Whole row is
