@@ -346,11 +346,11 @@
                     app:icon="@drawable/ic_btn_save" />
             </LinearLayout>
 
-            <!--    ═══════════════ TOTAL + GRADE DISTRIBUTION (minimal) ═══════════════    -->
+            <!--    ═══════════════ TOTAL + GRADE DISTRIBUTION (compact) ═══════════════    -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="24dp"
+                android:layout_marginBottom="8dp"
                 app:cardBackgroundColor="@android:color/white"
                 app:cardCornerRadius="16dp"
                 app:cardElevation="0dp"
@@ -359,242 +359,267 @@
 
                 <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
+                    android:layout_height="match_parent"
                     android:orientation="vertical"
-                    android:padding="24dp">
+                    android:padding="12dp">
 
-                    <!--    Total    -->
-                    <TextView
-                        android:layout_width="wrap_content"
+                    <!--    Total (label left, number right)    -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:letterSpacing="0.08"
-                        android:text="@string/total_eggs_detected"
-                        android:textAllCaps="true"
-                        android:textColor="#8A918B"
-                        android:textSize="11sp" />
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
 
-                    <TextView
-                        android:id="@+id/todayTotalValue"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:fontFamily="sans-serif-light"
-                        android:text="@string/zero"
-                        android:textColor="#1A1A1A"
-                        android:textSize="52sp" />
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:letterSpacing="0.06"
+                            android:text="@string/total_eggs_detected"
+                            android:textAllCaps="true"
+                            android:textColor="#8A918B"
+                            android:textSize="11sp" />
+
+                        <TextView
+                            android:id="@+id/todayTotalValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="sans-serif-light"
+                            android:text="@string/zero"
+                            android:textColor="#1A1A1A"
+                            android:textSize="30sp" />
+                    </LinearLayout>
 
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
-                        android:layout_marginTop="16dp"
+                        android:layout_marginTop="6dp"
                         android:layout_marginBottom="8dp"
                         android:background="#EEF0EE" />
 
-                    <!--    Grade A    -->
+                    <!--    Grades A / B / C in one row    -->
                     <LinearLayout
-                        android:id="@+id/gradeARow"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:background="?attr/selectableItemBackground"
-                        android:clickable="true"
-                        android:contentDescription="@string/view_grade_a_details"
-                        android:focusable="true"
-                        android:orientation="vertical"
-                        android:paddingVertical="12dp">
+                        android:baselineAligned="false"
+                        android:orientation="horizontal">
 
+                        <!--    Grade A    -->
                         <LinearLayout
-                            android:layout_width="match_parent"
+                            android:id="@+id/gradeARow"
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal">
+                            android:layout_marginEnd="6dp"
+                            android:layout_weight="1"
+                            android:background="?attr/selectableItemBackground"
+                            android:clickable="true"
+                            android:contentDescription="@string/view_grade_a_details"
+                            android:focusable="true"
+                            android:orientation="vertical"
+                            android:paddingVertical="4dp">
 
-                            <TextView
-                                android:layout_width="wrap_content"
+                            <LinearLayout
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:text="A"
-                                android:textColor="#1A1A1A"
-                                android:textSize="14sp"
-                                android:textStyle="bold" />
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="A"
+                                    android:textColor="#1A1A1A"
+                                    android:textSize="13sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:id="@+id/gradeAValue"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="6dp"
+                                    android:layout_weight="1"
+                                    android:text="@string/zero"
+                                    android:textColor="#1A1A1A"
+                                    android:textSize="15sp" />
+
+                                <TextView
+                                    android:id="@+id/gradeAPercent"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:gravity="end"
+                                    android:text="@string/zero_percent"
+                                    android:textColor="#8A918B"
+                                    android:textSize="15sp" />
+                            </LinearLayout>
+
+                            <com.google.android.material.progressindicator.LinearProgressIndicator
+                                android:id="@+id/gradeABar"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:max="100"
+                                android:progress="0"
+                                app:indicatorColor="#2E7D32"
+                                app:trackColor="#F1F3F1"
+                                app:trackCornerRadius="2dp"
+                                app:trackThickness="4dp" />
 
                             <TextView
                                 android:id="@+id/gradeADesc"
-                                android:layout_width="0dp"
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:layout_marginStart="10dp"
-                                android:layout_weight="1"
+                                android:layout_marginTop="3dp"
                                 android:ellipsize="end"
                                 android:maxLines="1"
                                 android:text="@string/grade_normal"
-                                android:textColor="#8A918B"
-                                android:textSize="12sp" />
-
-                            <TextView
-                                android:id="@+id/gradeAValue"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/zero"
-                                android:textColor="#1A1A1A"
-                                android:textSize="16sp" />
-
-                            <TextView
-                                android:id="@+id/gradeAPercent"
-                                android:layout_width="40dp"
-                                android:layout_height="wrap_content"
-                                android:gravity="end"
-                                android:text="@string/zero_percent"
-                                android:textColor="#8A918B"
-                                android:textSize="12sp" />
+                                android:textColor="@color/black"
+                                android:textSize="13sp" />
                         </LinearLayout>
 
-                        <com.google.android.material.progressindicator.LinearProgressIndicator
-                            android:id="@+id/gradeABar"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="10dp"
-                            android:max="100"
-                            android:progress="0"
-                            app:indicatorColor="#2E7D32"
-                            app:trackColor="#F1F3F1"
-                            app:trackCornerRadius="2dp"
-                            app:trackThickness="4dp" />
-                    </LinearLayout>
-
-                    <!--    Grade B    -->
-                    <LinearLayout
-                        android:id="@+id/gradeBRow"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:background="?attr/selectableItemBackground"
-                        android:clickable="true"
-                        android:contentDescription="@string/view_grade_b_details"
-                        android:focusable="true"
-                        android:orientation="vertical"
-                        android:paddingVertical="12dp">
-
+                        <!--    Grade B    -->
                         <LinearLayout
-                            android:layout_width="match_parent"
+                            android:id="@+id/gradeBRow"
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal">
+                            android:layout_marginStart="3dp"
+                            android:layout_marginEnd="3dp"
+                            android:layout_weight="1"
+                            android:background="?attr/selectableItemBackground"
+                            android:clickable="true"
+                            android:contentDescription="@string/view_grade_b_details"
+                            android:focusable="true"
+                            android:orientation="vertical"
+                            android:paddingVertical="4dp">
 
-                            <TextView
-                                android:layout_width="wrap_content"
+                            <LinearLayout
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:text="B"
-                                android:textColor="#1A1A1A"
-                                android:textSize="14sp"
-                                android:textStyle="bold" />
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="B"
+                                    android:textColor="#1A1A1A"
+                                    android:textSize="13sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:id="@+id/gradeBValue"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="6dp"
+                                    android:layout_weight="1"
+                                    android:text="@string/zero"
+                                    android:textColor="#1A1A1A"
+                                    android:textSize="15sp" />
+
+                                <TextView
+                                    android:id="@+id/gradeBPercent"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:gravity="end"
+                                    android:text="@string/zero_percent"
+                                    android:textColor="#8A918B"
+                                    android:textSize="15sp" />
+                            </LinearLayout>
+
+                            <com.google.android.material.progressindicator.LinearProgressIndicator
+                                android:id="@+id/gradeBBar"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:max="100"
+                                android:progress="0"
+                                app:indicatorColor="#F57F17"
+                                app:trackColor="#F1F3F1"
+                                app:trackCornerRadius="2dp"
+                                app:trackThickness="4dp" />
 
                             <TextView
                                 android:id="@+id/gradeBDesc"
-                                android:layout_width="0dp"
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:layout_marginStart="10dp"
-                                android:layout_weight="1"
+                                android:layout_marginTop="3dp"
                                 android:ellipsize="end"
                                 android:maxLines="1"
                                 android:text="@string/grade_cracked"
-                                android:textColor="#8A918B"
-                                android:textSize="12sp" />
-
-                            <TextView
-                                android:id="@+id/gradeBValue"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/zero"
-                                android:textColor="#1A1A1A"
-                                android:textSize="16sp" />
-
-                            <TextView
-                                android:id="@+id/gradeBPercent"
-                                android:layout_width="40dp"
-                                android:layout_height="wrap_content"
-                                android:gravity="end"
-                                android:text="@string/zero_percent"
-                                android:textColor="#8A918B"
-                                android:textSize="12sp" />
+                                android:textColor="@color/black"
+                                android:textSize="13sp" />
                         </LinearLayout>
 
-                        <com.google.android.material.progressindicator.LinearProgressIndicator
-                            android:id="@+id/gradeBBar"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="10dp"
-                            android:max="100"
-                            android:progress="0"
-                            app:indicatorColor="#F57F17"
-                            app:trackColor="#F1F3F1"
-                            app:trackCornerRadius="2dp"
-                            app:trackThickness="4dp" />
-                    </LinearLayout>
-
-                    <!--    Grade C    -->
-                    <LinearLayout
-                        android:id="@+id/gradeCRow"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:background="?attr/selectableItemBackground"
-                        android:clickable="true"
-                        android:contentDescription="@string/view_grade_c_details"
-                        android:focusable="true"
-                        android:orientation="vertical"
-                        android:paddingVertical="12dp">
-
+                        <!--    Grade C    -->
                         <LinearLayout
-                            android:layout_width="match_parent"
+                            android:id="@+id/gradeCRow"
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal">
+                            android:layout_marginStart="6dp"
+                            android:layout_weight="1"
+                            android:background="?attr/selectableItemBackground"
+                            android:clickable="true"
+                            android:contentDescription="@string/view_grade_c_details"
+                            android:focusable="true"
+                            android:orientation="vertical"
+                            android:paddingVertical="4dp">
 
-                            <TextView
-                                android:layout_width="wrap_content"
+                            <LinearLayout
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:text="C"
-                                android:textColor="#1A1A1A"
-                                android:textSize="14sp"
-                                android:textStyle="bold" />
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="C"
+                                    android:textColor="#1A1A1A"
+                                    android:textSize="13sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:id="@+id/gradeCValue"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="6dp"
+                                    android:layout_weight="1"
+                                    android:text="@string/zero"
+                                    android:textColor="#1A1A1A"
+                                    android:textSize="15sp" />
+
+                                <TextView
+                                    android:id="@+id/gradeCPercent"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:gravity="end"
+                                    android:text="@string/zero_percent"
+                                    android:textColor="#8A918B"
+                                    android:textSize="15sp" />
+                            </LinearLayout>
+
+                            <com.google.android.material.progressindicator.LinearProgressIndicator
+                                android:id="@+id/gradeCBar"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:max="100"
+                                android:progress="0"
+                                app:indicatorColor="#C62828"
+                                app:trackColor="#F1F3F1"
+                                app:trackCornerRadius="2dp"
+                                app:trackThickness="4dp" />
 
                             <TextView
                                 android:id="@+id/gradeCDesc"
-                                android:layout_width="0dp"
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:layout_marginStart="10dp"
-                                android:layout_weight="1"
+                                android:layout_marginTop="3dp"
                                 android:ellipsize="end"
                                 android:maxLines="1"
                                 android:text="@string/grade_reject"
-                                android:textColor="#8A918B"
-                                android:textSize="12sp" />
-
-                            <TextView
-                                android:id="@+id/gradeCValue"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/zero"
-                                android:textColor="#1A1A1A"
-                                android:textSize="16sp" />
-
-                            <TextView
-                                android:id="@+id/gradeCPercent"
-                                android:layout_width="40dp"
-                                android:layout_height="wrap_content"
-                                android:gravity="end"
-                                android:text="@string/zero_percent"
-                                android:textColor="#8A918B"
-                                android:textSize="12sp" />
+                                android:textColor="@color/black"
+                                android:textSize="13sp" />
                         </LinearLayout>
-
-                        <com.google.android.material.progressindicator.LinearProgressIndicator
-                            android:id="@+id/gradeCBar"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="10dp"
-                            android:max="100"
-                            android:progress="0"
-                            app:indicatorColor="#C62828"
-                            app:trackColor="#F1F3F1"
-                            app:trackCornerRadius="2dp"
-                            app:trackThickness="4dp" />
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
